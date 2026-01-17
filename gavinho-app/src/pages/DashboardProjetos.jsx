@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   FileText, Clock, CheckCircle2, AlertCircle,
-  AlertTriangle, MessageCircle, ChevronRight, Calendar
+  AlertTriangle, MessageCircle, ChevronRight, Calendar,
+  Database, RefreshCw
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
@@ -31,13 +32,18 @@ export default function DashboardProjetos() {
     try {
       setLoading(true)
 
-      // Buscar projetos
+      // Buscar projetos - sem join para evitar erros se clientes não existir
       const { data: projetos, error: projetosError } = await supabase
         .from('projetos')
-        .select('*, clientes(nome)')
-        .order('updated_at', { ascending: false })
+        .select('*')
+        .order('created_at', { ascending: false })
 
-      if (projetosError) throw projetosError
+      if (projetosError) {
+        console.error('Erro ao buscar projetos:', projetosError)
+        throw projetosError
+      }
+
+      console.log('Projetos carregados:', projetos?.length || 0, projetos)
 
       // Buscar tarefas/decisões pendentes
       const { data: tarefas } = await supabase
@@ -88,7 +94,7 @@ export default function DashboardProjetos() {
 
         setProjetosRecentes(projetos.slice(0, 5).map(p => ({
           ...p,
-          cliente_nome: p.clientes?.nome || 'Cliente não definido'
+          cliente_nome: p.cliente_nome || 'Cliente não definido'
         })))
       }
 
@@ -171,7 +177,42 @@ export default function DashboardProjetos() {
           <h1 className="page-title">Dashboard Projetos</h1>
           <p className="page-subtitle">Visão geral de todos os projetos</p>
         </div>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button
+            onClick={fetchData}
+            className="btn btn-outline"
+            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            <RefreshCw size={16} />
+            Atualizar
+          </button>
+        </div>
       </div>
+
+      {/* Aviso se não há projetos */}
+      {stats.total === 0 && (
+        <div className="card" style={{
+          padding: '32px',
+          textAlign: 'center',
+          marginBottom: '24px',
+          background: 'var(--alert-warning-bg)',
+          border: '1px solid var(--warning)'
+        }}>
+          <Database size={48} style={{ color: 'var(--warning)', marginBottom: '16px', opacity: 0.6 }} />
+          <h3 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--brown)', marginBottom: '8px' }}>
+            Nenhum projeto encontrado
+          </h3>
+          <p style={{ fontSize: '14px', color: 'var(--brown-light)', marginBottom: '16px' }}>
+            A base de dados não tem projetos. Execute o seed para criar dados de exemplo.
+          </p>
+          <button
+            onClick={() => navigate('/admin/seed')}
+            className="btn btn-primary"
+          >
+            Ir para Seed de Dados
+          </button>
+        </div>
+      )}
 
       {/* KPIs */}
       <div style={{
