@@ -1207,6 +1207,14 @@ export default function ProjetoDetalhe() {
           .from('projeto_entregaveis')
           .select('status')
           .eq('projeto_id', projetoData.id)
+
+        // Buscar equipa do projeto
+        const { data: equipaData } = await supabase
+          .from('projeto_equipa')
+          .select('*, utilizadores(id, nome, cargo, departamento, avatar_url)')
+          .eq('projeto_id', projetoData.id)
+
+        setEquipaProjeto(equipaData || [])
         
         // Calcular progresso baseado nos entregáveis
         let progressoCalculado = projetoData.progresso || 0
@@ -1866,31 +1874,52 @@ export default function ProjetoDetalhe() {
             <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)', marginBottom: '16px' }}>
               Equipa do Projeto
             </h3>
-            
-            <div className="grid grid-3" style={{ gap: '16px' }}>
-              {[
-                { role: 'Project Manager', name: project.equipa.project_manager },
-                { role: 'Designer de Interiores', name: project.equipa.designer },
-                { role: 'Arquiteto', name: project.equipa.arquiteto }
-              ].map((member, idx) => (
-                <div 
-                  key={idx}
-                  style={{
-                    padding: '16px',
-                    background: 'var(--cream)',
-                    borderRadius: '12px',
-                    opacity: member.name ? 1 : 0.5
-                  }}
-                >
-                  <div style={{ fontSize: '11px', color: 'var(--brown-light)', marginBottom: '8px' }}>
-                    {member.role}
+
+            {equipaProjeto.length === 0 ? (
+              <p style={{ fontSize: '13px', color: 'var(--brown-light)', textAlign: 'center', padding: '24px', background: 'var(--cream)', borderRadius: '12px' }}>
+                Nenhum membro atribuído. Clique em Editar para adicionar membros.
+              </p>
+            ) : (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+                {equipaProjeto.map((membro) => (
+                  <div
+                    key={membro.id}
+                    style={{
+                      padding: '16px',
+                      background: 'var(--cream)',
+                      borderRadius: '12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      minWidth: '200px'
+                    }}
+                  >
+                    <div style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '50%',
+                      background: 'var(--brown)',
+                      color: 'white',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '14px',
+                      fontWeight: 600
+                    }}>
+                      {membro.utilizadores?.nome?.substring(0, 2).toUpperCase() || '??'}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 500, color: 'var(--brown)', fontSize: '14px' }}>
+                        {membro.utilizadores?.nome || 'Sem nome'}
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>
+                        {membro.funcao || membro.utilizadores?.cargo || 'Membro'}
+                      </div>
+                    </div>
                   </div>
-                  <div style={{ fontWeight: 500, color: 'var(--brown)' }}>
-                    {member.name || 'Não atribuído'}
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
