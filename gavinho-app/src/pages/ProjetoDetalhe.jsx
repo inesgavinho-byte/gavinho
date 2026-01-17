@@ -1157,73 +1157,62 @@ export default function ProjetoDetalhe() {
           clienteData = cliente
         }
         
-        // Buscar serviços do projeto
-        const { data: servicosData } = await supabase
-          .from('projeto_servicos')
-          .select('*')
-          .eq('projeto_id', projetoData.id)
-          .order('ordem')
-        
-        // Buscar fases para cada serviço
-        let fasesData = []
-        if (servicosData && servicosData.length > 0) {
-          const servicoIds = servicosData.map(s => s.id)
-          const { data: fases } = await supabase
-            .from('servico_fases')
+        // Buscar dados relacionados com tratamento de erro (tabelas podem não existir)
+        let servicosData = []
+        let pagamentosData = []
+        let faturasData = []
+        let projetoEntregaveis = []
+        let equipaData = []
+
+        // Tentar buscar serviços do projeto (silenciar erro se tabela não existir)
+        try {
+          const { data, error } = await supabase
+            .from('projeto_servicos')
             .select('*')
-            .in('servico_id', servicoIds)
+            .eq('projeto_id', projetoData.id)
             .order('ordem')
-          fasesData = fases || []
-          
-          // Buscar entregáveis para cada fase
-          if (fasesData.length > 0) {
-            const faseIds = fasesData.map(f => f.id)
-            const { data: entregaveis } = await supabase
-              .from('fase_entregaveis')
-              .select('*')
-              .in('fase_id', faseIds)
-              .order('ordem')
-            
-            // Anexar entregáveis às fases
-            fasesData = fasesData.map(fase => ({
-              ...fase,
-              entregaveis: (entregaveis || []).filter(e => e.fase_id === fase.id)
-            }))
-          }
-          
-          // Anexar fases aos serviços
-          servicosData.forEach(servico => {
-            servico.fases = fasesData.filter(f => f.servico_id === servico.id)
-          })
-        }
-        
-        // Buscar pagamentos
-        const { data: pagamentosData } = await supabase
-          .from('projeto_pagamentos')
-          .select('*')
-          .eq('projeto_id', projetoData.id)
-          .order('prestacao_numero')
-        
-        // Buscar faturas
-        const { data: faturasData } = await supabase
-          .from('faturas')
-          .select('*')
-          .eq('projeto_id', projetoData.id)
-          .order('data_emissao')
-        
-        // Buscar entregáveis do projeto para calcular progresso
-        const { data: projetoEntregaveis } = await supabase
-          .from('projeto_entregaveis')
-          .select('status')
-          .eq('projeto_id', projetoData.id)
+          if (!error) servicosData = data || []
+        } catch (e) { /* tabela não existe */ }
 
-        // Buscar equipa do projeto
-        const { data: equipaData } = await supabase
-          .from('projeto_equipa')
-          .select('*, utilizadores(id, nome, cargo, departamento, avatar_url)')
-          .eq('projeto_id', projetoData.id)
+        // Tentar buscar pagamentos
+        try {
+          const { data, error } = await supabase
+            .from('projeto_pagamentos')
+            .select('*')
+            .eq('projeto_id', projetoData.id)
+            .order('prestacao_numero')
+          if (!error) pagamentosData = data || []
+        } catch (e) { /* tabela não existe */ }
 
-        setEquipaProjeto(equipaData || [])
+        // Tentar buscar faturas
+        try {
+          const { data, error } = await supabase
+            .from('faturas')
+            .select('*')
+            .eq('projeto_id', projetoData.id)
+            .order('data_emissao')
+          if (!error) faturasData = data || []
+        } catch (e) { /* tabela não existe */ }
+
+        // Tentar buscar entregáveis do projeto
+        try {
+          const { data, error } = await supabase
+            .from('projeto_entregaveis')
+            .select('status')
+            .eq('projeto_id', projetoData.id)
+          if (!error) projetoEntregaveis = data || []
+        } catch (e) { /* tabela não existe */ }
+
+        // Tentar buscar equipa do projeto
+        try {
+          const { data, error } = await supabase
+            .from('projeto_equipa')
+            .select('*, utilizadores(id, nome, cargo, departamento, avatar_url)')
+            .eq('projeto_id', projetoData.id)
+          if (!error) equipaData = data || []
+        } catch (e) { /* tabela não existe */ }
+
+        setEquipaProjeto(equipaData)
         
         // Calcular progresso baseado nos entregáveis
         let progressoCalculado = projetoData.progresso || 0
