@@ -1,4 +1,4 @@
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import {
   LayoutDashboard,
@@ -17,39 +17,63 @@ import {
   GanttChart,
   LogOut,
   ChevronDown,
+  ChevronRight,
   User,
-  UsersRound
+  UsersRound,
+  Receipt,
+  ShoppingCart,
+  PieChart,
+  Wallet
 } from 'lucide-react'
 import { useState } from 'react'
 
 const navigation = [
   {
-    section: 'Geral',
+    section: 'Módulo Projetos',
     items: [
-      { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-      { name: 'Projetos', href: '/projetos', icon: FolderKanban, badge: 12 },
-      { name: 'Chat', href: '/chat', icon: MessageSquare },
-    ]
-  },
-  {
-    section: 'Operação',
-    items: [
-      { name: 'Obras', href: '/obras', icon: HardHat, badge: 3 },
-      { name: 'Planning', href: '/planning', icon: GanttChart },
-      { name: 'Bloqueios', href: '/bloqueios', icon: AlertOctagon, badge: 4 },
-      { name: 'Tarefas', href: '/tarefas', icon: Kanban },
+      { name: 'Dashboard Projetos', href: '/projetos', icon: FolderKanban },
+      { name: 'Chat Projetos', href: '/chat', icon: MessageSquare },
+      {
+        name: 'Planning',
+        href: '/planning',
+        icon: GanttChart,
+        subItems: [
+          { name: 'Bloqueios', href: '/planning?tab=bloqueios', icon: AlertOctagon },
+          { name: 'Tarefas', href: '/planning?tab=tarefas', icon: Kanban }
+        ]
+      },
       { name: 'Calendário', href: '/calendario', icon: Calendar },
     ]
   },
   {
-    section: 'Gestão',
+    section: 'Módulo Obras',
+    items: [
+      { name: 'Dashboard Obras', href: '/obras', icon: HardHat },
+    ]
+  },
+  {
+    section: 'Gestão Projetos',
     items: [
       { name: 'Dashboard Gestão', href: '/gestao', icon: LayoutDashboard },
-      { name: 'Recursos Humanos', href: '/equipa', icon: UsersRound },
       { name: 'Clientes', href: '/clientes', icon: Users },
-      { name: 'Orçamentos', href: '/orcamentos', icon: FileText },
-      { name: 'Controlo Custos', href: '/financeiro', icon: Euro },
+      {
+        name: 'Gestão Financeira',
+        href: '/financeiro',
+        icon: Wallet,
+        subItems: [
+          { name: 'Orçamentos', href: '/financeiro?tab=orcamentos', icon: Receipt },
+          { name: 'Compras', href: '/financeiro?tab=compras', icon: ShoppingCart },
+          { name: 'Controlo Executado', href: '/financeiro?tab=controlo', icon: PieChart }
+        ]
+      },
       { name: 'Fornecedores', href: '/fornecedores', icon: Truck },
+    ]
+  },
+  {
+    section: 'Administração',
+    items: [
+      { name: 'Recursos Humanos', href: '/equipa', icon: UsersRound },
+      { name: 'Controlo Custos', href: '/financeiro', icon: Euro },
     ]
   }
 ]
@@ -57,7 +81,9 @@ const navigation = [
 export default function Sidebar({ isOpen, onClose, isMobile }) {
   const { user, signOut, getUserName, getUserInitials, getUserAvatar } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const [expandedItems, setExpandedItems] = useState({})
 
   const handleLogout = async () => {
     try {
@@ -83,6 +109,83 @@ export default function Sidebar({ isOpen, onClose, isMobile }) {
     }
   }
 
+  const toggleExpanded = (itemName) => {
+    setExpandedItems(prev => ({
+      ...prev,
+      [itemName]: !prev[itemName]
+    }))
+  }
+
+  const isItemActive = (item) => {
+    const basePath = item.href.split('?')[0]
+    return location.pathname === basePath || location.pathname.startsWith(basePath + '/')
+  }
+
+  const renderNavItem = (item) => {
+    const hasSubItems = item.subItems && item.subItems.length > 0
+    const isExpanded = expandedItems[item.name]
+    const isActive = isItemActive(item)
+
+    if (hasSubItems) {
+      return (
+        <div key={item.name}>
+          <div
+            onClick={() => toggleExpanded(item.name)}
+            className={`nav-item ${isActive ? 'active' : ''}`}
+            style={{ cursor: 'pointer' }}
+          >
+            <item.icon size={18} />
+            <span style={{ flex: 1 }}>{item.name}</span>
+            <ChevronRight
+              size={16}
+              style={{
+                transition: 'transform 0.2s',
+                transform: isExpanded ? 'rotate(90deg)' : 'rotate(0)'
+              }}
+            />
+          </div>
+          {isExpanded && (
+            <div style={{ marginLeft: '12px', borderLeft: '1px solid var(--stone)', marginTop: '4px' }}>
+              {item.subItems.map(subItem => (
+                <NavLink
+                  key={subItem.name}
+                  to={subItem.href}
+                  onClick={handleNavClick}
+                  className="nav-item nav-subitem"
+                  style={{
+                    paddingLeft: '20px',
+                    fontSize: '13px'
+                  }}
+                >
+                  <subItem.icon size={16} />
+                  <span style={{ flex: 1 }}>{subItem.name}</span>
+                </NavLink>
+              ))}
+            </div>
+          )}
+        </div>
+      )
+    }
+
+    return (
+      <NavLink
+        key={item.name}
+        to={item.href}
+        end={item.href === '/'}
+        onClick={handleNavClick}
+        className={({ isActive }) =>
+          `nav-item ${isActive ? 'active' : ''}`
+        }
+      >
+        <item.icon size={18} />
+        <span style={{ flex: 1 }}>{item.name}</span>
+        {item.badge && (
+          <span className="nav-item-badge">{item.badge}</span>
+        )}
+      </NavLink>
+    )
+  }
+
   return (
     <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
       {/* Logo */}
@@ -98,23 +201,7 @@ export default function Sidebar({ isOpen, onClose, isMobile }) {
         {navigation.map((group) => (
           <div key={group.section} className="nav-section">
             <div className="nav-section-title">{group.section}</div>
-            {group.items.map((item) => (
-              <NavLink
-                key={item.name}
-                to={item.href}
-                end={item.href === '/'}
-                onClick={handleNavClick}
-                className={({ isActive }) =>
-                  `nav-item ${isActive ? 'active' : ''}`
-                }
-              >
-                <item.icon size={18} />
-                <span style={{ flex: 1 }}>{item.name}</span>
-                {item.badge && (
-                  <span className="nav-item-badge">{item.badge}</span>
-                )}
-              </NavLink>
-            ))}
+            {group.items.map((item) => renderNavItem(item))}
           </div>
         ))}
       </nav>
