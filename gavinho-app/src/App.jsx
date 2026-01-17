@@ -30,6 +30,7 @@ import Perfil from './pages/Perfil'
 import PlaceholderPage from './pages/PlaceholderPage'
 import Biblioteca from './pages/Biblioteca'
 import ChatObras from './pages/ChatObras'
+import AdminSeed from './pages/AdminSeed'
 
 function App() {
   return (
@@ -75,6 +76,7 @@ function App() {
             <Route path="fornecedores/:id" element={<FornecedorDetalhe />} />
             <Route path="perfil" element={<Perfil />} />
             <Route path="configuracoes" element={<PlaceholderPage title="Configurações" subtitle="Definições da plataforma" />} />
+            <Route path="admin/seed" element={<AdminSeed />} />
           </Route>
         </Routes>
       </AuthProvider>
