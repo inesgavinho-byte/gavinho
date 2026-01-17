@@ -593,38 +593,92 @@ export default function Planning() {
       {/* TAB: Planning (Gantt) */}
       {activeTab === 'planning' && (
         <>
-          {/* KPIs */}
-          <div className="stats-grid mb-xl" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
-            <div className="stat-card">
-              <div className="stat-icon projects">
-                <Calendar size={22} />
+          {/* KPIs Compactos */}
+          <div style={{
+            display: 'flex',
+            gap: '16px',
+            marginBottom: '20px',
+            flexWrap: 'wrap'
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '12px 20px',
+              background: 'var(--white)',
+              borderRadius: '12px',
+              border: '1px solid var(--stone)',
+              minWidth: '160px'
+            }}>
+              <div style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '8px',
+                background: 'rgba(201, 168, 130, 0.15)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <Calendar size={18} style={{ color: 'var(--warning)' }} />
               </div>
-              <div className="stat-value">{projects.length}</div>
-              <div className="stat-label">Projetos Ativos</div>
+              <div>
+                <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--brown)', lineHeight: 1 }}>{projects.length}</div>
+                <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>Projetos Ativos</div>
+              </div>
             </div>
 
-            <div className="stat-card">
-              <div className="stat-icon" style={{ background: 'rgba(138, 158, 184, 0.15)' }}>
-                <Clock size={22} style={{ stroke: 'var(--info)' }} />
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '12px 20px',
+              background: 'var(--white)',
+              borderRadius: '12px',
+              border: '1px solid var(--stone)',
+              minWidth: '160px'
+            }}>
+              <div style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '8px',
+                background: 'rgba(138, 158, 184, 0.15)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <Clock size={18} style={{ color: 'var(--info)' }} />
               </div>
-              <div className="stat-value">{tasksInProgress}</div>
-              <div className="stat-label">Tarefas em Progresso</div>
+              <div>
+                <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--brown)', lineHeight: 1 }}>{tasksInProgress}</div>
+                <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>Tarefas em Progresso</div>
+              </div>
             </div>
 
-            <div className="stat-card">
-              <div className="stat-icon" style={{ background: 'rgba(201, 168, 130, 0.2)' }}>
-                <AlertTriangle size={22} style={{ stroke: 'var(--warning)' }} />
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '12px 20px',
+              background: 'var(--white)',
+              borderRadius: '12px',
+              border: '1px solid var(--stone)',
+              minWidth: '160px'
+            }}>
+              <div style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '8px',
+                background: 'rgba(201, 168, 130, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <AlertTriangle size={18} style={{ color: 'var(--warning)' }} />
               </div>
-              <div className="stat-value">{tasksPending}</div>
-              <div className="stat-label">Pendentes de Aprovação</div>
-            </div>
-
-            <div className="stat-card">
-              <div className="stat-icon" style={{ background: 'rgba(122, 158, 122, 0.15)' }}>
-                <Milestone size={22} style={{ stroke: 'var(--success)' }} />
+              <div>
+                <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--brown)', lineHeight: 1 }}>{tasksPending}</div>
+                <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>Pendentes de Ap.</div>
               </div>
-              <div className="stat-value">{milestonesUpcoming}</div>
-              <div className="stat-label">Marcos Próximos</div>
             </div>
           </div>
 
@@ -704,17 +758,17 @@ export default function Planning() {
 
       {/* Gantt Chart */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto' }}>
-          <div style={{ minWidth: `${300 + (columns.length * colWidth)}px` }}>
+        <div style={{ overflowX: 'auto', maxHeight: 'calc(100vh - 340px)' }}>
+          <div style={{ minWidth: `${280 + (columns.length * colWidth)}px` }}>
             {/* Header - Months */}
-            <div className="flex" style={{ borderBottom: '1px solid var(--stone)' }}>
-              <div style={{ 
-                width: '300px', 
-                minWidth: '300px', 
-                padding: '12px 16px',
+            <div className="flex" style={{ borderBottom: '1px solid var(--stone)', position: 'sticky', top: 0, zIndex: 10 }}>
+              <div style={{
+                width: '280px',
+                minWidth: '280px',
+                padding: '10px 14px',
                 background: 'var(--cream)',
                 fontWeight: 600,
-                fontSize: '13px',
+                fontSize: '12px',
                 borderRight: '1px solid var(--stone)'
               }}>
                 Projeto / Tarefa
@@ -741,10 +795,10 @@ export default function Planning() {
             </div>
 
             {/* Header - Days */}
-            <div className="flex" style={{ borderBottom: '1px solid var(--stone)' }}>
-              <div style={{ 
-                width: '300px', 
-                minWidth: '300px',
+            <div className="flex" style={{ borderBottom: '1px solid var(--stone)', position: 'sticky', top: '42px', zIndex: 9, background: 'var(--white)' }}>
+              <div style={{
+                width: '280px',
+                minWidth: '280px',
                 borderRight: '1px solid var(--stone)'
               }} />
               <div className="flex" style={{ flex: 1 }}>
@@ -782,15 +836,15 @@ export default function Planning() {
                   }}
                   onClick={() => toggleProject(project.id)}
                 >
-                  <div 
-                    style={{ 
-                      width: '300px', 
-                      minWidth: '300px', 
-                      padding: '12px 16px',
+                  <div
+                    style={{
+                      width: '280px',
+                      minWidth: '280px',
+                      padding: '10px 14px',
                       borderRight: '1px solid var(--stone)',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '12px'
+                      gap: '10px'
                     }}
                   >
                     {project.expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
@@ -828,15 +882,15 @@ export default function Planning() {
                         background: 'var(--white)'
                       }}
                     >
-                      <div 
-                        style={{ 
-                          width: '300px', 
-                          minWidth: '300px', 
-                          padding: '10px 16px 10px 48px',
+                      <div
+                        style={{
+                          width: '280px',
+                          minWidth: '280px',
+                          padding: '8px 14px 8px 40px',
                           borderRight: '1px solid var(--stone)',
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '10px'
+                          gap: '8px'
                         }}
                       >
                         {tarefa.marco ? (
@@ -980,44 +1034,29 @@ export default function Planning() {
             ))}
           </div>
         </div>
-      </div>
-
-          {/* Legend */}
-          <div className="card mt-lg">
-            <div className="flex items-center gap-lg" style={{ flexWrap: 'wrap' }}>
-              <span className="text-muted" style={{ fontSize: '12px', fontWeight: 600 }}>Legenda:</span>
-              {Object.entries(statusConfig).map(([key, config]) => (
-                <div key={key} className="flex items-center gap-xs">
-                  <div
-                    style={{
-                      width: '12px',
-                      height: '12px',
-                      borderRadius: '3px',
-                      background: config.bg,
-                      border: `1px solid ${config.color}`
-                    }}
-                  />
-                  <span style={{ fontSize: '12px' }}>{config.label}</span>
-                </div>
-              ))}
-              <div className="flex items-center gap-xs">
-                <div
-                  style={{
-                    width: '10px',
-                    height: '10px',
-                    background: 'var(--warning)',
-                    borderRadius: '2px',
-                    transform: 'rotate(45deg)'
-                  }}
-                />
-                <span style={{ fontSize: '12px' }}>Marco</span>
-              </div>
-              <div className="flex items-center gap-xs">
-                <Link2 size={12} style={{ color: 'var(--brown-light)' }} />
-                <span style={{ fontSize: '12px' }}>Tem dependências</span>
-              </div>
+        {/* Legend - Inline */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '16px',
+          padding: '10px 16px',
+          background: 'var(--cream)',
+          borderTop: '1px solid var(--stone)',
+          fontSize: '11px',
+          flexWrap: 'wrap'
+        }}>
+          {Object.entries(statusConfig).map(([key, config]) => (
+            <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <div style={{ width: '10px', height: '10px', borderRadius: '2px', background: config.bg, border: `1px solid ${config.color}` }} />
+              <span style={{ color: 'var(--brown-light)' }}>{config.label}</span>
             </div>
+          ))}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <div style={{ width: '8px', height: '8px', background: 'var(--warning)', borderRadius: '1px', transform: 'rotate(45deg)' }} />
+            <span style={{ color: 'var(--brown-light)' }}>Marco</span>
           </div>
+        </div>
+      </div>
         </>
       )}
 
