@@ -24,7 +24,9 @@ import {
   ShoppingCart,
   PieChart,
   Wallet,
-  Library
+  Library,
+  Database,
+  Shield
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -76,7 +78,8 @@ const navigation = [
     section: 'Administração',
     items: [
       { name: 'Recursos Humanos', href: '/equipa', icon: UsersRound },
-      { name: 'Controlo Custos', href: '/financeiro', icon: Euro },
+      { name: 'Seed de Dados', href: '/admin/seed', icon: Database },
+      { name: 'Configurações', href: '/configuracoes', icon: Settings },
     ]
   }
 ]
@@ -211,11 +214,6 @@ export default function Sidebar({ isOpen, onClose, isMobile }) {
 
       {/* Footer */}
       <div className="sidebar-footer">
-        <NavLink to="/configuracoes" className="nav-item">
-          <Settings size={18} />
-          <span style={{ flex: 1 }}>Configurações</span>
-        </NavLink>
-        
         {/* User Card with Dropdown */}
         <div style={{ position: 'relative' }}>
           <div 
