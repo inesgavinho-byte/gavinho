@@ -37,6 +37,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { jsPDF } from 'jspdf'
 import ProjetoEntregaveis from '../components/ProjetoEntregaveis'
 import ProjetoDocumentos from '../components/ProjetoDocumentos'
 
@@ -953,7 +954,136 @@ export default function ProjetoDetalhe() {
 
   // Exportar PDF
   const handleExportPDF = () => {
-    alert('Funcionalidade de exportar PDF em desenvolvimento.')
+    if (!project) return
+
+    try {
+      const doc = new jsPDF()
+      const pageWidth = doc.internal.pageSize.getWidth()
+      let y = 20
+
+      // Cores
+      const brown = [44, 44, 44]
+      const brownLight = [139, 119, 101]
+      const gray = [128, 128, 128]
+
+      // Header
+      doc.setFontSize(24)
+      doc.setTextColor(...brown)
+      doc.text('GAVINHO', 20, y)
+
+      y += 15
+      doc.setFontSize(10)
+      doc.setTextColor(...gray)
+      doc.text('Ficha de Projeto', 20, y)
+
+      // Linha separadora
+      y += 10
+      doc.setDrawColor(...brownLight)
+      doc.line(20, y, pageWidth - 20, y)
+
+      // Informações principais
+      y += 15
+      doc.setFontSize(18)
+      doc.setTextColor(...brown)
+      doc.text(project.nome || 'Sem nome', 20, y)
+
+      y += 8
+      doc.setFontSize(11)
+      doc.setTextColor(...brownLight)
+      doc.text(`${project.codigo} | ${project.tipologia || ''} | ${project.fase || ''}`, 20, y)
+
+      // Seção: Detalhes
+      y += 20
+      doc.setFontSize(12)
+      doc.setTextColor(...brown)
+      doc.text('DETALHES DO PROJETO', 20, y)
+
+      y += 10
+      doc.setFontSize(10)
+      doc.setTextColor(...gray)
+
+      const details = [
+        ['Cliente:', project.cliente?.nome || project.cliente_nome || '-'],
+        ['Localização:', `${project.cidade || ''}, ${project.pais || 'Portugal'}`],
+        ['Morada:', project.morada || project.localizacao || '-'],
+        ['Área Bruta:', project.area_bruta ? `${project.area_bruta} m²` : '-'],
+        ['Área Exterior:', project.area_exterior ? `${project.area_exterior} m²` : '-'],
+        ['Status:', project.status === 'on_track' ? 'No Prazo' : project.status === 'at_risk' ? 'Em Risco' : project.status || '-'],
+        ['Progresso:', `${project.progresso || 0}%`]
+      ]
+
+      details.forEach(([label, value]) => {
+        doc.setTextColor(...brown)
+        doc.text(label, 20, y)
+        doc.setTextColor(...gray)
+        doc.text(String(value), 70, y)
+        y += 7
+      })
+
+      // Seção: Datas
+      y += 10
+      doc.setFontSize(12)
+      doc.setTextColor(...brown)
+      doc.text('DATAS', 20, y)
+
+      y += 10
+      doc.setFontSize(10)
+
+      const datas = [
+        ['Data Início:', project.data_inicio || project.datas?.data_inicio || '-'],
+        ['Previsão Conclusão:', project.data_prevista || project.datas?.data_prevista || '-']
+      ]
+
+      datas.forEach(([label, value]) => {
+        doc.setTextColor(...brown)
+        doc.text(label, 20, y)
+        doc.setTextColor(...gray)
+        doc.text(String(value), 70, y)
+        y += 7
+      })
+
+      // Seção: Financeiro
+      if (project.orcamento_atual || project.valor_contratado) {
+        y += 10
+        doc.setFontSize(12)
+        doc.setTextColor(...brown)
+        doc.text('FINANCEIRO', 20, y)
+
+        y += 10
+        doc.setFontSize(10)
+
+        const formatCurrency = (val) => {
+          if (!val) return '-'
+          return new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(val)
+        }
+
+        const financeiro = [
+          ['Orçamento:', formatCurrency(project.orcamento_atual)],
+          ['Valor Contratado:', formatCurrency(project.valor_contratado)]
+        ]
+
+        financeiro.forEach(([label, value]) => {
+          doc.setTextColor(...brown)
+          doc.text(label, 20, y)
+          doc.setTextColor(...gray)
+          doc.text(String(value), 70, y)
+          y += 7
+        })
+      }
+
+      // Footer
+      y = doc.internal.pageSize.getHeight() - 20
+      doc.setFontSize(8)
+      doc.setTextColor(...gray)
+      doc.text(`Gerado em ${new Date().toLocaleDateString('pt-PT')} | GAVINHO Group`, 20, y)
+
+      // Download
+      doc.save(`Projeto_${project.codigo}_${project.nome?.replace(/\s+/g, '_') || 'export'}.pdf`)
+
+    } catch (err) {
+      console.error('Erro ao gerar PDF:', err)
+      alert('Erro ao gerar PDF: ' + err.message)
+    }
     setShowActions(false)
   }
 
