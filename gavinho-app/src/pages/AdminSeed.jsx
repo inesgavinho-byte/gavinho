@@ -201,11 +201,11 @@ export default function AdminSeed() {
       }])
       if (!eventoError) addLog('✅ Evento visita obra criado', 'success')
 
-      // 7. PROCUREMENT
+      // 7. PROCUREMENT - Logística Obra
       addLog('📦 Criando itens de procurement...', 'info')
       const procurement = [
-        { item: 'Contentor para obra', fornecedor: 'Máximo Entulhos', prazo: 'Esta semana', estado: 'Enviado' },
-        { item: 'Instalação sanitária apoio obra', fornecedor: 'VENDAP', prazo: '—', estado: 'Aguarda' }
+        { item: 'Contentor para obra', fornecedor: 'Máximo Entulhos', prazo: 'Esta semana', estado: 'Enviado', prioridade: 'alta' },
+        { item: 'Instalação sanitária apoio obra', fornecedor: 'VENDAP', prazo: '06/12', estado: 'Aguarda', prioridade: 'media' }
       ]
 
       for (const item of procurement) {
@@ -214,11 +214,100 @@ export default function AdminSeed() {
           descricao: `Fornecedor: ${item.fornecedor}\nPrazo: ${item.prazo}\nEstado: ${item.estado}`,
           projeto_id: projetoId,
           status: item.estado === 'Enviado' ? 'em_progresso' : 'pendente',
-          prioridade: 'media',
+          prioridade: item.prioridade,
           categoria: 'procurement',
           notas: `Fornecedor: ${item.fornecedor}`
         }])
         if (!error) addLog(`✅ Procurement: ${item.item}`, 'success')
+      }
+
+      // 8. PROCUREMENT - Azulejos Fachada
+      addLog('🏠 Criando procurement azulejos fachada...', 'info')
+      const azulejosSpec = 'Azulejo 15x15cm, padrão geométrico tradicional (módulo 4 peças), ~111 m² (~5.217 un)'
+      const fornecedoresAzulejos = [
+        { nome: 'Taile Decor', preco: '€61,00/m²', prazo: 'A confirmar', estado: 'Reconfirmação enviada', estimativa: '~€7.787' },
+        { nome: 'Cergam', preco: '~€152,75/m²', prazo: '90 dias', estado: 'Proposta recebida', estimativa: '~€17.205 + IVA' },
+        { nome: 'Viúva Lamego', preco: '—', prazo: '—', estado: 'Aguarda resposta', estimativa: '—' }
+      ]
+
+      const { error: azulejosError } = await supabase.from('tarefas').insert([{
+        titulo: '[PROCUREMENT] Azulejos Fachada - Comparação Fornecedores',
+        descricao: `Especificação: ${azulejosSpec}\n\n` +
+          fornecedoresAzulejos.map(f =>
+            `${f.nome}: ${f.preco} | Prazo: ${f.prazo} | ${f.estado} | Est: ${f.estimativa}`
+          ).join('\n'),
+        projeto_id: projetoId,
+        status: 'em_progresso',
+        prioridade: 'alta',
+        categoria: 'procurement',
+        notas: 'Aguardar propostas finais até 06/12'
+      }])
+      if (!azulejosError) addLog('✅ Procurement azulejos criado', 'success')
+
+      // 9. AUSÊNCIAS REGISTADAS
+      addLog('🏥 Registando ausências...', 'info')
+      const ausencias = [
+        { nome: 'João Umbelino', data: '2024-12-02', motivo: 'Doença' },
+        { nome: 'Valentina Gatica', data: '2024-11-28', motivo: 'Doença' }
+      ]
+
+      for (const ausencia of ausencias) {
+        const { error } = await supabase.from('eventos').insert([{
+          titulo: `[AUSÊNCIA] ${ausencia.nome} - ${ausencia.motivo}`,
+          descricao: `Colaborador: ${ausencia.nome}\nMotivo: ${ausencia.motivo}`,
+          projeto_id: projetoId,
+          data: ausencia.data,
+          tipo: 'ausencia',
+          participantes: ausencia.nome
+        }])
+        if (!error) addLog(`✅ Ausência registada: ${ausencia.nome}`, 'success')
+      }
+
+      // 10. NOTAS IMPORTANTES
+      addLog('📝 Adicionando notas críticas...', 'info')
+      const notas = [
+        { titulo: 'Reunião 02/12 - Planta cores não entregue', descricao: 'Acordado envio planta cores convencionais, não foi entregue', tipo: 'nota', prioridade: 'alta' },
+        { titulo: 'PONTO CRÍTICO: Dependência AW Engenharia', descricao: 'Vários dias sem resposta da AW Engenharia - bloqueio ativo', tipo: 'blocker', prioridade: 'urgente' },
+        { titulo: 'RISCO: Visita obra pode ficar comprometida', descricao: 'Visita de amanhã pode ficar comprometida sem planta do último piso', tipo: 'risco', prioridade: 'urgente' }
+      ]
+
+      for (const nota of notas) {
+        if (nota.tipo === 'blocker' || nota.tipo === 'risco') {
+          const { error } = await supabase.from('decisoes').insert([{
+            titulo: nota.titulo,
+            descricao: nota.descricao,
+            projeto_id: projetoId,
+            tipo: nota.tipo === 'blocker' ? 'blocker' : 'decision',
+            status: 'pendente',
+            prioridade: nota.prioridade
+          }])
+          if (!error) addLog(`✅ ${nota.tipo === 'blocker' ? 'Bloqueio' : 'Risco'}: ${nota.titulo}`, 'success')
+        }
+      }
+
+      // 11. FOLLOW-UPS
+      addLog('📞 Criando follow-ups...', 'info')
+      const followups = [
+        { acao: 'Contactar Valentina', prazo: '2024-12-02', motivo: 'Planta urgente', prioridade: 'urgente' },
+        { acao: 'Ligar Máximo Entulhos', prazo: '2024-12-03', motivo: 'Contentor urgente', prioridade: 'alta' },
+        { acao: 'Contactar AW Engenharia', prazo: '2024-12-02', motivo: 'Bloqueio ativo', prioridade: 'urgente' },
+        { acao: 'Follow-up VENDAP', prazo: '2024-12-06', motivo: 'Sanitários obra', prioridade: 'media' },
+        { acao: 'Follow-up Taile Decor', prazo: '2024-12-06', motivo: 'Proposta azulejos', prioridade: 'media' },
+        { acao: 'Follow-up Viúva Lamego', prazo: '2024-12-06', motivo: 'Proposta azulejos', prioridade: 'media' }
+      ]
+
+      for (const followup of followups) {
+        const { error } = await supabase.from('tarefas').insert([{
+          titulo: `[FOLLOW-UP] ${followup.acao}`,
+          descricao: followup.motivo,
+          projeto_id: projetoId,
+          status: 'pendente',
+          prioridade: followup.prioridade,
+          data_limite: followup.prazo,
+          categoria: 'followup',
+          notas: `Motivo: ${followup.motivo}`
+        }])
+        if (!error) addLog(`✅ Follow-up: ${followup.acao}`, 'success')
       }
 
       addLog('🎉 Seed concluído com sucesso!', 'success')
@@ -292,10 +381,10 @@ export default function AdminSeed() {
               {[
                 { icon: Building2, label: '1 Projeto' },
                 { icon: Users, label: '4 Utilizadores' },
-                { icon: ListChecks, label: '10 Tarefas' },
-                { icon: AlertTriangle, label: '2 Bloqueios' },
-                { icon: Calendar, label: '1 Evento' },
-                { icon: Package, label: '2 Procurement' }
+                { icon: ListChecks, label: '17 Tarefas' },
+                { icon: AlertTriangle, label: '4 Bloqueios' },
+                { icon: Calendar, label: '3 Eventos' },
+                { icon: Package, label: '4 Procurement' }
               ].map((item, idx) => (
                 <div key={idx} className="flex items-center gap-sm" style={{ fontSize: '13px', color: 'var(--brown-light)' }}>
                   <item.icon size={14} />
