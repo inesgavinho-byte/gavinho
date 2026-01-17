@@ -702,6 +702,10 @@ export default function ProjetoDetalhe() {
   const [showEquipaModal, setShowEquipaModal] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
+  // Sub-tabs para Fases & Entregas
+  const [activeSubTab, setActiveSubTab] = useState('conceito-briefing')
+  const [activeFaseSection, setActiveFaseSection] = useState('entregaveis')
+
   // Opções para selects
   const TIPOLOGIAS = ['Residencial', 'Comercial', 'Hospitality', 'Misto']
   const SUBTIPOS = ['Moradia', 'Apartamento', 'Edifício', 'Loja', 'Escritório', 'Hotel', 'Restaurante']
@@ -1513,10 +1517,6 @@ export default function ProjetoDetalhe() {
     { id: 'biblioteca', label: 'Biblioteca', icon: Library },
     { id: 'gestao', label: 'Gestão de Projeto', icon: Settings, adminOnly: true }
   ]
-
-  // Sub-tabs para Fases & Entregas - Fases do projeto
-  const [activeSubTab, setActiveSubTab] = useState('conceito-briefing')
-  const [activeFaseSection, setActiveFaseSection] = useState('entregaveis')
 
   const fasesDoProjetoTabs = [
     { id: 'conceito-briefing', label: 'Conceito & Briefing' },
