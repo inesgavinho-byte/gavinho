@@ -60,9 +60,12 @@ export default function Biblioteca() {
   // Modals
   const [showModal, setShowModal] = useState(false)
   const [showTagModal, setShowTagModal] = useState(false)
+  const [showCategoriaModal, setShowCategoriaModal] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null)
   const [showPreview, setShowPreview] = useState(null)
   const [editingItem, setEditingItem] = useState(null)
+  const [editingCategoria, setEditingCategoria] = useState(null)
+  const [editingTag, setEditingTag] = useState(null)
   
   // Forms
   const [materialForm, setMaterialForm] = useState({
@@ -78,6 +81,7 @@ export default function Biblioteca() {
     projeto_id: '', notas: '', tags: []
   })
   const [newTag, setNewTag] = useState({ nome: '', cor: '#C9A882' })
+  const [newCategoria, setNewCategoria] = useState({ nome: '', tipo: 'materiais', icone: 'layers', cor: '#C9A882' })
   
   // Inline tag creation
   const [showInlineTagInput, setShowInlineTagInput] = useState(false)
@@ -207,18 +211,21 @@ export default function Biblioteca() {
         const data = {
           ...materialForm,
           textura_url: tempFileUrl || editingItem?.textura_url,
-          preco_m2: materialForm.preco_m2 ? parseFloat(materialForm.preco_m2) : null
+          preco_m2: materialForm.preco_m2 ? parseFloat(materialForm.preco_m2) : null,
+          categoria_id: materialForm.categoria_id || null
         }
         delete data.tags
 
         let itemId
         if (editingItem) {
-          await supabase.from('biblioteca_materiais').update(data).eq('id', editingItem.id)
+          const { error: updateError } = await supabase.from('biblioteca_materiais').update(data).eq('id', editingItem.id)
+          if (updateError) throw updateError
           itemId = editingItem.id
           // Remove old tags
           await supabase.from('biblioteca_materiais_tags').delete().eq('material_id', itemId)
         } else {
-          const { data: newItem } = await supabase.from('biblioteca_materiais').insert([data]).select().single()
+          const { data: newItem, error: insertError } = await supabase.from('biblioteca_materiais').insert([data]).select().single()
+          if (insertError) throw insertError
           itemId = newItem.id
         }
         // Add tags
@@ -235,17 +242,20 @@ export default function Biblioteca() {
           preco: modelo3dForm.preco ? parseFloat(modelo3dForm.preco) : null,
           largura_cm: modelo3dForm.largura_cm ? parseFloat(modelo3dForm.largura_cm) : null,
           altura_cm: modelo3dForm.altura_cm ? parseFloat(modelo3dForm.altura_cm) : null,
-          profundidade_cm: modelo3dForm.profundidade_cm ? parseFloat(modelo3dForm.profundidade_cm) : null
+          profundidade_cm: modelo3dForm.profundidade_cm ? parseFloat(modelo3dForm.profundidade_cm) : null,
+          categoria_id: modelo3dForm.categoria_id || null
         }
         delete data.tags
 
         let itemId
         if (editingItem) {
-          await supabase.from('biblioteca_modelos3d').update(data).eq('id', editingItem.id)
+          const { error: updateError } = await supabase.from('biblioteca_modelos3d').update(data).eq('id', editingItem.id)
+          if (updateError) throw updateError
           itemId = editingItem.id
           await supabase.from('biblioteca_modelos3d_tags').delete().eq('modelo_id', itemId)
         } else {
-          const { data: newItem } = await supabase.from('biblioteca_modelos3d').insert([data]).select().single()
+          const { data: newItem, error: insertError } = await supabase.from('biblioteca_modelos3d').insert([data]).select().single()
+          if (insertError) throw insertError
           itemId = newItem.id
         }
         if (modelo3dForm.tags.length > 0) {
@@ -257,17 +267,20 @@ export default function Biblioteca() {
         const data = {
           ...inspiracaoForm,
           imagem_url: tempFileUrl || editingItem?.imagem_url,
-          projeto_id: inspiracaoForm.projeto_id || null
+          projeto_id: inspiracaoForm.projeto_id || null,
+          categoria_id: inspiracaoForm.categoria_id || null
         }
         delete data.tags
 
         let itemId
         if (editingItem) {
-          await supabase.from('biblioteca_inspiracao').update(data).eq('id', editingItem.id)
+          const { error: updateError } = await supabase.from('biblioteca_inspiracao').update(data).eq('id', editingItem.id)
+          if (updateError) throw updateError
           itemId = editingItem.id
           await supabase.from('biblioteca_inspiracao_tags').delete().eq('inspiracao_id', itemId)
         } else {
-          const { data: newItem } = await supabase.from('biblioteca_inspiracao').insert([data]).select().single()
+          const { data: newItem, error: insertError } = await supabase.from('biblioteca_inspiracao').insert([data]).select().single()
+          if (insertError) throw insertError
           itemId = newItem.id
         }
         if (inspiracaoForm.tags.length > 0) {
@@ -281,7 +294,7 @@ export default function Biblioteca() {
       loadData()
     } catch (err) {
       console.error('Erro ao guardar:', err)
-      alert('Erro ao guardar')
+      alert(`Erro ao guardar: ${err.message || 'Verifique os campos e tente novamente'}`)
     }
   }
 
@@ -331,7 +344,7 @@ export default function Biblioteca() {
       const { data, error } = await supabase.from('biblioteca_tags').insert([{ nome: inlineTagName.trim(), cor: inlineTagColor }]).select().single()
       if (error) throw error
       
-      // Adicionar tag À  lista e selecionar automaticamente
+      // Adicionar tag à lista e selecionar automaticamente
       setTags(prev => [...prev, data])
       
       // Adicionar ao form atual
@@ -351,6 +364,73 @@ export default function Biblioteca() {
     } catch (err) {
       console.error('Erro ao criar tag:', err)
       alert('Erro ao criar tag')
+    }
+  }
+
+  // Editar tag existente
+  const handleUpdateTag = async () => {
+    if (!editingTag || !editingTag.nome.trim()) return
+    try {
+      const { error } = await supabase.from('biblioteca_tags').update({ nome: editingTag.nome, cor: editingTag.cor }).eq('id', editingTag.id)
+      if (error) throw error
+      setEditingTag(null)
+      loadData()
+    } catch (err) {
+      console.error('Erro ao atualizar tag:', err)
+      alert('Erro ao atualizar tag')
+    }
+  }
+
+  // Eliminar tag
+  const handleDeleteTag = async (tagId) => {
+    try {
+      await supabase.from('biblioteca_tags').delete().eq('id', tagId)
+      loadData()
+    } catch (err) {
+      console.error('Erro ao eliminar tag:', err)
+      alert('Erro ao eliminar tag')
+    }
+  }
+
+  // ============================================
+  // CATEGORY MANAGEMENT
+  // ============================================
+  const handleSaveCategoria = async () => {
+    if (!newCategoria.nome.trim()) return
+    try {
+      const ordem = categorias.filter(c => c.tipo === newCategoria.tipo).length + 1
+      const { error } = await supabase.from('biblioteca_categorias').insert([{ ...newCategoria, ordem }])
+      if (error) throw error
+      setNewCategoria({ nome: '', tipo: activeTab === 'modelos3d' ? 'modelo3d' : activeTab, icone: 'layers', cor: '#C9A882' })
+      loadData()
+    } catch (err) {
+      console.error('Erro ao criar categoria:', err)
+      alert('Erro ao criar categoria')
+    }
+  }
+
+  const handleUpdateCategoria = async () => {
+    if (!editingCategoria || !editingCategoria.nome.trim()) return
+    try {
+      const { error } = await supabase.from('biblioteca_categorias')
+        .update({ nome: editingCategoria.nome, icone: editingCategoria.icone, cor: editingCategoria.cor })
+        .eq('id', editingCategoria.id)
+      if (error) throw error
+      setEditingCategoria(null)
+      loadData()
+    } catch (err) {
+      console.error('Erro ao atualizar categoria:', err)
+      alert('Erro ao atualizar categoria')
+    }
+  }
+
+  const handleDeleteCategoria = async (categoriaId) => {
+    try {
+      await supabase.from('biblioteca_categorias').delete().eq('id', categoriaId)
+      loadData()
+    } catch (err) {
+      console.error('Erro ao eliminar categoria:', err)
+      alert('Erro ao eliminar categoria (pode ter itens associados)')
     }
   }
 
@@ -453,8 +533,11 @@ export default function Biblioteca() {
           <p className="page-subtitle">Materiais, modelos 3D e inspiração</p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
+          <button onClick={() => setShowCategoriaModal(true)} className="btn btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Filter size={16} /> Categorias
+          </button>
           <button onClick={() => setShowTagModal(true)} className="btn btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Tag size={16} /> Gerir Tags
+            <Tag size={16} /> Tags
           </button>
           <button onClick={openNewModal} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Plus size={16} /> Adicionar
@@ -591,8 +674,8 @@ export default function Biblioteca() {
       {/* Content Grid */}
       {filteredItems.length === 0 ? (
         <div className="card" style={{ padding: '60px', textAlign: 'center' }}>
-          <div style={{ fontSize: '48px', marginBottom: '16px', opacity: 0.3 }}>
-            {activeTab === 'materiais' ? 'ðŸ§±' : activeTab === 'modelos3d' ? 'ðŸ“¦' : 'âœ¨'}
+          <div style={{ marginBottom: '16px', opacity: 0.3 }}>
+            {activeTab === 'materiais' ? <Layers size={48} /> : activeTab === 'modelos3d' ? <Box size={48} /> : <Sparkles size={48} />}
           </div>
           <p style={{ color: 'var(--brown-light)', marginBottom: '16px' }}>
             {searchTerm || selectedCategoria || selectedTags.length > 0 
@@ -663,9 +746,9 @@ export default function Biblioteca() {
                     <td style={{ padding: '12px 16px', fontSize: '13px', fontWeight: 500 }}>{item.nome || '(sem nome)'}</td>
                     <td style={{ padding: '12px 16px', fontSize: '13px', color: 'var(--brown-light)' }}>{categoria?.nome || '-'}</td>
                     {activeTab === 'materiais' && <td style={{ padding: '12px 16px', fontSize: '13px' }}>{item.fornecedor || '-'}</td>}
-                    {activeTab === 'materiais' && <td style={{ padding: '12px 16px', fontSize: '13px', textAlign: 'right' }}>{item.preco_m2 ? `â‚¬${item.preco_m2}` : '-'}</td>}
+                    {activeTab === 'materiais' && <td style={{ padding: '12px 16px', fontSize: '13px', textAlign: 'right' }}>{item.preco_m2 ? `€${item.preco_m2}` : '-'}</td>}
                     {activeTab === 'modelos3d' && <td style={{ padding: '12px 16px', fontSize: '13px' }}>{item.formato || '-'}</td>}
-                    {activeTab === 'modelos3d' && <td style={{ padding: '12px 16px', fontSize: '13px' }}>{item.largura_cm && item.altura_cm && item.profundidade_cm ? `${item.largura_cm}À—${item.altura_cm}À—${item.profundidade_cm} cm` : '-'}</td>}
+                    {activeTab === 'modelos3d' && <td style={{ padding: '12px 16px', fontSize: '13px' }}>{item.largura_cm && item.altura_cm && item.profundidade_cm ? `${item.largura_cm}×${item.altura_cm}×${item.profundidade_cm} cm` : '-'}</td>}
                     <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                       <button onClick={() => openEditModal(item)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', marginRight: '4px' }}>
                         <Edit size={16} style={{ color: 'var(--brown-light)' }} />
@@ -736,7 +819,7 @@ export default function Biblioteca() {
                       <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, marginBottom: '6px' }}>Categoria</label>
                       <select value={materialForm.categoria_id} onChange={e => setMaterialForm({ ...materialForm, categoria_id: e.target.value })} className="form-input">
                         <option value="">Selecionar...</option>
-                        {getCategoriasByTipo('material').map(cat => (
+                        {getCategoriasByTipo('materiais').map(cat => (
                           <option key={cat.id} value={cat.id}>{cat.nome}</option>
                         ))}
                       </select>
@@ -756,7 +839,7 @@ export default function Biblioteca() {
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '16px' }}>
                     <div>
-                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, marginBottom: '6px' }}>Preço/m² (â‚¬)</label>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, marginBottom: '6px' }}>Preço/m² (€)</label>
                       <input type="number" step="0.01" value={materialForm.preco_m2} onChange={e => setMaterialForm({ ...materialForm, preco_m2: e.target.value })} className="form-input" placeholder="0.00" />
                     </div>
                     <div>
@@ -800,7 +883,7 @@ export default function Biblioteca() {
                         />
                         <Box size={20} style={{ color: 'var(--brown-light)', marginBottom: '4px' }} />
                         <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
-                          {tempFileUrl || editingItem?.ficheiro_url ? 'âœ“ Ficheiro carregado' : 'Upload ficheiro 3D'}
+                          {tempFileUrl || editingItem?.ficheiro_url ? '✓ Ficheiro carregado' : 'Upload ficheiro 3D'}
                         </div>
                       </div>
                     </div>
@@ -861,7 +944,7 @@ export default function Biblioteca() {
                       <input type="text" value={modelo3dForm.fornecedor} onChange={e => setModelo3dForm({ ...modelo3dForm, fornecedor: e.target.value })} className="form-input" />
                     </div>
                     <div>
-                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, marginBottom: '6px' }}>Preço (â‚¬)</label>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, marginBottom: '6px' }}>Preço (€)</label>
                       <input type="number" step="0.01" value={modelo3dForm.preco} onChange={e => setModelo3dForm({ ...modelo3dForm, preco: e.target.value })} className="form-input" />
                     </div>
                   </div>
@@ -918,7 +1001,7 @@ export default function Biblioteca() {
                         <>
                           <img src={tempFileUrl || editingItem?.imagem_url} alt="Preview" style={{ width: '100px', height: '70px', objectFit: 'cover', borderRadius: '8px', border: '1px solid var(--stone)' }} />
                           <div style={{ flex: 1 }}>
-                            <div style={{ fontWeight: 600, color: 'var(--success)', fontSize: '13px', marginBottom: '4px' }}>âœ“ Imagem carregada</div>
+                            <div style={{ fontWeight: 600, color: 'var(--success)', fontSize: '13px', marginBottom: '4px' }}>✓ Imagem carregada</div>
                             <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>Clica para substituir</div>
                           </div>
                           <button
@@ -1075,11 +1158,11 @@ export default function Biblioteca() {
 
       {/* Modal Gerir Tags */}
       {showTagModal && (
-        <div className="modal-overlay" onClick={() => setShowTagModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '450px' }}>
+        <div className="modal-overlay" onClick={() => { setShowTagModal(false); setEditingTag(null) }}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
             <div className="modal-header">
               <h3>Gerir Tags</h3>
-              <button onClick={() => setShowTagModal(false)} className="btn-icon"><X size={18} /></button>
+              <button onClick={() => { setShowTagModal(false); setEditingTag(null) }} className="btn-icon"><X size={18} /></button>
             </div>
             <div className="modal-body">
               {/* Nova Tag */}
@@ -1091,6 +1174,7 @@ export default function Biblioteca() {
                   placeholder="Nova tag..."
                   className="form-input"
                   style={{ flex: 1 }}
+                  onKeyDown={e => e.key === 'Enter' && newTag.nome.trim() && handleSaveTag()}
                 />
                 <input
                   type="color"
@@ -1104,13 +1188,169 @@ export default function Biblioteca() {
               </div>
 
               {/* Lista de Tags */}
-              <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+              <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
                 {tags.map(tag => (
-                  <div key={tag.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px', borderBottom: '1px solid var(--stone)' }}>
-                    <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: tag.cor }} />
-                    <span style={{ flex: 1, fontSize: '13px' }}>{tag.nome}</span>
+                  <div key={tag.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 8px', borderBottom: '1px solid var(--stone)' }}>
+                    {editingTag?.id === tag.id ? (
+                      <>
+                        <input
+                          type="text"
+                          value={editingTag.nome}
+                          onChange={e => setEditingTag({ ...editingTag, nome: e.target.value })}
+                          className="form-input"
+                          style={{ flex: 1, padding: '6px 10px' }}
+                          autoFocus
+                          onKeyDown={e => e.key === 'Enter' && handleUpdateTag()}
+                        />
+                        <input
+                          type="color"
+                          value={editingTag.cor}
+                          onChange={e => setEditingTag({ ...editingTag, cor: e.target.value })}
+                          style={{ width: '32px', height: '32px', padding: '2px', border: '1px solid var(--stone)', borderRadius: '4px', cursor: 'pointer' }}
+                        />
+                        <button onClick={handleUpdateTag} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}>
+                          <Check size={16} style={{ color: 'var(--success)' }} />
+                        </button>
+                        <button onClick={() => setEditingTag(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}>
+                          <X size={16} style={{ color: 'var(--brown-light)' }} />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: tag.cor }} />
+                        <span style={{ flex: 1, fontSize: '13px' }}>{tag.nome}</span>
+                        <button onClick={() => setEditingTag({ ...tag })} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}>
+                          <Edit size={14} style={{ color: 'var(--brown-light)' }} />
+                        </button>
+                        <button onClick={() => handleDeleteTag(tag.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}>
+                          <Trash2 size={14} style={{ color: 'var(--error)' }} />
+                        </button>
+                      </>
+                    )}
                   </div>
                 ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Gerir Categorias */}
+      {showCategoriaModal && (
+        <div className="modal-overlay" onClick={() => { setShowCategoriaModal(false); setEditingCategoria(null) }}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '550px' }}>
+            <div className="modal-header">
+              <h3>Gerir Categorias</h3>
+              <button onClick={() => { setShowCategoriaModal(false); setEditingCategoria(null) }} className="btn-icon"><X size={18} /></button>
+            </div>
+            <div className="modal-body">
+              {/* Nova Categoria */}
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
+                <input
+                  type="text"
+                  value={newCategoria.nome}
+                  onChange={e => setNewCategoria({ ...newCategoria, nome: e.target.value })}
+                  placeholder="Nova categoria..."
+                  className="form-input"
+                  style={{ flex: 1, minWidth: '150px' }}
+                  onKeyDown={e => e.key === 'Enter' && newCategoria.nome.trim() && handleSaveCategoria()}
+                />
+                <select
+                  value={newCategoria.tipo}
+                  onChange={e => setNewCategoria({ ...newCategoria, tipo: e.target.value })}
+                  className="form-input"
+                  style={{ width: '130px' }}
+                >
+                  <option value="materiais">Materiais</option>
+                  <option value="modelo3d">Modelos 3D</option>
+                  <option value="inspiracao">Inspiração</option>
+                </select>
+                <input
+                  type="color"
+                  value={newCategoria.cor}
+                  onChange={e => setNewCategoria({ ...newCategoria, cor: e.target.value })}
+                  style={{ width: '40px', height: '38px', padding: '2px', border: '1px solid var(--stone)', borderRadius: '6px', cursor: 'pointer' }}
+                />
+                <button onClick={handleSaveCategoria} className="btn btn-primary" disabled={!newCategoria.nome.trim()}>
+                  <Plus size={16} />
+                </button>
+              </div>
+
+              {/* Tabs por tipo */}
+              <div style={{ display: 'flex', gap: '4px', marginBottom: '12px' }}>
+                {[
+                  { id: 'materiais', label: 'Materiais' },
+                  { id: 'modelo3d', label: 'Modelos 3D' },
+                  { id: 'inspiracao', label: 'Inspiração' }
+                ].map(tipo => (
+                  <button
+                    key={tipo.id}
+                    onClick={() => setNewCategoria(prev => ({ ...prev, tipo: tipo.id }))}
+                    style={{
+                      padding: '6px 12px',
+                      fontSize: '12px',
+                      border: '1px solid var(--stone)',
+                      borderRadius: '6px',
+                      background: newCategoria.tipo === tipo.id ? 'var(--brown)' : 'white',
+                      color: newCategoria.tipo === tipo.id ? 'white' : 'var(--brown)',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {tipo.label} ({categorias.filter(c => c.tipo === tipo.id).length})
+                  </button>
+                ))}
+              </div>
+
+              {/* Lista de Categorias */}
+              <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                {categorias.filter(c => c.tipo === newCategoria.tipo).map(cat => {
+                  const IconComponent = ICON_MAP[cat.icone] || Layers
+                  return (
+                    <div key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 8px', borderBottom: '1px solid var(--stone)' }}>
+                      {editingCategoria?.id === cat.id ? (
+                        <>
+                          <input
+                            type="text"
+                            value={editingCategoria.nome}
+                            onChange={e => setEditingCategoria({ ...editingCategoria, nome: e.target.value })}
+                            className="form-input"
+                            style={{ flex: 1, padding: '6px 10px' }}
+                            autoFocus
+                            onKeyDown={e => e.key === 'Enter' && handleUpdateCategoria()}
+                          />
+                          <input
+                            type="color"
+                            value={editingCategoria.cor || '#C9A882'}
+                            onChange={e => setEditingCategoria({ ...editingCategoria, cor: e.target.value })}
+                            style={{ width: '32px', height: '32px', padding: '2px', border: '1px solid var(--stone)', borderRadius: '4px', cursor: 'pointer' }}
+                          />
+                          <button onClick={handleUpdateCategoria} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}>
+                            <Check size={16} style={{ color: 'var(--success)' }} />
+                          </button>
+                          <button onClick={() => setEditingCategoria(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}>
+                            <X size={16} style={{ color: 'var(--brown-light)' }} />
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <IconComponent size={16} style={{ color: cat.cor || 'var(--brown-light)' }} />
+                          <span style={{ flex: 1, fontSize: '13px' }}>{cat.nome}</span>
+                          <button onClick={() => setEditingCategoria({ ...cat })} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}>
+                            <Edit size={14} style={{ color: 'var(--brown-light)' }} />
+                          </button>
+                          <button onClick={() => handleDeleteCategoria(cat.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}>
+                            <Trash2 size={14} style={{ color: 'var(--error)' }} />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )
+                })}
+                {categorias.filter(c => c.tipo === newCategoria.tipo).length === 0 && (
+                  <div style={{ padding: '20px', textAlign: 'center', color: 'var(--brown-light)', fontSize: '13px' }}>
+                    Sem categorias neste tipo
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1313,7 +1553,7 @@ function ItemCard({ item, type, tags, categorias, onEdit, onDelete, onPreview, o
           <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginBottom: '8px' }}>
             {item.fornecedor && <span>{item.fornecedor}</span>}
             {item.fornecedor && item.preco_m2 && <span>  –  </span>}
-            {item.preco_m2 && <span style={{ color: 'var(--brown)', fontWeight: 500 }}>â‚¬{item.preco_m2}/m²</span>}
+            {item.preco_m2 && <span style={{ color: 'var(--brown)', fontWeight: 500 }}>€{item.preco_m2}/m²</span>}
           </div>
         )}
 
@@ -1321,7 +1561,7 @@ function ItemCard({ item, type, tags, categorias, onEdit, onDelete, onPreview, o
           <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginBottom: '8px' }}>
             {item.formato && <span style={{ background: 'var(--stone)', padding: '2px 6px', borderRadius: '4px', marginRight: '6px' }}>{item.formato}</span>}
             {item.largura_cm && item.altura_cm && item.profundidade_cm && (
-              <span>{item.largura_cm}À—{item.altura_cm}À—{item.profundidade_cm} cm</span>
+              <span>{item.largura_cm}×{item.altura_cm}×{item.profundidade_cm} cm</span>
             )}
           </div>
         )}
