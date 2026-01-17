@@ -706,6 +706,44 @@ export default function ProjetoDetalhe() {
   const [activeSubTab, setActiveSubTab] = useState('conceito-briefing')
   const [activeFaseSection, setActiveFaseSection] = useState('entregaveis')
 
+  // Gestão de Renders/Archviz
+  const [renders, setRenders] = useState([])
+  const [showRenderModal, setShowRenderModal] = useState(false)
+  const [editingRender, setEditingRender] = useState(null)
+  const [renderForm, setRenderForm] = useState({
+    compartimento: '',
+    versao: 1,
+    descricao: '',
+    is_final: false,
+    imagem_url: ''
+  })
+
+  // Lista de compartimentos comuns
+  const COMPARTIMENTOS = [
+    'Sala de Estar',
+    'Sala de Jantar',
+    'Cozinha',
+    'Suite Principal',
+    'Suite 1',
+    'Suite 2',
+    'Quarto 1',
+    'Quarto 2',
+    'Casa de Banho Social',
+    'Casa de Banho Suite',
+    'Hall de Entrada',
+    'Varanda',
+    'Terraço',
+    'Jardim',
+    'Piscina',
+    'Escritório',
+    'Closet',
+    'Lavandaria',
+    'Garagem',
+    'Exterior - Fachada',
+    'Exterior - Vista Geral',
+    'Outro'
+  ]
+
   // Opções para selects
   const TIPOLOGIAS = ['Residencial', 'Comercial', 'Hospitality', 'Misto']
   const SUBTIPOS = ['Moradia', 'Apartamento', 'Edifício', 'Loja', 'Escritório', 'Hotel', 'Restaurante']
@@ -1498,11 +1536,171 @@ export default function ProjetoDetalhe() {
     handleFileUpload(file)
   }
 
+  // Funções de gestão de renders
+  const getNextVersion = (compartimento) => {
+    const compartimentoRenders = renders.filter(r => r.compartimento === compartimento)
+    return compartimentoRenders.length + 1
+  }
+
+  const openAddRenderModal = () => {
+    setEditingRender(null)
+    setRenderForm({
+      compartimento: '',
+      versao: 1,
+      descricao: '',
+      is_final: false,
+      imagem_url: ''
+    })
+    setShowRenderModal(true)
+  }
+
+  const openEditRenderModal = (render) => {
+    setEditingRender(render)
+    setRenderForm({
+      compartimento: render.compartimento,
+      versao: render.versao,
+      descricao: render.descricao || '',
+      is_final: render.is_final || false,
+      imagem_url: render.imagem_url || ''
+    })
+    setShowRenderModal(true)
+  }
+
+  const handleRenderCompartimentoChange = (compartimento) => {
+    const versao = getNextVersion(compartimento)
+    setRenderForm(prev => ({ ...prev, compartimento, versao }))
+  }
+
+  const handleSaveRender = async () => {
+    if (!renderForm.compartimento) {
+      alert('Por favor selecione um compartimento')
+      return
+    }
+
+    try {
+      const renderData = {
+        projeto_id: project.id,
+        compartimento: renderForm.compartimento,
+        versao: editingRender ? renderForm.versao : getNextVersion(renderForm.compartimento),
+        descricao: renderForm.descricao,
+        is_final: renderForm.is_final,
+        imagem_url: renderForm.imagem_url,
+        created_at: new Date().toISOString()
+      }
+
+      if (editingRender) {
+        // Atualizar render existente
+        const { error } = await supabase
+          .from('projeto_renders')
+          .update(renderData)
+          .eq('id', editingRender.id)
+
+        if (error) throw error
+
+        setRenders(prev => prev.map(r =>
+          r.id === editingRender.id ? { ...r, ...renderData } : r
+        ))
+      } else {
+        // Criar novo render
+        const { data, error } = await supabase
+          .from('projeto_renders')
+          .insert([renderData])
+          .select()
+          .single()
+
+        if (error) {
+          // Se tabela não existe, guardar localmente
+          console.warn('Tabela projeto_renders não existe, guardando localmente')
+          const newRender = { ...renderData, id: Date.now() }
+          setRenders(prev => [...prev, newRender])
+        } else {
+          setRenders(prev => [...prev, data])
+        }
+      }
+
+      setShowRenderModal(false)
+      setEditingRender(null)
+    } catch (err) {
+      console.error('Erro ao guardar render:', err)
+      // Fallback para armazenamento local
+      const newRender = {
+        ...renderForm,
+        id: Date.now(),
+        versao: getNextVersion(renderForm.compartimento)
+      }
+      setRenders(prev => editingRender
+        ? prev.map(r => r.id === editingRender.id ? { ...r, ...renderForm } : r)
+        : [...prev, newRender]
+      )
+      setShowRenderModal(false)
+      setEditingRender(null)
+    }
+  }
+
+  const handleDeleteRender = async (render) => {
+    if (!confirm('Tem certeza que deseja eliminar este render?')) return
+
+    try {
+      const { error } = await supabase
+        .from('projeto_renders')
+        .delete()
+        .eq('id', render.id)
+
+      if (error) throw error
+    } catch (err) {
+      console.error('Erro ao eliminar:', err)
+    }
+
+    setRenders(prev => prev.filter(r => r.id !== render.id))
+  }
+
+  const toggleFinalImage = async (render) => {
+    const newIsFinal = !render.is_final
+
+    try {
+      await supabase
+        .from('projeto_renders')
+        .update({ is_final: newIsFinal })
+        .eq('id', render.id)
+    } catch (err) {
+      console.error('Erro ao atualizar:', err)
+    }
+
+    setRenders(prev => prev.map(r =>
+      r.id === render.id ? { ...r, is_final: newIsFinal } : r
+    ))
+  }
+
+  const handleRenderImageUpload = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Simular upload - em produção, fazer upload para Supabase Storage
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      setRenderForm(prev => ({ ...prev, imagem_url: event.target?.result }))
+    }
+    reader.readAsDataURL(file)
+  }
+
+  // Renders agrupados por compartimento
+  const rendersByCompartimento = renders.reduce((acc, render) => {
+    if (!acc[render.compartimento]) {
+      acc[render.compartimento] = []
+    }
+    acc[render.compartimento].push(render)
+    return acc
+  }, {})
+
+  // Imagens finais do projeto
+  const imagensFinais = renders.filter(r => r.is_final)
+
   // Tabs - Contratos e Financeiro apenas visíveis para administração
   const allTabs = [
     { id: 'dashboard', label: 'Dashboard Projeto', icon: Layers },
     { id: 'fases', label: 'Fases & Entregas', icon: Target },
     { id: 'archviz', label: 'Archviz', icon: Image },
+    { id: 'imagens-finais', label: 'Imagens Finais', icon: CheckCircle },
     { id: 'biblioteca', label: 'Biblioteca', icon: Library },
     { id: 'gestao', label: 'Gestão de Projeto', icon: Settings, adminOnly: true }
   ]
@@ -1660,25 +1858,6 @@ export default function ProjetoDetalhe() {
               )}
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* Progress Bar */}
-      <div className="card mb-lg">
-        <div className="flex items-center justify-between mb-md">
-          <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--brown)' }}>
-            Progresso Global
-          </span>
-          <span style={{ fontSize: '20px', fontWeight: 700, color: 'var(--brown)' }}>
-            {project.progresso}%
-          </span>
-        </div>
-        <div className="progress-bar" style={{ height: '8px' }}>
-          <div className="progress-fill" style={{ width: `${project.progresso}%` }} />
-        </div>
-        <div className="flex items-center justify-between mt-md text-muted" style={{ fontSize: '12px' }}>
-          <span>Início: {formatDate(project.datas.data_inicio)}</span>
-          <span>Previsão: {formatDate(project.datas.data_prevista)}</span>
         </div>
       </div>
 
@@ -2150,52 +2329,252 @@ export default function ProjetoDetalhe() {
       {activeTab === 'archviz' && (
         <div className="card">
           <div className="flex items-center justify-between" style={{ marginBottom: '24px' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
-              Visualizações 3D & Renders
-            </h3>
-            <button className="btn btn-primary" style={{ padding: '10px 16px' }}>
+            <div>
+              <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
+                Visualizações 3D & Renders
+              </h3>
+              <p style={{ fontSize: '13px', color: 'var(--brown-light)', marginTop: '4px' }}>
+                {renders.length} render{renders.length !== 1 ? 's' : ''} • {imagensFinais.length} imagem{imagensFinais.length !== 1 ? 'ns' : ''} final{imagensFinais.length !== 1 ? 'is' : ''}
+              </p>
+            </div>
+            <button onClick={openAddRenderModal} className="btn btn-primary" style={{ padding: '10px 16px' }}>
               <Plus size={16} style={{ marginRight: '8px' }} />
               Adicionar Render
             </button>
           </div>
 
-          <div className="grid grid-3" style={{ gap: '16px' }}>
-            {/* Placeholder renders */}
-            {[1, 2, 3].map((_, idx) => (
-              <div
-                key={idx}
-                style={{
-                  aspectRatio: '16/10',
-                  background: 'var(--cream)',
-                  borderRadius: '12px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  border: '2px dashed var(--stone)',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-              >
-                <Image size={32} style={{ color: 'var(--brown-light)', opacity: 0.4, marginBottom: '8px' }} />
-                <span style={{ fontSize: '12px', color: 'var(--brown-light)' }}>Adicionar imagem</span>
-              </div>
-            ))}
+          {/* Renders por Compartimento */}
+          {Object.keys(rendersByCompartimento).length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              {Object.entries(rendersByCompartimento).map(([compartimento, compartimentoRenders]) => (
+                <div key={compartimento}>
+                  <div className="flex items-center justify-between" style={{ marginBottom: '12px' }}>
+                    <h4 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--brown)' }}>
+                      {compartimento}
+                      <span style={{ fontWeight: 400, color: 'var(--brown-light)', marginLeft: '8px' }}>
+                        ({compartimentoRenders.length} versão{compartimentoRenders.length !== 1 ? 'ões' : ''})
+                      </span>
+                    </h4>
+                  </div>
+                  <div className="grid grid-4" style={{ gap: '12px' }}>
+                    {compartimentoRenders.sort((a, b) => b.versao - a.versao).map((render) => (
+                      <div
+                        key={render.id}
+                        style={{
+                          position: 'relative',
+                          aspectRatio: '16/10',
+                          background: render.imagem_url ? `url(${render.imagem_url}) center/cover` : 'var(--cream)',
+                          borderRadius: '12px',
+                          overflow: 'hidden',
+                          border: render.is_final ? '3px solid var(--success)' : '1px solid var(--stone)',
+                          cursor: 'pointer'
+                        }}
+                        onClick={() => openEditRenderModal(render)}
+                      >
+                        {!render.imagem_url && (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                            <Image size={24} style={{ color: 'var(--brown-light)', opacity: 0.4 }} />
+                          </div>
+                        )}
+
+                        {/* Versão Badge */}
+                        <div style={{
+                          position: 'absolute',
+                          top: '8px',
+                          left: '8px',
+                          padding: '4px 8px',
+                          background: 'rgba(0,0,0,0.7)',
+                          color: 'white',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          fontWeight: 600
+                        }}>
+                          v{render.versao}
+                        </div>
+
+                        {/* Final Badge */}
+                        {render.is_final && (
+                          <div style={{
+                            position: 'absolute',
+                            top: '8px',
+                            right: '8px',
+                            padding: '4px 8px',
+                            background: 'var(--success)',
+                            color: 'white',
+                            borderRadius: '6px',
+                            fontSize: '10px',
+                            fontWeight: 600,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}>
+                            <CheckCircle size={12} />
+                            FINAL
+                          </div>
+                        )}
+
+                        {/* Hover Actions */}
+                        <div style={{
+                          position: 'absolute',
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          padding: '8px',
+                          background: 'linear-gradient(transparent, rgba(0,0,0,0.8))',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
+                        }}>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); toggleFinalImage(render) }}
+                            style={{
+                              padding: '4px 8px',
+                              background: render.is_final ? 'var(--error)' : 'var(--success)',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              fontSize: '10px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {render.is_final ? 'Remover Final' : 'Marcar Final'}
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleDeleteRender(render) }}
+                            style={{
+                              padding: '4px',
+                              background: 'rgba(255,255,255,0.2)',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{
+              padding: '48px',
+              background: 'var(--cream)',
+              borderRadius: '12px',
+              textAlign: 'center'
+            }}>
+              <Image size={48} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '16px' }} />
+              <h4 style={{ color: 'var(--brown)', marginBottom: '8px' }}>Galeria Archviz Vazia</h4>
+              <p style={{ color: 'var(--brown-light)', fontSize: '13px', marginBottom: '16px' }}>
+                Adicione renders e visualizações 3D organizados por compartimento.
+              </p>
+              <button onClick={openAddRenderModal} className="btn btn-secondary">
+                <Plus size={16} style={{ marginRight: '8px' }} />
+                Adicionar Primeiro Render
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tab Imagens Finais */}
+      {activeTab === 'imagens-finais' && (
+        <div className="card">
+          <div className="flex items-center justify-between" style={{ marginBottom: '24px' }}>
+            <div>
+              <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
+                Imagens Finais do Projeto
+              </h3>
+              <p style={{ fontSize: '13px', color: 'var(--brown-light)', marginTop: '4px' }}>
+                Imagens aprovadas para entrega ao cliente
+              </p>
+            </div>
+            <span style={{
+              padding: '8px 16px',
+              background: 'var(--success)',
+              color: 'white',
+              borderRadius: '20px',
+              fontSize: '13px',
+              fontWeight: 600
+            }}>
+              {imagensFinais.length} imagem{imagensFinais.length !== 1 ? 'ns' : ''}
+            </span>
           </div>
 
-          <div style={{
-            marginTop: '24px',
-            padding: '32px',
-            background: 'var(--cream)',
-            borderRadius: '12px',
-            textAlign: 'center'
-          }}>
-            <Image size={48} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '16px' }} />
-            <h4 style={{ color: 'var(--brown)', marginBottom: '8px' }}>Galeria Archviz</h4>
-            <p style={{ color: 'var(--brown-light)', fontSize: '13px' }}>
-              Arraste imagens aqui ou clique para fazer upload de renders e visualizações 3D do projeto.
-            </p>
-          </div>
+          {imagensFinais.length > 0 ? (
+            <div className="grid grid-3" style={{ gap: '16px' }}>
+              {imagensFinais.map((render) => (
+                <div
+                  key={render.id}
+                  style={{
+                    position: 'relative',
+                    aspectRatio: '16/10',
+                    background: render.imagem_url ? `url(${render.imagem_url}) center/cover` : 'var(--cream)',
+                    borderRadius: '12px',
+                    overflow: 'hidden',
+                    border: '3px solid var(--success)'
+                  }}
+                >
+                  {!render.imagem_url && (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                      <Image size={32} style={{ color: 'var(--brown-light)', opacity: 0.4 }} />
+                    </div>
+                  )}
+
+                  <div style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    padding: '12px',
+                    background: 'linear-gradient(transparent, rgba(0,0,0,0.8))',
+                    color: 'white'
+                  }}>
+                    <div style={{ fontSize: '13px', fontWeight: 600 }}>{render.compartimento}</div>
+                    <div style={{ fontSize: '11px', opacity: 0.8 }}>Versão {render.versao}</div>
+                  </div>
+
+                  <button
+                    onClick={() => toggleFinalImage(render)}
+                    style={{
+                      position: 'absolute',
+                      top: '8px',
+                      right: '8px',
+                      padding: '6px 10px',
+                      background: 'var(--error)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      fontSize: '11px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <X size={12} />
+                    Remover
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{
+              padding: '48px',
+              background: 'var(--cream)',
+              borderRadius: '12px',
+              textAlign: 'center'
+            }}>
+              <CheckCircle size={48} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '16px' }} />
+              <h4 style={{ color: 'var(--brown)', marginBottom: '8px' }}>Nenhuma Imagem Final</h4>
+              <p style={{ color: 'var(--brown-light)', fontSize: '13px' }}>
+                Vá à tab "Archviz" e marque as imagens que devem aparecer nas entregas ao cliente.
+              </p>
+            </div>
+          )}
         </div>
       )}
 
@@ -2515,6 +2894,240 @@ export default function ProjetoDetalhe() {
                 }}
               >
                 Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Adicionar/Editar Render */}
+      {showRenderModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+          onClick={() => setShowRenderModal(false)}
+        >
+          <div
+            style={{
+              background: 'var(--white)',
+              borderRadius: '16px',
+              width: '100%',
+              maxWidth: '500px',
+              maxHeight: '90vh',
+              overflow: 'auto',
+              margin: '20px'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '20px 24px',
+              borderBottom: '1px solid var(--stone)'
+            }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--brown)' }}>
+                {editingRender ? 'Editar Render' : 'Adicionar Render'}
+              </h2>
+              <button
+                onClick={() => setShowRenderModal(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--brown-light)' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Form */}
+            <div style={{ padding: '24px' }}>
+              {/* Compartimento */}
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '8px', color: 'var(--brown)' }}>
+                  Compartimento *
+                </label>
+                <select
+                  value={renderForm.compartimento}
+                  onChange={(e) => handleRenderCompartimentoChange(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid var(--stone)',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    background: 'var(--white)',
+                    color: 'var(--brown)'
+                  }}
+                >
+                  <option value="">Selecionar compartimento...</option>
+                  {COMPARTIMENTOS.map(comp => (
+                    <option key={comp} value={comp}>{comp}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Versão (auto) */}
+              {renderForm.compartimento && (
+                <div style={{
+                  marginBottom: '20px',
+                  padding: '12px 16px',
+                  background: 'var(--cream)',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}>
+                  <span style={{ fontSize: '13px', color: 'var(--brown-light)' }}>
+                    Versão automática
+                  </span>
+                  <span style={{
+                    fontSize: '16px',
+                    fontWeight: 700,
+                    color: 'var(--brown)',
+                    background: 'var(--white)',
+                    padding: '4px 12px',
+                    borderRadius: '6px'
+                  }}>
+                    v{editingRender ? renderForm.versao : getNextVersion(renderForm.compartimento)}
+                  </span>
+                </div>
+              )}
+
+              {/* Imagem Upload */}
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '8px', color: 'var(--brown)' }}>
+                  Imagem do Render
+                </label>
+                <div
+                  style={{
+                    position: 'relative',
+                    aspectRatio: '16/10',
+                    background: renderForm.imagem_url ? `url(${renderForm.imagem_url}) center/cover` : 'var(--cream)',
+                    borderRadius: '12px',
+                    border: '2px dashed var(--stone)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    overflow: 'hidden'
+                  }}
+                  onClick={() => document.getElementById('render-image-input').click()}
+                >
+                  {!renderForm.imagem_url && (
+                    <>
+                      <Upload size={32} style={{ color: 'var(--brown-light)', opacity: 0.5, marginBottom: '8px' }} />
+                      <span style={{ fontSize: '13px', color: 'var(--brown-light)' }}>
+                        Clique para fazer upload
+                      </span>
+                    </>
+                  )}
+                  {renderForm.imagem_url && (
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '8px',
+                      right: '8px',
+                      padding: '6px 12px',
+                      background: 'rgba(0,0,0,0.7)',
+                      color: 'white',
+                      borderRadius: '6px',
+                      fontSize: '11px'
+                    }}>
+                      Clique para alterar
+                    </div>
+                  )}
+                </div>
+                <input
+                  id="render-image-input"
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={handleRenderImageUpload}
+                />
+              </div>
+
+              {/* Descrição */}
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '8px', color: 'var(--brown)' }}>
+                  Descrição (opcional)
+                </label>
+                <textarea
+                  value={renderForm.descricao}
+                  onChange={(e) => setRenderForm(prev => ({ ...prev, descricao: e.target.value }))}
+                  placeholder="Notas sobre este render..."
+                  rows={3}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid var(--stone)',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    resize: 'vertical',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              {/* Marcar como Final */}
+              <div style={{
+                marginBottom: '20px',
+                padding: '16px',
+                background: renderForm.is_final ? 'rgba(var(--success-rgb), 0.1)' : 'var(--cream)',
+                borderRadius: '12px',
+                border: renderForm.is_final ? '2px solid var(--success)' : '1px solid var(--stone)'
+              }}>
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  cursor: 'pointer'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={renderForm.is_final}
+                    onChange={(e) => setRenderForm(prev => ({ ...prev, is_final: e.target.checked }))}
+                    style={{
+                      width: '20px',
+                      height: '20px',
+                      accentColor: 'var(--success)'
+                    }}
+                  />
+                  <div>
+                    <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--brown)', display: 'block' }}>
+                      Marcar como Imagem Final
+                    </span>
+                    <span style={{ fontSize: '12px', color: 'var(--brown-light)' }}>
+                      Esta imagem aparecerá nas entregas ao cliente
+                    </span>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div style={{
+              display: 'flex',
+              gap: '12px',
+              justifyContent: 'flex-end',
+              padding: '16px 24px',
+              borderTop: '1px solid var(--stone)',
+              background: 'var(--cream)'
+            }}>
+              <button onClick={() => setShowRenderModal(false)} className="btn btn-outline">
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveRender}
+                className="btn btn-primary"
+                disabled={!renderForm.compartimento}
+              >
+                {editingRender ? 'Guardar Alterações' : 'Adicionar Render'}
               </button>
             </div>
           </div>
