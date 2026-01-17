@@ -23,7 +23,8 @@ import {
   Receipt,
   ShoppingCart,
   PieChart,
-  Wallet
+  Wallet,
+  Library
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -43,6 +44,7 @@ const navigation = [
         ]
       },
       { name: 'Calendário', href: '/calendario', icon: Calendar },
+      { name: 'Biblioteca', href: '/biblioteca', icon: Library },
     ]
   },
   {
