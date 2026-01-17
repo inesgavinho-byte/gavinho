@@ -495,10 +495,9 @@ export default function Projetos() {
                   }} />
                 </div>
 
-                {/* Footer: Status + Orçamento */}
+                {/* Footer: Status */}
                 <div style={{
                   display: 'flex',
-                  justifyContent: 'space-between',
                   alignItems: 'center',
                   marginTop: '4px'
                 }}>
@@ -516,13 +515,6 @@ export default function Projetos() {
                       background: getStatusColor(p.status)
                     }} />
                     {getStatusLabel(p.status)}
-                  </span>
-                  <span style={{
-                    fontSize: '14px',
-                    fontWeight: 600,
-                    color: 'var(--brown)'
-                  }}>
-                    {p.orcamento_atual ? formatCurrency(p.orcamento_atual) : '— €0'}
                   </span>
                 </div>
               </div>
