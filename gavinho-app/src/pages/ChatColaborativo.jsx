@@ -405,15 +405,19 @@ export default function ChatColaborativo() {
   }
 
   return (
-    <div className="fade-in" style={{ height: 'calc(100vh - 120px)' }}>
+    <div className="fade-in" style={{
+      height: 'calc(100vh - 64px)',
+      margin: '-24px',
+      marginTop: '-16px'
+    }}>
       <div style={{
         display: 'grid',
         gridTemplateColumns: '280px 1fr',
         height: '100%',
         background: 'var(--white)',
-        borderRadius: '12px',
+        borderRadius: '0',
         overflow: 'hidden',
-        border: '1px solid var(--stone)'
+        borderLeft: '1px solid var(--stone)'
       }}>
 
         {/* ========== SIDEBAR ESTILO TEAMS ========== */}
