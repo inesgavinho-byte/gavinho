@@ -363,36 +363,170 @@ export default function Projetos() {
           <button className="btn btn-primary" style={{ marginTop: '16px' }} onClick={handleNewProject}>Criar Primeiro Projeto</button>
         </div>
       ) : viewMode === 'grid' ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
-          {filteredProjects.map((p) => (
-            <div key={p.id} className="card" style={{ cursor: 'pointer', position: 'relative' }} onClick={() => navigate(`/projetos/${p.codigo}`)}>
-              <div style={{ position: 'absolute', top: '16px', right: '16px' }}>
-                <button onClick={(e) => { e.stopPropagation(); setActiveMenu(activeMenu === p.id ? null : p.id) }} className="btn btn-ghost btn-icon"><MoreVertical size={16} /></button>
-                {activeMenu === p.id && (
-                  <div style={{ position: 'absolute', right: 0, top: '100%', background: 'var(--white)', borderRadius: '10px', boxShadow: 'var(--shadow-lg)', minWidth: '150px', zIndex: 100, overflow: 'hidden' }}>
-                    <button onClick={(e) => { e.stopPropagation(); navigate(`/projetos/${p.codigo}`) }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--brown)' }}><Eye size={14} />Ver Detalhe</button>
-                    <button onClick={(e) => { e.stopPropagation(); handleEditProject(p) }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--brown)' }}><Edit size={14} />Editar</button>
-                    <button onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(p); setActiveMenu(null) }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--error)' }}><Trash2 size={14} />Eliminar</button>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '20px' }}>
+          {filteredProjects.map((p) => {
+            const prioridade = getPrioridadeFromOrcamento(p.orcamento_atual)
+            const prioridadeStyle = getPrioridadeStyle(prioridade)
+            return (
+              <div
+                key={p.id}
+                className="card"
+                style={{
+                  cursor: 'pointer',
+                  position: 'relative',
+                  padding: '20px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '16px'
+                }}
+                onClick={() => navigate(`/projetos/${p.codigo}`)}
+              >
+                {/* Header: Título + Menu + Badge */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1, paddingRight: '60px' }}>
+                    <h3 style={{
+                      fontSize: '16px',
+                      fontWeight: 600,
+                      color: 'var(--brown)',
+                      marginBottom: '4px',
+                      lineHeight: 1.3
+                    }}>
+                      {p.codigo}_{(p.nome || '').toUpperCase()}
+                    </h3>
+                    <p style={{
+                      fontSize: '13px',
+                      color: 'var(--brown-light)',
+                      margin: 0
+                    }}>
+                      {p.cliente_nome || 'Cliente não definido'}
+                    </p>
                   </div>
-                )}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                <span style={{ fontFamily: 'monospace', fontWeight: 600, color: 'var(--warning)' }}>{p.codigo}</span>
-                <span style={{ padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 600, background: `${getFaseColor(p.fase)}20`, color: getFaseColor(p.fase) }}>{p.fase}</span>
-              </div>
-              <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '12px' }}>{p.nome}</h3>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                <div style={{ flex: 1, height: '6px', background: 'var(--stone)', borderRadius: '3px', overflow: 'hidden' }}>
-                  <div style={{ width: `${p.progresso || 0}%`, height: '100%', background: getStatusColor(p.status), borderRadius: '3px' }} />
+
+                  {/* Priority Badge */}
+                  <span style={{
+                    position: 'absolute',
+                    top: '16px',
+                    right: '50px',
+                    padding: '6px 14px',
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    borderRadius: '6px',
+                    background: prioridadeStyle.bg,
+                    color: 'white'
+                  }}>
+                    {prioridadeStyle.label}
+                  </span>
+
+                  {/* Menu */}
+                  <div style={{ position: 'absolute', top: '12px', right: '12px' }}>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setActiveMenu(activeMenu === p.id ? null : p.id) }}
+                      className="btn btn-ghost btn-icon"
+                      style={{ padding: '4px' }}
+                    >
+                      <MoreVertical size={16} />
+                    </button>
+                    {activeMenu === p.id && (
+                      <div style={{
+                        position: 'absolute',
+                        right: 0,
+                        top: '100%',
+                        background: 'var(--white)',
+                        borderRadius: '10px',
+                        boxShadow: 'var(--shadow-lg)',
+                        minWidth: '150px',
+                        zIndex: 100,
+                        overflow: 'hidden'
+                      }}>
+                        <button onClick={(e) => { e.stopPropagation(); navigate(`/projetos/${p.codigo}`) }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--brown)' }}><Eye size={14} />Ver Detalhe</button>
+                        <button onClick={(e) => { e.stopPropagation(); handleEditProject(p) }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--brown)' }}><Edit size={14} />Editar</button>
+                        <button onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(p); setActiveMenu(null) }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--error)' }}><Trash2 size={14} />Eliminar</button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <span style={{ fontSize: '12px', fontWeight: 500 }}>{p.progresso || 0}%</span>
+
+                {/* Meta Info: Localização + Datas */}
+                <div style={{
+                  display: 'flex',
+                  gap: '20px',
+                  fontSize: '13px',
+                  color: 'var(--brown-light)'
+                }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <MapPin size={14} />
+                    {p.cidade || p.localizacao || '—'}
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Calendar size={14} />
+                    {formatDateRange(p.data_inicio, p.data_prevista_conclusao)}
+                  </span>
+                </div>
+
+                {/* Progress Bar */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{
+                    flex: 1,
+                    height: '4px',
+                    background: 'var(--stone)',
+                    borderRadius: '2px',
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{
+                      width: `${p.progresso || 0}%`,
+                      height: '100%',
+                      background: getStatusColor(p.status),
+                      borderRadius: '2px',
+                      transition: 'width 0.3s ease'
+                    }} />
+                  </div>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    color: 'var(--brown)',
+                    minWidth: '36px',
+                    textAlign: 'right'
+                  }}>
+                    {p.progresso || 0}%
+                  </span>
+                </div>
+
+                {/* Footer: Status + Orçamento */}
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  paddingTop: '8px',
+                  borderTop: '1px solid var(--stone)'
+                }}>
+                  <span style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    fontSize: '13px',
+                    color: 'var(--brown-light)'
+                  }}>
+                    <span style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: getStatusColor(p.status)
+                    }} />
+                    {getStatusLabel(p.status)}
+                  </span>
+                  <span style={{
+                    fontSize: '15px',
+                    fontWeight: 600,
+                    color: 'var(--brown)'
+                  }}>
+                    {formatCurrency(p.orcamento_atual)}
+                  </span>
+                </div>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--brown-light)' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><MapPin size={12} />{p.cidade || p.localizacao || '-'}</span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ width: '8px', height: '8px', borderRadius: '50%', background: getStatusColor(p.status) }} />{getStatusLabel(p.status)}</span>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       ) : (
         <div className="card">
