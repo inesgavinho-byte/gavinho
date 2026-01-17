@@ -816,9 +816,9 @@ export default function ProjetoDetalhe() {
     setSaving(false)
   }
 
-  // Sincronizar tab da URL com estado
+  // Sincronizar tab da URL com estado - só atualiza se urlTab mudar
   useEffect(() => {
-    if (urlTab && urlTab !== activeTab) {
+    if (urlTab) {
       setActiveTab(urlTab)
     }
   }, [urlTab])
