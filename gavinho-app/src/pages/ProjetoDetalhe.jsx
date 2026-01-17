@@ -33,7 +33,11 @@ import {
   File,
   ListChecks,
   FileCheck,
-  Lock
+  Lock,
+  Image,
+  Library,
+  Settings,
+  Eye
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -1503,16 +1507,34 @@ export default function ProjetoDetalhe() {
 
   // Tabs - Contratos e Financeiro apenas visíveis para administração
   const allTabs = [
-    { id: 'geral', label: 'Geral', icon: Layers },
+    { id: 'dashboard', label: 'Dashboard Projeto', icon: Layers },
     { id: 'fases', label: 'Fases & Entregas', icon: Target },
-    { id: 'contratos', label: 'Contratos', icon: FileCheck, adminOnly: true },
-    { id: 'financeiro', label: 'Financeiro', icon: Euro, adminOnly: true },
-    { id: 'documentos', label: 'Documentos', icon: FileText }
+    { id: 'archviz', label: 'Archviz', icon: Image },
+    { id: 'biblioteca', label: 'Biblioteca', icon: Library },
+    { id: 'gestao', label: 'Gestão de Projeto', icon: Settings, adminOnly: true }
   ]
 
-  // Sub-tabs para Fases & Entregas
-  const [activeSubTab, setActiveSubTab] = useState('fases-contratuais')
-  
+  // Sub-tabs para Fases & Entregas - Fases do projeto
+  const [activeSubTab, setActiveSubTab] = useState('conceito-briefing')
+  const [activeFaseSection, setActiveFaseSection] = useState('entregaveis')
+
+  const fasesDoProjetoTabs = [
+    { id: 'conceito-briefing', label: 'Conceito & Briefing' },
+    { id: 'estudo-previo', label: 'Estudo Prévio' },
+    { id: 'projeto-base', label: 'Projeto Base' },
+    { id: 'projeto-execucao', label: 'Projeto Execução' },
+    { id: 'compatibilizacao', label: 'Compatibilização' },
+    { id: 'bom-construcao', label: 'Bom para Construção' }
+  ]
+
+  // Secções dentro de cada fase
+  const faseSections = [
+    { id: 'prazo', label: 'Prazo Contratual', icon: Calendar },
+    { id: 'entregaveis', label: 'Entregáveis', icon: ListChecks },
+    { id: 'design-review', label: 'Design Review', icon: Eye },
+    { id: 'atas', label: 'Atas', icon: FileText }
+  ]
+
   const tabs = allTabs.filter(tab => !tab.adminOnly || isAdmin())
 
   return (
@@ -1710,7 +1732,7 @@ export default function ProjetoDetalhe() {
       </div>
 
       {/* Tab Content */}
-      {activeTab === 'geral' && (
+      {activeTab === 'dashboard' && (
         <div className="grid grid-2" style={{ gap: '24px' }}>
           {/* Cliente */}
           <div className="card">
@@ -1927,457 +1949,443 @@ export default function ProjetoDetalhe() {
         </div>
       )}
 
-      {/* Tab Fases & Entregas com Sub-tabs */}
+      {/* Tab Fases & Entregas */}
       {activeTab === 'fases' && (
         <div>
-          {/* Sub-tabs navigation */}
+          {/* Fases navigation - horizontal tabs */}
           <div style={{
             display: 'flex',
-            gap: '8px',
+            gap: '4px',
             marginBottom: '24px',
-            borderBottom: '1px solid var(--stone)',
-            paddingBottom: '16px'
+            background: 'var(--cream)',
+            padding: '6px',
+            borderRadius: '12px',
+            overflowX: 'auto'
           }}>
-            {[
-              { id: 'fases-contratuais', label: 'Fases Contratuais' },
-              { id: 'entregaveis', label: 'Entregáveis' },
-              { id: 'central-entregas', label: 'Central de Entregas' }
-            ].map(subTab => (
+            {fasesDoProjetoTabs.map((fase, index) => (
               <button
-                key={subTab.id}
-                onClick={() => setActiveSubTab(subTab.id)}
+                key={fase.id}
+                onClick={() => setActiveSubTab(fase.id)}
                 style={{
-                  padding: '10px 20px',
-                  background: activeSubTab === subTab.id ? 'var(--brown)' : 'var(--cream)',
-                  color: activeSubTab === subTab.id ? 'white' : 'var(--brown)',
+                  padding: '12px 16px',
+                  background: activeSubTab === fase.id ? 'var(--white)' : 'transparent',
+                  boxShadow: activeSubTab === fase.id ? 'var(--shadow-sm)' : 'none',
+                  color: activeSubTab === fase.id ? 'var(--brown)' : 'var(--brown-light)',
                   border: 'none',
                   borderRadius: '8px',
                   fontSize: '13px',
+                  fontWeight: activeSubTab === fase.id ? 600 : 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  whiteSpace: 'nowrap',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                <span style={{
+                  width: '22px',
+                  height: '22px',
+                  borderRadius: '50%',
+                  background: activeSubTab === fase.id ? 'var(--brown)' : 'var(--stone)',
+                  color: activeSubTab === fase.id ? 'white' : 'var(--brown-light)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '11px',
+                  fontWeight: 700
+                }}>
+                  {index + 1}
+                </span>
+                {fase.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Section navigation within phase */}
+          <div style={{
+            display: 'flex',
+            gap: '8px',
+            marginBottom: '20px',
+            borderBottom: '1px solid var(--stone)',
+            paddingBottom: '12px'
+          }}>
+            {faseSections.map(section => (
+              <button
+                key={section.id}
+                onClick={() => setActiveFaseSection(section.id)}
+                style={{
+                  padding: '8px 16px',
+                  background: activeFaseSection === section.id ? 'var(--brown)' : 'transparent',
+                  color: activeFaseSection === section.id ? 'white' : 'var(--brown-light)',
+                  border: activeFaseSection === section.id ? 'none' : '1px solid var(--stone)',
+                  borderRadius: '20px',
+                  fontSize: '12px',
                   fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <section.icon size={14} />
+                {section.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Content based on active section */}
+          <div className="card">
+            <h3 style={{
+              fontSize: '16px',
+              fontWeight: 600,
+              color: 'var(--brown)',
+              marginBottom: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px'
+            }}>
+              {fasesDoProjetoTabs.find(f => f.id === activeSubTab)?.label}
+              <span style={{
+                fontSize: '12px',
+                fontWeight: 500,
+                padding: '4px 10px',
+                background: 'var(--cream)',
+                borderRadius: '12px',
+                color: 'var(--brown-light)'
+              }}>
+                {faseSections.find(s => s.id === activeFaseSection)?.label}
+              </span>
+            </h3>
+
+            {/* Prazo Contratual */}
+            {activeFaseSection === 'prazo' && (
+              <div>
+                <div className="grid grid-3" style={{ gap: '16px', marginBottom: '24px' }}>
+                  <div style={{ padding: '16px', background: 'var(--cream)', borderRadius: '12px' }}>
+                    <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginBottom: '4px' }}>Data Início</div>
+                    <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
+                      {project.data_inicio ? new Date(project.data_inicio).toLocaleDateString('pt-PT') : 'A definir'}
+                    </div>
+                  </div>
+                  <div style={{ padding: '16px', background: 'var(--cream)', borderRadius: '12px' }}>
+                    <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginBottom: '4px' }}>Data Fim Prevista</div>
+                    <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
+                      {project.data_fim_prevista ? new Date(project.data_fim_prevista).toLocaleDateString('pt-PT') : 'A definir'}
+                    </div>
+                  </div>
+                  <div style={{ padding: '16px', background: 'var(--cream)', borderRadius: '12px' }}>
+                    <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginBottom: '4px' }}>Duração</div>
+                    <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
+                      {project.prazo_execucao || '—'} {project.prazo_execucao ? 'dias' : ''}
+                    </div>
+                  </div>
+                </div>
+                <div style={{
+                  padding: '24px',
+                  background: 'var(--cream)',
+                  borderRadius: '12px',
+                  textAlign: 'center',
+                  color: 'var(--brown-light)'
+                }}>
+                  <Calendar size={32} style={{ opacity: 0.3, marginBottom: '12px' }} />
+                  <p>Timeline detalhado desta fase em desenvolvimento.</p>
+                </div>
+              </div>
+            )}
+
+            {/* Entregáveis */}
+            {activeFaseSection === 'entregaveis' && (
+              <ProjetoEntregaveis projeto={project} faseAtual={activeSubTab} />
+            )}
+
+            {/* Design Review */}
+            {activeFaseSection === 'design-review' && (
+              <div style={{
+                padding: '48px',
+                background: 'var(--cream)',
+                borderRadius: '12px',
+                textAlign: 'center',
+                color: 'var(--brown-light)'
+              }}>
+                <Eye size={48} style={{ opacity: 0.3, marginBottom: '16px' }} />
+                <h4 style={{ color: 'var(--brown)', marginBottom: '8px' }}>Design Review</h4>
+                <p>Sistema de revisão de design com comentários e aprovações.</p>
+                <button className="btn btn-secondary" style={{ marginTop: '16px' }}>
+                  <Plus size={16} style={{ marginRight: '8px' }} />
+                  Iniciar Design Review
+                </button>
+              </div>
+            )}
+
+            {/* Atas */}
+            {activeFaseSection === 'atas' && (
+              <div>
+                <div className="flex items-center justify-between" style={{ marginBottom: '20px' }}>
+                  <span style={{ fontSize: '13px', color: 'var(--brown-light)' }}>
+                    Atas de reunião desta fase
+                  </span>
+                  <button className="btn btn-primary" style={{ padding: '8px 16px' }}>
+                    <Plus size={16} style={{ marginRight: '8px' }} />
+                    Nova Ata
+                  </button>
+                </div>
+                <div style={{
+                  padding: '48px',
+                  background: 'var(--cream)',
+                  borderRadius: '12px',
+                  textAlign: 'center',
+                  color: 'var(--brown-light)'
+                }}>
+                  <FileText size={48} style={{ opacity: 0.3, marginBottom: '16px' }} />
+                  <p>Nenhuma ata registada para esta fase.</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Tab Archviz */}
+      {activeTab === 'archviz' && (
+        <div className="card">
+          <div className="flex items-center justify-between" style={{ marginBottom: '24px' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
+              Visualizações 3D & Renders
+            </h3>
+            <button className="btn btn-primary" style={{ padding: '10px 16px' }}>
+              <Plus size={16} style={{ marginRight: '8px' }} />
+              Adicionar Render
+            </button>
+          </div>
+
+          <div className="grid grid-3" style={{ gap: '16px' }}>
+            {/* Placeholder renders */}
+            {[1, 2, 3].map((_, idx) => (
+              <div
+                key={idx}
+                style={{
+                  aspectRatio: '16/10',
+                  background: 'var(--cream)',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '2px dashed var(--stone)',
                   cursor: 'pointer',
                   transition: 'all 0.2s'
                 }}
               >
-                {subTab.label}
-              </button>
+                <Image size={32} style={{ color: 'var(--brown-light)', opacity: 0.4, marginBottom: '8px' }} />
+                <span style={{ fontSize: '12px', color: 'var(--brown-light)' }}>Adicionar imagem</span>
+              </div>
             ))}
           </div>
 
-          {/* Sub-tab: Fases Contratuais */}
-          {activeSubTab === 'fases-contratuais' && (
-            <div className="card">
-              <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)', marginBottom: '24px' }}>
-                Fases Contratuais
-              </h3>
-
-              {project.servicos && project.servicos[1]?.fases?.length > 0 ? (
-                project.servicos[1].fases.map((fase, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      padding: '24px',
-                      background: fase.status === 'em_progresso' ? 'var(--cream)' : 'transparent',
-                      borderRadius: '16px',
-                      marginBottom: '16px',
-                      border: fase.status === 'em_progresso' ? '2px solid var(--blush)' : '1px solid var(--stone)'
-                    }}
-                  >
-                    <div className="flex items-center justify-between mb-lg">
-                      <div className="flex items-center gap-md">
-                        <div style={{
-                          width: '36px',
-                          height: '36px',
-                          borderRadius: '50%',
-                          background: fase.status === 'em_progresso' ? 'var(--blush)' :
-                                      fase.status === 'concluido' ? 'var(--success)' : 'var(--stone)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: fase.status === 'pendente' ? 'var(--brown-light)' : 'var(--white)',
-                          fontWeight: 700,
-                          fontSize: '14px'
-                        }}>
-                          {fase.status === 'concluido' ? <CheckCircle size={18} /> : fase.numero}
-                        </div>
-                        <div>
-                          <div style={{ fontWeight: 600, color: 'var(--brown)' }}>
-                            Fase {fase.numero}: {fase.nome}
-                          </div>
-                          <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>
-                            Prazo: {fase.prazo}
-                          </div>
-                        </div>
-                      </div>
-                      <div
-                        style={{
-                          padding: '6px 12px',
-                          borderRadius: '20px',
-                          background: `${getStatusColor(fase.status)}15`,
-                          color: getStatusColor(fase.status),
-                          fontSize: '12px',
-                          fontWeight: 600
-                        }}
-                      >
-                        {getStatusLabel(fase.status)}
-                      </div>
-                    </div>
-
-                    {fase.entregaveis && fase.entregaveis.length > 0 && (
-                      <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(2, 1fr)',
-                        gap: '10px',
-                        marginLeft: '52px'
-                      }}>
-                        {fase.entregaveis.map((item, i) => (
-                          <div
-                            key={i}
-                            className="flex items-center gap-sm"
-                            style={{ fontSize: '13px', color: 'var(--brown-light)' }}
-                          >
-                            <div style={{
-                              width: '6px',
-                              height: '6px',
-                              borderRadius: '50%',
-                              background: 'var(--stone-dark)'
-                            }} />
-                            {item}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))
-              ) : (
-                <p style={{ textAlign: 'center', color: 'var(--brown-light)', padding: '48px' }}>
-                  Nenhuma fase contratual definida para este projeto.
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Sub-tab: Entregáveis */}
-          {activeSubTab === 'entregaveis' && (
-            <ProjetoEntregaveis projeto={project} />
-          )}
-
-          {/* Sub-tab: Central de Entregas */}
-          {activeSubTab === 'central-entregas' && (
-            <CentralEntregas projeto={project} />
-          )}
+          <div style={{
+            marginTop: '24px',
+            padding: '32px',
+            background: 'var(--cream)',
+            borderRadius: '12px',
+            textAlign: 'center'
+          }}>
+            <Image size={48} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '16px' }} />
+            <h4 style={{ color: 'var(--brown)', marginBottom: '8px' }}>Galeria Archviz</h4>
+            <p style={{ color: 'var(--brown-light)', fontSize: '13px' }}>
+              Arraste imagens aqui ou clique para fazer upload de renders e visualizações 3D do projeto.
+            </p>
+          </div>
         </div>
       )}
 
-      {/* Tab Contratos - Apenas Administração */}
-      {activeTab === 'contratos' && isAdmin() && (
-        <ProjetoDocumentos projeto={project} />
-      )}
-
-      {/* Tab Financeiro - Apenas Administração */}
-      {activeTab === 'financeiro' && isAdmin() && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          {/* KPIs Financeiros */}
-          <div className="grid grid-4" style={{ gap: '16px' }}>
+      {/* Tab Biblioteca do Projeto */}
+      {activeTab === 'biblioteca' && (
+        <div>
+          <div className="grid grid-3" style={{ gap: '16px', marginBottom: '24px' }}>
+            {/* KPI Cards */}
             {[
-              { label: 'Total Contratado', value: project.financeiro.total_contratado, color: 'var(--brown)' },
-              { label: 'Total Faturado', value: project.financeiro.total_faturado, color: 'var(--info)' },
-              { label: 'Total Pago', value: project.financeiro.total_pago, color: 'var(--success)' },
-              { label: 'Total Pendente', value: project.financeiro.total_pendente, color: 'var(--warning)' }
-            ].map((kpi, idx) => (
+              { label: 'Materiais', count: 12, icon: '🎨' },
+              { label: 'Objetos 3D', count: 8, icon: '📦' },
+              { label: 'Texturas', count: 24, icon: '🖼️' }
+            ].map((item, idx) => (
               <div key={idx} className="card" style={{ padding: '20px' }}>
-                <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginBottom: '8px' }}>
-                  {kpi.label}
-                </div>
-                <div style={{ fontSize: '24px', fontWeight: 700, color: kpi.color }}>
-                  {formatCurrency(kpi.value)}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Plano de Pagamentos */}
-          <div className="card">
-            <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)', marginBottom: '20px' }}>
-              Plano de Pagamentos
-            </h3>
-            
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <th style={{ textAlign: 'left', padding: '12px', borderBottom: '1px solid var(--stone)', fontSize: '12px', color: 'var(--brown-light)', fontWeight: 600 }}>Prestação</th>
-                  <th style={{ textAlign: 'left', padding: '12px', borderBottom: '1px solid var(--stone)', fontSize: '12px', color: 'var(--brown-light)', fontWeight: 600 }}>Descrição</th>
-                  <th style={{ textAlign: 'left', padding: '12px', borderBottom: '1px solid var(--stone)', fontSize: '12px', color: 'var(--brown-light)', fontWeight: 600 }}>Data Limite</th>
-                  <th style={{ textAlign: 'right', padding: '12px', borderBottom: '1px solid var(--stone)', fontSize: '12px', color: 'var(--brown-light)', fontWeight: 600 }}>Valor</th>
-                  <th style={{ textAlign: 'center', padding: '12px', borderBottom: '1px solid var(--stone)', fontSize: '12px', color: 'var(--brown-light)', fontWeight: 600 }}>Estado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {project.pagamentos.map((pag, idx) => (
-                  <tr key={idx} style={{ borderBottom: '1px solid var(--stone)' }}>
-                    <td style={{ padding: '14px 12px', fontWeight: 600, color: 'var(--brown)' }}>
-                      #{pag.prestacao}
-                    </td>
-                    <td style={{ padding: '14px 12px', color: 'var(--brown)' }}>
-                      {pag.descricao}
-                    </td>
-                    <td style={{ padding: '14px 12px', color: 'var(--brown-light)', fontSize: '13px' }}>
-                      {formatDate(pag.data)}
-                    </td>
-                    <td style={{ padding: '14px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--brown)' }}>
-                      {formatCurrency(pag.valor)}
-                    </td>
-                    <td style={{ padding: '14px 12px', textAlign: 'center' }}>
-                      <span style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        padding: '4px 10px',
-                        borderRadius: '20px',
-                        background: `${getStatusColor(pag.estado)}15`,
-                        color: getStatusColor(pag.estado),
-                        fontSize: '11px',
-                        fontWeight: 600
-                      }}>
-                        {pag.estado === 'pago' ? <CheckCircle size={12} /> : <Clock size={12} />}
-                        {getStatusLabel(pag.estado)}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Faturas */}
-          <div className="card">
-            <div className="flex items-center justify-between mb-lg">
-              <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
-                Faturas Emitidas
-              </h3>
-              <button className="btn btn-secondary" style={{ padding: '8px 14px', fontSize: '12px' }}>
-                <Receipt size={14} />
-                Nova Fatura
-              </button>
-            </div>
-            
-            {project.faturas.map((fatura, idx) => (
-              <div 
-                key={idx}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '16px',
-                  background: 'var(--cream)',
-                  borderRadius: '12px'
-                }}
-              >
                 <div className="flex items-center gap-md">
-                  <div style={{
-                    width: '40px',
-                    height: '40px',
-                    borderRadius: '10px',
-                    background: 'var(--white)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    <Receipt size={18} style={{ color: 'var(--brown-light)' }} />
-                  </div>
+                  <span style={{ fontSize: '32px' }}>{item.icon}</span>
                   <div>
-                    <div style={{ fontWeight: 600, color: 'var(--brown)' }}>
-                      {fatura.numero}
+                    <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--brown)' }}>
+                      {item.count}
                     </div>
-                    <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>
-                      {fatura.descricao} • {formatDate(fatura.data)}
+                    <div style={{ fontSize: '13px', color: 'var(--brown-light)' }}>
+                      {item.label}
                     </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-lg">
-                  <div style={{ fontWeight: 600, color: 'var(--brown)' }}>
-                    {formatCurrency(fatura.valor)}
-                  </div>
-                  <span style={{
-                    padding: '4px 10px',
-                    borderRadius: '20px',
-                    background: `${getStatusColor(fatura.estado)}15`,
-                    color: getStatusColor(fatura.estado),
-                    fontSize: '11px',
-                    fontWeight: 600
-                  }}>
-                    {getStatusLabel(fatura.estado)}
-                  </span>
-                  <button style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--brown-light)',
-                    cursor: 'pointer'
-                  }}>
-                    <Download size={16} />
-                  </button>
                 </div>
               </div>
             ))}
+          </div>
+
+          <div className="card">
+            <div className="flex items-center justify-between" style={{ marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
+                Biblioteca do Projeto
+              </h3>
+              <div className="flex gap-sm">
+                <button className="btn btn-secondary" style={{ padding: '8px 14px' }}>
+                  Importar da Biblioteca Global
+                </button>
+                <button className="btn btn-primary" style={{ padding: '8px 14px' }}>
+                  <Plus size={16} style={{ marginRight: '8px' }} />
+                  Adicionar Item
+                </button>
+              </div>
+            </div>
+
+            {/* Tabs de categorias */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+              {['Todos', 'Materiais', 'Objetos 3D', 'Texturas'].map((cat, idx) => (
+                <button
+                  key={idx}
+                  style={{
+                    padding: '8px 16px',
+                    background: idx === 0 ? 'var(--brown)' : 'transparent',
+                    color: idx === 0 ? 'white' : 'var(--brown-light)',
+                    border: idx === 0 ? 'none' : '1px solid var(--stone)',
+                    borderRadius: '20px',
+                    fontSize: '12px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+
+            <div style={{
+              padding: '48px',
+              background: 'var(--cream)',
+              borderRadius: '12px',
+              textAlign: 'center',
+              color: 'var(--brown-light)'
+            }}>
+              <Library size={48} style={{ opacity: 0.3, marginBottom: '16px' }} />
+              <h4 style={{ color: 'var(--brown)', marginBottom: '8px' }}>Biblioteca Vazia</h4>
+              <p>Adicione materiais, objetos 3D e texturas específicos deste projeto.</p>
+            </div>
           </div>
         </div>
       )}
 
-      {activeTab === 'documentos' && (
+      {/* Tab Gestão de Projeto - Apenas Admin/PM */}
+      {activeTab === 'gestao' && isAdmin() && (
         <div className="card">
-          <div className="flex items-center justify-between mb-lg">
-            <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
-              Documentos do Projeto
-            </h3>
-            <button 
-              className="btn btn-primary" 
-              style={{ padding: '8px 14px', fontSize: '12px' }}
-              onClick={() => openUploadModal()}
+          <div className="flex items-center gap-md" style={{ marginBottom: '24px' }}>
+            <div style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: '12px',
+              background: 'var(--brown)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white'
+            }}>
+              <Settings size={24} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)', margin: 0 }}>
+                Gestão de Projeto
+              </h3>
+              <p style={{ fontSize: '13px', color: 'var(--brown-light)', margin: 0 }}>
+                Acesso restrito a administradores e gestores de projeto
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-2" style={{ gap: '16px' }}>
+            <button
+              onClick={() => navigate(`/gestao/projeto/${project.id}`)}
+              style={{
+                padding: '24px',
+                background: 'var(--cream)',
+                border: '1px solid var(--stone)',
+                borderRadius: '12px',
+                textAlign: 'left',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
             >
-              <Plus size={14} />
-              Novo Documento
+              <h4 style={{ color: 'var(--brown)', marginBottom: '8px', fontSize: '14px', fontWeight: 600 }}>
+                Dashboard de Gestão
+              </h4>
+              <p style={{ color: 'var(--brown-light)', fontSize: '12px', margin: 0 }}>
+                Visão geral financeira, contratos e documentação administrativa
+              </p>
+            </button>
+
+            <button
+              onClick={() => navigate(`/financeiro?projeto=${project.id}`)}
+              style={{
+                padding: '24px',
+                background: 'var(--cream)',
+                border: '1px solid var(--stone)',
+                borderRadius: '12px',
+                textAlign: 'left',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              <h4 style={{ color: 'var(--brown)', marginBottom: '8px', fontSize: '14px', fontWeight: 600 }}>
+                Gestão Financeira
+              </h4>
+              <p style={{ color: 'var(--brown-light)', fontSize: '12px', margin: 0 }}>
+                Orçamentos, compras e controlo de execução
+              </p>
+            </button>
+
+            <button
+              onClick={() => navigate(`/clientes/${project.cliente?.id}`)}
+              style={{
+                padding: '24px',
+                background: 'var(--cream)',
+                border: '1px solid var(--stone)',
+                borderRadius: '12px',
+                textAlign: 'left',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              <h4 style={{ color: 'var(--brown)', marginBottom: '8px', fontSize: '14px', fontWeight: 600 }}>
+                Ficha de Cliente
+              </h4>
+              <p style={{ color: 'var(--brown-light)', fontSize: '12px', margin: 0 }}>
+                Dados do cliente, histórico e comunicações
+              </p>
+            </button>
+
+            <button
+              style={{
+                padding: '24px',
+                background: 'var(--cream)',
+                border: '1px solid var(--stone)',
+                borderRadius: '12px',
+                textAlign: 'left',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              <h4 style={{ color: 'var(--brown)', marginBottom: '8px', fontSize: '14px', fontWeight: 600 }}>
+                Contratos & Documentos
+              </h4>
+              <p style={{ color: 'var(--brown-light)', fontSize: '12px', margin: 0 }}>
+                Propostas, contratos e documentação legal
+              </p>
             </button>
           </div>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {projectDocs.map((doc, idx) => (
-              <div 
-                key={idx}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '16px',
-                  background: 'var(--cream)',
-                  borderRadius: '12px',
-                  border: doc.estado === 'assinado' ? '1px solid var(--success)' : '1px solid transparent'
-                }}
-              >
-                <div className="flex items-center gap-md">
-                  <div style={{
-                    width: '40px',
-                    height: '40px',
-                    borderRadius: '10px',
-                    background: doc.tipo === 'Proposta' ? 'rgba(138, 158, 184, 0.15)' : 
-                                doc.estado === 'assinado' ? 'rgba(122, 158, 122, 0.15)' : 'var(--stone)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    {doc.estado === 'assinado' ? (
-                      <CheckCircle size={18} style={{ color: 'var(--success)' }} />
-                    ) : (
-                      <FileText size={18} style={{ color: doc.tipo === 'Proposta' ? 'var(--info)' : 'var(--brown-light)' }} />
-                    )}
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: 500, color: 'var(--brown)', fontSize: '14px' }}>
-                      {doc.nome}
-                    </div>
-                    <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>
-                      {doc.tipo} • {formatDate(doc.data)}
-                      {doc.ficheiro_assinado && (
-                        <span style={{ color: 'var(--success)', marginLeft: '8px' }}>
-                          • Assinado: {doc.ficheiro_assinado}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-sm">
-                  {/* Botão de anexar versão assinada - só aparece para documentos pendentes do tipo Proposta */}
-                  {(doc.estado === 'pendente' || doc.estado === 'emitido') && doc.tipo === 'Proposta' && (
-                    <button 
-                      onClick={() => openUploadModal(doc)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        padding: '6px 12px',
-                        background: 'var(--blush)',
-                        border: 'none',
-                        borderRadius: '8px',
-                        color: 'var(--brown-dark)',
-                        fontSize: '11px',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease'
-                      }}
-                    >
-                      <Upload size={12} />
-                      Anexar Assinada
-                    </button>
-                  )}
-                  <span style={{
-                    padding: '4px 10px',
-                    borderRadius: '20px',
-                    background: doc.estado === 'assinado' ? 'rgba(122, 158, 122, 0.15)' : 
-                                doc.estado === 'pendente' ? 'rgba(201, 168, 130, 0.15)' : 'var(--stone)',
-                    color: doc.estado === 'assinado' ? 'var(--success)' : 
-                           doc.estado === 'pendente' ? 'var(--warning)' : 'var(--brown-light)',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    textTransform: 'capitalize'
-                  }}>
-                    {doc.estado}
-                  </span>
-                  <button style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--brown-light)',
-                    cursor: 'pointer',
-                    padding: '4px'
-                  }}>
-                    <Download size={16} />
-                  </button>
-                  <button style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--brown-light)',
-                    cursor: 'pointer',
-                    padding: '4px'
-                  }}>
-                    <ExternalLink size={16} />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Área de upload rápido via drag & drop */}
-          <div 
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            onClick={() => document.getElementById('doc-file-input')?.click()}
-            style={{
-              position: 'relative',
-              marginTop: '24px',
-              padding: '32px',
-              border: `2px dashed ${dragOver ? 'var(--blush)' : 'var(--stone)'}`,
-              borderRadius: '16px',
-              background: dragOver ? 'rgba(195, 186, 175, 0.1)' : 'transparent',
-              textAlign: 'center',
-              transition: 'all 0.2s ease',
-              cursor: 'pointer'
-            }}
-          >
-            <Upload size={32} style={{ color: 'var(--brown-light)', marginBottom: '12px' }} />
-            <div style={{ fontSize: '14px', color: 'var(--brown)', marginBottom: '4px' }}>
-              Arraste um PDF aqui para adicionar
-            </div>
-            <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>
-              ou clique para selecionar ficheiro
-            </div>
-            <input
-              id="doc-file-input"
-              type="file"
-              accept=".pdf,application/pdf"
-              onChange={handleFileSelect}
-              style={{ display: 'none' }}
-            />
-          </div>
         </div>
       )}
+
 
       {/* Modal de Upload */}
       {showUploadModal && (
