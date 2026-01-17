@@ -457,7 +457,7 @@ export default function Planning() {
   }
 
   // Navegar no tempo
-  const navigate = (direction) => {
+  const navigateTime = (direction) => {
     const newDate = new Date(currentDate)
     if (viewMode === 'week') {
       newDate.setDate(newDate.getDate() + (direction * 14))
@@ -665,7 +665,7 @@ export default function Planning() {
 
           {/* Navigation */}
           <div className="flex items-center gap-md">
-            <button className="btn btn-ghost btn-icon" onClick={() => navigate(-1)}>
+            <button className="btn btn-ghost btn-icon" onClick={() => navigateTime(-1)}>
               <ChevronLeft size={20} />
             </button>
             <div style={{ fontWeight: 600, minWidth: '180px', textAlign: 'center' }}>
@@ -673,7 +673,7 @@ export default function Planning() {
               {' "" '}
               {rangeEnd.toLocaleDateString('pt-PT', { month: 'long', year: 'numeric' })}
             </div>
-            <button className="btn btn-ghost btn-icon" onClick={() => navigate(1)}>
+            <button className="btn btn-ghost btn-icon" onClick={() => navigateTime(1)}>
               <ChevronRight size={20} />
             </button>
             <button 
