@@ -64,9 +64,9 @@ export default function Projetos() {
     const { data } = await supabase
       .from('projetos')
       .select('codigo')
-      .order('codigo', { ascending: true })
+      .order('codigo', { ascending: false })
       .limit(1)
-    
+
     let nextNum = 1
     if (data && data.length > 0 && data[0].codigo) {
       const match = data[0].codigo.match(/GA(\d+)/)
