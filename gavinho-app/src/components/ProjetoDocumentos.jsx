@@ -415,7 +415,7 @@ export default function ProjetoDocumentos({ projeto, onValorUpdate }) {
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, marginBottom: '6px' }}>Valor (€)</label>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, marginBottom: '6px' }}>Valor (â‚¬)</label>
                   <input
                     type="number"
                     value={formData.valor}

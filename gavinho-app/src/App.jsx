@@ -27,6 +27,8 @@ import Planning from './pages/Planning'
 import Calendario from './pages/Calendario'
 import Perfil from './pages/Perfil'
 import PlaceholderPage from './pages/PlaceholderPage'
+import Biblioteca from './pages/Biblioteca'
+import ChatObras from './pages/ChatObras'
 
 function App() {
   return (
@@ -60,6 +62,8 @@ function App() {
             <Route path="tarefas" element={<Tarefas />} />
             <Route path="bloqueios" element={<BlockersDecisions />} />
             <Route path="chat" element={<ChatProjetos />} />
+            <Route path="chat-obras" element={<ChatObras />} />
+            <Route path="biblioteca" element={<Biblioteca />} />
             <Route path="planning" element={<Planning />} />
             <Route path="calendario" element={<Calendario />} />
             <Route path="orcamentos" element={<Orcamentos />} />

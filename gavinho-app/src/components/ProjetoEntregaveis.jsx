@@ -223,7 +223,7 @@ export default function ProjetoEntregaveis({ projeto }) {
       const codigoIdx = headers.findIndex(h => h.includes('COD'))
       const nomeIdx = headers.findIndex(h => h.includes('DESENHO') && !h.includes('ESCALA'))
       const escalaIdx = headers.findIndex(h => h.includes('ESCALA'))
-      const dataInicioIdx = headers.findIndex(h => h.includes('INÍCIO') || h.includes('INICIO'))
+      const dataInicioIdx = headers.findIndex(h => h.includes('INÀCIO') || h.includes('INICIO'))
       const dataConclusaoIdx = headers.findIndex(h => h.includes('CONCLUS'))
       const estadoIdx = headers.findIndex(h => h.includes('ESTADO') || h.includes('STATUS'))
       const executanteIdx = headers.findIndex(h => h.includes('EXECUTANTE') || h.includes('PESSOA'))
@@ -266,7 +266,7 @@ export default function ProjetoEntregaveis({ projeto }) {
 
       if (error) throw error
 
-      alert(`✓ Importados ${items.length} entregáveis`)
+      alert(`âœ“ Importados ${items.length} entregáveis`)
       loadEntregaveis()
     } catch (err) {
       console.error('Erro ao importar:', err)
@@ -379,7 +379,7 @@ export default function ProjetoEntregaveis({ projeto }) {
           <div>
             <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0 }}>Lista de Entregáveis</h3>
             <p style={{ fontSize: '12px', color: 'var(--brown-light)', margin: '4px 0 0' }}>
-              {stats.total} entregáveis • {progressPercent}% concluído
+              {stats.total} entregáveis  –  {progressPercent}% concluído
             </p>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
@@ -510,7 +510,7 @@ export default function ProjetoEntregaveis({ projeto }) {
                       <div>
                         <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>{faseNome}</h4>
                         <span style={{ fontSize: '11px', opacity: 0.9 }}>
-                          {faseItems.length} entregáveis • {faseConcluidos} concluídos
+                          {faseItems.length} entregáveis  –  {faseConcluidos} concluídos
                         </span>
                       </div>
                     </div>
@@ -547,7 +547,7 @@ export default function ProjetoEntregaveis({ projeto }) {
                             {expandedFases[`${faseNome}__${catNome}`] ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                             <span style={{ fontWeight: 600, fontSize: '13px', flex: 1 }}>{catNome}</span>
                             <span style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
-                              {items.length} itens • {items.filter(i => i.status === 'concluido' || i.status === 'aprovado').length} ✓
+                              {items.length} itens  –  {items.filter(i => i.status === 'concluido' || i.status === 'aprovado').length} âœ“
                             </span>
                           </div>
                           
