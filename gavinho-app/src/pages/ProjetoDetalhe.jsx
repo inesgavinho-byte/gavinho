@@ -1769,31 +1769,37 @@ export default function ProjetoDetalhe() {
                 fontWeight: 600,
                 fontSize: '16px'
               }}>
-                {project.cliente.nome.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                {(project.cliente?.nome || 'Cliente').split(' ').map(n => n[0]).join('').slice(0, 2)}
               </div>
               <div>
                 <div style={{ fontWeight: 600, color: 'var(--brown)' }}>
-                  {project.cliente.titulo} {project.cliente.nome}
+                  {project.cliente?.titulo} {project.cliente?.nome || 'Cliente'}
                 </div>
                 <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>
-                  {project.cliente.codigo} • {project.cliente.tipo}
+                  {project.cliente?.codigo || 'N/D'} • {project.cliente?.tipo || 'Particular'}
                 </div>
               </div>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div className="flex items-center gap-sm text-muted" style={{ fontSize: '13px' }}>
-                <Mail size={14} />
-                {project.cliente.email}
-              </div>
-              <div className="flex items-center gap-sm text-muted" style={{ fontSize: '13px' }}>
-                <Phone size={14} />
-                {project.cliente.telefone}
-              </div>
-              <div className="flex items-center gap-sm text-muted" style={{ fontSize: '13px' }}>
-                <Globe size={14} />
-                {project.cliente.segmento} • {project.cliente.idioma}
-              </div>
+              {project.cliente?.email && (
+                <div className="flex items-center gap-sm text-muted" style={{ fontSize: '13px' }}>
+                  <Mail size={14} />
+                  {project.cliente.email}
+                </div>
+              )}
+              {project.cliente?.telefone && (
+                <div className="flex items-center gap-sm text-muted" style={{ fontSize: '13px' }}>
+                  <Phone size={14} />
+                  {project.cliente.telefone}
+                </div>
+              )}
+              {(project.cliente?.segmento || project.cliente?.idioma) && (
+                <div className="flex items-center gap-sm text-muted" style={{ fontSize: '13px' }}>
+                  <Globe size={14} />
+                  {[project.cliente?.segmento, project.cliente?.idioma].filter(Boolean).join(' • ')}
+                </div>
+              )}
             </div>
           </div>
 
@@ -1810,14 +1816,14 @@ export default function ProjetoDetalhe() {
               marginBottom: '16px'
             }}>
               <div style={{ fontSize: '14px', fontWeight: 500, color: 'var(--brown)', marginBottom: '8px' }}>
-                {project.localizacao.morada}
+                {project.localizacao?.morada || project.morada || '—'}
               </div>
               <div style={{ fontSize: '13px', color: 'var(--brown-light)' }}>
-                {project.localizacao.codigo_postal} {project.localizacao.cidade}
-                {project.localizacao.estado && `, ${project.localizacao.estado}`}
+                {[project.localizacao?.codigo_postal, project.localizacao?.cidade || project.cidade].filter(Boolean).join(' ')}
+                {project.localizacao?.estado && `, ${project.localizacao.estado}`}
               </div>
               <div style={{ fontSize: '13px', color: 'var(--brown-light)' }}>
-                {project.localizacao.pais}
+                {project.localizacao?.pais || project.pais || 'Portugal'}
               </div>
             </div>
 
@@ -1846,9 +1852,13 @@ export default function ProjetoDetalhe() {
             <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)', marginBottom: '16px' }}>
               Serviços Contratados
             </h3>
-            
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {project.servicos.map((servico, idx) => (
+              {(!project.servicos || project.servicos.length === 0) ? (
+                <p style={{ fontSize: '13px', color: 'var(--brown-light)', textAlign: 'center', padding: '24px', background: 'var(--cream)', borderRadius: '12px' }}>
+                  Nenhum serviço contratado.
+                </p>
+              ) : project.servicos.map((servico, idx) => (
                 <div 
                   key={idx}
                   style={{
