@@ -93,7 +93,7 @@ const sampleProjectData = {
         descricao: 'Acompanhamento e controlo do projeto até conclusão',
         data_fim: '2027-12-20',
         inclui: [
-          'Visitas mensais ÃƒÂ  obra',
+          'Visitas mensais à obra',
           'Relatórios trimestrais',
           'Controlo de qualidade',
           'Controlo de prazos',
@@ -567,7 +567,7 @@ const sampleProjectData = {
     subtipo: 'Prédio Urbano',
     numero_pisos: 5,
     numero_fogos: 5,
-    composicao: 'R/C + 3 Pisos + ÃƒÂguas-Furtadas',
+    composicao: 'R/C + 3 Pisos + Águas-Furtadas',
     localizacao: {
       morada: 'Rua José Estêvão, Nº29',
       cidade: 'Lisboa',
@@ -630,7 +630,7 @@ const sampleProjectData = {
         valor: 30500,
         fases: [
           { numero: 5, nome: 'Especialidades', prazo: '60 dias úteis', status: 'pendente',
-            entregaveis: ['Demolição', 'Estabilidade', 'ÃƒÂguas', 'Esgotos', 'Gás', 'Eletricidade/Domótica', 'ITED', 'Térmico+PCE', 'AVAC/AQS', 'SCIE', 'Acústico', 'Eletromecânico', 'Intrusão/Videoporteiro', 'PSS'] }
+            entregaveis: ['Demolição', 'Estabilidade', 'Águas', 'Esgotos', 'Gás', 'Eletricidade/Domótica', 'ITED', 'Térmico+PCE', 'AVAC/AQS', 'SCIE', 'Acústico', 'Eletromecânico', 'Intrusão/Videoporteiro', 'PSS'] }
         ]
       }
     ],
@@ -1180,7 +1180,7 @@ export default function ProjetoDetalhe() {
               .in('fase_id', faseIds)
               .order('ordem')
             
-            // Anexar entregáveis ÃƒÂ s fases
+            // Anexar entregáveis às fases
             fasesData = fasesData.map(fase => ({
               ...fase,
               entregaveis: (entregaveis || []).filter(e => e.fase_id === fase.id)
