@@ -40,6 +40,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { jsPDF } from 'jspdf'
 import ProjetoEntregaveis from '../components/ProjetoEntregaveis'
 import ProjetoDocumentos from '../components/ProjetoDocumentos'
+import CentralEntregas from '../components/CentralEntregas'
 
 // Dados de exemplo baseados nos JSONs fornecidos
 const sampleProjectData = {
@@ -1503,12 +1504,14 @@ export default function ProjetoDetalhe() {
   // Tabs - Contratos e Financeiro apenas visíveis para administração
   const allTabs = [
     { id: 'geral', label: 'Geral', icon: Layers },
-    { id: 'entregaveis', label: 'Entregáveis', icon: ListChecks },
-    { id: 'contratos', label: 'Contratos', icon: FileCheck, adminOnly: true },
     { id: 'fases', label: 'Fases & Entregas', icon: Target },
+    { id: 'contratos', label: 'Contratos', icon: FileCheck, adminOnly: true },
     { id: 'financeiro', label: 'Financeiro', icon: Euro, adminOnly: true },
     { id: 'documentos', label: 'Documentos', icon: FileText }
   ]
+
+  // Sub-tabs para Fases & Entregas
+  const [activeSubTab, setActiveSubTab] = useState('fases-contratuais')
   
   const tabs = allTabs.filter(tab => !tab.adminOnly || isAdmin())
 
@@ -1924,98 +1927,150 @@ export default function ProjetoDetalhe() {
         </div>
       )}
 
-      {/* Tab Entregáveis */}
-      {activeTab === 'entregaveis' && (
-        <ProjetoEntregaveis projeto={project} />
+      {/* Tab Fases & Entregas com Sub-tabs */}
+      {activeTab === 'fases' && (
+        <div>
+          {/* Sub-tabs navigation */}
+          <div style={{
+            display: 'flex',
+            gap: '8px',
+            marginBottom: '24px',
+            borderBottom: '1px solid var(--stone)',
+            paddingBottom: '16px'
+          }}>
+            {[
+              { id: 'fases-contratuais', label: 'Fases Contratuais' },
+              { id: 'entregaveis', label: 'Entregáveis' },
+              { id: 'central-entregas', label: 'Central de Entregas' }
+            ].map(subTab => (
+              <button
+                key={subTab.id}
+                onClick={() => setActiveSubTab(subTab.id)}
+                style={{
+                  padding: '10px 20px',
+                  background: activeSubTab === subTab.id ? 'var(--brown)' : 'var(--cream)',
+                  color: activeSubTab === subTab.id ? 'white' : 'var(--brown)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                {subTab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Sub-tab: Fases Contratuais */}
+          {activeSubTab === 'fases-contratuais' && (
+            <div className="card">
+              <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)', marginBottom: '24px' }}>
+                Fases Contratuais
+              </h3>
+
+              {project.servicos && project.servicos[1]?.fases?.length > 0 ? (
+                project.servicos[1].fases.map((fase, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      padding: '24px',
+                      background: fase.status === 'em_progresso' ? 'var(--cream)' : 'transparent',
+                      borderRadius: '16px',
+                      marginBottom: '16px',
+                      border: fase.status === 'em_progresso' ? '2px solid var(--blush)' : '1px solid var(--stone)'
+                    }}
+                  >
+                    <div className="flex items-center justify-between mb-lg">
+                      <div className="flex items-center gap-md">
+                        <div style={{
+                          width: '36px',
+                          height: '36px',
+                          borderRadius: '50%',
+                          background: fase.status === 'em_progresso' ? 'var(--blush)' :
+                                      fase.status === 'concluido' ? 'var(--success)' : 'var(--stone)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: fase.status === 'pendente' ? 'var(--brown-light)' : 'var(--white)',
+                          fontWeight: 700,
+                          fontSize: '14px'
+                        }}>
+                          {fase.status === 'concluido' ? <CheckCircle size={18} /> : fase.numero}
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 600, color: 'var(--brown)' }}>
+                            Fase {fase.numero}: {fase.nome}
+                          </div>
+                          <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>
+                            Prazo: {fase.prazo}
+                          </div>
+                        </div>
+                      </div>
+                      <div
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: '20px',
+                          background: `${getStatusColor(fase.status)}15`,
+                          color: getStatusColor(fase.status),
+                          fontSize: '12px',
+                          fontWeight: 600
+                        }}
+                      >
+                        {getStatusLabel(fase.status)}
+                      </div>
+                    </div>
+
+                    {fase.entregaveis && fase.entregaveis.length > 0 && (
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(2, 1fr)',
+                        gap: '10px',
+                        marginLeft: '52px'
+                      }}>
+                        {fase.entregaveis.map((item, i) => (
+                          <div
+                            key={i}
+                            className="flex items-center gap-sm"
+                            style={{ fontSize: '13px', color: 'var(--brown-light)' }}
+                          >
+                            <div style={{
+                              width: '6px',
+                              height: '6px',
+                              borderRadius: '50%',
+                              background: 'var(--stone-dark)'
+                            }} />
+                            {item}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <p style={{ textAlign: 'center', color: 'var(--brown-light)', padding: '48px' }}>
+                  Nenhuma fase contratual definida para este projeto.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Sub-tab: Entregáveis */}
+          {activeSubTab === 'entregaveis' && (
+            <ProjetoEntregaveis projeto={project} />
+          )}
+
+          {/* Sub-tab: Central de Entregas */}
+          {activeSubTab === 'central-entregas' && (
+            <CentralEntregas projeto={project} />
+          )}
+        </div>
       )}
 
       {/* Tab Contratos - Apenas Administração */}
       {activeTab === 'contratos' && isAdmin() && (
         <ProjetoDocumentos projeto={project} />
-      )}
-
-      {activeTab === 'fases' && (
-        <div className="card">
-          <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)', marginBottom: '24px' }}>
-            Fases do Design de Interiores
-          </h3>
-          
-          {project.servicos[1]?.fases?.map((fase, idx) => (
-            <div 
-              key={idx}
-              style={{
-                padding: '24px',
-                background: fase.status === 'em_progresso' ? 'var(--cream)' : 'transparent',
-                borderRadius: '16px',
-                marginBottom: '16px',
-                border: fase.status === 'em_progresso' ? '2px solid var(--blush)' : '1px solid var(--stone)'
-              }}
-            >
-              <div className="flex items-center justify-between mb-lg">
-                <div className="flex items-center gap-md">
-                  <div style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '50%',
-                    background: fase.status === 'em_progresso' ? 'var(--blush)' : 
-                                fase.status === 'concluido' ? 'var(--success)' : 'var(--stone)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: fase.status === 'pendente' ? 'var(--brown-light)' : 'var(--white)',
-                    fontWeight: 700,
-                    fontSize: '14px'
-                  }}>
-                    {fase.status === 'concluido' ? <CheckCircle size={18} /> : fase.numero}
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: 600, color: 'var(--brown)' }}>
-                      Fase {fase.numero}: {fase.nome}
-                    </div>
-                    <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>
-                      Prazo: {fase.prazo}
-                    </div>
-                  </div>
-                </div>
-                <div 
-                  style={{
-                    padding: '6px 12px',
-                    borderRadius: '20px',
-                    background: `${getStatusColor(fase.status)}15`,
-                    color: getStatusColor(fase.status),
-                    fontSize: '12px',
-                    fontWeight: 600
-                  }}
-                >
-                  {getStatusLabel(fase.status)}
-                </div>
-              </div>
-
-              <div style={{ 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(2, 1fr)', 
-                gap: '10px',
-                marginLeft: '52px'
-              }}>
-                {fase.entregaveis.map((item, i) => (
-                  <div 
-                    key={i}
-                    className="flex items-center gap-sm"
-                    style={{ fontSize: '13px', color: 'var(--brown-light)' }}
-                  >
-                    <div style={{
-                      width: '6px',
-                      height: '6px',
-                      borderRadius: '50%',
-                      background: 'var(--stone-dark)'
-                    }} />
-                    {item}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
       )}
 
       {/* Tab Financeiro - Apenas Administração */}
