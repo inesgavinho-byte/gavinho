@@ -12,7 +12,8 @@ import {
   ListChecks,
   Calendar,
   AlertTriangle,
-  Package
+  Package,
+  HardHat
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
@@ -310,6 +311,44 @@ export default function AdminSeed() {
         if (!error) addLog(`✅ Follow-up: ${followup.acao}`, 'success')
       }
 
+      // 12. CRIAR OBRA
+      addLog('🏗️ Criando obra Maria Residences...', 'info')
+      const obraData = {
+        nome: 'Maria Residences',
+        projeto_id: projetoId,
+        localizacao: 'Rua Maria nº 1 a 7, Lisboa',
+        tipo: 'Construção Nova',
+        status: 'em_curso',
+        progresso: 35,
+        data_inicio: '2024-06-01',
+        data_prevista_conclusao: '2025-06-30',
+        encarregado: 'Sr. Edgard Borges',
+        contacto_obra: '+351 937 263 804',
+        orcamento: 850000,
+        notas: 'Obra em fase de construção.\nEncarregado: Sr. Edgard Borges\nContacto: +351 937 263 804'
+      }
+
+      // Verificar se obra já existe
+      const { data: existingObra } = await supabase
+        .from('obras')
+        .select('id')
+        .eq('nome', 'Maria Residences')
+        .single()
+
+      if (existingObra) {
+        const { error } = await supabase
+          .from('obras')
+          .update(obraData)
+          .eq('id', existingObra.id)
+        if (!error) addLog('✅ Obra atualizada: Maria Residences', 'success')
+      } else {
+        const { error } = await supabase
+          .from('obras')
+          .insert([obraData])
+        if (!error) addLog('✅ Obra criada: Maria Residences', 'success')
+        else addLog(`⚠️ Erro ao criar obra: ${error.message}`, 'error')
+      }
+
       addLog('🎉 Seed concluído com sucesso!', 'success')
       setResult({ success: true, projetoId })
 
@@ -380,6 +419,7 @@ export default function AdminSeed() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
               {[
                 { icon: Building2, label: '1 Projeto' },
+                { icon: HardHat, label: '1 Obra' },
                 { icon: Users, label: '4 Utilizadores' },
                 { icon: ListChecks, label: '17 Tarefas' },
                 { icon: AlertTriangle, label: '4 Bloqueios' },
