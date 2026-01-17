@@ -1,37 +1,49 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
-  /* GAVINHO Palette - Refined Design */
-  --sandy-beach: #F5F3EF;
-  --blush: #C3BAAF;
-  --blush-light: #D4CCC3;
-  --blush-dark: #B0A599;
-  --brown: #4A4744;
-  --brown-light: #7A7673;
-  --brown-dark: #3A3836;
+  /* GAVINHO Palette - Refined Design 2.0 */
+  --sandy-beach: #F2F0E7;
+  --soft-cream: #F2F0E7;
+  --blush: #ADAA96;
+  --blush-light: #C4C1B3;
+  --blush-dark: #9A978A;
+  --warm-beige: #ADAA96;
+  --olive-gray: #8B8670;
+  --brown: #3D3D3D;
+  --brown-light: #6B6B6B;
+  --brown-dark: #2D2D2D;
+  --text-dark: #3D3D3D;
+  --text-muted: #6B6B6B;
 
   /* Neutrals */
   --white: #FFFFFF;
-  --cream: #F8F6F3;
-  --off-white: #FAF9F7;
-  --stone: #E8E4DF;
-  --stone-dark: #D5D0CA;
+  --cream: #F5F3EB;
+  --off-white: #F8F6F0;
+  --stone: #E5E2D9;
+  --stone-dark: #D5D2C9;
+  --border-light: #E5E2D9;
 
   /* Status */
-  --success: #7A9E7A;
-  --warning: #C9A882;
-  --error: #B88A8A;
-  --info: #8A9EB8;
+  --success: #7A8B6E;
+  --warning: #C9A86C;
+  --error: #9A6B5B;
+  --info: #7A8B9E;
 
-  /* Priority Colors - New */
-  --priority-urgente: #A67B5B;
-  --priority-alta: #C4A35A;
-  --priority-media: #9BA88D;
-  --priority-baixa: #A8A8A0;
+  /* Status Backgrounds */
+  --success-bg: rgba(122, 139, 110, 0.15);
+  --warning-bg: rgba(201, 168, 108, 0.15);
+  --error-bg: rgba(154, 107, 91, 0.15);
+  --alert-warning-bg: #FEF3C7;
+
+  /* Priority Colors */
+  --priority-urgente: #9A6B5B;
+  --priority-alta: #C9A86C;
+  --priority-media: #7A8B6E;
+  --priority-baixa: #8B8670;
 
   /* Accent */
-  --accent-olive: #8B9A7D;
-  --accent-olive-dark: #7A8568;
+  --accent-olive: #7A8B6E;
+  --accent-olive-dark: #6B7A5F;
   
   /* Shadows */
   --shadow-sm: 0 2px 8px rgba(95, 92, 89, 0.06);
