@@ -694,6 +694,7 @@ export default function ProjetoDetalhe() {
   const [utilizadores, setUtilizadores] = useState([])
   const [equipaProjeto, setEquipaProjeto] = useState([])
   const [showEquipaModal, setShowEquipaModal] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   // Opções para selects
   const TIPOLOGIAS = ['Residencial', 'Comercial', 'Hospitality', 'Misto']
@@ -884,6 +885,102 @@ export default function ProjetoDetalhe() {
   const handleTabChange = (tabId) => {
     navigate(`/projetos/${id}/${tabId}`, { replace: true })
     setActiveTab(tabId)
+  }
+
+  // Duplicar projeto
+  const handleDuplicate = async () => {
+    if (!project) return
+    if (!confirm('Deseja duplicar este projeto?')) return
+
+    try {
+      // Gerar novo código
+      const { data: lastProject } = await supabase
+        .from('projetos')
+        .select('codigo')
+        .order('codigo', { ascending: false })
+        .limit(1)
+
+      let nextNum = 1
+      if (lastProject && lastProject.length > 0) {
+        const match = lastProject[0].codigo.match(/GA(\d+)/)
+        if (match) nextNum = parseInt(match[1]) + 1
+      }
+      const newCode = `GA${String(nextNum).padStart(5, '0')}`
+
+      // Criar cópia do projeto
+      const { error } = await supabase
+        .from('projetos')
+        .insert({
+          codigo: newCode,
+          nome: `${project.nome} (cópia)`,
+          tipologia: project.tipologia,
+          subtipo: project.subtipo,
+          fase: 'Conceito',
+          status: 'on_track',
+          progresso: 0,
+          cliente_id: project.cliente_id,
+          morada: project.morada,
+          cidade: project.cidade,
+          pais: project.pais || 'Portugal',
+          data_inicio: new Date().toISOString().split('T')[0]
+        })
+
+      if (error) throw error
+
+      alert(`Projeto duplicado com sucesso! Novo código: ${newCode}`)
+      navigate(`/projetos/${newCode}`)
+    } catch (err) {
+      console.error('Erro ao duplicar:', err)
+      alert(`Erro ao duplicar: ${err.message}`)
+    }
+    setShowActions(false)
+  }
+
+  // Partilhar projeto
+  const handleShare = () => {
+    const url = window.location.href
+    if (navigator.share) {
+      navigator.share({
+        title: `Projeto ${project?.codigo} - ${project?.nome}`,
+        url: url
+      })
+    } else {
+      navigator.clipboard.writeText(url)
+      alert('Link copiado para a área de transferência!')
+    }
+    setShowActions(false)
+  }
+
+  // Exportar PDF
+  const handleExportPDF = () => {
+    alert('Funcionalidade de exportar PDF em desenvolvimento.')
+    setShowActions(false)
+  }
+
+  // Eliminar projeto
+  const handleDelete = async () => {
+    setShowDeleteConfirm(true)
+    setShowActions(false)
+  }
+
+  const confirmDelete = async () => {
+    if (!project) return
+
+    try {
+      const { error } = await supabase
+        .from('projetos')
+        .delete()
+        .eq('codigo', project.codigo)
+
+      if (error) throw error
+
+      alert('Projeto eliminado com sucesso!')
+      navigate('/projetos')
+    } catch (err) {
+      console.error('Erro ao eliminar:', err)
+      alert(`Erro ao eliminar: ${err.message}. Verifique se não existem dados associados.`)
+    }
+    setShowDeleteConfirm(false)
   }
 
   // Buscar projeto do Supabase com dados relacionados
@@ -1381,13 +1478,14 @@ export default function ProjetoDetalhe() {
                   }}
                 >
                   {[
-                    { icon: Copy, label: 'Duplicar Projeto' },
-                    { icon: Share, label: 'Partilhar' },
-                    { icon: Download, label: 'Exportar PDF' },
-                    { icon: Trash2, label: 'Eliminar', danger: true }
+                    { icon: Copy, label: 'Duplicar Projeto', onClick: handleDuplicate },
+                    { icon: Share, label: 'Partilhar', onClick: handleShare },
+                    { icon: Download, label: 'Exportar PDF', onClick: handleExportPDF },
+                    { icon: Trash2, label: 'Eliminar', danger: true, onClick: handleDelete }
                   ].map((action, i) => (
                     <button
                       key={i}
+                      onClick={action.onClick}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -2789,6 +2887,65 @@ export default function ProjetoDetalhe() {
                   </p>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de confirmação de eliminação */}
+      {showDeleteConfirm && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '16px',
+            padding: '24px',
+            maxWidth: '400px',
+            width: '90%'
+          }}>
+            <h3 style={{ margin: '0 0 16px', color: 'var(--brown)' }}>Eliminar Projeto</h3>
+            <p style={{ margin: '0 0 24px', color: 'var(--brown-light)', fontSize: '14px' }}>
+              Tem a certeza que deseja eliminar o projeto <strong>{project?.nome}</strong>? Esta ação não pode ser revertida.
+            </p>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                style={{
+                  padding: '10px 20px',
+                  background: 'var(--stone)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  color: 'var(--brown)'
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmDelete}
+                style={{
+                  padding: '10px 20px',
+                  background: 'var(--error)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  cursor: 'pointer'
+                }}
+              >
+                Eliminar
+              </button>
             </div>
           </div>
         </div>
