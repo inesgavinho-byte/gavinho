@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { 
+import {
   Plus, Search, Filter, LayoutGrid, List, MoreVertical, MapPin, Calendar, X,
-  Edit, Trash2, Eye, FolderKanban
+  Edit, Trash2, Eye, FolderKanban, ChevronDown
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
 const fases = ['Todas', 'Proposta', 'Conceito', 'Projeto', 'Licenciamento', 'Construção', 'Fit-out', 'Entrega']
 const tipologias = ['Residencial', 'Hospitalidade', 'Comercial', 'Misto']
 const statusOptions = ['on_track', 'at_risk', 'blocked']
+const prioridades = ['Todas', 'Urgente', 'Alta', 'Média', 'Baixa']
 
 export default function Projetos() {
   const navigate = useNavigate()
@@ -18,6 +19,7 @@ export default function Projetos() {
   const [viewMode, setViewMode] = useState('grid')
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedFase, setSelectedFase] = useState('Todas')
+  const [selectedPrioridade, setSelectedPrioridade] = useState('Todas')
   const [showModal, setShowModal] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null)
   const [editingProject, setEditingProject] = useState(null)
@@ -217,7 +219,7 @@ export default function Projetos() {
   }
 
   const getStatusLabel = (status) => {
-    const labels = { on_track: 'No prazo', at_risk: 'Em risco', blocked: 'Bloqueado' }
+    const labels = { on_track: 'Em Andamento', at_risk: 'Em Risco', blocked: 'Bloqueado' }
     return labels[status] || 'N/D'
   }
 
@@ -226,9 +228,40 @@ export default function Projetos() {
     return colors[fase] || '#C3BAAF'
   }
 
+  const getPrioridadeFromOrcamento = (orcamento) => {
+    if (!orcamento) return 'media'
+    if (orcamento >= 500000) return 'urgente'
+    if (orcamento >= 300000) return 'alta'
+    if (orcamento >= 100000) return 'media'
+    return 'baixa'
+  }
+
+  const getPrioridadeStyle = (prioridade) => {
+    const styles = {
+      urgente: { bg: 'var(--priority-urgente)', label: 'URGENTE' },
+      alta: { bg: 'var(--priority-alta)', label: 'ALTA' },
+      media: { bg: 'var(--priority-media)', label: 'MÉDIA' },
+      baixa: { bg: 'var(--priority-baixa)', label: 'BAIXA' }
+    }
+    return styles[prioridade] || styles.media
+  }
+
   const formatCurrency = (value) => {
-    if (!value) return '-'
+    if (!value) return '— €0'
     return new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(value)
+  }
+
+  const formatDateRange = (dataInicio, dataFim) => {
+    const format = (d) => {
+      if (!d) return ''
+      return new Date(d).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    }
+    const inicio = format(dataInicio)
+    const fim = format(dataFim)
+    if (inicio && fim) return `${inicio} - ${fim}`
+    if (inicio) return inicio
+    if (fim) return `até ${fim}`
+    return '—'
   }
 
   if (loading) {
@@ -241,10 +274,11 @@ export default function Projetos() {
 
   return (
     <div className="fade-in">
+      {/* Header */}
       <div className="page-header">
         <div>
           <h1 className="page-title">Projetos</h1>
-          <p className="page-subtitle">{filteredProjects.length} projetos</p>
+          <p className="page-subtitle">Gestão completa de projetos de design & build</p>
         </div>
         <button className="btn btn-primary" onClick={handleNewProject}>
           <Plus size={18} />
@@ -252,22 +286,72 @@ export default function Projetos() {
         </button>
       </div>
 
-      {/* Filtros */}
-      <div className="card mb-lg">
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
-            <Search size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--brown-light)' }} />
-            <input type="text" placeholder="Pesquisar projetos..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ width: '100%', padding: '12px 12px 12px 40px', border: '1px solid var(--stone)', borderRadius: '10px', fontSize: '14px' }} />
-          </div>
-          <select value={selectedFase} onChange={(e) => setSelectedFase(e.target.value)}
-            style={{ padding: '12px 16px', border: '1px solid var(--stone)', borderRadius: '10px', fontSize: '14px', background: 'var(--white)', minWidth: '150px' }}>
-            {fases.map(f => <option key={f} value={f}>{f}</option>)}
+      {/* Filtros - Novo Design */}
+      <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap', alignItems: 'center' }}>
+        {/* Search */}
+        <div style={{ position: 'relative', flex: 1, minWidth: '300px', maxWidth: '450px' }}>
+          <Search size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--brown-light)' }} />
+          <input
+            type="text"
+            placeholder="Procurar por nome, cliente ou localização..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '14px 16px 14px 48px',
+              border: '1px solid var(--stone)',
+              borderRadius: '24px',
+              fontSize: '14px',
+              background: 'var(--white)',
+              color: 'var(--brown)'
+            }}
+          />
+        </div>
+
+        {/* Status Filter */}
+        <div style={{ position: 'relative' }}>
+          <select
+            value={selectedFase}
+            onChange={(e) => setSelectedFase(e.target.value)}
+            style={{
+              padding: '14px 40px 14px 20px',
+              border: '1px solid var(--stone)',
+              borderRadius: '24px',
+              fontSize: '14px',
+              background: 'var(--white)',
+              color: 'var(--brown)',
+              appearance: 'none',
+              cursor: 'pointer',
+              minWidth: '180px'
+            }}
+          >
+            <option value="Todas">Todos os estados</option>
+            {fases.filter(f => f !== 'Todas').map(f => <option key={f} value={f}>{f}</option>)}
           </select>
-          <div style={{ display: 'flex', gap: '4px', background: 'var(--stone)', padding: '4px', borderRadius: '10px' }}>
-            <button onClick={() => setViewMode('grid')} style={{ padding: '8px', background: viewMode === 'grid' ? 'var(--white)' : 'transparent', border: 'none', borderRadius: '6px', cursor: 'pointer' }}><LayoutGrid size={18} /></button>
-            <button onClick={() => setViewMode('list')} style={{ padding: '8px', background: viewMode === 'list' ? 'var(--white)' : 'transparent', border: 'none', borderRadius: '6px', cursor: 'pointer' }}><List size={18} /></button>
-          </div>
+          <ChevronDown size={16} style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--brown-light)', pointerEvents: 'none' }} />
+        </div>
+
+        {/* Priority Filter */}
+        <div style={{ position: 'relative' }}>
+          <select
+            value={selectedPrioridade}
+            onChange={(e) => setSelectedPrioridade(e.target.value)}
+            style={{
+              padding: '14px 40px 14px 20px',
+              border: '1px solid var(--stone)',
+              borderRadius: '24px',
+              fontSize: '14px',
+              background: 'var(--white)',
+              color: 'var(--brown)',
+              appearance: 'none',
+              cursor: 'pointer',
+              minWidth: '180px'
+            }}
+          >
+            <option value="Todas">Todas as prioridades</option>
+            {prioridades.filter(p => p !== 'Todas').map(p => <option key={p} value={p.toLowerCase()}>{p}</option>)}
+          </select>
+          <ChevronDown size={16} style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--brown-light)', pointerEvents: 'none' }} />
         </div>
       </div>
 
