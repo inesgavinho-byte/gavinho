@@ -23,6 +23,7 @@ import Orcamentos from './pages/Orcamentos'
 import OrcamentoDetalhe from './pages/OrcamentoDetalhe'
 import BlockersDecisions from './pages/BlockersDecisions'
 import ChatProjetos from './pages/ChatProjetos'
+import ChatColaborativo from './pages/ChatColaborativo'
 import Finance from './pages/Finance'
 import Planning from './pages/Planning'
 import Calendario from './pages/Calendario'
@@ -64,7 +65,7 @@ function App() {
             <Route path="equipa/:id" element={<PlaceholderPage title="Perfil do Colaborador" subtitle="Informações e alocações" />} />
             <Route path="tarefas" element={<Tarefas />} />
             <Route path="bloqueios" element={<BlockersDecisions />} />
-            <Route path="chat" element={<ChatProjetos />} />
+            <Route path="chat" element={<ChatColaborativo />} />
             <Route path="chat-obras" element={<ChatObras />} />
             <Route path="biblioteca" element={<Biblioteca />} />
             <Route path="planning" element={<Planning />} />
