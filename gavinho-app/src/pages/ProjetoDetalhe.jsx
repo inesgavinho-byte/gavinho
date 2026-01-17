@@ -683,7 +683,7 @@ export default function ProjetoDetalhe() {
   const { id, tab: urlTab } = useParams()
   const navigate = useNavigate()
   const { isAdmin } = useAuth()
-  const [activeTab, setActiveTab] = useState(urlTab || 'geral')
+  const [activeTab, setActiveTab] = useState(urlTab || 'dashboard')
   const [showActions, setShowActions] = useState(false)
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [uploadingDoc, setUploadingDoc] = useState(null)
