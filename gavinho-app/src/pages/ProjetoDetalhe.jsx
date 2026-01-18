@@ -2495,104 +2495,207 @@ export default function ProjetoDetalhe() {
       {/* Modal Adicionar/Editar Interveniente */}
       {showIntervenienteModal && (
         <div className="modal-overlay" onClick={() => setShowIntervenienteModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px' }}>
-            <div className="modal-header">
-              <h3>{editingInterveniente ? 'Editar Interveniente' : 'Adicionar Interveniente'}</h3>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '650px', width: '95%' }}>
+            <div className="modal-header" style={{ borderBottom: '1px solid var(--stone)', paddingBottom: '16px' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--brown)' }}>
+                  {editingInterveniente ? 'Editar Interveniente' : 'Adicionar Interveniente'}
+                </h3>
+                <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--brown-light)' }}>
+                  Registe os intervenientes externos do projeto
+                </p>
+              </div>
               <button className="modal-close" onClick={() => setShowIntervenienteModal(false)}>
                 <X size={20} />
               </button>
             </div>
-            <div className="modal-body">
-              <div className="form-group">
-                <label>Tipo *</label>
-                <select
-                  value={intervenienteForm.tipo}
-                  onChange={(e) => setIntervenienteForm(prev => ({ ...prev, tipo: e.target.value }))}
-                  className="form-control"
-                >
-                  <option value="">Selecionar tipo...</option>
-                  {TIPOS_INTERVENIENTES.map(tipo => (
-                    <option key={tipo} value={tipo}>{tipo}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label>Entidade / Empresa</label>
-                <input
-                  type="text"
-                  value={intervenienteForm.entidade}
-                  onChange={(e) => setIntervenienteForm(prev => ({ ...prev, entidade: e.target.value }))}
-                  className="form-control"
-                  placeholder="Ex: PROAP, GAPRES, GET..."
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Contacto Geral (email/telefone)</label>
-                <input
-                  type="text"
-                  value={intervenienteForm.contacto_geral}
-                  onChange={(e) => setIntervenienteForm(prev => ({ ...prev, contacto_geral: e.target.value }))}
-                  className="form-control"
-                  placeholder="Ex: proap@proap.pt ou 226 177 235"
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <div className="form-group">
-                  <label>Responsável - Nome</label>
-                  <input
-                    type="text"
-                    value={intervenienteForm.responsavel_nome}
-                    onChange={(e) => setIntervenienteForm(prev => ({ ...prev, responsavel_nome: e.target.value }))}
-                    className="form-control"
-                    placeholder="Ex: Eng. José Carvalheira"
-                  />
+            <div className="modal-body" style={{ padding: '24px' }}>
+              {/* Tipo e Entidade */}
+              <div style={{
+                background: 'var(--cream)',
+                padding: '20px',
+                borderRadius: '12px',
+                marginBottom: '20px'
+              }}>
+                <h4 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--brown)', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Identificação
+                </h4>
+                <div className="form-group" style={{ marginBottom: '16px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--brown)', marginBottom: '6px', display: 'block' }}>
+                    Tipo de Interveniente *
+                  </label>
+                  <select
+                    value={intervenienteForm.tipo}
+                    onChange={(e) => setIntervenienteForm(prev => ({ ...prev, tipo: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: '12px 14px',
+                      border: '1px solid var(--stone)',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      background: 'var(--white)',
+                      color: 'var(--brown)'
+                    }}
+                  >
+                    <option value="">Selecionar tipo...</option>
+                    {TIPOS_INTERVENIENTES.map(tipo => (
+                      <option key={tipo} value={tipo}>{tipo}</option>
+                    ))}
+                  </select>
                 </div>
-                <div className="form-group">
-                  <label>Responsável - Email</label>
-                  <input
-                    type="email"
-                    value={intervenienteForm.responsavel_email}
-                    onChange={(e) => setIntervenienteForm(prev => ({ ...prev, responsavel_email: e.target.value }))}
-                    className="form-control"
-                    placeholder="email@exemplo.pt"
-                  />
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--brown)', marginBottom: '6px', display: 'block' }}>
+                      Entidade / Empresa
+                    </label>
+                    <input
+                      type="text"
+                      value={intervenienteForm.entidade}
+                      onChange={(e) => setIntervenienteForm(prev => ({ ...prev, entidade: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        padding: '12px 14px',
+                        border: '1px solid var(--stone)',
+                        borderRadius: '8px',
+                        fontSize: '14px'
+                      }}
+                      placeholder="Ex: PROAP, GAPRES, GET"
+                    />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--brown)', marginBottom: '6px', display: 'block' }}>
+                      Contacto Geral
+                    </label>
+                    <input
+                      type="text"
+                      value={intervenienteForm.contacto_geral}
+                      onChange={(e) => setIntervenienteForm(prev => ({ ...prev, contacto_geral: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        padding: '12px 14px',
+                        border: '1px solid var(--stone)',
+                        borderRadius: '8px',
+                        fontSize: '14px'
+                      }}
+                      placeholder="email@empresa.pt ou telefone"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <div className="form-group">
-                  <label>Responsável Secundário - Nome</label>
-                  <input
-                    type="text"
-                    value={intervenienteForm.responsavel_secundario_nome}
-                    onChange={(e) => setIntervenienteForm(prev => ({ ...prev, responsavel_secundario_nome: e.target.value }))}
-                    className="form-control"
-                    placeholder="Ex: Arq. Tiago Araújo"
-                  />
+              {/* Responsável Principal */}
+              <div style={{
+                background: 'var(--cream)',
+                padding: '20px',
+                borderRadius: '12px',
+                marginBottom: '20px'
+              }}>
+                <h4 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--brown)', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Responsável Principal
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--brown)', marginBottom: '6px', display: 'block' }}>
+                      Nome
+                    </label>
+                    <input
+                      type="text"
+                      value={intervenienteForm.responsavel_nome}
+                      onChange={(e) => setIntervenienteForm(prev => ({ ...prev, responsavel_nome: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        padding: '12px 14px',
+                        border: '1px solid var(--stone)',
+                        borderRadius: '8px',
+                        fontSize: '14px'
+                      }}
+                      placeholder="Ex: Eng. José Carvalheira"
+                    />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--brown)', marginBottom: '6px', display: 'block' }}>
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      value={intervenienteForm.responsavel_email}
+                      onChange={(e) => setIntervenienteForm(prev => ({ ...prev, responsavel_email: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        padding: '12px 14px',
+                        border: '1px solid var(--stone)',
+                        borderRadius: '8px',
+                        fontSize: '14px'
+                      }}
+                      placeholder="email@exemplo.pt"
+                    />
+                  </div>
                 </div>
-                <div className="form-group">
-                  <label>Responsável Secundário - Email</label>
-                  <input
-                    type="email"
-                    value={intervenienteForm.responsavel_secundario_email}
-                    onChange={(e) => setIntervenienteForm(prev => ({ ...prev, responsavel_secundario_email: e.target.value }))}
-                    className="form-control"
-                    placeholder="email@exemplo.pt"
-                  />
+              </div>
+
+              {/* Responsável Secundário */}
+              <div style={{
+                background: 'var(--cream)',
+                padding: '20px',
+                borderRadius: '12px'
+              }}>
+                <h4 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--brown)', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Responsável Secundário <span style={{ fontWeight: 400, textTransform: 'none' }}>(opcional)</span>
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--brown)', marginBottom: '6px', display: 'block' }}>
+                      Nome
+                    </label>
+                    <input
+                      type="text"
+                      value={intervenienteForm.responsavel_secundario_nome}
+                      onChange={(e) => setIntervenienteForm(prev => ({ ...prev, responsavel_secundario_nome: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        padding: '12px 14px',
+                        border: '1px solid var(--stone)',
+                        borderRadius: '8px',
+                        fontSize: '14px'
+                      }}
+                      placeholder="Ex: Arq. Tiago Araújo"
+                    />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--brown)', marginBottom: '6px', display: 'block' }}>
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      value={intervenienteForm.responsavel_secundario_email}
+                      onChange={(e) => setIntervenienteForm(prev => ({ ...prev, responsavel_secundario_email: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        padding: '12px 14px',
+                        border: '1px solid var(--stone)',
+                        borderRadius: '8px',
+                        fontSize: '14px'
+                      }}
+                      placeholder="email@exemplo.pt"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
-            <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setShowIntervenienteModal(false)}>
+            <div className="modal-footer" style={{ borderTop: '1px solid var(--stone)', padding: '16px 24px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setShowIntervenienteModal(false)}
+                style={{ padding: '10px 20px' }}
+              >
                 Cancelar
               </button>
               <button
                 className="btn btn-primary"
                 onClick={handleSaveInterveniente}
                 disabled={!intervenienteForm.tipo}
+                style={{ padding: '10px 24px' }}
               >
                 {editingInterveniente ? 'Guardar Alterações' : 'Adicionar'}
               </button>
