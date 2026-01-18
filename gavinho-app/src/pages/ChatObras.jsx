@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import {
   Search, Send, Image, X, HardHat, MessageSquare, Loader2, AlertCircle,
   Phone, Settings, Check, CheckCheck, Clock, Package, Users, Wrench,
   AlertTriangle, ListTodo, Sparkles, ChevronRight, RefreshCw, Plus,
-  ExternalLink, Wifi, WifiOff, Bot, Eye, EyeOff, ArrowLeft
+  ExternalLink, Wifi, WifiOff, Bot, Eye, EyeOff, ArrowLeft, Home
 } from 'lucide-react'
 
 // Dados mock para demonstrar funcionalidades da IA
@@ -46,6 +47,7 @@ const MOCK_WHATSAPP_MESSAGES = [
 ]
 
 export default function ChatObras() {
+  const navigate = useNavigate()
   const [obras, setObras] = useState([])
   const [selectedObra, setSelectedObra] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -53,6 +55,7 @@ export default function ChatObras() {
   const [searchTerm, setSearchTerm] = useState('')
   const [newMessage, setNewMessage] = useState('')
   const [sending, setSending] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
 
   // Estados WhatsApp
   const [whatsappConnected, setWhatsappConnected] = useState(false)
@@ -66,6 +69,20 @@ export default function ChatObras() {
   const [processedSuggestions, setProcessedSuggestions] = useState({})
 
   const messagesEndRef = useRef(null)
+
+  // Detectar mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768)
+      // Esconder painel IA em mobile por defeito
+      if (window.innerWidth <= 768) {
+        setShowAIPanel(false)
+      }
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -410,11 +427,20 @@ export default function ChatObras() {
     return acc
   }, {})
 
+  // Calcular grid columns baseado em mobile/desktop e painel IA
+  const getGridColumns = () => {
+    if (isMobile) {
+      // Em mobile: se tem obra selecionada, mostrar só o chat; senão, mostrar só a lista
+      return selectedObra ? '1fr' : '1fr'
+    }
+    return showAIPanel ? '260px 1fr 340px' : '260px 1fr'
+  }
+
   return (
     <div className="chat-fullwidth" style={{
       display: 'grid',
-      gridTemplateColumns: showAIPanel ? '260px 1fr 340px' : '260px 1fr',
-      height: '100vh',
+      gridTemplateColumns: getGridColumns(),
+      height: isMobile ? 'calc(100vh - 56px)' : '100vh',
       background: 'var(--cream)',
       overflow: 'hidden',
       transition: 'grid-template-columns 0.3s ease'
@@ -423,7 +449,7 @@ export default function ChatObras() {
       <div style={{
         background: '#1e1e2d',
         color: 'white',
-        display: 'flex',
+        display: isMobile && selectedObra ? 'none' : 'flex',
         flexDirection: 'column',
         borderRight: '1px solid rgba(255,255,255,0.05)'
       }}>
@@ -435,6 +461,27 @@ export default function ChatObras() {
           justifyContent: 'space-between'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              onClick={() => navigate('/obras')}
+              style={{
+                background: 'rgba(255,255,255,0.1)',
+                border: 'none',
+                borderRadius: '50%',
+                width: 32,
+                height: 32,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: 'rgba(255,255,255,0.8)',
+                transition: 'background 0.2s'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+              title="Voltar ao Dashboard Obras"
+            >
+              <Home style={{ width: 16, height: 16 }} />
+            </button>
             <Phone style={{ width: 18, height: 18, color: '#25D366' }} />
             <span style={{ fontSize: 14, fontWeight: 600 }}>Chat Obras</span>
           </div>
@@ -560,7 +607,7 @@ export default function ChatObras() {
 
       {/* Centro - Chat WhatsApp Style */}
       <div style={{
-        display: 'flex',
+        display: isMobile && !selectedObra ? 'none' : 'flex',
         flexDirection: 'column',
         background: '#ECE5DD',
         backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23d4cfc4\' fill-opacity=\'0.4\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")',
@@ -810,7 +857,7 @@ export default function ChatObras() {
       </div>
 
       {/* Painel direito - IA Insights */}
-      {showAIPanel && selectedObra && (
+      {showAIPanel && selectedObra && !isMobile && (
         <div style={{
           background: 'white',
           borderLeft: '1px solid #E5E5E5',
