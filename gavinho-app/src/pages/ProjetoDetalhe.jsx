@@ -1825,11 +1825,12 @@ export default function ProjetoDetalhe() {
     return compartimentoRenders.length + 1
   }
 
-  const openAddRenderModal = () => {
+  const openAddRenderModal = (compartimento = '') => {
     setEditingRender(null)
+    const versao = compartimento ? getNextVersion(compartimento) : 1
     setRenderForm({
-      compartimento: '',
-      versao: 1,
+      compartimento: compartimento,
+      versao: versao,
       descricao: '',
       is_final: false,
       imagem_url: ''
@@ -3146,6 +3147,14 @@ export default function ProjetoDetalhe() {
                         ({compartimentoRenders.length} versão{compartimentoRenders.length !== 1 ? 'ões' : ''})
                       </span>
                     </h4>
+                    <button
+                      onClick={() => openAddRenderModal(compartimento)}
+                      className="btn btn-secondary"
+                      style={{ padding: '6px 12px', fontSize: '12px' }}
+                    >
+                      <Plus size={14} style={{ marginRight: '6px' }} />
+                      Adicionar Versão
+                    </button>
                   </div>
                   <div className="grid grid-3" style={{ gap: '16px' }}>
                     {compartimentoRenders.sort((a, b) => b.versao - a.versao).map((render) => (
