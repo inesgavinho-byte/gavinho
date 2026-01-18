@@ -10,6 +10,7 @@ import {
 import ObraTracking from '../components/ObraTracking'
 import ObraAutos from '../components/ObraAutos'
 import ObraOrcamentacao from '../components/ObraOrcamentacao'
+import { exportDiarioToPDF } from '../utils/exportDiarioToPDF'
 
 const tabs = [
   { id: 'tracking', label: 'Tracking', icon: ClipboardList },
@@ -844,6 +845,7 @@ export default function ObraDetalhe() {
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: '4px' }}>
+                      <button className="btn btn-ghost btn-icon" title="Exportar PDF" onClick={() => exportDiarioToPDF(d, obra, { equipa })}><Download size={14} /></button>
                       <button className="btn btn-ghost btn-icon" onClick={() => handleEditDiario(d)}><Edit size={14} /></button>
                       <button className="btn btn-ghost btn-icon" onClick={() => setShowDeleteConfirm({ type: 'diario', item: d })}><Trash2 size={14} /></button>
                     </div>
