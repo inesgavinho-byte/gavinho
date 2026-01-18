@@ -23,6 +23,9 @@ export default function ProjetoEntregaveis({ projeto }) {
   const [saving, setSaving] = useState(false)
   const fileInputRef = useRef(null)
 
+  // Estado para edição inline
+  const [editingCell, setEditingCell] = useState(null) // { id: itemId, field: 'status' | 'executante' }
+
   const [formData, setFormData] = useState({
     codigo: '',
     nome: '',
@@ -160,6 +163,27 @@ export default function ProjetoEntregaveis({ projeto }) {
     } catch (err) {
       console.error('Erro ao eliminar:', err)
       alert('Erro ao eliminar')
+    }
+  }
+
+  // Atualização inline de um campo específico
+  const handleInlineUpdate = async (itemId, field, value) => {
+    try {
+      const { error } = await supabase
+        .from('projeto_entregaveis')
+        .update({ [field]: value })
+        .eq('id', itemId)
+
+      if (error) throw error
+
+      // Atualizar estado local imediatamente
+      setEntregaveis(prev => prev.map(item =>
+        item.id === itemId ? { ...item, [field]: value } : item
+      ))
+      setEditingCell(null)
+    } catch (err) {
+      console.error('Erro ao atualizar:', err)
+      alert('Erro ao atualizar')
     }
   }
 
@@ -555,9 +579,9 @@ export default function ProjetoEntregaveis({ projeto }) {
                           {expandedFases[`${faseNome}__${catNome}`] && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '20px' }}>
                               {/* Cabeçalho das colunas */}
-                              <div style={{ 
-                                display: 'flex', 
-                                alignItems: 'center', 
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
                                 gap: '12px',
                                 padding: '6px 12px',
                                 fontSize: '10px',
@@ -568,19 +592,19 @@ export default function ProjetoEntregaveis({ projeto }) {
                               }}>
                                 <span style={{ minWidth: '70px' }}>Código</span>
                                 <span style={{ flex: 1 }}>Descrição</span>
-                                <span style={{ minWidth: '50px' }}>Escala</span>
-                                <span style={{ minWidth: '80px', textAlign: 'center' }}>Início</span>
-                                <span style={{ minWidth: '80px', textAlign: 'center' }}>Conclusão</span>
-                                <span style={{ minWidth: '80px', textAlign: 'center' }}>Executante</span>
-                                <span style={{ minWidth: '70px' }}>Estado</span>
+                                <span style={{ minWidth: '60px', textAlign: 'center' }}>Escala</span>
+                                <span style={{ minWidth: '90px', textAlign: 'center' }}>Estado</span>
+                                <span style={{ minWidth: '100px', textAlign: 'center' }}>Executante</span>
+                                <span style={{ minWidth: '70px', textAlign: 'center' }}>Início</span>
+                                <span style={{ minWidth: '70px', textAlign: 'center' }}>Conclusão</span>
                                 <span style={{ minWidth: '50px' }}></span>
                               </div>
                               {items.sort((a, b) => (a.codigo || '').localeCompare(b.codigo || '', undefined, { numeric: true })).map(item => (
-                                <div 
+                                <div
                                   key={item.id}
-                                  style={{ 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
                                     gap: '12px',
                                     padding: '8px 12px',
                                     background: 'var(--white)',
@@ -589,39 +613,106 @@ export default function ProjetoEntregaveis({ projeto }) {
                                     fontSize: '13px'
                                   }}
                                 >
-                                  <span style={{ 
-                                    fontFamily: 'monospace', 
-                                    fontSize: '11px', 
+                                  <span style={{
+                                    fontFamily: 'monospace',
+                                    fontSize: '11px',
                                     color: 'var(--brown-light)',
                                     minWidth: '70px'
                                   }}>
                                     {item.codigo}
                                   </span>
                                   <span style={{ flex: 1 }}>{item.nome}</span>
-                                  <span style={{ fontSize: '11px', color: 'var(--brown-light)', background: item.escala ? 'var(--stone)' : 'transparent', padding: item.escala ? '2px 6px' : '2px 0', borderRadius: '4px', minWidth: '50px', textAlign: 'center' }}>
+                                  <span style={{ fontSize: '11px', color: 'var(--brown-light)', background: item.escala ? 'var(--stone)' : 'transparent', padding: item.escala ? '2px 6px' : '2px 0', borderRadius: '4px', minWidth: '60px', textAlign: 'center' }}>
                                     {item.escala || '-'}
                                   </span>
-                                  {/* Datas e Executante */}
-                                  <span style={{ fontSize: '10px', color: 'var(--brown-light)', minWidth: '80px', textAlign: 'center' }}>
+                                  {/* Estado - Edição Inline */}
+                                  {editingCell?.id === item.id && editingCell?.field === 'status' ? (
+                                    <select
+                                      autoFocus
+                                      value={item.status}
+                                      onChange={(e) => handleInlineUpdate(item.id, 'status', e.target.value)}
+                                      onBlur={() => setEditingCell(null)}
+                                      style={{
+                                        minWidth: '90px',
+                                        padding: '4px 8px',
+                                        fontSize: '11px',
+                                        border: '1px solid var(--info)',
+                                        borderRadius: '6px',
+                                        background: 'var(--white)',
+                                        cursor: 'pointer'
+                                      }}
+                                    >
+                                      {Object.entries(statusConfig).map(([key, val]) => (
+                                        <option key={key} value={key}>{val.label}</option>
+                                      ))}
+                                    </select>
+                                  ) : (
+                                    <span
+                                      onClick={() => setEditingCell({ id: item.id, field: 'status' })}
+                                      style={{
+                                        padding: '4px 8px',
+                                        borderRadius: '10px',
+                                        fontSize: '10px',
+                                        fontWeight: 600,
+                                        background: statusConfig[item.status]?.bg,
+                                        color: statusConfig[item.status]?.color,
+                                        minWidth: '90px',
+                                        textAlign: 'center',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s'
+                                      }}
+                                      title="Clique para alterar"
+                                    >
+                                      {statusConfig[item.status]?.label}
+                                    </span>
+                                  )}
+                                  {/* Executante - Edição Inline */}
+                                  {editingCell?.id === item.id && editingCell?.field === 'executante' ? (
+                                    <input
+                                      type="text"
+                                      autoFocus
+                                      defaultValue={item.executante || ''}
+                                      onBlur={(e) => handleInlineUpdate(item.id, 'executante', e.target.value || null)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') handleInlineUpdate(item.id, 'executante', e.target.value || null)
+                                        if (e.key === 'Escape') setEditingCell(null)
+                                      }}
+                                      style={{
+                                        minWidth: '100px',
+                                        padding: '4px 8px',
+                                        fontSize: '11px',
+                                        border: '1px solid var(--info)',
+                                        borderRadius: '6px',
+                                        background: 'var(--white)',
+                                        textAlign: 'center'
+                                      }}
+                                      placeholder="Nome..."
+                                    />
+                                  ) : (
+                                    <span
+                                      onClick={() => setEditingCell({ id: item.id, field: 'executante' })}
+                                      style={{
+                                        fontSize: '11px',
+                                        color: item.executante ? 'var(--info)' : 'var(--brown-light)',
+                                        minWidth: '100px',
+                                        textAlign: 'center',
+                                        cursor: 'pointer',
+                                        padding: '4px 8px',
+                                        borderRadius: '6px',
+                                        background: item.executante ? 'rgba(138, 158, 184, 0.1)' : 'transparent',
+                                        transition: 'all 0.2s'
+                                      }}
+                                      title="Clique para alterar"
+                                    >
+                                      {item.executante || '—'}
+                                    </span>
+                                  )}
+                                  {/* Datas */}
+                                  <span style={{ fontSize: '10px', color: 'var(--brown-light)', minWidth: '70px', textAlign: 'center' }}>
                                     {item.data_inicio ? new Date(item.data_inicio).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' }) : '-'}
                                   </span>
-                                  <span style={{ fontSize: '10px', color: 'var(--brown-light)', minWidth: '80px', textAlign: 'center' }}>
+                                  <span style={{ fontSize: '10px', color: 'var(--brown-light)', minWidth: '70px', textAlign: 'center' }}>
                                     {item.data_conclusao ? new Date(item.data_conclusao).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' }) : '-'}
-                                  </span>
-                                  <span style={{ fontSize: '10px', color: 'var(--info)', minWidth: '80px', textAlign: 'center' }}>
-                                    {item.executante || '-'}
-                                  </span>
-                                  <span style={{ 
-                                    padding: '3px 8px', 
-                                    borderRadius: '10px', 
-                                    fontSize: '10px', 
-                                    fontWeight: 600, 
-                                    background: statusConfig[item.status]?.bg, 
-                                    color: statusConfig[item.status]?.color,
-                                    minWidth: '70px',
-                                    textAlign: 'center'
-                                  }}>
-                                    {statusConfig[item.status]?.label}
                                   </span>
                                   <div style={{ display: 'flex', gap: '4px', minWidth: '50px' }}>
                                     <button onClick={() => handleEdit(item)} className="btn btn-ghost btn-icon" style={{ padding: '4px' }}>
