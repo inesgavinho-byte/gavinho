@@ -702,7 +702,19 @@ export default function ProjetoDetalhe() {
   const [clientes, setClientes] = useState([])
   const [utilizadores, setUtilizadores] = useState([])
   const [equipaProjeto, setEquipaProjeto] = useState([])
+  const [intervenientes, setIntervenientes] = useState([])
   const [showEquipaModal, setShowEquipaModal] = useState(false)
+  const [showIntervenienteModal, setShowIntervenienteModal] = useState(false)
+  const [editingInterveniente, setEditingInterveniente] = useState(null)
+  const [intervenienteForm, setIntervenienteForm] = useState({
+    tipo: '',
+    entidade: '',
+    contacto_geral: '',
+    responsavel_nome: '',
+    responsavel_email: '',
+    responsavel_secundario_nome: '',
+    responsavel_secundario_email: ''
+  })
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   // Sub-tabs para Fases & Entregas
@@ -928,6 +940,116 @@ export default function ProjetoDetalhe() {
       fetchEquipaProjeto(project.id)
     } catch (err) {
       console.error('Erro ao remover:', err)
+    }
+  }
+
+  // Tipos de intervenientes
+  const TIPOS_INTERVENIENTES = [
+    'Dono de Obra',
+    'Cliente',
+    'Representante Dono de Obra',
+    'Autor Licenciamento Arquitectura',
+    'Arquitectura Paisagista',
+    'Especialidade Estruturas',
+    'Especialidades',
+    'Especialidade Acústica',
+    'Especialidade Térmica',
+    'Especialidade Segurança',
+    'Outro'
+  ]
+
+  // Carregar intervenientes do projeto
+  const fetchIntervenientes = async (projetoId) => {
+    try {
+      const { data } = await supabase
+        .from('projeto_intervenientes')
+        .select('*')
+        .eq('projeto_id', projetoId)
+        .order('created_at')
+      setIntervenientes(data || [])
+    } catch (err) {
+      console.error('Erro ao carregar intervenientes:', err)
+    }
+  }
+
+  // Adicionar/Editar interveniente
+  const handleSaveInterveniente = async () => {
+    if (!project?.id || !intervenienteForm.tipo) return
+    try {
+      if (editingInterveniente) {
+        const { error } = await supabase
+          .from('projeto_intervenientes')
+          .update({
+            tipo: intervenienteForm.tipo,
+            entidade: intervenienteForm.entidade,
+            contacto_geral: intervenienteForm.contacto_geral,
+            responsavel_nome: intervenienteForm.responsavel_nome,
+            responsavel_email: intervenienteForm.responsavel_email,
+            responsavel_secundario_nome: intervenienteForm.responsavel_secundario_nome,
+            responsavel_secundario_email: intervenienteForm.responsavel_secundario_email
+          })
+          .eq('id', editingInterveniente.id)
+        if (error) throw error
+      } else {
+        const { error } = await supabase
+          .from('projeto_intervenientes')
+          .insert({
+            projeto_id: project.id,
+            tipo: intervenienteForm.tipo,
+            entidade: intervenienteForm.entidade,
+            contacto_geral: intervenienteForm.contacto_geral,
+            responsavel_nome: intervenienteForm.responsavel_nome,
+            responsavel_email: intervenienteForm.responsavel_email,
+            responsavel_secundario_nome: intervenienteForm.responsavel_secundario_nome,
+            responsavel_secundario_email: intervenienteForm.responsavel_secundario_email
+          })
+        if (error) throw error
+      }
+      fetchIntervenientes(project.id)
+      setShowIntervenienteModal(false)
+      setEditingInterveniente(null)
+      setIntervenienteForm({
+        tipo: '',
+        entidade: '',
+        contacto_geral: '',
+        responsavel_nome: '',
+        responsavel_email: '',
+        responsavel_secundario_nome: '',
+        responsavel_secundario_email: ''
+      })
+    } catch (err) {
+      console.error('Erro ao salvar interveniente:', err)
+      alert(`Erro: ${err.message}`)
+    }
+  }
+
+  // Editar interveniente
+  const handleEditInterveniente = (interveniente) => {
+    setEditingInterveniente(interveniente)
+    setIntervenienteForm({
+      tipo: interveniente.tipo || '',
+      entidade: interveniente.entidade || '',
+      contacto_geral: interveniente.contacto_geral || '',
+      responsavel_nome: interveniente.responsavel_nome || '',
+      responsavel_email: interveniente.responsavel_email || '',
+      responsavel_secundario_nome: interveniente.responsavel_secundario_nome || '',
+      responsavel_secundario_email: interveniente.responsavel_secundario_email || ''
+    })
+    setShowIntervenienteModal(true)
+  }
+
+  // Remover interveniente
+  const handleRemoveInterveniente = async (id) => {
+    if (!confirm('Remover este interveniente?')) return
+    try {
+      const { error } = await supabase
+        .from('projeto_intervenientes')
+        .delete()
+        .eq('id', id)
+      if (error) throw error
+      fetchIntervenientes(project.id)
+    } catch (err) {
+      console.error('Erro ao remover interveniente:', err)
     }
   }
 
@@ -1380,7 +1502,11 @@ export default function ProjetoDetalhe() {
         }
         
         setProject(fullProject)
-        
+
+        // Carregar equipa e intervenientes
+        fetchEquipaProjeto(projetoData.id)
+        fetchIntervenientes(projetoData.id)
+
       } catch (err) {
         console.error('Erro ao buscar projeto:', err)
         // Fallback para dados locais
@@ -2117,6 +2243,222 @@ export default function ProjetoDetalhe() {
                 ))}
               </div>
             )}
+          </div>
+
+          {/* Intervenientes do Projeto */}
+          <div className="card" style={{ gridColumn: 'span 2' }}>
+            <div className="flex items-center justify-between mb-lg">
+              <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
+                Intervenientes do Projeto
+              </h3>
+              <button
+                className="btn btn-primary"
+                style={{ padding: '6px 12px', fontSize: '12px' }}
+                onClick={() => {
+                  setEditingInterveniente(null)
+                  setIntervenienteForm({
+                    tipo: '',
+                    entidade: '',
+                    contacto_geral: '',
+                    responsavel_nome: '',
+                    responsavel_email: '',
+                    responsavel_secundario_nome: '',
+                    responsavel_secundario_email: ''
+                  })
+                  setShowIntervenienteModal(true)
+                }}
+              >
+                <Plus size={14} /> Adicionar
+              </button>
+            </div>
+
+            {intervenientes.length === 0 ? (
+              <p style={{ fontSize: '13px', color: 'var(--brown-light)', textAlign: 'center', padding: '24px', background: 'var(--cream)', borderRadius: '12px' }}>
+                Nenhum interveniente registado.
+              </p>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid var(--stone)' }}>
+                      <th style={{ textAlign: 'left', padding: '12px 8px', color: 'var(--brown)', fontWeight: 600 }}>Tipo</th>
+                      <th style={{ textAlign: 'left', padding: '12px 8px', color: 'var(--brown)', fontWeight: 600 }}>Entidade</th>
+                      <th style={{ textAlign: 'left', padding: '12px 8px', color: 'var(--brown)', fontWeight: 600 }}>Responsável</th>
+                      <th style={{ textAlign: 'left', padding: '12px 8px', color: 'var(--brown)', fontWeight: 600 }}>Responsável Secundário</th>
+                      <th style={{ width: '60px' }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {intervenientes.map((item) => (
+                      <tr key={item.id} style={{ borderBottom: '1px solid var(--cream)' }}>
+                        <td style={{ padding: '12px 8px', color: 'var(--brown)', fontWeight: 500 }}>
+                          {item.tipo}
+                        </td>
+                        <td style={{ padding: '12px 8px', color: 'var(--brown-light)' }}>
+                          <div>{item.entidade || '—'}</div>
+                          {item.contacto_geral && (
+                            <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>{item.contacto_geral}</div>
+                          )}
+                        </td>
+                        <td style={{ padding: '12px 8px' }}>
+                          <div style={{ color: 'var(--brown)' }}>{item.responsavel_nome || '—'}</div>
+                          {item.responsavel_email && (
+                            <a href={`mailto:${item.responsavel_email}`} style={{ fontSize: '11px', color: 'var(--gold-dark)' }}>
+                              {item.responsavel_email}
+                            </a>
+                          )}
+                        </td>
+                        <td style={{ padding: '12px 8px' }}>
+                          <div style={{ color: 'var(--brown)' }}>{item.responsavel_secundario_nome || '—'}</div>
+                          {item.responsavel_secundario_email && (
+                            <a href={`mailto:${item.responsavel_secundario_email}`} style={{ fontSize: '11px', color: 'var(--gold-dark)' }}>
+                              {item.responsavel_secundario_email}
+                            </a>
+                          )}
+                        </td>
+                        <td style={{ padding: '12px 8px' }}>
+                          <div style={{ display: 'flex', gap: '4px' }}>
+                            <button
+                              onClick={() => handleEditInterveniente(item)}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                padding: '4px',
+                                color: 'var(--brown-light)'
+                              }}
+                            >
+                              <Edit size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleRemoveInterveniente(item.id)}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                padding: '4px',
+                                color: 'var(--danger)'
+                              }}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal Adicionar/Editar Interveniente */}
+      {showIntervenienteModal && (
+        <div className="modal-overlay" onClick={() => setShowIntervenienteModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+            <div className="modal-header">
+              <h3>{editingInterveniente ? 'Editar Interveniente' : 'Adicionar Interveniente'}</h3>
+              <button className="modal-close" onClick={() => setShowIntervenienteModal(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label>Tipo *</label>
+                <select
+                  value={intervenienteForm.tipo}
+                  onChange={(e) => setIntervenienteForm(prev => ({ ...prev, tipo: e.target.value }))}
+                  className="form-control"
+                >
+                  <option value="">Selecionar tipo...</option>
+                  {TIPOS_INTERVENIENTES.map(tipo => (
+                    <option key={tipo} value={tipo}>{tipo}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>Entidade / Empresa</label>
+                <input
+                  type="text"
+                  value={intervenienteForm.entidade}
+                  onChange={(e) => setIntervenienteForm(prev => ({ ...prev, entidade: e.target.value }))}
+                  className="form-control"
+                  placeholder="Ex: PROAP, GAPRES, GET..."
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Contacto Geral (email/telefone)</label>
+                <input
+                  type="text"
+                  value={intervenienteForm.contacto_geral}
+                  onChange={(e) => setIntervenienteForm(prev => ({ ...prev, contacto_geral: e.target.value }))}
+                  className="form-control"
+                  placeholder="Ex: proap@proap.pt ou 226 177 235"
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="form-group">
+                  <label>Responsável - Nome</label>
+                  <input
+                    type="text"
+                    value={intervenienteForm.responsavel_nome}
+                    onChange={(e) => setIntervenienteForm(prev => ({ ...prev, responsavel_nome: e.target.value }))}
+                    className="form-control"
+                    placeholder="Ex: Eng. José Carvalheira"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Responsável - Email</label>
+                  <input
+                    type="email"
+                    value={intervenienteForm.responsavel_email}
+                    onChange={(e) => setIntervenienteForm(prev => ({ ...prev, responsavel_email: e.target.value }))}
+                    className="form-control"
+                    placeholder="email@exemplo.pt"
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="form-group">
+                  <label>Responsável Secundário - Nome</label>
+                  <input
+                    type="text"
+                    value={intervenienteForm.responsavel_secundario_nome}
+                    onChange={(e) => setIntervenienteForm(prev => ({ ...prev, responsavel_secundario_nome: e.target.value }))}
+                    className="form-control"
+                    placeholder="Ex: Arq. Tiago Araújo"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Responsável Secundário - Email</label>
+                  <input
+                    type="email"
+                    value={intervenienteForm.responsavel_secundario_email}
+                    onChange={(e) => setIntervenienteForm(prev => ({ ...prev, responsavel_secundario_email: e.target.value }))}
+                    className="form-control"
+                    placeholder="email@exemplo.pt"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowIntervenienteModal(false)}>
+                Cancelar
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handleSaveInterveniente}
+                disabled={!intervenienteForm.tipo}
+              >
+                {editingInterveniente ? 'Guardar Alterações' : 'Adicionar'}
+              </button>
+            </div>
           </div>
         </div>
       )}
