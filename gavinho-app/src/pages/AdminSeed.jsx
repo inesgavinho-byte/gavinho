@@ -879,7 +879,7 @@ export default function AdminSeed() {
           destinatario: 'Cliente MYRYAD',
           data_prevista: entrega.data,
           data_entrega: entrega.data,
-          status: 'entregue',
+          status: 'concluido',
           observacoes: entrega.observacoes || null,
           documentos: isMail ? 'Via Email' : 'Via Link'
         }])
