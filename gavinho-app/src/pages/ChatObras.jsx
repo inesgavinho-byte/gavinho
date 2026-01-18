@@ -69,6 +69,9 @@ export default function ChatObras() {
   const [processedSuggestions, setProcessedSuggestions] = useState({})
 
   const messagesEndRef = useRef(null)
+  const messagesContainerRef = useRef(null)
+  const isInitialLoad = useRef(true)
+  const previousMessagesLength = useRef(0)
 
   // Detectar mobile
   useEffect(() => {
@@ -84,12 +87,38 @@ export default function ChatObras() {
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  const scrollToBottom = (force = false) => {
+    if (!messagesContainerRef.current) return
+
+    // Só fazer scroll automático se:
+    // 1. For forçado (ex: ao enviar mensagem)
+    // 2. O utilizador já estiver perto do fim do chat
+    const container = messagesContainerRef.current
+    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100
+
+    if (force || isNearBottom) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
   }
 
   useEffect(() => {
-    scrollToBottom()
+    // Só fazer scroll automático quando novas mensagens são adicionadas
+    // (não quando a obra é selecionada inicialmente)
+    if (mensagens.length > previousMessagesLength.current && !isInitialLoad.current) {
+      scrollToBottom()
+    }
+    previousMessagesLength.current = mensagens.length
+
+    // Depois da primeira carga, marcar como não sendo mais carga inicial
+    if (isInitialLoad.current && mensagens.length > 0) {
+      // Fazer scroll para o fim apenas na primeira carga, sem animação
+      setTimeout(() => {
+        if (messagesContainerRef.current) {
+          messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight
+        }
+        isInitialLoad.current = false
+      }, 100)
+    }
   }, [mensagens])
 
   useEffect(() => {
@@ -98,6 +127,10 @@ export default function ChatObras() {
 
   useEffect(() => {
     if (selectedObra) {
+      // Resetar estado de scroll quando muda de obra
+      isInitialLoad.current = true
+      previousMessagesLength.current = 0
+
       loadMensagens()
       loadAISugestoes()
       // Subscrever a novas mensagens em tempo real
@@ -294,6 +327,9 @@ export default function ChatObras() {
       setMensagens(prev => [...prev, novaMensagem])
       const messageContent = newMessage.trim()
       setNewMessage('')
+
+      // Forçar scroll para baixo ao enviar mensagem
+      setTimeout(() => scrollToBottom(true), 50)
 
       // Se WhatsApp estiver configurado, enviar via Twilio
       if (whatsappConnected) {
@@ -611,7 +647,10 @@ export default function ChatObras() {
         flexDirection: 'column',
         background: '#ECE5DD',
         backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23d4cfc4\' fill-opacity=\'0.4\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")',
-        position: 'relative'
+        position: 'relative',
+        minHeight: 0,
+        height: '100%',
+        overflow: 'hidden'
       }}>
         {selectedObra ? (
           <>
@@ -696,7 +735,15 @@ export default function ChatObras() {
             </div>
 
             {/* Mensagens */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
+            <div ref={messagesContainerRef} style={{
+              flex: 1,
+              overflowY: 'auto',
+              overflowX: 'hidden',
+              padding: '16px',
+              WebkitOverflowScrolling: 'touch',
+              minHeight: 0,
+              position: 'relative'
+            }}>
               {Object.entries(messagesByDate).map(([date, msgs]) => (
                 <div key={date}>
                   {/* Separador de data */}
@@ -1204,6 +1251,17 @@ export default function ChatObras() {
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
+        }
+
+        /* Garantir scroll suave em mobile */
+        .chat-fullwidth {
+          -webkit-overflow-scrolling: touch;
+          touch-action: pan-y;
+        }
+
+        /* Prevenir pull-to-refresh no chat */
+        .chat-fullwidth > div {
+          overscroll-behavior: contain;
         }
       `}</style>
     </div>
