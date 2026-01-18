@@ -1190,6 +1190,22 @@ export default function ProjetoDetalhe() {
     }
   }
 
+  // Carregar renders do projeto
+  const fetchRenders = async (projetoId) => {
+    try {
+      const { data, error } = await supabase
+        .from('projeto_renders')
+        .select('*')
+        .eq('projeto_id', projetoId)
+        .order('compartimento')
+        .order('versao', { ascending: false })
+      if (error) throw error
+      setRenders(data || [])
+    } catch (err) {
+      console.error('Erro ao carregar renders:', err)
+    }
+  }
+
   // Navegar para tab
   const handleTabChange = (tabId) => {
     navigate(`/projetos/${id}/${tabId}`, { replace: true })
@@ -1640,10 +1656,11 @@ export default function ProjetoDetalhe() {
         
         setProject(fullProject)
 
-        // Carregar equipa, intervenientes e fases
+        // Carregar equipa, intervenientes, fases e renders
         fetchEquipaProjeto(projetoData.id)
         fetchIntervenientes(projetoData.id)
         fetchFasesContratuais(projetoData.id)
+        fetchRenders(projetoData.id)
 
       } catch (err) {
         console.error('Erro ao buscar projeto:', err)
