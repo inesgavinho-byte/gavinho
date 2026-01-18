@@ -81,12 +81,29 @@ export default function ChatObras() {
 
   useEffect(() => {
     if (selectedObra) {
-      // Simular carregamento de mensagens WhatsApp
-      setMensagens(MOCK_WHATSAPP_MESSAGES)
-      // Simular análise da IA
-      simulateAIAnalysis()
+      loadMensagens()
+      loadAISugestoes()
+      // Subscrever a novas mensagens em tempo real
+      const channel = supabase
+        .channel(`whatsapp_${selectedObra.id}`)
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'whatsapp_mensagens',
+          filter: `obra_id=eq.${selectedObra.id}`
+        }, () => {
+          loadMensagens()
+        })
+        .subscribe()
+
+      return () => supabase.removeChannel(channel)
     }
   }, [selectedObra])
+
+  // Verificar configuração WhatsApp ao carregar
+  useEffect(() => {
+    checkWhatsAppConfig()
+  }, [])
 
   const loadObras = async () => {
     try {
@@ -107,31 +124,185 @@ export default function ChatObras() {
     }
   }
 
-  const simulateAIAnalysis = () => {
+  // Verificar se WhatsApp está configurado
+  const checkWhatsAppConfig = async () => {
+    try {
+      const { data } = await supabase
+        .from('whatsapp_config')
+        .select('ativo')
+        .eq('ativo', true)
+        .single()
+      setWhatsappConnected(!!data)
+    } catch {
+      setWhatsappConnected(false)
+    }
+  }
+
+  // Carregar mensagens WhatsApp da obra
+  const loadMensagens = async () => {
+    if (!selectedObra) return
+
+    try {
+      const { data, error } = await supabase
+        .from('whatsapp_mensagens')
+        .select('*')
+        .eq('obra_id', selectedObra.id)
+        .order('created_at', { ascending: true })
+
+      if (error) throw error
+
+      // Se houver mensagens reais, usar; senão, usar mock
+      if (data && data.length > 0) {
+        const formattedMessages = data.map(msg => ({
+          id: msg.id,
+          tipo: msg.tipo,
+          autor: msg.autor_nome || msg.telefone_origem,
+          telefone: msg.telefone_origem,
+          conteudo: msg.conteudo,
+          hora: new Date(msg.created_at).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }),
+          data: msg.created_at.split('T')[0],
+          lida: msg.lida,
+          anexos: msg.anexos
+        }))
+        setMensagens(formattedMessages)
+      } else {
+        // Usar dados mock para demonstração
+        setMensagens(MOCK_WHATSAPP_MESSAGES)
+      }
+    } catch (err) {
+      console.error('Erro ao carregar mensagens:', err)
+      // Fallback para mock
+      setMensagens(MOCK_WHATSAPP_MESSAGES)
+    }
+  }
+
+  // Carregar sugestões da IA
+  const loadAISugestoes = async () => {
+    if (!selectedObra) return
+
     setAnalyzingAI(true)
-    setTimeout(() => {
+    try {
+      const { data, error } = await supabase
+        .from('ia_sugestoes')
+        .select('*')
+        .eq('obra_id', selectedObra.id)
+        .eq('status', 'pendente')
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+
+      if (data && data.length > 0) {
+        // Organizar sugestões por tipo
+        const organized = {
+          materiais: [],
+          horas: [],
+          trabalhos: [],
+          tarefas: [],
+          naoConformidades: []
+        }
+
+        data.forEach(s => {
+          const item = {
+            id: s.id,
+            texto: s.texto_original,
+            confianca: s.confianca,
+            ...s.dados
+          }
+
+          switch (s.tipo) {
+            case 'requisicao_material':
+              organized.materiais.push({ ...item, material: s.dados.material, quantidade: s.dados.quantidade, unidade: s.dados.unidade, urgente: s.dados.urgente })
+              break
+            case 'registo_horas':
+              organized.horas.push({ ...item, pessoas: s.dados.pessoas, horasTotal: s.dados.horasTotal, horas: s.dados.horas, data: s.dados.data })
+              break
+            case 'trabalho_executado':
+              organized.trabalhos.push({ ...item, trabalho: s.dados.descricao, percentagem: s.dados.percentagem })
+              break
+            case 'nova_tarefa':
+              organized.tarefas.push({ ...item, tarefa: s.dados.descricao, prioridade: s.dados.prioridade })
+              break
+            case 'nao_conformidade':
+              organized.naoConformidades.push({ ...item, descricao: s.dados.descricao, gravidade: s.dados.gravidade })
+              break
+          }
+        })
+
+        setAiSuggestions(organized)
+      } else {
+        // Usar dados mock para demonstração
+        setAiSuggestions(MOCK_AI_SUGGESTIONS)
+      }
+    } catch (err) {
+      console.error('Erro ao carregar sugestões IA:', err)
+      // Fallback para mock
       setAiSuggestions(MOCK_AI_SUGGESTIONS)
+    } finally {
       setAnalyzingAI(false)
-    }, 1500)
+    }
+  }
+
+  // Reanalizar mensagens com IA
+  const triggerAIAnalysis = async () => {
+    setAnalyzingAI(true)
+    try {
+      // Chamar Edge Function de análise (se configurada)
+      const { data, error } = await supabase.functions.invoke('analisar-mensagens')
+      if (!error) {
+        // Recarregar sugestões após análise
+        await loadAISugestoes()
+      }
+    } catch (err) {
+      console.error('Erro ao analisar:', err)
+    } finally {
+      setAnalyzingAI(false)
+    }
   }
 
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !selectedObra) return
 
     setSending(true)
-    // Simular envio
-    const novaMensagem = {
-      id: Date.now(),
-      tipo: 'enviada',
-      autor: 'Gavinho',
-      conteudo: newMessage.trim(),
-      hora: new Date().toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }),
-      data: new Date().toISOString().split('T')[0],
-      lida: false
+    try {
+      // Adicionar mensagem localmente primeiro (optimistic update)
+      const novaMensagem = {
+        id: Date.now(),
+        tipo: 'enviada',
+        autor: 'Gavinho',
+        conteudo: newMessage.trim(),
+        hora: new Date().toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }),
+        data: new Date().toISOString().split('T')[0],
+        lida: false
+      }
+      setMensagens(prev => [...prev, novaMensagem])
+      const messageContent = newMessage.trim()
+      setNewMessage('')
+
+      // Se WhatsApp estiver configurado, enviar via Twilio
+      if (whatsappConnected) {
+        // Obter contacto principal da obra
+        const { data: contacto } = await supabase
+          .from('whatsapp_contactos')
+          .select('telefone')
+          .eq('obra_id', selectedObra.id)
+          .limit(1)
+          .single()
+
+        if (contacto) {
+          await supabase.functions.invoke('twilio-send', {
+            body: {
+              to: contacto.telefone,
+              body: messageContent,
+              obra_id: selectedObra.id
+            }
+          })
+        }
+      }
+    } catch (err) {
+      console.error('Erro ao enviar mensagem:', err)
+    } finally {
+      setSending(false)
     }
-    setMensagens(prev => [...prev, novaMensagem])
-    setNewMessage('')
-    setSending(false)
   }
 
   const handleKeyPress = (e) => {
@@ -141,19 +312,46 @@ export default function ChatObras() {
     }
   }
 
-  const handleAcceptSuggestion = (tipo, id) => {
+  const handleAcceptSuggestion = async (tipo, id) => {
     setProcessedSuggestions(prev => ({
       ...prev,
       [`${tipo}-${id}`]: 'accepted'
     }))
-    // Aqui futuramente integraria com as APIs para criar requisições, registos, etc.
+
+    try {
+      // Atualizar status na base de dados
+      await supabase
+        .from('ia_sugestoes')
+        .update({
+          status: 'aceite',
+          processado_em: new Date().toISOString()
+        })
+        .eq('id', id)
+
+      // TODO: Criar entidade correspondente (requisição, tarefa, etc.)
+      // Dependendo do tipo, criar na tabela apropriada
+    } catch (err) {
+      console.error('Erro ao aceitar sugestão:', err)
+    }
   }
 
-  const handleRejectSuggestion = (tipo, id) => {
+  const handleRejectSuggestion = async (tipo, id) => {
     setProcessedSuggestions(prev => ({
       ...prev,
       [`${tipo}-${id}`]: 'rejected'
     }))
+
+    try {
+      await supabase
+        .from('ia_sugestoes')
+        .update({
+          status: 'rejeitada',
+          processado_em: new Date().toISOString()
+        })
+        .eq('id', id)
+    } catch (err) {
+      console.error('Erro ao rejeitar sugestão:', err)
+    }
   }
 
   const formatDate = (dateStr) => {
@@ -627,7 +825,7 @@ export default function ChatObras() {
               </div>
             </div>
             <button
-              onClick={simulateAIAnalysis}
+              onClick={triggerAIAnalysis}
               disabled={analyzingAI}
               style={{
                 background: '#F5F5F5',
