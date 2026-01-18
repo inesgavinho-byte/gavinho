@@ -715,6 +715,22 @@ export default function ProjetoDetalhe() {
     responsavel_secundario_nome: '',
     responsavel_secundario_email: ''
   })
+
+  // Fases Contratuais
+  const [fasesContratuais, setFasesContratuais] = useState([])
+  const [showFaseModal, setShowFaseModal] = useState(false)
+  const [editingFase, setEditingFase] = useState(null)
+  const [faseForm, setFaseForm] = useState({
+    numero: '',
+    nome: '',
+    data_inicio: '',
+    num_dias: '',
+    conclusao_prevista: '',
+    data_entrega: '',
+    estado: 'nao_iniciado',
+    avaliacao: ''
+  })
+
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   // Sub-tabs para Fases & Entregas
@@ -1050,6 +1066,127 @@ export default function ProjetoDetalhe() {
       fetchIntervenientes(project.id)
     } catch (err) {
       console.error('Erro ao remover interveniente:', err)
+    }
+  }
+
+  // Carregar fases contratuais
+  const fetchFasesContratuais = async (projetoId) => {
+    try {
+      const { data } = await supabase
+        .from('projeto_fases_contratuais')
+        .select('*')
+        .eq('projeto_id', projetoId)
+        .order('numero')
+      setFasesContratuais(data || [])
+    } catch (err) {
+      console.error('Erro ao carregar fases:', err)
+    }
+  }
+
+  // Salvar fase contratual
+  const handleSaveFase = async () => {
+    if (!project?.id || !faseForm.nome) return
+    try {
+      const faseData = {
+        projeto_id: project.id,
+        numero: parseInt(faseForm.numero) || 1,
+        nome: faseForm.nome,
+        data_inicio: faseForm.data_inicio || null,
+        num_dias: faseForm.num_dias || null,
+        conclusao_prevista: faseForm.conclusao_prevista || null,
+        data_entrega: faseForm.data_entrega || null,
+        estado: faseForm.estado,
+        avaliacao: faseForm.avaliacao || null
+      }
+
+      if (editingFase) {
+        const { error } = await supabase
+          .from('projeto_fases_contratuais')
+          .update(faseData)
+          .eq('id', editingFase.id)
+        if (error) throw error
+      } else {
+        const { error } = await supabase
+          .from('projeto_fases_contratuais')
+          .insert(faseData)
+        if (error) throw error
+      }
+
+      fetchFasesContratuais(project.id)
+      setShowFaseModal(false)
+      setEditingFase(null)
+      setFaseForm({
+        numero: '',
+        nome: '',
+        data_inicio: '',
+        num_dias: '',
+        conclusao_prevista: '',
+        data_entrega: '',
+        estado: 'nao_iniciado',
+        avaliacao: ''
+      })
+    } catch (err) {
+      console.error('Erro ao salvar fase:', err)
+      alert(`Erro: ${err.message}`)
+    }
+  }
+
+  // Editar fase
+  const handleEditFase = (fase) => {
+    setEditingFase(fase)
+    setFaseForm({
+      numero: fase.numero || '',
+      nome: fase.nome || '',
+      data_inicio: fase.data_inicio || '',
+      num_dias: fase.num_dias || '',
+      conclusao_prevista: fase.conclusao_prevista || '',
+      data_entrega: fase.data_entrega || '',
+      estado: fase.estado || 'nao_iniciado',
+      avaliacao: fase.avaliacao || ''
+    })
+    setShowFaseModal(true)
+  }
+
+  // Atualizar estado da fase inline
+  const handleUpdateFaseEstado = async (faseId, novoEstado) => {
+    try {
+      const { error } = await supabase
+        .from('projeto_fases_contratuais')
+        .update({ estado: novoEstado })
+        .eq('id', faseId)
+      if (error) throw error
+      fetchFasesContratuais(project.id)
+    } catch (err) {
+      console.error('Erro ao atualizar estado:', err)
+    }
+  }
+
+  // Atualizar avaliação inline
+  const handleUpdateFaseAvaliacao = async (faseId, novaAvaliacao) => {
+    try {
+      const { error } = await supabase
+        .from('projeto_fases_contratuais')
+        .update({ avaliacao: novaAvaliacao })
+        .eq('id', faseId)
+      if (error) throw error
+      fetchFasesContratuais(project.id)
+    } catch (err) {
+      console.error('Erro ao atualizar avaliação:', err)
+    }
+  }
+
+  // Remover fase
+  const handleRemoveFase = async (id) => {
+    if (!confirm('Remover esta fase?')) return
+    try {
+      const { error } = await supabase
+        .from('projeto_fases_contratuais')
+        .delete()
+        .eq('id', id)
+      if (error) throw error
+      fetchFasesContratuais(project.id)
+    } catch (err) {
+      console.error('Erro ao remover fase:', err)
     }
   }
 
@@ -1503,9 +1640,10 @@ export default function ProjetoDetalhe() {
         
         setProject(fullProject)
 
-        // Carregar equipa e intervenientes
+        // Carregar equipa, intervenientes e fases
         fetchEquipaProjeto(projetoData.id)
         fetchIntervenientes(projetoData.id)
+        fetchFasesContratuais(projetoData.id)
 
       } catch (err) {
         console.error('Erro ao buscar projeto:', err)
@@ -2463,6 +2601,127 @@ export default function ProjetoDetalhe() {
         </div>
       )}
 
+      {/* Modal Adicionar/Editar Fase Contratual */}
+      {showFaseModal && (
+        <div className="modal-overlay" onClick={() => setShowFaseModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+            <div className="modal-header">
+              <h3>{editingFase ? 'Editar Fase' : 'Adicionar Fase Contratual'}</h3>
+              <button className="modal-close" onClick={() => setShowFaseModal(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: '16px' }}>
+                <div className="form-group">
+                  <label>Nº Fase *</label>
+                  <input
+                    type="number"
+                    value={faseForm.numero}
+                    onChange={(e) => setFaseForm(prev => ({ ...prev, numero: e.target.value }))}
+                    className="form-control"
+                    min="1"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Nome da Fase *</label>
+                  <input
+                    type="text"
+                    value={faseForm.nome}
+                    onChange={(e) => setFaseForm(prev => ({ ...prev, nome: e.target.value }))}
+                    className="form-control"
+                    placeholder="Ex: Estudos de Layout/Revisão do Projeto de Arquitetura"
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="form-group">
+                  <label>Data Início</label>
+                  <input
+                    type="date"
+                    value={faseForm.data_inicio}
+                    onChange={(e) => setFaseForm(prev => ({ ...prev, data_inicio: e.target.value }))}
+                    className="form-control"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Nº Dias da Fase</label>
+                  <input
+                    type="text"
+                    value={faseForm.num_dias}
+                    onChange={(e) => setFaseForm(prev => ({ ...prev, num_dias: e.target.value }))}
+                    className="form-control"
+                    placeholder="Ex: 40 ou 60 dias úteis após entrega do PB"
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="form-group">
+                  <label>Conclusão Prevista</label>
+                  <input
+                    type="text"
+                    value={faseForm.conclusao_prevista}
+                    onChange={(e) => setFaseForm(prev => ({ ...prev, conclusao_prevista: e.target.value }))}
+                    className="form-control"
+                    placeholder="Ex: Março 2025 ou Final de Outubro 2025"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Data Entrega</label>
+                  <input
+                    type="date"
+                    value={faseForm.data_entrega}
+                    onChange={(e) => setFaseForm(prev => ({ ...prev, data_entrega: e.target.value }))}
+                    className="form-control"
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="form-group">
+                  <label>Estado</label>
+                  <select
+                    value={faseForm.estado}
+                    onChange={(e) => setFaseForm(prev => ({ ...prev, estado: e.target.value }))}
+                    className="form-control"
+                  >
+                    <option value="nao_iniciado">Não iniciado</option>
+                    <option value="em_curso">Em curso</option>
+                    <option value="concluido">Concluído</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Avaliação Performance</label>
+                  <select
+                    value={faseForm.avaliacao}
+                    onChange={(e) => setFaseForm(prev => ({ ...prev, avaliacao: e.target.value }))}
+                    className="form-control"
+                  >
+                    <option value="">—</option>
+                    <option value="on_time">On Time</option>
+                    <option value="delayed">Delayed</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowFaseModal(false)}>
+                Cancelar
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handleSaveFase}
+                disabled={!faseForm.nome}
+              >
+                {editingFase ? 'Guardar Alterações' : 'Adicionar Fase'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Tab Fases & Entregas */}
       {activeTab === 'fases' && (
         <div>
@@ -2519,9 +2778,10 @@ export default function ProjetoDetalhe() {
             {/* Prazo Contratual */}
             {activeFaseSection === 'prazo' && (
               <div>
+                {/* Resumo do projeto */}
                 <div className="grid grid-3" style={{ gap: '16px', marginBottom: '24px' }}>
                   <div style={{ padding: '16px', background: 'var(--cream)', borderRadius: '12px' }}>
-                    <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginBottom: '4px' }}>Data Início</div>
+                    <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginBottom: '4px' }}>Data Início Projeto</div>
                     <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
                       {project.data_inicio ? new Date(project.data_inicio).toLocaleDateString('pt-PT') : 'A definir'}
                     </div>
@@ -2533,22 +2793,149 @@ export default function ProjetoDetalhe() {
                     </div>
                   </div>
                   <div style={{ padding: '16px', background: 'var(--cream)', borderRadius: '12px' }}>
-                    <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginBottom: '4px' }}>Duração</div>
+                    <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginBottom: '4px' }}>Duração Total</div>
                     <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
                       {project.prazo_execucao || '—'} {project.prazo_execucao ? 'dias' : ''}
                     </div>
                   </div>
                 </div>
-                <div style={{
-                  padding: '24px',
-                  background: 'var(--cream)',
-                  borderRadius: '12px',
-                  textAlign: 'center',
-                  color: 'var(--brown-light)'
-                }}>
-                  <Calendar size={32} style={{ opacity: 0.3, marginBottom: '12px' }} />
-                  <p>Timeline detalhado desta fase em desenvolvimento.</p>
+
+                {/* Tabela de Fases */}
+                <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h4 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--brown)' }}>Fases e Prazos Contratuais</h4>
+                  <button
+                    className="btn btn-primary"
+                    style={{ padding: '6px 12px', fontSize: '12px' }}
+                    onClick={() => {
+                      setEditingFase(null)
+                      setFaseForm({
+                        numero: (fasesContratuais.length + 1).toString(),
+                        nome: '',
+                        data_inicio: '',
+                        num_dias: '',
+                        conclusao_prevista: '',
+                        data_entrega: '',
+                        estado: 'nao_iniciado',
+                        avaliacao: ''
+                      })
+                      setShowFaseModal(true)
+                    }}
+                  >
+                    <Plus size={14} /> Adicionar Fase
+                  </button>
                 </div>
+
+                {fasesContratuais.length === 0 ? (
+                  <div style={{
+                    padding: '32px',
+                    background: 'var(--cream)',
+                    borderRadius: '12px',
+                    textAlign: 'center',
+                    color: 'var(--brown-light)'
+                  }}>
+                    <Calendar size={32} style={{ opacity: 0.3, marginBottom: '12px' }} />
+                    <p>Nenhuma fase contratual definida.</p>
+                  </div>
+                ) : (
+                  <div style={{ overflowX: 'auto', border: '1px solid var(--stone)', borderRadius: '12px' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                      <thead>
+                        <tr style={{ background: 'var(--cream)' }}>
+                          <th style={{ textAlign: 'left', padding: '12px 10px', color: 'var(--brown)', fontWeight: 600, borderBottom: '2px solid var(--stone)' }}>FASE</th>
+                          <th style={{ textAlign: 'center', padding: '12px 10px', color: 'var(--brown)', fontWeight: 600, borderBottom: '2px solid var(--stone)', width: '100px' }}>INÍCIO</th>
+                          <th style={{ textAlign: 'center', padding: '12px 10px', color: 'var(--brown)', fontWeight: 600, borderBottom: '2px solid var(--stone)', width: '100px' }}>Nº DIAS FASE</th>
+                          <th style={{ textAlign: 'center', padding: '12px 10px', color: 'var(--brown)', fontWeight: 600, borderBottom: '2px solid var(--stone)', width: '120px' }}>CONCLUSÃO PREVISTA</th>
+                          <th style={{ textAlign: 'center', padding: '12px 10px', color: 'var(--brown)', fontWeight: 600, borderBottom: '2px solid var(--stone)', width: '100px' }}>DATA ENTREGA</th>
+                          <th style={{ textAlign: 'center', padding: '12px 10px', color: 'var(--brown)', fontWeight: 600, borderBottom: '2px solid var(--stone)', width: '120px' }}>ESTADO</th>
+                          <th style={{ textAlign: 'center', padding: '12px 10px', color: 'var(--brown)', fontWeight: 600, borderBottom: '2px solid var(--stone)', width: '120px' }}>AVALIAÇÃO PERFORMANCE</th>
+                          <th style={{ width: '50px', borderBottom: '2px solid var(--stone)' }}></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {fasesContratuais.map((fase) => (
+                          <tr key={fase.id} style={{ borderBottom: '1px solid var(--cream)' }}>
+                            <td style={{ padding: '12px 10px', color: 'var(--brown)' }}>
+                              <span style={{ fontWeight: 500 }}>{fase.numero}ª Fase – </span>
+                              {fase.nome}
+                            </td>
+                            <td style={{ padding: '12px 10px', textAlign: 'center', color: 'var(--brown-light)' }}>
+                              {fase.data_inicio ? new Date(fase.data_inicio).toLocaleDateString('pt-PT') : '—'}
+                            </td>
+                            <td style={{ padding: '12px 10px', textAlign: 'center', color: 'var(--brown-light)' }}>
+                              {fase.num_dias || '—'}
+                            </td>
+                            <td style={{ padding: '12px 10px', textAlign: 'center', color: 'var(--brown-light)' }}>
+                              {fase.conclusao_prevista || '—'}
+                            </td>
+                            <td style={{ padding: '12px 10px', textAlign: 'center', color: 'var(--brown-light)' }}>
+                              {fase.data_entrega ? new Date(fase.data_entrega).toLocaleDateString('pt-PT') : '—'}
+                            </td>
+                            <td style={{ padding: '12px 10px', textAlign: 'center' }}>
+                              <select
+                                value={fase.estado}
+                                onChange={(e) => handleUpdateFaseEstado(fase.id, e.target.value)}
+                                style={{
+                                  padding: '4px 8px',
+                                  borderRadius: '12px',
+                                  border: 'none',
+                                  fontSize: '11px',
+                                  fontWeight: 500,
+                                  cursor: 'pointer',
+                                  background: fase.estado === 'concluido' ? '#dcfce7' :
+                                              fase.estado === 'em_curso' ? '#fef9c3' : '#f3f4f6',
+                                  color: fase.estado === 'concluido' ? '#166534' :
+                                         fase.estado === 'em_curso' ? '#854d0e' : '#6b7280'
+                                }}
+                              >
+                                <option value="nao_iniciado">Não iniciado</option>
+                                <option value="em_curso">Em curso</option>
+                                <option value="concluido">Concluído</option>
+                              </select>
+                            </td>
+                            <td style={{ padding: '12px 10px', textAlign: 'center' }}>
+                              <select
+                                value={fase.avaliacao || ''}
+                                onChange={(e) => handleUpdateFaseAvaliacao(fase.id, e.target.value)}
+                                style={{
+                                  padding: '4px 8px',
+                                  borderRadius: '12px',
+                                  border: 'none',
+                                  fontSize: '11px',
+                                  fontWeight: 500,
+                                  cursor: 'pointer',
+                                  background: fase.avaliacao === 'on_time' ? '#dcfce7' :
+                                              fase.avaliacao === 'delayed' ? '#fee2e2' : '#f3f4f6',
+                                  color: fase.avaliacao === 'on_time' ? '#166534' :
+                                         fase.avaliacao === 'delayed' ? '#dc2626' : '#6b7280'
+                                }}
+                              >
+                                <option value="">—</option>
+                                <option value="on_time">On Time</option>
+                                <option value="delayed">Delayed</option>
+                              </select>
+                            </td>
+                            <td style={{ padding: '12px 10px' }}>
+                              <div style={{ display: 'flex', gap: '4px' }}>
+                                <button
+                                  onClick={() => handleEditFase(fase)}
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--brown-light)' }}
+                                >
+                                  <Edit size={14} />
+                                </button>
+                                <button
+                                  onClick={() => handleRemoveFase(fase.id)}
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--danger)' }}
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             )}
 
