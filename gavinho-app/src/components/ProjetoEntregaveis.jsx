@@ -26,6 +26,9 @@ export default function ProjetoEntregaveis({ projeto }) {
   // Estado para edição inline
   const [editingCell, setEditingCell] = useState(null) // { id: itemId, field: 'status' | 'executante' }
 
+  // Lista de utilizadores (Recursos Humanos)
+  const [utilizadores, setUtilizadores] = useState([])
+
   const [formData, setFormData] = useState({
     codigo: '',
     nome: '',
@@ -44,8 +47,25 @@ export default function ProjetoEntregaveis({ projeto }) {
   useEffect(() => {
     if (projeto?.id) {
       loadEntregaveis()
+      loadUtilizadores()
     }
   }, [projeto?.id])
+
+  // Carregar utilizadores (Recursos Humanos)
+  const loadUtilizadores = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('utilizadores')
+        .select('id, nome, cargo, departamento')
+        .eq('ativo', true)
+        .order('nome')
+
+      if (error) throw error
+      setUtilizadores(data || [])
+    } catch (err) {
+      console.error('Erro ao carregar utilizadores:', err)
+    }
+  }
 
   const loadEntregaveis = async (resetExpanded = true) => {
     try {
@@ -131,11 +151,21 @@ export default function ProjetoEntregaveis({ projeto }) {
           .update(itemData)
           .eq('id', editingItem.id)
         if (error) throw error
+
+        // Se adicionou executante e tem datas (e não tinha antes), criar tarefa
+        if (itemData.executante && itemData.data_inicio && !editingItem.executante) {
+          await criarTarefaEntregavel(itemData, itemData.executante)
+        }
       } else {
         const { error } = await supabase
           .from('projeto_entregaveis')
           .insert([itemData])
         if (error) throw error
+
+        // Se criou com executante e datas, criar tarefa
+        if (itemData.executante && itemData.data_inicio) {
+          await criarTarefaEntregavel(itemData, itemData.executante)
+        }
       }
 
       setShowModal(false)
@@ -176,6 +206,15 @@ export default function ProjetoEntregaveis({ projeto }) {
 
       if (error) throw error
 
+      // Buscar item atualizado para verificar se deve criar tarefa
+      const item = entregaveis.find(e => e.id === itemId)
+      const updatedItem = { ...item, [field]: value }
+
+      // Se atribuiu executante e tem datas, criar tarefa
+      if (field === 'executante' && value && updatedItem.data_inicio) {
+        await criarTarefaEntregavel(updatedItem, value)
+      }
+
       // Atualizar estado local imediatamente
       setEntregaveis(prev => prev.map(item =>
         item.id === itemId ? { ...item, [field]: value } : item
@@ -184,6 +223,31 @@ export default function ProjetoEntregaveis({ projeto }) {
     } catch (err) {
       console.error('Erro ao atualizar:', err)
       alert('Erro ao atualizar')
+    }
+  }
+
+  // Criar tarefa automaticamente ao atribuir executante com datas
+  const criarTarefaEntregavel = async (entregavel, executanteNome) => {
+    try {
+      // Encontrar o utilizador pelo nome
+      const utilizador = utilizadores.find(u => u.nome === executanteNome)
+
+      const { error } = await supabase.from('tarefas').insert([{
+        titulo: `[ENTREGÁVEL] ${entregavel.codigo} - ${entregavel.nome}`,
+        descricao: `Entregável do projeto: ${entregavel.nome}\nEscala: ${entregavel.escala || '-'}\nFase: ${entregavel.fase || '-'}`,
+        projeto_id: projeto.id,
+        responsavel_id: utilizador?.id || null,
+        responsavel_nome: executanteNome,
+        status: 'pendente',
+        prioridade: 'media',
+        data_limite: entregavel.data_conclusao || entregavel.data_inicio,
+        categoria: 'entregavel'
+      }])
+
+      if (error) throw error
+      console.log('Tarefa criada para entregável:', entregavel.codigo)
+    } catch (err) {
+      console.error('Erro ao criar tarefa:', err)
     }
   }
 
@@ -665,17 +729,13 @@ export default function ProjetoEntregaveis({ projeto }) {
                                       {statusConfig[item.status]?.label}
                                     </span>
                                   )}
-                                  {/* Executante - Edição Inline */}
+                                  {/* Executante - Edição Inline (Dropdown de Recursos Humanos) */}
                                   {editingCell?.id === item.id && editingCell?.field === 'executante' ? (
-                                    <input
-                                      type="text"
+                                    <select
                                       autoFocus
-                                      defaultValue={item.executante || ''}
-                                      onBlur={(e) => handleInlineUpdate(item.id, 'executante', e.target.value || null)}
-                                      onKeyDown={(e) => {
-                                        if (e.key === 'Enter') handleInlineUpdate(item.id, 'executante', e.target.value || null)
-                                        if (e.key === 'Escape') setEditingCell(null)
-                                      }}
+                                      value={item.executante || ''}
+                                      onChange={(e) => handleInlineUpdate(item.id, 'executante', e.target.value || null)}
+                                      onBlur={() => setEditingCell(null)}
                                       style={{
                                         width: '100%',
                                         padding: '4px 6px',
@@ -683,10 +743,14 @@ export default function ProjetoEntregaveis({ projeto }) {
                                         border: '1px solid var(--info)',
                                         borderRadius: '6px',
                                         background: 'var(--white)',
-                                        textAlign: 'center'
+                                        cursor: 'pointer'
                                       }}
-                                      placeholder="Nome..."
-                                    />
+                                    >
+                                      <option value="">— Selecionar —</option>
+                                      {utilizadores.map(u => (
+                                        <option key={u.id} value={u.nome}>{u.nome}</option>
+                                      ))}
+                                    </select>
                                   ) : (
                                     <span
                                       onClick={() => setEditingCell({ id: item.id, field: 'executante' })}
@@ -931,13 +995,16 @@ export default function ProjetoEntregaveis({ projeto }) {
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, marginBottom: '6px' }}>Executante</label>
-                  <input
-                    type="text"
+                  <select
                     value={formData.executante}
                     onChange={e => setFormData({ ...formData, executante: e.target.value })}
-                    placeholder="Nome do executante"
                     style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
-                  />
+                  >
+                    <option value="">— Selecionar Executante —</option>
+                    {utilizadores.map(u => (
+                      <option key={u.id} value={u.nome}>{u.nome} {u.cargo ? `(${u.cargo})` : ''}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
