@@ -14,7 +14,8 @@ import {
   AlertTriangle,
   Package,
   HardHat,
-  FileText
+  FileText,
+  Send
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
@@ -642,6 +643,274 @@ export default function AdminSeed() {
     setLoading(false)
   }
 
+  // ============================================
+  // SEED: Entregas Cliente MYRYAD (GA00469)
+  // ============================================
+  const seedEntregasMYRYAD = async () => {
+    setLoading(true)
+    setLogs([])
+    setResult(null)
+
+    const addLog = (message, type = 'info') => {
+      const timestamp = new Date().toLocaleTimeString('pt-PT')
+      setLogs(prev => [...prev, { message, type, timestamp }])
+    }
+
+    try {
+      addLog('🚀 Iniciando seed de Entregas MYRYAD...', 'info')
+
+      // Verificar se projeto GA00469 existe
+      addLog('🔍 Procurando projeto GA00469 - MYRYAD...', 'info')
+      const { data: projetos, error: projError } = await supabase
+        .from('projetos')
+        .select('id, codigo, nome')
+        .ilike('codigo', '%GA00469%')
+
+      if (projError) throw projError
+
+      let projetoId
+      if (!projetos || projetos.length === 0) {
+        addLog('⚠️ Projeto GA00469 não encontrado. A criar...', 'info')
+        const { data: novoProjeto, error: createError } = await supabase
+          .from('projetos')
+          .insert([{
+            codigo: 'GA00469',
+            nome: 'MYRYAD Hotel',
+            fase: 'Projeto de Execução',
+            status: 'em_progresso',
+            tipologia: 'Hotel',
+            subtipo: 'Hotel 5 Estrelas'
+          }])
+          .select()
+          .single()
+
+        if (createError) throw createError
+        projetoId = novoProjeto.id
+        addLog(`✅ Projeto GA00469 criado: ${novoProjeto.id}`, 'success')
+      } else {
+        projetoId = projetos[0].id
+        addLog(`✅ Projeto encontrado: ${projetos[0].nome} (${projetoId})`, 'success')
+      }
+
+      // Limpar entregas existentes
+      addLog('🧹 Limpando entregas anteriores...', 'info')
+      await supabase.from('projeto_entregas').delete().eq('projeto_id', projetoId)
+
+      // Dados das entregas ao cliente
+      const entregasCliente = [
+        {
+          numero: 1,
+          data: '2024-08-02',
+          titulo: 'Entrega 01 - Plantas e Projetos Iniciais',
+          descricao: 'Planta Piso 0 Myriad + MCC - PDF +TIFF; Projeto Suite 1909 - PDF; Projeto Quarto Standard 1910 - PDF; MQT Suite 1909- PDF; MQT Quarto Standard 1910',
+          observacoes: 'Piso 19 - Quarto 1910 - Suite 1909'
+        },
+        {
+          numero: 2,
+          data: '2024-09-05',
+          titulo: 'Entrega 02 - Projeto Execução Arquitetura',
+          descricao: 'Projeto Execução Arquitetura Suite 1909 PDF + DWG; Projeto Execução Arquitetura Quarto Standard 1910 - PDF + DWG; MQT Suite 1909 + Quarto 1910 - PDF',
+          observacoes: 'Piso 19 - Quarto 1910 - Suite 1909'
+        },
+        {
+          numero: 3,
+          data: '2024-11-11',
+          titulo: 'Entrega 03 - Artigos Marcenaria + Mobiliário',
+          descricao: 'Artigos Marcenaria + Mobiliário- Quarto Standard 1910 - PDF; Artigos Marcenaria + Mobiliário - Suite 1909 - PDF',
+          observacoes: 'Piso 19 - Quarto 1910 - Suite 1909'
+        },
+        {
+          numero: 4,
+          data: '2024-11-27',
+          titulo: 'Entrega 04 - Proposta Plantas',
+          descricao: 'Proposta Planta Piso 0- PDF; Planta Piso Tipo - PDF',
+          observacoes: ''
+        },
+        {
+          numero: 0,
+          data: '2024-12-12',
+          titulo: 'Entrega Mail - Revestimentos IS',
+          descricao: 'Revestimentos e Material Bancadas IS - Resumo dos Materiais a Utilizar - PDF',
+          observacoes: '',
+          tipo_entrega: 'mail'
+        },
+        {
+          numero: 5,
+          data: '2025-01-17',
+          titulo: 'Entrega 05 - Layout Elétrico v1',
+          descricao: 'Layout Elétrico Quarto Standard 1910, v1 - PDF + DWG',
+          observacoes: 'Piso 19 - Quarto 1910'
+        },
+        {
+          numero: 6,
+          data: '2025-01-22',
+          titulo: 'Entrega 06 - Layout Elétrico v2',
+          descricao: 'Layout Elétrico Quarto Standard 1910, v2 - PDF',
+          observacoes: 'Piso 19 - Quarto 1910'
+        },
+        {
+          numero: 7,
+          data: '2025-01-27',
+          titulo: 'Entrega 07 - Layout Elétrico v3',
+          descricao: 'Layout Elétrico Quarto Standard 1910 v3 - PDF',
+          observacoes: 'Piso 19 - Quarto 1910'
+        },
+        {
+          numero: 0,
+          data: '2025-02-04',
+          titulo: 'Entrega Mail - Ficha Técnica Pavimento',
+          descricao: 'Ficha Técnica - Pavimento SurPlus_TF_EN_10-2023 (1) - PDF',
+          observacoes: '',
+          tipo_entrega: 'mail'
+        },
+        {
+          numero: 8,
+          data: '2025-02-10',
+          titulo: 'Entrega 08 - Pérgola MCC v2',
+          descricao: 'Pérgola - Planta e Alçado MCC v2 - PDF',
+          observacoes: ''
+        },
+        {
+          numero: 9,
+          data: '2025-02-25',
+          titulo: 'Entrega 09 - Imagens 3D Pérgola + Mapa Acabamentos',
+          descricao: 'Apresentação Imagens 3d Pérgola + Quarto Standard 1910 Mapa de acabamentos - PDF',
+          observacoes: 'Piso 19 - Quarto 1910'
+        },
+        {
+          numero: 10,
+          data: '2025-03-03',
+          titulo: 'Entrega 10 - Pérgola v3',
+          descricao: 'Pérgola Planta e Alçado v3 - PDF; Pérgola Corte v3 - PDF; Pérgola MCC - DWG',
+          observacoes: ''
+        },
+        {
+          numero: 11,
+          data: '2025-03-11',
+          titulo: 'Entrega 11 - Pacote Completo',
+          descricao: 'Apresentação Myriad Imagens e Mapa de Acabamentos - PDF; Proposta Crystal Center Piso 0, 1 e 2 - PDF; Pormenor Aro de Pedra Corredores + Imagens 3D - PDF; Listagem de Equipamentos Decoração - PDF; Planta Piso 0 Proposta 1 e 2 + Imagens 3D - PDF; Planta Piso 1 Proposta 1 e 2 + Imagens 3D - PDF; Pacote Projeto Quarto Premium + Imagens 3D - PDF; Pacote Projeto Quarto Standard 1910 - PDF; Quarto Standard 1910 Apainelados - PDF; Detalhes Serralharia - PDF; Planta e Corte Spa + Imagens 3D - PDF; Pacote Projeto Suite 1909 - PDF',
+          observacoes: 'Piso 19 - Quarto 1910 - Suite 1909 - Premium'
+        },
+        {
+          numero: 0,
+          data: '2025-03-20',
+          titulo: 'Entrega Mail - Tapete Quartos',
+          descricao: 'Desenho Técnico Tapete Quartos - PDF + DWG; Imagem com textura do Tapete; Abstract_designs - PDF',
+          observacoes: '',
+          tipo_entrega: 'mail'
+        },
+        {
+          numero: 0,
+          data: '2025-03-28',
+          titulo: 'Entrega Mail - Detalhe Pérgola',
+          descricao: 'Print com detalhe do revestimento ripado da pérgola. Fachada em tubos - PDF',
+          observacoes: '',
+          tipo_entrega: 'mail'
+        },
+        {
+          numero: 0,
+          data: '2025-04-21',
+          titulo: 'Entrega Mail - Mapa Tipologias',
+          descricao: '230pa015q_01 - Mapa de Tipologías - PDF',
+          observacoes: '',
+          tipo_entrega: 'mail'
+        },
+        {
+          numero: 0,
+          data: '2025-05-13',
+          titulo: 'Entrega Mail - DWG Quarto Modelo',
+          descricao: 'Quarto Modelo Standard 1910 - DWG; Tampos em Pedra - DWG',
+          observacoes: '',
+          tipo_entrega: 'mail'
+        },
+        {
+          numero: 12,
+          data: '2025-06-05',
+          titulo: 'Entrega 12 - PEXA Quartos',
+          descricao: 'Informação Marca Argile - PDF; Imagens Referência Aparelhagem; PEXA Quarto Standard 1910 - PDF + DWG; PEXA Quarto Premium - PDF + DWG',
+          observacoes: 'Piso 19 - Quarto 1910 - Premium'
+        },
+        {
+          numero: 0,
+          data: '2025-06-30',
+          titulo: 'Entrega Mail - Tintas Argile',
+          descricao: 'Aplicação das Tintas Argile nos Quartos Mock-up - PDF',
+          observacoes: '',
+          tipo_entrega: 'mail'
+        },
+        {
+          numero: 0,
+          data: '2025-07-03',
+          titulo: 'Entrega Mail - Aparelhagem e Iluminação',
+          descricao: 'Envio da referência da Aparelhagem Elétrica; PEXI Candeeiro de Pé - Quarto Standard - PDF; Tabela de iluminação - Quarto Standard - PDF; Explicação de Aplicação Cerâmico nos Corredores - PDF',
+          observacoes: 'Piso 19 - Quarto 1910',
+          tipo_entrega: 'mail'
+        },
+        {
+          numero: 0,
+          data: '2025-07-14',
+          titulo: 'Entrega Mail - PEXA Premium Obra',
+          descricao: 'PEXA Quarto Premium para Obra - PDF + DWF',
+          observacoes: 'Piso 19 - Premium',
+          tipo_entrega: 'mail'
+        },
+        {
+          numero: 0,
+          data: '2025-08-11',
+          titulo: 'Entrega Mail - Mockup Bedrooms',
+          descricao: 'GA00469_Myriad_Mockup Bedrooms_ Desenhos Técnicos e Imagens tridimensionais alteradas',
+          observacoes: '',
+          tipo_entrega: 'mail'
+        }
+      ]
+
+      // Inserir entregas
+      addLog('📦 Criando entregas ao cliente...', 'info')
+      let countEntregas = 0
+      let countMails = 0
+
+      for (const entrega of entregasCliente) {
+        const isMail = entrega.tipo_entrega === 'mail'
+        const { error } = await supabase.from('projeto_entregas').insert([{
+          projeto_id: projetoId,
+          tipo: 'cliente',
+          titulo: entrega.titulo,
+          descricao: entrega.descricao,
+          destinatario: 'Cliente MYRYAD',
+          data_prevista: entrega.data,
+          data_entrega: entrega.data,
+          status: 'entregue',
+          observacoes: entrega.observacoes || null,
+          documentos: isMail ? 'Via Email' : 'Via Link'
+        }])
+
+        if (error) {
+          addLog(`⚠️ Erro ao criar ${entrega.titulo}: ${error.message}`, 'error')
+        } else {
+          if (isMail) {
+            countMails++
+          } else {
+            countEntregas++
+          }
+        }
+      }
+
+      addLog(`✅ ${countEntregas} entregas formais criadas`, 'success')
+      addLog(`✅ ${countMails} entregas por email criadas`, 'success')
+
+      const total = countEntregas + countMails
+      addLog(`🎉 Seed concluído! Total: ${total} entregas`, 'success')
+      setResult({ success: true, projetoId, total })
+
+    } catch (error) {
+      console.error('Erro:', error)
+      addLog(`❌ Erro: ${error.message}`, 'error')
+      setResult({ success: false, error: error.message })
+    }
+
+    setLoading(false)
+  }
+
   return (
     <div className="fade-in">
       {/* Header */}
@@ -728,6 +997,77 @@ export default function AdminSeed() {
               <>
                 <Play size={18} style={{ marginRight: '8px' }} />
                 Executar Seed Entregáveis
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* MYRYAD Entregas Card */}
+        <div className="card" style={{ padding: '24px' }}>
+          <div className="flex items-center gap-md" style={{ marginBottom: '20px' }}>
+            <div style={{
+              width: '56px',
+              height: '56px',
+              borderRadius: '12px',
+              background: 'linear-gradient(135deg, var(--info), #5a7a9e)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white'
+            }}>
+              <Send size={28} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--brown)' }}>
+                GA00469 - MYRYAD
+              </h3>
+              <p style={{ fontSize: '13px', color: 'var(--brown-light)' }}>
+                Entregas ao Cliente (Ago 2024 - Ago 2025)
+              </p>
+            </div>
+          </div>
+
+          {/* O que será criado */}
+          <div style={{
+            background: 'var(--cream)',
+            borderRadius: '12px',
+            padding: '16px',
+            marginBottom: '20px'
+          }}>
+            <h4 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--brown)', marginBottom: '12px' }}>
+              O que será criado:
+            </h4>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              {[
+                { icon: Send, label: '12 Entregas Formais' },
+                { icon: FileText, label: '10 Entregas Email' },
+                { icon: Package, label: 'Projetos Suite 1909' },
+                { icon: Package, label: 'Quarto Standard 1910' },
+                { icon: Building2, label: 'Pérgola & Spa' }
+              ].map((item, idx) => (
+                <div key={idx} className="flex items-center gap-sm" style={{ fontSize: '13px', color: 'var(--brown-light)' }}>
+                  <item.icon size={14} />
+                  {item.label}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <button
+            onClick={seedEntregasMYRYAD}
+            disabled={loading}
+            className="btn btn-primary"
+            style={{ width: '100%', padding: '14px' }}
+          >
+            {loading ? (
+              <>
+                <Loader size={18} style={{ marginRight: '8px', animation: 'spin 1s linear infinite' }} />
+                A processar...
+              </>
+            ) : (
+              <>
+                <Play size={18} style={{ marginRight: '8px' }} />
+                Executar Seed Entregas
               </>
             )}
           </button>
