@@ -2560,7 +2560,7 @@ export default function ProjetoDetalhe() {
                         borderRadius: '8px',
                         fontSize: '14px'
                       }}
-                      placeholder="Ex: PROAP, GAPRES, GET"
+                      placeholder="Nome da empresa ou entidade"
                     />
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
@@ -2610,7 +2610,7 @@ export default function ProjetoDetalhe() {
                         borderRadius: '8px',
                         fontSize: '14px'
                       }}
-                      placeholder="Ex: Eng. José Carvalheira"
+                      placeholder="Nome do responsável"
                     />
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
@@ -2659,7 +2659,7 @@ export default function ProjetoDetalhe() {
                         borderRadius: '8px',
                         fontSize: '14px'
                       }}
-                      placeholder="Ex: Arq. Tiago Araújo"
+                      placeholder="Nome do responsável"
                     />
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
