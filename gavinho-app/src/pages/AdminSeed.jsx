@@ -13,7 +13,8 @@ import {
   Calendar,
   AlertTriangle,
   Package,
-  HardHat
+  HardHat,
+  FileText
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
@@ -361,6 +362,285 @@ export default function AdminSeed() {
     setLoading(false)
   }
 
+  // ========== SEED ENTREGÁVEIS GA00489 ==========
+  const seedEntregaveisGA00489 = async () => {
+    setLoading(true)
+    setLogs([])
+    setResult(null)
+
+    addLog('🚀 Iniciando seed de entregáveis GA00489 - AS House Mora...', 'info')
+
+    try {
+      // Verificar se projeto GA00489 existe
+      const { data: projeto } = await supabase
+        .from('projetos')
+        .select('id')
+        .eq('codigo', 'GA00489')
+        .single()
+
+      let projetoId
+      if (!projeto) {
+        // Criar projeto se não existir
+        const { data: novoProjeto, error } = await supabase
+          .from('projetos')
+          .insert([{
+            codigo: 'GA00489',
+            nome: 'AS House - Mora',
+            tipologia: 'Residencial',
+            subtipo: 'Moradia',
+            fase: 'Projeto Base',
+            status: 'in_progress',
+            progresso: 25
+          }])
+          .select()
+          .single()
+
+        if (error) throw error
+        projetoId = novoProjeto.id
+        addLog('✅ Projeto GA00489 criado', 'success')
+      } else {
+        projetoId = projeto.id
+        addLog('✅ Projeto GA00489 encontrado', 'success')
+      }
+
+      // Limpar entregáveis existentes deste projeto
+      await supabase
+        .from('projeto_entregaveis')
+        .delete()
+        .eq('projeto_id', projetoId)
+
+      addLog('🗑️ Entregáveis existentes removidos', 'info')
+
+      // ========== PROJETO BASE ==========
+      addLog('📐 Criando entregáveis do Projeto Base...', 'info')
+
+      const entregaveisProjetoBase = [
+        // 01 DESENHOS GERAIS
+        // 01.01 Existente - Projeto Licenciado
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.01', subNome: 'Existente - Projeto Licenciado', cod: '01.01.01', desenho: 'Planta Piso -1', escala: '1/100', dataInicio: '2025-07-08', estado: 'para_revisao' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.01', subNome: 'Existente - Projeto Licenciado', cod: '01.01.02', desenho: 'Planta Piso 0', escala: '1/100', dataInicio: '2025-07-08', estado: 'para_revisao' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.01', subNome: 'Existente - Projeto Licenciado', cod: '01.01.03', desenho: 'Planta Piso 1', escala: '1/100', dataInicio: '2025-07-08', estado: 'para_revisao' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.01', subNome: 'Existente - Projeto Licenciado', cod: '01.01.04', desenho: 'Planta Piso 2', escala: '1/100', dataInicio: '2025-07-08', estado: 'para_revisao' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.01', subNome: 'Existente - Projeto Licenciado', cod: '01.01.05', desenho: 'Planta Cobertura', escala: '1/100', dataInicio: '2025-07-08', estado: 'para_revisao' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.01', subNome: 'Existente - Projeto Licenciado', cod: '01.01.06', desenho: 'Corte AA', escala: '1/100', dataInicio: '2025-07-08', estado: 'para_revisao' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.01', subNome: 'Existente - Projeto Licenciado', cod: '01.01.07', desenho: 'Corte BB', escala: '1/100', dataInicio: '2025-07-08', estado: 'para_revisao' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.01', subNome: 'Existente - Projeto Licenciado', cod: '01.01.08', desenho: 'Alçado Norte', escala: '1/100', dataInicio: '2025-07-08', estado: 'para_revisao' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.01', subNome: 'Existente - Projeto Licenciado', cod: '01.01.09', desenho: 'Alçado Sul', escala: '1/100', dataInicio: '2025-07-08', estado: 'para_revisao' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.01', subNome: 'Existente - Projeto Licenciado', cod: '01.01.10', desenho: 'Alçado Este', escala: '1/100', dataInicio: '2025-07-08', estado: 'para_revisao' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.01', subNome: 'Existente - Projeto Licenciado', cod: '01.01.11', desenho: 'Alçado Oeste', escala: '1/100', dataInicio: '2025-07-08', estado: 'para_revisao' },
+        // 01.02 Cores Convencionais
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.02', subNome: 'Cores Convencionais', cod: '01.02.01', desenho: 'Planta Piso -1', escala: '1/100', dataInicio: '2025-07-08', estado: 'para_revisao' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.02', subNome: 'Cores Convencionais', cod: '01.02.02', desenho: 'Planta Piso 0', escala: '1/100', dataInicio: '2025-07-08', estado: 'para_revisao' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.02', subNome: 'Cores Convencionais', cod: '01.02.03', desenho: 'Planta Piso 1', escala: '1/100', dataInicio: '2025-07-08', estado: 'para_revisao' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.02', subNome: 'Cores Convencionais', cod: '01.02.04', desenho: 'Planta Piso 2', escala: '1/100', dataInicio: '2025-07-08', estado: 'para_revisao' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.02', subNome: 'Cores Convencionais', cod: '01.02.05', desenho: 'Planta Cobertura', escala: '1/100', dataInicio: '2025-07-08', estado: 'para_revisao' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.02', subNome: 'Cores Convencionais', cod: '01.02.06', desenho: 'Corte AA', escala: '1/100', dataInicio: '2025-07-08', estado: 'para_revisao' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.02', subNome: 'Cores Convencionais', cod: '01.02.07', desenho: 'Corte BB', escala: '1/100', dataInicio: '2025-07-08', estado: 'para_revisao' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.02', subNome: 'Cores Convencionais', cod: '01.02.08', desenho: 'Alçado Norte', escala: '1/100', dataInicio: '2025-07-08', estado: 'para_revisao' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.02', subNome: 'Cores Convencionais', cod: '01.02.09', desenho: 'Alçado Sul', escala: '1/100', dataInicio: '2025-07-08', estado: 'para_revisao' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.02', subNome: 'Cores Convencionais', cod: '01.02.10', desenho: 'Alçado Este', escala: '1/100', dataInicio: '2025-07-08', estado: 'para_revisao' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.02', subNome: 'Cores Convencionais', cod: '01.02.11', desenho: 'Alçado Oeste', escala: '1/100', dataInicio: '2025-07-08', estado: 'para_revisao' },
+        // 01.03 Proposta
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.03', subNome: 'Proposta', cod: '01.03.01', desenho: 'Planta Piso -1', escala: '1/100', dataInicio: '2025-07-08', estado: 'para_revisao' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.03', subNome: 'Proposta', cod: '01.03.02', desenho: 'Planta Piso 0', escala: '1/100', dataInicio: '2025-07-08', estado: 'para_revisao' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.03', subNome: 'Proposta', cod: '01.03.03', desenho: 'Planta Piso 1', escala: '1/100', dataInicio: '2025-07-08', estado: 'para_revisao' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.03', subNome: 'Proposta', cod: '01.03.04', desenho: 'Planta Piso 2', escala: '1/100', dataInicio: '2025-07-08', estado: 'para_revisao' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.03', subNome: 'Proposta', cod: '01.03.05', desenho: 'Planta Cobertura', escala: '1/100', dataInicio: '2025-07-08', estado: 'para_revisao' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.03', subNome: 'Proposta', cod: '01.03.06', desenho: 'Corte AA', escala: '1/100', dataInicio: '2025-07-08', estado: 'para_revisao' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.03', subNome: 'Proposta', cod: '01.03.07', desenho: 'Corte BB', escala: '1/100', dataInicio: '2025-07-08', estado: 'para_revisao' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.03', subNome: 'Proposta', cod: '01.03.08', desenho: 'Alçado Norte', escala: '1/100', dataInicio: '2025-07-08', estado: 'para_revisao' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.03', subNome: 'Proposta', cod: '01.03.09', desenho: 'Alçado Sul', escala: '1/100', dataInicio: '2025-07-08', estado: 'para_revisao' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.03', subNome: 'Proposta', cod: '01.03.10', desenho: 'Alçado Este', escala: '1/100', dataInicio: '2025-07-08', estado: 'para_revisao' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.03', subNome: 'Proposta', cod: '01.03.11', desenho: 'Alçado Oeste', escala: '1/100', dataInicio: '2025-07-08', estado: 'para_revisao' },
+        // 01.04 Proposta com Mobiliário
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.04', subNome: 'Proposta com Mobiliário', cod: '01.04.01', desenho: 'Planta Piso -1', escala: '1/100', dataInicio: '2025-07-08', estado: 'para_revisao' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.04', subNome: 'Proposta com Mobiliário', cod: '01.04.02', desenho: 'Planta Piso 0', escala: '1/100', dataInicio: '2025-07-08', estado: 'para_revisao' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.04', subNome: 'Proposta com Mobiliário', cod: '01.04.03', desenho: 'Planta Piso 1', escala: '1/100', dataInicio: '2025-07-08', estado: 'para_revisao' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.04', subNome: 'Proposta com Mobiliário', cod: '01.04.04', desenho: 'Planta Piso 2', escala: '1/100', dataInicio: '2025-07-08', estado: 'para_revisao' },
+        // 02 MAPAS GERAIS
+        // 02.01 Mapa de Pavimentos
+        { cat: '02', catNome: 'MAPAS GERAIS', sub: '02.01', subNome: 'Mapa de Pavimentos', cod: '02.01.01', desenho: 'Planta Piso -1', escala: '1/100', estado: 'nao_iniciado' },
+        { cat: '02', catNome: 'MAPAS GERAIS', sub: '02.01', subNome: 'Mapa de Pavimentos', cod: '02.01.02', desenho: 'Planta Piso 0', escala: '1/100', estado: 'nao_iniciado' },
+        { cat: '02', catNome: 'MAPAS GERAIS', sub: '02.01', subNome: 'Mapa de Pavimentos', cod: '02.01.03', desenho: 'Planta Piso 1', escala: '1/100', estado: 'nao_iniciado' },
+        { cat: '02', catNome: 'MAPAS GERAIS', sub: '02.01', subNome: 'Mapa de Pavimentos', cod: '02.01.04', desenho: 'Planta Piso 2', escala: '1/100', estado: 'nao_iniciado' },
+        // 02.02 Mapa de Revestimento de Paredes
+        { cat: '02', catNome: 'MAPAS GERAIS', sub: '02.02', subNome: 'Mapa de Revestimento de Paredes', cod: '02.02.01', desenho: 'Planta Piso -1', escala: '1/100', estado: 'nao_iniciado' },
+        { cat: '02', catNome: 'MAPAS GERAIS', sub: '02.02', subNome: 'Mapa de Revestimento de Paredes', cod: '02.02.02', desenho: 'Planta Piso 0', escala: '1/100', estado: 'nao_iniciado' },
+        { cat: '02', catNome: 'MAPAS GERAIS', sub: '02.02', subNome: 'Mapa de Revestimento de Paredes', cod: '02.02.03', desenho: 'Planta Piso 1', escala: '1/100', estado: 'nao_iniciado' },
+        { cat: '02', catNome: 'MAPAS GERAIS', sub: '02.02', subNome: 'Mapa de Revestimento de Paredes', cod: '02.02.04', desenho: 'Planta Piso 2', escala: '1/100', estado: 'nao_iniciado' },
+        // 02.03 Mapa de Tetos
+        { cat: '02', catNome: 'MAPAS GERAIS', sub: '02.03', subNome: 'Mapa de Tetos', cod: '02.03.01', desenho: 'Planta Piso -1', escala: '1/100', estado: 'para_revisao' },
+        { cat: '02', catNome: 'MAPAS GERAIS', sub: '02.03', subNome: 'Mapa de Tetos', cod: '02.03.02', desenho: 'Planta Piso 0', escala: '1/100', estado: 'para_revisao' },
+        { cat: '02', catNome: 'MAPAS GERAIS', sub: '02.03', subNome: 'Mapa de Tetos', cod: '02.03.03', desenho: 'Planta Piso 1', escala: '1/100', estado: 'para_revisao' },
+        { cat: '02', catNome: 'MAPAS GERAIS', sub: '02.03', subNome: 'Mapa de Tetos', cod: '02.03.04', desenho: 'Planta Piso 2', escala: '1/100', estado: 'para_revisao' },
+        // 02.04 Layout Elétrico
+        { cat: '02', catNome: 'MAPAS GERAIS', sub: '02.04', subNome: 'Layout Elétrico', cod: '02.04.01', desenho: 'Planta Piso -1', escala: '1/100', estado: 'nao_iniciado' },
+        { cat: '02', catNome: 'MAPAS GERAIS', sub: '02.04', subNome: 'Layout Elétrico', cod: '02.04.02', desenho: 'Planta Piso 0', escala: '1/100', estado: 'nao_iniciado' },
+        { cat: '02', catNome: 'MAPAS GERAIS', sub: '02.04', subNome: 'Layout Elétrico', cod: '02.04.03', desenho: 'Planta Piso 1', escala: '1/100', estado: 'nao_iniciado' },
+        { cat: '02', catNome: 'MAPAS GERAIS', sub: '02.04', subNome: 'Layout Elétrico', cod: '02.04.04', desenho: 'Planta Piso 2', escala: '1/100', estado: 'nao_iniciado' },
+        // Mapa de Acabamentos
+        { cat: '02', catNome: 'MAPAS GERAIS', sub: '02.05', subNome: 'Mapa de Acabamentos', cod: '02.05.01', desenho: 'Mapa de Acabamentos', escala: '-', estado: 'nao_iniciado' }
+      ]
+
+      // Inserir entregáveis do Projeto Base
+      for (const ent of entregaveisProjetoBase) {
+        const { error } = await supabase.from('projeto_entregaveis').insert([{
+          projeto_id: projetoId,
+          fase: 'Projeto Base',
+          categoria_cod: ent.cat,
+          categoria_nome: ent.catNome,
+          subcategoria_cod: ent.sub,
+          subcategoria_nome: ent.subNome,
+          cod_desenho: ent.cod,
+          desenho: ent.desenho,
+          escala: ent.escala,
+          data_inicio: ent.dataInicio || null,
+          data_conclusao: null,
+          estado: ent.estado,
+          executante: null
+        }])
+        if (error) console.error('Erro ao inserir entregável:', error)
+      }
+      addLog(`✅ ${entregaveisProjetoBase.length} entregáveis do Projeto Base criados`, 'success')
+
+      // ========== PROJETO DE EXECUÇÃO ==========
+      addLog('📐 Criando entregáveis do Projeto de Execução...', 'info')
+
+      const entregaveisProjetoExecucao = [
+        // 01 DESENHOS GERAIS
+        // 01.01 Existente - Projeto Licenciado
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.01', subNome: 'Existente - Projeto Licenciado', cod: '01.01.01', desenho: 'Planta Piso -1', escala: '1/100', estado: 'nao_iniciado' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.01', subNome: 'Existente - Projeto Licenciado', cod: '01.01.02', desenho: 'Planta Piso 0', escala: '1/100', estado: 'nao_iniciado' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.01', subNome: 'Existente - Projeto Licenciado', cod: '01.01.03', desenho: 'Planta Piso 1', escala: '1/100', estado: 'nao_iniciado' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.01', subNome: 'Existente - Projeto Licenciado', cod: '01.01.04', desenho: 'Planta Piso 2', escala: '1/100', estado: 'nao_iniciado' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.01', subNome: 'Existente - Projeto Licenciado', cod: '01.01.05', desenho: 'Planta Cobertura', escala: '1/100', estado: 'nao_iniciado' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.01', subNome: 'Existente - Projeto Licenciado', cod: '01.01.06', desenho: 'Corte AA', escala: '1/100', estado: 'nao_iniciado' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.01', subNome: 'Existente - Projeto Licenciado', cod: '01.01.07', desenho: 'Corte BB', escala: '1/100', estado: 'nao_iniciado' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.01', subNome: 'Existente - Projeto Licenciado', cod: '01.01.08', desenho: 'Alçado Norte', escala: '1/100', estado: 'nao_iniciado' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.01', subNome: 'Existente - Projeto Licenciado', cod: '01.01.09', desenho: 'Alçado Sul', escala: '1/100', estado: 'nao_iniciado' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.01', subNome: 'Existente - Projeto Licenciado', cod: '01.01.10', desenho: 'Alçado Este', escala: '1/100', estado: 'nao_iniciado' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.01', subNome: 'Existente - Projeto Licenciado', cod: '01.01.11', desenho: 'Alçado Oeste', escala: '1/100', estado: 'nao_iniciado' },
+        // 01.02 Cores Convencionais
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.02', subNome: 'Cores Convencionais', cod: '01.02.01', desenho: 'Planta Piso -1', escala: '1/100', estado: 'nao_iniciado' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.02', subNome: 'Cores Convencionais', cod: '01.02.02', desenho: 'Planta Piso 0', escala: '1/100', estado: 'nao_iniciado' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.02', subNome: 'Cores Convencionais', cod: '01.02.03', desenho: 'Planta Piso 1', escala: '1/100', estado: 'nao_iniciado' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.02', subNome: 'Cores Convencionais', cod: '01.02.04', desenho: 'Planta Piso 2', escala: '1/100', estado: 'nao_iniciado' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.02', subNome: 'Cores Convencionais', cod: '01.02.05', desenho: 'Planta Cobertura', escala: '1/100', estado: 'nao_iniciado' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.02', subNome: 'Cores Convencionais', cod: '01.02.06', desenho: 'Corte AA', escala: '1/100', estado: 'nao_iniciado' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.02', subNome: 'Cores Convencionais', cod: '01.02.07', desenho: 'Corte BB', escala: '1/100', estado: 'nao_iniciado' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.02', subNome: 'Cores Convencionais', cod: '01.02.08', desenho: 'Alçado Norte', escala: '1/100', estado: 'nao_iniciado' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.02', subNome: 'Cores Convencionais', cod: '01.02.09', desenho: 'Alçado Sul', escala: '1/100', estado: 'nao_iniciado' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.02', subNome: 'Cores Convencionais', cod: '01.02.10', desenho: 'Alçado Este', escala: '1/100', estado: 'nao_iniciado' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.02', subNome: 'Cores Convencionais', cod: '01.02.11', desenho: 'Alçado Oeste', escala: '1/100', estado: 'nao_iniciado' },
+        // 01.03 Proposta (escala 1/50)
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.03', subNome: 'Proposta', cod: '01.03.01', desenho: 'Planta Piso -1', escala: '1/50', estado: 'nao_iniciado' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.03', subNome: 'Proposta', cod: '01.03.02', desenho: 'Planta Piso 0', escala: '1/50', estado: 'nao_iniciado' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.03', subNome: 'Proposta', cod: '01.03.03', desenho: 'Planta Piso 1', escala: '1/50', estado: 'nao_iniciado' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.03', subNome: 'Proposta', cod: '01.03.04', desenho: 'Planta Piso 2', escala: '1/50', estado: 'nao_iniciado' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.03', subNome: 'Proposta', cod: '01.03.05', desenho: 'Planta Cobertura', escala: '1/50', estado: 'nao_iniciado' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.03', subNome: 'Proposta', cod: '01.03.06', desenho: 'Corte AA', escala: '1/50', estado: 'nao_iniciado' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.03', subNome: 'Proposta', cod: '01.03.07', desenho: 'Corte BB', escala: '1/50', estado: 'nao_iniciado' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.03', subNome: 'Proposta', cod: '01.03.08', desenho: 'Alçado Norte', escala: '1/50', estado: 'nao_iniciado' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.03', subNome: 'Proposta', cod: '01.03.09', desenho: 'Alçado Sul', escala: '1/50', estado: 'nao_iniciado' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.03', subNome: 'Proposta', cod: '01.03.10', desenho: 'Alçado Este', escala: '1/50', estado: 'nao_iniciado' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.03', subNome: 'Proposta', cod: '01.03.11', desenho: 'Alçado Oeste', escala: '1/50', estado: 'nao_iniciado' },
+        // 01.04 Proposta com Mobiliário (escala 1/50)
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.04', subNome: 'Proposta com Mobiliário', cod: '01.04.01', desenho: 'Planta Piso -1', escala: '1/50', estado: 'nao_iniciado' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.04', subNome: 'Proposta com Mobiliário', cod: '01.04.02', desenho: 'Planta Piso 0', escala: '1/50', estado: 'nao_iniciado' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.04', subNome: 'Proposta com Mobiliário', cod: '01.04.03', desenho: 'Planta Piso 1', escala: '1/50', estado: 'nao_iniciado' },
+        { cat: '01', catNome: 'DESENHOS GERAIS', sub: '01.04', subNome: 'Proposta com Mobiliário', cod: '01.04.04', desenho: 'Planta Piso 2', escala: '1/50', estado: 'nao_iniciado' },
+        // 02 MAPAS GERAIS
+        // 02.01 Mapa de Paredes
+        { cat: '02', catNome: 'MAPAS GERAIS', sub: '02.01', subNome: 'Mapa de Paredes', cod: '02.01.01', desenho: 'Planta Piso -1', escala: '1/50', estado: 'nao_iniciado' },
+        { cat: '02', catNome: 'MAPAS GERAIS', sub: '02.01', subNome: 'Mapa de Paredes', cod: '02.01.02', desenho: 'Planta Piso 0', escala: '1/50', estado: 'nao_iniciado' },
+        { cat: '02', catNome: 'MAPAS GERAIS', sub: '02.01', subNome: 'Mapa de Paredes', cod: '02.01.03', desenho: 'Planta Piso 1', escala: '1/50', estado: 'nao_iniciado' },
+        { cat: '02', catNome: 'MAPAS GERAIS', sub: '02.01', subNome: 'Mapa de Paredes', cod: '02.01.04', desenho: 'Planta Piso 2', escala: '1/50', estado: 'nao_iniciado' },
+        { cat: '02', catNome: 'MAPAS GERAIS', sub: '02.01', subNome: 'Mapa de Paredes', cod: '02.01.05', desenho: 'Pormenores de Tipos de Paredes', escala: '1/10', estado: 'nao_iniciado' },
+        // 02.02 Mapa de Pavimentos
+        { cat: '02', catNome: 'MAPAS GERAIS', sub: '02.02', subNome: 'Mapa de Pavimentos', cod: '02.02.01', desenho: 'Planta Piso -1', escala: '1/50', estado: 'nao_iniciado' },
+        { cat: '02', catNome: 'MAPAS GERAIS', sub: '02.02', subNome: 'Mapa de Pavimentos', cod: '02.02.02', desenho: 'Planta Piso 0', escala: '1/50', estado: 'nao_iniciado' },
+        { cat: '02', catNome: 'MAPAS GERAIS', sub: '02.02', subNome: 'Mapa de Pavimentos', cod: '02.02.03', desenho: 'Planta Piso 1', escala: '1/50', estado: 'nao_iniciado' },
+        { cat: '02', catNome: 'MAPAS GERAIS', sub: '02.02', subNome: 'Mapa de Pavimentos', cod: '02.02.04', desenho: 'Planta Piso 2', escala: '1/50', estado: 'nao_iniciado' },
+        // 02.03 Mapa de Revestimento de Paredes
+        { cat: '02', catNome: 'MAPAS GERAIS', sub: '02.03', subNome: 'Mapa de Revestimento de Paredes', cod: '02.03.01', desenho: 'Planta Piso -1', escala: '1/50', estado: 'nao_iniciado' },
+        { cat: '02', catNome: 'MAPAS GERAIS', sub: '02.03', subNome: 'Mapa de Revestimento de Paredes', cod: '02.03.02', desenho: 'Planta Piso 0', escala: '1/50', estado: 'nao_iniciado' },
+        { cat: '02', catNome: 'MAPAS GERAIS', sub: '02.03', subNome: 'Mapa de Revestimento de Paredes', cod: '02.03.03', desenho: 'Planta Piso 1', escala: '1/50', estado: 'nao_iniciado' },
+        { cat: '02', catNome: 'MAPAS GERAIS', sub: '02.03', subNome: 'Mapa de Revestimento de Paredes', cod: '02.03.04', desenho: 'Planta Piso 2', escala: '1/50', estado: 'nao_iniciado' },
+        // 02.04 Mapa de Tetos
+        { cat: '02', catNome: 'MAPAS GERAIS', sub: '02.04', subNome: 'Mapa de Tetos', cod: '02.04.01', desenho: 'Planta Piso -1', escala: '1/50', estado: 'nao_iniciado' },
+        { cat: '02', catNome: 'MAPAS GERAIS', sub: '02.04', subNome: 'Mapa de Tetos', cod: '02.04.02', desenho: 'Planta Piso 0', escala: '1/50', estado: 'nao_iniciado' },
+        { cat: '02', catNome: 'MAPAS GERAIS', sub: '02.04', subNome: 'Mapa de Tetos', cod: '02.04.03', desenho: 'Planta Piso 1', escala: '1/50', estado: 'nao_iniciado' },
+        { cat: '02', catNome: 'MAPAS GERAIS', sub: '02.04', subNome: 'Mapa de Tetos', cod: '02.04.04', desenho: 'Planta Piso 2', escala: '1/50', estado: 'nao_iniciado' },
+        { cat: '02', catNome: 'MAPAS GERAIS', sub: '02.04', subNome: 'Mapa de Tetos', cod: '02.04.05', desenho: 'Pormenores de Tetos', escala: '1/10', estado: 'nao_iniciado' },
+        // 02.05 Layout Elétrico
+        { cat: '02', catNome: 'MAPAS GERAIS', sub: '02.05', subNome: 'Layout Elétrico', cod: '02.05.01', desenho: 'Planta Piso -1', escala: '1/100', estado: 'nao_iniciado' },
+        { cat: '02', catNome: 'MAPAS GERAIS', sub: '02.05', subNome: 'Layout Elétrico', cod: '02.05.02', desenho: 'Planta Piso 0', escala: '1/100', estado: 'nao_iniciado' },
+        { cat: '02', catNome: 'MAPAS GERAIS', sub: '02.05', subNome: 'Layout Elétrico', cod: '02.05.03', desenho: 'Planta Piso 1', escala: '1/100', estado: 'nao_iniciado' },
+        { cat: '02', catNome: 'MAPAS GERAIS', sub: '02.05', subNome: 'Layout Elétrico', cod: '02.05.04', desenho: 'Planta Piso 2', escala: '1/100', estado: 'nao_iniciado' },
+        // 03 MAPAS DE PORMENORES
+        // 03.01 Mapa de Vãos Exteriores
+        { cat: '03', catNome: 'MAPAS DE PORMENORES', sub: '03.01', subNome: 'Mapa de Vãos Exteriores', cod: '03.01.01', desenho: 'VE.01', escala: '1/20', estado: 'nao_iniciado' },
+        { cat: '03', catNome: 'MAPAS DE PORMENORES', sub: '03.01', subNome: 'Mapa de Vãos Exteriores', cod: '03.01.02', desenho: 'VE.02', escala: '1/20', estado: 'nao_iniciado' },
+        { cat: '03', catNome: 'MAPAS DE PORMENORES', sub: '03.01', subNome: 'Mapa de Vãos Exteriores', cod: '03.01.03', desenho: '...', escala: '1/20', estado: 'nao_iniciado' },
+        // 03.02 Mapa de Vãos Interiores
+        { cat: '03', catNome: 'MAPAS DE PORMENORES', sub: '03.02', subNome: 'Mapa de Vãos Interiores', cod: '03.02.01', desenho: 'VI.01', escala: '1/20', estado: 'nao_iniciado' },
+        { cat: '03', catNome: 'MAPAS DE PORMENORES', sub: '03.02', subNome: 'Mapa de Vãos Interiores', cod: '03.02.02', desenho: 'VI.02', escala: '1/20', estado: 'nao_iniciado' },
+        { cat: '03', catNome: 'MAPAS DE PORMENORES', sub: '03.02', subNome: 'Mapa de Vãos Interiores', cod: '03.02.03', desenho: '...', escala: '1/20', estado: 'nao_iniciado' },
+        // 03.03 Mapa de Zonas Húmidas
+        { cat: '03', catNome: 'MAPAS DE PORMENORES', sub: '03.03', subNome: 'Mapa de Zonas Húmidas', cod: '03.03.01', desenho: 'IS.01', escala: '1/20', estado: 'nao_iniciado' },
+        { cat: '03', catNome: 'MAPAS DE PORMENORES', sub: '03.03', subNome: 'Mapa de Zonas Húmidas', cod: '03.03.02', desenho: 'IS.02', escala: '1/20', estado: 'nao_iniciado' },
+        { cat: '03', catNome: 'MAPAS DE PORMENORES', sub: '03.03', subNome: 'Mapa de Zonas Húmidas', cod: '03.03.03', desenho: '...', escala: '1/20', estado: 'nao_iniciado' },
+        // 03.04 Mapa de Pedras
+        { cat: '03', catNome: 'MAPAS DE PORMENORES', sub: '03.04', subNome: 'Mapa de Pedras', cod: '03.04.01', desenho: 'Cantarias', escala: '1/20', estado: 'nao_iniciado' },
+        { cat: '03', catNome: 'MAPAS DE PORMENORES', sub: '03.04', subNome: 'Mapa de Pedras', cod: '03.04.02', desenho: 'Instalações Sanitárias', escala: '1/20', estado: 'nao_iniciado' },
+        { cat: '03', catNome: 'MAPAS DE PORMENORES', sub: '03.04', subNome: 'Mapa de Pedras', cod: '03.04.03', desenho: 'Tampos, backsplash e outros', escala: '1/20', estado: 'nao_iniciado' },
+        // 03.05 Mapa de Marcenarias
+        { cat: '03', catNome: 'MAPAS DE PORMENORES', sub: '03.05', subNome: 'Mapa de Marcenarias', cod: '03.05.01', desenho: 'MF.01', escala: '1/20', estado: 'nao_iniciado' },
+        { cat: '03', catNome: 'MAPAS DE PORMENORES', sub: '03.05', subNome: 'Mapa de Marcenarias', cod: '03.05.02', desenho: 'MF.02', escala: '1/20', estado: 'nao_iniciado' },
+        { cat: '03', catNome: 'MAPAS DE PORMENORES', sub: '03.05', subNome: 'Mapa de Marcenarias', cod: '03.05.03', desenho: 'MF.03', escala: '1/20', estado: 'nao_iniciado' },
+        // 03.06 Mapa de Escadas e Rampas
+        { cat: '03', catNome: 'MAPAS DE PORMENORES', sub: '03.06', subNome: 'Mapa de Escadas e Rampas', cod: '03.06.01', desenho: 'Escada Interior', escala: '1/20', estado: 'nao_iniciado' },
+        { cat: '03', catNome: 'MAPAS DE PORMENORES', sub: '03.06', subNome: 'Mapa de Escadas e Rampas', cod: '03.06.02', desenho: 'Escada Exterior', escala: '1/20', estado: 'nao_iniciado' },
+        // 03.07 Mapa de Guarda-Corpos
+        { cat: '03', catNome: 'MAPAS DE PORMENORES', sub: '03.07', subNome: 'Mapa de Guarda-Corpos', cod: '03.07.01', desenho: 'Guarda-corpos', escala: '1/20', estado: 'nao_iniciado' },
+        // 03.08 Outros Pormenores
+        { cat: '03', catNome: 'MAPAS DE PORMENORES', sub: '03.08', subNome: 'Outros Pormenores', cod: '03.08.01', desenho: 'Pormenor 01', escala: '1/20', estado: 'nao_iniciado' }
+      ]
+
+      // Inserir entregáveis do Projeto de Execução
+      for (const ent of entregaveisProjetoExecucao) {
+        const { error } = await supabase.from('projeto_entregaveis').insert([{
+          projeto_id: projetoId,
+          fase: 'Projeto de Execução',
+          categoria_cod: ent.cat,
+          categoria_nome: ent.catNome,
+          subcategoria_cod: ent.sub,
+          subcategoria_nome: ent.subNome,
+          cod_desenho: ent.cod,
+          desenho: ent.desenho,
+          escala: ent.escala,
+          data_inicio: null,
+          data_conclusao: null,
+          estado: ent.estado,
+          executante: null
+        }])
+        if (error) console.error('Erro ao inserir entregável:', error)
+      }
+      addLog(`✅ ${entregaveisProjetoExecucao.length} entregáveis do Projeto de Execução criados`, 'success')
+
+      const totalEntregaveis = entregaveisProjetoBase.length + entregaveisProjetoExecucao.length
+      addLog(`🎉 Seed concluído! Total: ${totalEntregaveis} entregáveis`, 'success')
+      setResult({ success: true, projetoId, total: totalEntregaveis })
+
+    } catch (error) {
+      console.error('Erro:', error)
+      addLog(`❌ Erro: ${error.message}`, 'error')
+      setResult({ success: false, error: error.message })
+    }
+
+    setLoading(false)
+  }
+
   return (
     <div className="fade-in">
       {/* Header */}
@@ -381,6 +661,77 @@ export default function AdminSeed() {
 
       {/* Seed Cards */}
       <div className="grid grid-2" style={{ gap: '24px', marginBottom: '32px' }}>
+        {/* GA00489 Entregáveis Card */}
+        <div className="card" style={{ padding: '24px' }}>
+          <div className="flex items-center gap-md" style={{ marginBottom: '20px' }}>
+            <div style={{
+              width: '56px',
+              height: '56px',
+              borderRadius: '12px',
+              background: 'linear-gradient(135deg, var(--accent-olive), #5a6b50)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white'
+            }}>
+              <FileText size={28} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--brown)' }}>
+                GA00489 - AS House Mora
+              </h3>
+              <p style={{ fontSize: '13px', color: 'var(--brown-light)' }}>
+                Lista de Entregáveis (Projeto Base + Execução)
+              </p>
+            </div>
+          </div>
+
+          {/* O que será criado */}
+          <div style={{
+            background: 'var(--cream)',
+            borderRadius: '12px',
+            padding: '16px',
+            marginBottom: '20px'
+          }}>
+            <h4 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--brown)', marginBottom: '12px' }}>
+              O que será criado:
+            </h4>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              {[
+                { icon: FileText, label: '57 Projeto Base' },
+                { icon: FileText, label: '86 Projeto Execução' },
+                { icon: ListChecks, label: 'Desenhos Gerais' },
+                { icon: ListChecks, label: 'Mapas Gerais' },
+                { icon: ListChecks, label: 'Mapas Pormenores' }
+              ].map((item, idx) => (
+                <div key={idx} className="flex items-center gap-sm" style={{ fontSize: '13px', color: 'var(--brown-light)' }}>
+                  <item.icon size={14} />
+                  {item.label}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <button
+            onClick={seedEntregaveisGA00489}
+            disabled={loading}
+            className="btn btn-primary"
+            style={{ width: '100%', padding: '14px' }}
+          >
+            {loading ? (
+              <>
+                <Loader size={18} style={{ marginRight: '8px', animation: 'spin 1s linear infinite' }} />
+                A processar...
+              </>
+            ) : (
+              <>
+                <Play size={18} style={{ marginRight: '8px' }} />
+                Executar Seed Entregáveis
+              </>
+            )}
+          </button>
+        </div>
+
         {/* Maria Residences Card */}
         <div className="card" style={{ padding: '24px' }}>
           <div className="flex items-center gap-md" style={{ marginBottom: '20px' }}>
