@@ -54,6 +54,7 @@ const navigation = [
     section: 'Módulo Obras',
     items: [
       { name: 'Dashboard Obras', href: '/obras', icon: HardHat },
+      { name: 'Chat Obras', href: '/chat-obras', icon: MessageSquare },
     ]
   },
   {
