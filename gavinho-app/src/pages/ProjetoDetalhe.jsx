@@ -3726,9 +3726,12 @@ export default function ProjetoDetalhe() {
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '8px', color: 'var(--brown)' }}>
                   Compartimento *
                 </label>
-                <select
+                <input
+                  type="text"
+                  list="compartimentos-list"
                   value={renderForm.compartimento}
                   onChange={(e) => handleRenderCompartimentoChange(e.target.value)}
+                  placeholder="Selecionar ou escrever nome..."
                   style={{
                     width: '100%',
                     padding: '12px',
@@ -3738,12 +3741,15 @@ export default function ProjetoDetalhe() {
                     background: 'var(--white)',
                     color: 'var(--brown)'
                   }}
-                >
-                  <option value="">Selecionar compartimento...</option>
+                />
+                <datalist id="compartimentos-list">
                   {COMPARTIMENTOS.map(comp => (
-                    <option key={comp} value={comp}>{comp}</option>
+                    <option key={comp} value={comp} />
                   ))}
-                </select>
+                </datalist>
+                <p style={{ fontSize: '11px', color: 'var(--brown-light)', marginTop: '6px' }}>
+                  Selecione da lista ou escreva um nome personalizado
+                </p>
               </div>
 
               {/* Versão (auto) */}
