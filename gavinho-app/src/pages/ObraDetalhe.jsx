@@ -819,7 +819,7 @@ export default function ObraDetalhe() {
               <button className="btn btn-outline" onClick={() => navigate(`/obras/${obra.codigo}/relatorio-semanal`)}>
                 <FileText size={16} /> Relatório Semanal
               </button>
-              <button className="btn btn-primary" onClick={() => { resetDiarioForm(); setShowDiarioModal(true) }}>
+              <button className="btn btn-primary" onClick={() => navigate(`/obras/${obra.id}/diario`)}>
                 <Plus size={16} /> Novo Registo
               </button>
             </div>
@@ -846,7 +846,7 @@ export default function ObraDetalhe() {
                     </div>
                     <div style={{ display: 'flex', gap: '4px' }}>
                       <button className="btn btn-ghost btn-icon" title="Exportar PDF" onClick={() => exportDiarioToPDF(d, obra, { equipa })}><Download size={14} /></button>
-                      <button className="btn btn-ghost btn-icon" onClick={() => handleEditDiario(d)}><Edit size={14} /></button>
+                      <button className="btn btn-ghost btn-icon" onClick={() => navigate(`/obras/${obra.id}/diario?data=${d.data}`)}><Edit size={14} /></button>
                       <button className="btn btn-ghost btn-icon" onClick={() => setShowDeleteConfirm({ type: 'diario', item: d })}><Trash2 size={14} /></button>
                     </div>
                   </div>

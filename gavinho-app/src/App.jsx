@@ -32,6 +32,7 @@ import PlaceholderPage from './pages/PlaceholderPage'
 import Biblioteca from './pages/Biblioteca'
 import ChatObras from './pages/ChatObras'
 import AdminSeed from './pages/AdminSeed'
+import DiarioObra from './pages/DiarioObra'
 
 function App() {
   return (
@@ -61,6 +62,8 @@ function App() {
             <Route path="obras/:id" element={<ObraDetalhe />} />
             <Route path="obras/:id/:tab" element={<ObraDetalhe />} />
             <Route path="obras/:id/relatorio-semanal" element={<RelatorioSemanal />} />
+            <Route path="obras/:id/diario" element={<DiarioObra />} />
+            <Route path="diario-obra" element={<DiarioObra />} />
             <Route path="equipa" element={<Equipa />} />
             <Route path="equipa/:id" element={<PlaceholderPage title="Perfil do Colaborador" subtitle="Informações e alocações" />} />
             <Route path="tarefas" element={<Tarefas />} />
