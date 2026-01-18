@@ -706,8 +706,7 @@ export default function ProjetoDetalhe() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   // Sub-tabs para Fases & Entregas
-  const [activeSubTab, setActiveSubTab] = useState('conceito-briefing')
-  const [activeFaseSection, setActiveFaseSection] = useState('entregaveis')
+    const [activeFaseSection, setActiveFaseSection] = useState('entregaveis')
 
   // Gestão de Renders/Archviz
   const [renders, setRenders] = useState([])
@@ -1708,16 +1707,7 @@ export default function ProjetoDetalhe() {
     { id: 'gestao', label: 'Gestão de Projeto', icon: Settings, adminOnly: true }
   ]
 
-  const fasesDoProjetoTabs = [
-    { id: 'conceito-briefing', label: 'Conceito & Briefing' },
-    { id: 'estudo-previo', label: 'Estudo Prévio' },
-    { id: 'projeto-base', label: 'Projeto Base' },
-    { id: 'projeto-execucao', label: 'Projeto Execução' },
-    { id: 'compatibilizacao', label: 'Compatibilização' },
-    { id: 'bom-construcao', label: 'Bom para Construção' }
-  ]
-
-  // Secções dentro de cada fase
+  // Secções dentro de Fases & Entregas
   const faseSections = [
     { id: 'prazo', label: 'Prazo Contratual', icon: Calendar },
     { id: 'entregaveis', label: 'Entregáveis', icon: ListChecks },
@@ -2134,57 +2124,7 @@ export default function ProjetoDetalhe() {
       {/* Tab Fases & Entregas */}
       {activeTab === 'fases' && (
         <div>
-          {/* Fases navigation - horizontal tabs */}
-          <div style={{
-            display: 'flex',
-            gap: '4px',
-            marginBottom: '24px',
-            background: 'var(--cream)',
-            padding: '6px',
-            borderRadius: '12px',
-            overflowX: 'auto'
-          }}>
-            {fasesDoProjetoTabs.map((fase, index) => (
-              <button
-                key={fase.id}
-                onClick={() => setActiveSubTab(fase.id)}
-                style={{
-                  padding: '12px 16px',
-                  background: activeSubTab === fase.id ? 'var(--white)' : 'transparent',
-                  boxShadow: activeSubTab === fase.id ? 'var(--shadow-sm)' : 'none',
-                  color: activeSubTab === fase.id ? 'var(--brown)' : 'var(--brown-light)',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '13px',
-                  fontWeight: activeSubTab === fase.id ? 600 : 500,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  whiteSpace: 'nowrap',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
-              >
-                <span style={{
-                  width: '22px',
-                  height: '22px',
-                  borderRadius: '50%',
-                  background: activeSubTab === fase.id ? 'var(--brown)' : 'var(--stone)',
-                  color: activeSubTab === fase.id ? 'white' : 'var(--brown-light)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '11px',
-                  fontWeight: 700
-                }}>
-                  {index + 1}
-                </span>
-                {fase.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Section navigation within phase */}
+          {/* Section navigation */}
           <div style={{
             display: 'flex',
             gap: '8px',
@@ -2228,16 +2168,9 @@ export default function ProjetoDetalhe() {
               alignItems: 'center',
               gap: '12px'
             }}>
-              {fasesDoProjetoTabs.find(f => f.id === activeSubTab)?.label}
-              <span style={{
-                fontSize: '12px',
-                fontWeight: 500,
-                padding: '4px 10px',
-                background: 'var(--cream)',
-                borderRadius: '12px',
-                color: 'var(--brown-light)'
-              }}>
-                {faseSections.find(s => s.id === activeFaseSection)?.label}
+              {faseSections.find(s => s.id === activeFaseSection)?.label}
+              <span className="badge badge-gold" style={{ fontSize: '11px' }}>
+                {project.fase || 'Fase não definida'}
               </span>
             </h3>
 
@@ -2279,7 +2212,7 @@ export default function ProjetoDetalhe() {
 
             {/* Entregáveis */}
             {activeFaseSection === 'entregaveis' && (
-              <ProjetoEntregaveis projeto={project} faseAtual={activeSubTab} />
+              <ProjetoEntregaveis projeto={project} />
             )}
 
             {/* Central de Entregas */}
