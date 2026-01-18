@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { 
+import {
   ArrowLeft, MapPin, Calendar, Users, HardHat, BookOpen, Grid3X3, Camera, AlertTriangle,
   Plus, Sun, Cloud, CloudRain, Wind, Thermometer, Clock, CheckCircle2, Edit, X, Building2,
   ChevronRight, Trash2, UserPlus, Phone, Mail, Briefcase, ClipboardList, Receipt,
-  Upload, Image, FileText, Download, Loader2, Calculator, Euro
+  Upload, Image, FileText, Download, Loader2, Calculator, Euro, MessageSquare
 } from 'lucide-react'
 import ObraTracking from '../components/ObraTracking'
 import ObraAutos from '../components/ObraAutos'
@@ -620,6 +620,14 @@ export default function ObraDetalhe() {
           <h1 className="page-title" style={{ marginBottom: 0 }}>{obra.nome}</h1>
           {obra.projetos?.cliente_nome && <p style={{ color: 'var(--brown-light)', fontSize: '14px', margin: 0 }}>Cliente: {obra.projetos.cliente_nome}</p>}
         </div>
+        <button
+          className="btn btn-outline"
+          onClick={() => navigate(`/obras/${obra.id}/comunicacoes`)}
+          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+        >
+          <MessageSquare size={16} />
+          Comunicacoes
+        </button>
       </div>
 
       {/* KPIs */}
