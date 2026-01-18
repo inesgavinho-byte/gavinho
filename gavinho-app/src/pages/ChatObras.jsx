@@ -4,7 +4,7 @@ import {
   Search, Send, Image, X, HardHat, MessageSquare, Loader2, AlertCircle,
   Phone, Settings, Check, CheckCheck, Clock, Package, Users, Wrench,
   AlertTriangle, ListTodo, Sparkles, ChevronRight, RefreshCw, Plus,
-  ExternalLink, Wifi, WifiOff, Bot, Eye, EyeOff
+  ExternalLink, Wifi, WifiOff, Bot, Eye, EyeOff, ArrowLeft
 } from 'lucide-react'
 
 // Dados mock para demonstrar funcionalidades da IA
@@ -577,6 +577,27 @@ export default function ChatObras() {
               gap: '12px',
               color: 'white'
             }}>
+              <button
+                onClick={() => setSelectedObra(null)}
+                style={{
+                  background: 'rgba(255,255,255,0.1)',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: 36,
+                  height: 36,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: 'white',
+                  transition: 'background 0.2s'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+                title="Voltar"
+              >
+                <ArrowLeft style={{ width: 20, height: 20 }} />
+              </button>
               <div style={{
                 width: 40,
                 height: 40,
