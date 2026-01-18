@@ -37,7 +37,10 @@ import {
   Image,
   Library,
   Settings,
-  Eye
+  Eye,
+  Package,
+  Send,
+  Users
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -1718,6 +1721,7 @@ export default function ProjetoDetalhe() {
   const faseSections = [
     { id: 'prazo', label: 'Prazo Contratual', icon: Calendar },
     { id: 'entregaveis', label: 'Entregáveis', icon: ListChecks },
+    { id: 'entregas', label: 'Central de Entregas', icon: Package },
     { id: 'design-review', label: 'Design Review', icon: Eye },
     { id: 'atas', label: 'Atas', icon: FileText }
   ]
@@ -2276,6 +2280,11 @@ export default function ProjetoDetalhe() {
             {/* Entregáveis */}
             {activeFaseSection === 'entregaveis' && (
               <ProjetoEntregaveis projeto={project} faseAtual={activeSubTab} />
+            )}
+
+            {/* Central de Entregas */}
+            {activeFaseSection === 'entregas' && (
+              <CentralEntregas projeto={project} />
             )}
 
             {/* Design Review */}
