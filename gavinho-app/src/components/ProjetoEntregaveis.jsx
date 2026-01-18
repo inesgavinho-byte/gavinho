@@ -616,7 +616,7 @@ export default function ProjetoEntregaveis({ projeto }) {
                                   }}
                                 >
                                   {/* Código */}
-                                  <span style={{ fontFamily: 'monospace', fontSize: '11px', color: 'var(--brown-light)' }}>
+                                  <span style={{ fontWeight: 500, fontSize: '11px', color: 'var(--brown-light)' }}>
                                     {item.codigo}
                                   </span>
                                   {/* Descrição */}
@@ -763,7 +763,7 @@ export default function ProjetoEntregaveis({ projeto }) {
                               {expandedGroups[groupCode] ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                             </button>
                           )}
-                          <span style={{ fontWeight: 700, fontFamily: 'monospace', color: 'var(--warning)' }}>{group.item.codigo}</span>
+                          <span style={{ fontWeight: 700, fontWeight: 500, color: 'var(--warning)' }}>{group.item.codigo}</span>
                         </div>
                       </td>
                       <td style={{ padding: '12px 16px', fontWeight: 600 }}>{group.item.nome}</td>
@@ -797,7 +797,7 @@ export default function ProjetoEntregaveis({ projeto }) {
                                   {expandedGroups[subCode] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                                 </button>
                               )}
-                              <span style={{ fontWeight: 600, fontFamily: 'monospace', color: 'var(--info)' }}>{subGroup.item.codigo}</span>
+                              <span style={{ fontWeight: 600, fontWeight: 500, color: 'var(--info)' }}>{subGroup.item.codigo}</span>
                             </div>
                           </td>
                           <td style={{ padding: '12px 16px', fontWeight: 500 }}>{subGroup.item.nome}</td>
@@ -823,7 +823,7 @@ export default function ProjetoEntregaveis({ projeto }) {
                       {expandedGroups[subCode] && subGroup.children.sort((a, b) => a.codigo.localeCompare(b.codigo, undefined, { numeric: true })).map(item => (
                         <tr key={item.id} style={{ borderBottom: '1px solid var(--stone)' }}>
                           <td style={{ padding: '12px 16px', paddingLeft: '64px' }}>
-                            <span style={{ fontFamily: 'monospace', fontSize: '12px', color: 'var(--brown-light)' }}>{item.codigo}</span>
+                            <span style={{ fontWeight: 500, fontSize: '12px', color: 'var(--brown-light)' }}>{item.codigo}</span>
                           </td>
                           <td style={{ padding: '12px 16px' }}>{item.nome}</td>
                           <td style={{ padding: '12px 16px', textAlign: 'center', color: 'var(--brown-light)', fontSize: '12px' }}>{item.escala || '-'}</td>
