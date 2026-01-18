@@ -2356,7 +2356,7 @@ export default function ProjetoDetalhe() {
                       </span>
                     </h4>
                   </div>
-                  <div className="grid grid-4" style={{ gap: '12px' }}>
+                  <div className="grid grid-3" style={{ gap: '16px' }}>
                     {compartimentoRenders.sort((a, b) => b.versao - a.versao).map((render) => (
                       <div
                         key={render.id}
