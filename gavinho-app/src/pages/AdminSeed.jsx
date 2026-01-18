@@ -483,20 +483,24 @@ export default function AdminSeed() {
       ]
 
       // Inserir entregáveis do Projeto Base
+      // Mapear status: 'para_revisao' -> 'em_progresso', 'nao_iniciado' -> 'pendente'
+      const mapStatus = (estado) => {
+        if (estado === 'para_revisao') return 'em_progresso'
+        if (estado === 'nao_iniciado') return 'pendente'
+        return 'pendente'
+      }
+
       for (const ent of entregaveisProjetoBase) {
         const { error } = await supabase.from('projeto_entregaveis').insert([{
           projeto_id: projetoId,
           fase: 'Projeto Base',
-          categoria_cod: ent.cat,
-          categoria_nome: ent.catNome,
-          subcategoria_cod: ent.sub,
-          subcategoria_nome: ent.subNome,
-          cod_desenho: ent.cod,
-          desenho: ent.desenho,
+          categoria: ent.catNome,
+          codigo: ent.cod,
+          nome: ent.desenho,
           escala: ent.escala,
           data_inicio: ent.dataInicio || null,
           data_conclusao: null,
-          estado: ent.estado,
+          status: mapStatus(ent.estado),
           executante: null
         }])
         if (error) console.error('Erro ao inserir entregável:', error)
@@ -612,16 +616,13 @@ export default function AdminSeed() {
         const { error } = await supabase.from('projeto_entregaveis').insert([{
           projeto_id: projetoId,
           fase: 'Projeto de Execução',
-          categoria_cod: ent.cat,
-          categoria_nome: ent.catNome,
-          subcategoria_cod: ent.sub,
-          subcategoria_nome: ent.subNome,
-          cod_desenho: ent.cod,
-          desenho: ent.desenho,
+          categoria: ent.catNome,
+          codigo: ent.cod,
+          nome: ent.desenho,
           escala: ent.escala,
           data_inicio: null,
           data_conclusao: null,
-          estado: ent.estado,
+          status: mapStatus(ent.estado),
           executante: null
         }])
         if (error) console.error('Erro ao inserir entregável:', error)
