@@ -1,7 +1,6 @@
 [build]
-  base = "gavinho-app"
-  command = "npm run build"
-  publish = "dist"
+  command = "cd gavinho-app && npm install && npm run build"
+  publish = "gavinho-app/dist"
 
 [[redirects]]
   from = "/*"
