@@ -3123,7 +3123,7 @@ export default function ProjetoDetalhe() {
       {/* Tab Diário de Bordo */}
       {activeTab === 'diario' && (
         <div className="card" style={{ padding: '20px' }}>
-          <DiarioBordo projeto={projeto} />
+          <DiarioBordo projeto={project} />
         </div>
       )}
 
