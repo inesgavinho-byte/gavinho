@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
-import { 
+import {
   Plus, Upload, FileText, ChevronRight, ChevronDown, Edit2, Trash2, Save, X,
   Calendar, User, CheckCircle, Clock, AlertCircle, Download, FileSpreadsheet,
-  Loader2, MoreVertical, Eye
+  Loader2, MoreVertical, Eye, CheckSquare, Square
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 
@@ -22,6 +22,9 @@ export default function ProjetoEntregaveis({ projeto }) {
   const [expandedGroups, setExpandedGroups] = useState({})
   const [saving, setSaving] = useState(false)
   const fileInputRef = useRef(null)
+
+  // Estado para seleção múltipla
+  const [selectedItems, setSelectedItems] = useState(new Set())
 
   // Estado para edição inline
   const [editingCell, setEditingCell] = useState(null) // { id: itemId, field: 'status' | 'executante' }
@@ -193,6 +196,45 @@ export default function ProjetoEntregaveis({ projeto }) {
     } catch (err) {
       console.error('Erro ao eliminar:', err)
       alert('Erro ao eliminar')
+    }
+  }
+
+  // Seleção múltipla
+  const toggleSelectItem = (id) => {
+    setSelectedItems(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(id)) {
+        newSet.delete(id)
+      } else {
+        newSet.add(id)
+      }
+      return newSet
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedItems.size === entregaveis.length) {
+      setSelectedItems(new Set())
+    } else {
+      setSelectedItems(new Set(entregaveis.map(e => e.id)))
+    }
+  }
+
+  const handleDeleteSelected = async () => {
+    if (selectedItems.size === 0) return
+    if (!confirm(`Tem certeza que deseja eliminar ${selectedItems.size} entregável(is)?`)) return
+
+    try {
+      const { error } = await supabase
+        .from('projeto_entregaveis')
+        .delete()
+        .in('id', Array.from(selectedItems))
+      if (error) throw error
+      setSelectedItems(new Set())
+      loadEntregaveis(false)
+    } catch (err) {
+      console.error('Erro ao eliminar:', err)
+      alert('Erro ao eliminar: ' + err.message)
     }
   }
 
@@ -489,7 +531,16 @@ export default function ProjetoEntregaveis({ projeto }) {
               {stats.total} entregáveis  –  {progressPercent}% concluído
             </p>
           </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {selectedItems.size > 0 && (
+              <button
+                onClick={handleDeleteSelected}
+                className="btn"
+                style={{ fontSize: '12px', padding: '8px 12px', background: 'var(--error)', color: 'white' }}
+              >
+                <Trash2 size={14} /> Apagar ({selectedItems.size})
+              </button>
+            )}
             <input
               type="file"
               ref={fileInputRef}
@@ -497,14 +548,14 @@ export default function ProjetoEntregaveis({ projeto }) {
               accept=".xlsx,.xls"
               style={{ display: 'none' }}
             />
-            <button 
+            <button
               onClick={() => fileInputRef.current?.click()}
               className="btn btn-outline"
               style={{ fontSize: '12px', padding: '8px 12px' }}
             >
               <FileSpreadsheet size={14} /> Importar Excel
             </button>
-            <button 
+            <button
               onClick={() => { resetForm(); setEditingItem(null); setShowModal(true) }}
               className="btn btn-primary"
               style={{ fontSize: '12px', padding: '8px 12px' }}
@@ -664,7 +715,7 @@ export default function ProjetoEntregaveis({ projeto }) {
                               {/* Cabeçalho das colunas */}
                               <div style={{
                                 display: 'grid',
-                                gridTemplateColumns: '80px 1fr 70px 110px 110px 80px 80px 60px',
+                                gridTemplateColumns: '32px 80px 1fr 70px 110px 110px 80px 80px 60px',
                                 alignItems: 'center',
                                 gap: '8px',
                                 padding: '8px 12px',
@@ -674,6 +725,17 @@ export default function ProjetoEntregaveis({ projeto }) {
                                 textTransform: 'uppercase',
                                 letterSpacing: '0.5px'
                               }}>
+                                <span
+                                  onClick={toggleSelectAll}
+                                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                  title="Selecionar todos"
+                                >
+                                  {selectedItems.size === entregaveis.length && entregaveis.length > 0 ? (
+                                    <CheckSquare size={14} style={{ color: 'var(--info)' }} />
+                                  ) : (
+                                    <Square size={14} />
+                                  )}
+                                </span>
                                 <span>Código</span>
                                 <span>Descrição</span>
                                 <span style={{ textAlign: 'center' }}>Escala</span>
@@ -688,16 +750,27 @@ export default function ProjetoEntregaveis({ projeto }) {
                                   key={item.id}
                                   style={{
                                     display: 'grid',
-                                    gridTemplateColumns: '80px 1fr 70px 110px 110px 80px 80px 60px',
+                                    gridTemplateColumns: '32px 80px 1fr 70px 110px 110px 80px 80px 60px',
                                     alignItems: 'center',
                                     gap: '8px',
                                     padding: '10px 12px',
-                                    background: 'var(--white)',
-                                    border: '1px solid var(--stone)',
+                                    background: selectedItems.has(item.id) ? 'rgba(138, 158, 184, 0.1)' : 'var(--white)',
+                                    border: selectedItems.has(item.id) ? '1px solid var(--info)' : '1px solid var(--stone)',
                                     borderRadius: '6px',
                                     fontSize: '13px'
                                   }}
                                 >
+                                  {/* Checkbox */}
+                                  <span
+                                    onClick={() => toggleSelectItem(item.id)}
+                                    style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                  >
+                                    {selectedItems.has(item.id) ? (
+                                      <CheckSquare size={16} style={{ color: 'var(--info)' }} />
+                                    ) : (
+                                      <Square size={16} style={{ color: 'var(--brown-light)' }} />
+                                    )}
+                                  </span>
                                   {/* Código */}
                                   <span style={{ fontWeight: 500, fontSize: '11px', color: 'var(--brown-light)' }}>
                                     {item.codigo}
@@ -823,6 +896,19 @@ export default function ProjetoEntregaveis({ projeto }) {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
               <tr style={{ background: 'var(--cream)', borderBottom: '2px solid var(--stone)' }}>
+                <th style={{ padding: '12px 16px', width: '40px' }}>
+                  <span
+                    onClick={toggleSelectAll}
+                    style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    title="Selecionar todos"
+                  >
+                    {selectedItems.size === entregaveis.length && entregaveis.length > 0 ? (
+                      <CheckSquare size={16} style={{ color: 'var(--info)' }} />
+                    ) : (
+                      <Square size={16} style={{ color: 'var(--brown-light)' }} />
+                    )}
+                  </span>
+                </th>
                 <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, width: '120px' }}>Código</th>
                 <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600 }}>Descrição</th>
                 <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 600, width: '80px' }}>Escala</th>
@@ -838,7 +924,19 @@ export default function ProjetoEntregaveis({ projeto }) {
                 <>
                   {/* Grupo Principal (01, 02, etc.) */}
                   {group.item && (
-                    <tr key={group.item.id} style={{ background: 'rgba(201, 168, 130, 0.08)', borderBottom: '1px solid var(--stone)' }}>
+                    <tr key={group.item.id} style={{ background: selectedItems.has(group.item.id) ? 'rgba(138, 158, 184, 0.15)' : 'rgba(201, 168, 130, 0.08)', borderBottom: '1px solid var(--stone)' }}>
+                      <td style={{ padding: '12px 16px' }}>
+                        <span
+                          onClick={() => toggleSelectItem(group.item.id)}
+                          style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        >
+                          {selectedItems.has(group.item.id) ? (
+                            <CheckSquare size={16} style={{ color: 'var(--info)' }} />
+                          ) : (
+                            <Square size={16} style={{ color: 'var(--brown-light)' }} />
+                          )}
+                        </span>
+                      </td>
                       <td style={{ padding: '12px 16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           {Object.keys(group.children).length > 0 && (
@@ -872,7 +970,19 @@ export default function ProjetoEntregaveis({ projeto }) {
                   {expandedGroups[groupCode] && Object.entries(group.children).sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true })).map(([subCode, subGroup]) => (
                     <>
                       {subGroup.item && (
-                        <tr key={subGroup.item.id} style={{ background: 'rgba(138, 158, 184, 0.05)', borderBottom: '1px solid var(--stone)' }}>
+                        <tr key={subGroup.item.id} style={{ background: selectedItems.has(subGroup.item.id) ? 'rgba(138, 158, 184, 0.15)' : 'rgba(138, 158, 184, 0.05)', borderBottom: '1px solid var(--stone)' }}>
+                          <td style={{ padding: '12px 16px' }}>
+                            <span
+                              onClick={() => toggleSelectItem(subGroup.item.id)}
+                              style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                            >
+                              {selectedItems.has(subGroup.item.id) ? (
+                                <CheckSquare size={16} style={{ color: 'var(--info)' }} />
+                              ) : (
+                                <Square size={16} style={{ color: 'var(--brown-light)' }} />
+                              )}
+                            </span>
+                          </td>
                           <td style={{ padding: '12px 16px', paddingLeft: '40px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                               {subGroup.children.length > 0 && (
@@ -904,7 +1014,19 @@ export default function ProjetoEntregaveis({ projeto }) {
 
                       {/* Itens (01.01.01, 01.01.02, etc.) */}
                       {expandedGroups[subCode] && subGroup.children.sort((a, b) => a.codigo.localeCompare(b.codigo, undefined, { numeric: true })).map(item => (
-                        <tr key={item.id} style={{ borderBottom: '1px solid var(--stone)' }}>
+                        <tr key={item.id} style={{ borderBottom: '1px solid var(--stone)', background: selectedItems.has(item.id) ? 'rgba(138, 158, 184, 0.1)' : 'transparent' }}>
+                          <td style={{ padding: '12px 16px' }}>
+                            <span
+                              onClick={() => toggleSelectItem(item.id)}
+                              style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                            >
+                              {selectedItems.has(item.id) ? (
+                                <CheckSquare size={16} style={{ color: 'var(--info)' }} />
+                              ) : (
+                                <Square size={16} style={{ color: 'var(--brown-light)' }} />
+                              )}
+                            </span>
+                          </td>
                           <td style={{ padding: '12px 16px', paddingLeft: '64px' }}>
                             <span style={{ fontWeight: 500, fontSize: '12px', color: 'var(--brown-light)' }}>{item.codigo}</span>
                           </td>
