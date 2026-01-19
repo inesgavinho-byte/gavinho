@@ -309,7 +309,7 @@ export default function ProjetoEntregaveis({ projeto }) {
 
       const headers = rows[headerRow].map(h => (h || '').toString().toUpperCase().trim())
       const codigoIdx = headers.findIndex(h => h.includes('COD'))
-      const nomeIdx = headers.findIndex(h => h.includes('DESENHO') && !h.includes('ESCALA'))
+      const nomeIdx = headers.findIndex(h => (h.includes('DESENHO') || h.includes('DESCRI')) && !h.includes('ESCALA'))
       const escalaIdx = headers.findIndex(h => h.includes('ESCALA'))
       const dataInicioIdx = headers.findIndex(h => h.includes('INÀCIO') || h.includes('INICIO'))
       const dataConclusaoIdx = headers.findIndex(h => h.includes('CONCLUS'))
@@ -317,7 +317,7 @@ export default function ProjetoEntregaveis({ projeto }) {
       const executanteIdx = headers.findIndex(h => h.includes('EXECUTANTE') || h.includes('PESSOA'))
 
       if (codigoIdx === -1 || nomeIdx === -1) {
-        alert('Colunas COD. DESENHO e DESENHO são obrigatórias')
+        alert('Colunas CÓDIGO e DESCRIÇÃO (ou DESENHO) são obrigatórias')
         return
       }
 
