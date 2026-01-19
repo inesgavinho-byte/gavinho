@@ -221,13 +221,23 @@ export default function DiarioBordo({ projeto }) {
             {entradas.length} {entradas.length === 1 ? 'entrada' : 'entradas'}
           </p>
         </div>
-        <button
-          onClick={() => { resetForm(); setShowModal(true) }}
-          className="btn btn-primary"
-          style={{ fontSize: '12px', padding: '8px 16px' }}
-        >
-          <Plus size={14} /> Nova Entrada
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            onClick={handleSyncOutlook}
+            className="btn btn-outline"
+            style={{ fontSize: '12px', padding: '8px 12px' }}
+            disabled={syncing}
+          >
+            <Mail size={14} /> {syncing ? 'A sincronizar...' : 'Sync Outlook'}
+          </button>
+          <button
+            onClick={() => { resetForm(); setShowModal(true) }}
+            className="btn btn-primary"
+            style={{ fontSize: '12px', padding: '8px 16px' }}
+          >
+            <Plus size={14} /> Nova Entrada
+          </button>
+        </div>
       </div>
 
       {/* Filtros */}
