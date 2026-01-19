@@ -1,0 +1,542 @@
+/* ============================================
+   GAVINHO - Diário de Obra CSS (PDF Export)
+   ============================================ */
+
+/* Reset & Variables */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    /* Cores Principais */
+    --warm-beige: #ADAA96;
+    --soft-cream: #F2F0E7;
+    --olive-gray: #8B8670;
+    --white: #FFFFFF;
+
+    /* Texto */
+    --text-dark: #3D3D3D;
+    --text-muted: #6B6B6B;
+
+    /* Bordas */
+    --border-light: #E5E2D9;
+
+    /* Estados */
+    --error: #9A6B5B;
+    --warning: #C9A86C;
+    --success: #7A8B6E;
+}
+
+.diario-pdf-container {
+    font-family: 'Quattrocento Sans', Arial, sans-serif;
+    background-color: var(--soft-cream);
+    color: var(--text-dark);
+    line-height: 1.5;
+    padding: 32px;
+    width: 210mm;
+    min-height: 297mm;
+}
+
+/* ============================================
+   HEADER DA PÁGINA
+   ============================================ */
+
+.pdf-page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 24px;
+}
+
+.pdf-page-header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin-bottom: 4px;
+}
+
+.pdf-page-header p {
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.pdf-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+}
+
+.pdf-breadcrumb a {
+    color: var(--warm-beige);
+    text-decoration: none;
+}
+
+/* ============================================
+   META INFO BAR (Cabeçalho do Formulário)
+   ============================================ */
+
+.pdf-meta-bar {
+    background: var(--white);
+    border-radius: 10px;
+    border: 1px solid var(--border-light);
+    padding: 20px;
+    margin-bottom: 24px;
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 20px;
+}
+
+.pdf-meta-field label {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+}
+
+.pdf-meta-field .value {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-dark);
+}
+
+/* ============================================
+   SECTION CARD (Cards de cada secção)
+   ============================================ */
+
+.pdf-section-card {
+    background: var(--white);
+    border-radius: 10px;
+    border: 1px solid var(--border-light);
+    padding: 24px;
+    margin-bottom: 20px;
+}
+
+.pdf-section-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.pdf-section-number {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--olive-gray);
+    color: var(--white);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.pdf-section-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-dark);
+}
+
+.pdf-section-subtitle {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+/* ============================================
+   1. CONDIÇÕES METEOROLÓGICAS
+   ============================================ */
+
+.pdf-weather-grid {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.pdf-weather-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 16px 20px;
+    border: 2px solid var(--border-light);
+    border-radius: 10px;
+    min-width: 90px;
+}
+
+.pdf-weather-option.selected {
+    border-color: var(--warm-beige);
+    background: rgba(173, 170, 150, 0.1);
+}
+
+.pdf-weather-option svg {
+    width: 32px;
+    height: 32px;
+    stroke: var(--olive-gray);
+}
+
+.pdf-weather-option.selected svg {
+    stroke: var(--warm-beige);
+}
+
+.pdf-weather-option span {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 700;
+}
+
+.pdf-weather-option.selected span {
+    color: var(--text-dark);
+}
+
+.pdf-weather-details {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border-light);
+}
+
+/* ============================================
+   2. TRABALHADORES / SUBEMPREITEIROS
+   ============================================ */
+
+.pdf-workers-summary {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.pdf-worker-count-box {
+    flex: 1;
+    padding: 16px;
+    background: var(--soft-cream);
+    border-radius: 8px;
+    text-align: center;
+}
+
+.pdf-worker-count-box .count {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text-dark);
+}
+
+.pdf-worker-count-box .label {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.pdf-workers-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.pdf-workers-table th {
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    padding: 12px;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.pdf-workers-table td {
+    padding: 12px;
+    font-size: 13px;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.pdf-workers-table tr:last-child td {
+    border-bottom: none;
+}
+
+/* ============================================
+   3. TAREFAS EXECUTADAS
+   ============================================ */
+
+.pdf-task-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.pdf-task-item:last-child {
+    border-bottom: none;
+}
+
+.pdf-task-checkbox {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--border-light);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.pdf-task-checkbox.checked {
+    background: var(--olive-gray);
+    border-color: var(--olive-gray);
+}
+
+.pdf-task-checkbox svg {
+    width: 12px;
+    height: 12px;
+    stroke: var(--white);
+}
+
+.pdf-task-content {
+    flex: 1;
+}
+
+.pdf-task-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin-bottom: 4px;
+}
+
+.pdf-task-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+/* ============================================
+   4. OCORRÊNCIAS / INCIDENTES
+   ============================================ */
+
+.pdf-severity-options {
+    display: flex;
+    gap: 12px;
+}
+
+.pdf-severity-option {
+    flex: 1;
+    padding: 12px;
+    border: 2px solid var(--border-light);
+    border-radius: 8px;
+    text-align: center;
+}
+
+.pdf-severity-option.selected.baixa {
+    border-color: var(--success);
+    background: rgba(122, 139, 110, 0.1);
+}
+
+.pdf-severity-option.selected.media {
+    border-color: var(--warning);
+    background: rgba(201, 168, 108, 0.1);
+}
+
+.pdf-severity-option.selected.alta {
+    border-color: var(--error);
+    background: rgba(154, 107, 91, 0.1);
+}
+
+.pdf-severity-option span {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-muted);
+}
+
+.pdf-severity-option.selected.baixa span { color: var(--success); }
+.pdf-severity-option.selected.media span { color: var(--warning); }
+.pdf-severity-option.selected.alta span { color: var(--error); }
+
+/* ============================================
+   5. NÃO CONFORMIDADES
+   ============================================ */
+
+.pdf-nc-item {
+    padding: 16px;
+    background: var(--soft-cream);
+    border-radius: 8px;
+    margin-bottom: 12px;
+}
+
+.pdf-nc-item:last-child {
+    margin-bottom: 0;
+}
+
+.pdf-nc-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.pdf-nc-tag {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.pdf-nc-tag.critica {
+    background: rgba(154, 107, 91, 0.15);
+    color: var(--error);
+}
+
+.pdf-nc-tag.maior {
+    background: rgba(201, 168, 108, 0.15);
+    color: var(--warning);
+}
+
+.pdf-nc-tag.menor {
+    background: rgba(122, 139, 110, 0.15);
+    color: var(--success);
+}
+
+/* ============================================
+   6. REGISTO FOTOGRÁFICO
+   ============================================ */
+
+.pdf-photos-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+}
+
+.pdf-photo-item {
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--soft-cream);
+    border: 1px solid var(--border-light);
+}
+
+.pdf-photo-item .photo-preview {
+    aspect-ratio: 4/3;
+    position: relative;
+    overflow: hidden;
+}
+
+.pdf-photo-item .photo-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.pdf-photo-item .photo-caption {
+    padding: 12px;
+    border-top: 1px solid var(--border-light);
+    background: var(--white);
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+/* ============================================
+   FORM GROUPS (Textareas, Labels)
+   ============================================ */
+
+.pdf-form-group {
+    margin-bottom: 20px;
+}
+
+.pdf-form-group:last-child {
+    margin-bottom: 0;
+}
+
+.pdf-form-group label {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin-bottom: 8px;
+}
+
+.pdf-form-group .content {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text-dark);
+    white-space: pre-wrap;
+}
+
+/* ============================================
+   PROBLEMS SECTION
+   ============================================ */
+
+.pdf-problems-section {
+    margin-top: 12px;
+    padding: 16px;
+    background: rgba(154, 107, 91, 0.1);
+    border-radius: 8px;
+    border-left: 4px solid var(--error);
+}
+
+.pdf-problems-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--error);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+}
+
+.pdf-problems-content {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text-dark);
+}
+
+/* ============================================
+   FOOTER
+   ============================================ */
+
+.pdf-footer {
+    margin-top: 32px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-light);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.pdf-footer .logo {
+    font-weight: 700;
+    color: var(--warm-beige);
+}
+
+/* ============================================
+   PRINT STYLES
+   ============================================ */
+
+@media print {
+    .diario-pdf-container {
+        padding: 20mm;
+        background: white;
+    }
+
+    .pdf-section-card {
+        break-inside: avoid;
+    }
+
+    .pdf-photos-grid {
+        break-inside: avoid;
+    }
+}

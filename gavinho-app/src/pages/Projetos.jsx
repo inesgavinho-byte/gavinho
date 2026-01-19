@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { 
+import {
   Plus, Search, Filter, LayoutGrid, List, MoreVertical, MapPin, Calendar, X,
-  Edit, Trash2, Eye, FolderKanban
+  Edit, Trash2, Eye, FolderKanban, ChevronDown
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
 const fases = ['Todas', 'Proposta', 'Conceito', 'Projeto', 'Licenciamento', 'Construção', 'Fit-out', 'Entrega']
 const tipologias = ['Residencial', 'Hospitalidade', 'Comercial', 'Misto']
 const statusOptions = ['on_track', 'at_risk', 'blocked']
+const prioridades = ['Todas', 'Urgente', 'Alta', 'Média', 'Baixa']
 
 export default function Projetos() {
   const navigate = useNavigate()
@@ -18,6 +19,7 @@ export default function Projetos() {
   const [viewMode, setViewMode] = useState('grid')
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedFase, setSelectedFase] = useState('Todas')
+  const [selectedPrioridade, setSelectedPrioridade] = useState('Todas')
   const [showModal, setShowModal] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null)
   const [editingProject, setEditingProject] = useState(null)
@@ -64,9 +66,9 @@ export default function Projetos() {
     const { data } = await supabase
       .from('projetos')
       .select('codigo')
-      .order('codigo', { ascending: true })
+      .order('codigo', { ascending: false })
       .limit(1)
-    
+
     let nextNum = 1
     if (data && data.length > 0 && data[0].codigo) {
       const match = data[0].codigo.match(/GA(\d+)/)
@@ -217,7 +219,7 @@ export default function Projetos() {
   }
 
   const getStatusLabel = (status) => {
-    const labels = { on_track: 'No prazo', at_risk: 'Em risco', blocked: 'Bloqueado' }
+    const labels = { on_track: 'Em Andamento', at_risk: 'Em Risco', blocked: 'Bloqueado' }
     return labels[status] || 'N/D'
   }
 
@@ -226,9 +228,40 @@ export default function Projetos() {
     return colors[fase] || '#C3BAAF'
   }
 
+  const getPrioridadeFromOrcamento = (orcamento) => {
+    if (!orcamento) return 'media'
+    if (orcamento >= 500000) return 'urgente'
+    if (orcamento >= 300000) return 'alta'
+    if (orcamento >= 100000) return 'media'
+    return 'baixa'
+  }
+
+  const getPrioridadeStyle = (prioridade) => {
+    const styles = {
+      urgente: { bg: 'var(--priority-urgente)', label: 'URGENTE' },
+      alta: { bg: 'var(--priority-alta)', label: 'ALTA' },
+      media: { bg: 'var(--priority-media)', label: 'MÉDIA' },
+      baixa: { bg: 'var(--priority-baixa)', label: 'BAIXA' }
+    }
+    return styles[prioridade] || styles.media
+  }
+
   const formatCurrency = (value) => {
-    if (!value) return '-'
+    if (!value) return '— €0'
     return new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(value)
+  }
+
+  const formatDateRange = (dataInicio, dataFim) => {
+    const format = (d) => {
+      if (!d) return ''
+      return new Date(d).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    }
+    const inicio = format(dataInicio)
+    const fim = format(dataFim)
+    if (inicio && fim) return `${inicio} - ${fim}`
+    if (inicio) return inicio
+    if (fim) return `até ${fim}`
+    return '—'
   }
 
   if (loading) {
@@ -241,10 +274,11 @@ export default function Projetos() {
 
   return (
     <div className="fade-in">
+      {/* Header */}
       <div className="page-header">
         <div>
           <h1 className="page-title">Projetos</h1>
-          <p className="page-subtitle">{filteredProjects.length} projetos</p>
+          <p className="page-subtitle">Gestão completa de projetos de design & build</p>
         </div>
         <button className="btn btn-primary" onClick={handleNewProject}>
           <Plus size={18} />
@@ -252,22 +286,72 @@ export default function Projetos() {
         </button>
       </div>
 
-      {/* Filtros */}
-      <div className="card mb-lg">
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
-            <Search size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--brown-light)' }} />
-            <input type="text" placeholder="Pesquisar projetos..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ width: '100%', padding: '12px 12px 12px 40px', border: '1px solid var(--stone)', borderRadius: '10px', fontSize: '14px' }} />
-          </div>
-          <select value={selectedFase} onChange={(e) => setSelectedFase(e.target.value)}
-            style={{ padding: '12px 16px', border: '1px solid var(--stone)', borderRadius: '10px', fontSize: '14px', background: 'var(--white)', minWidth: '150px' }}>
-            {fases.map(f => <option key={f} value={f}>{f}</option>)}
+      {/* Filtros - Novo Design */}
+      <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap', alignItems: 'center' }}>
+        {/* Search */}
+        <div style={{ position: 'relative', flex: 1, minWidth: '300px', maxWidth: '450px' }}>
+          <Search size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--brown-light)' }} />
+          <input
+            type="text"
+            placeholder="Procurar por nome, cliente ou localização..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '14px 16px 14px 48px',
+              border: '1px solid var(--stone)',
+              borderRadius: '24px',
+              fontSize: '14px',
+              background: 'var(--white)',
+              color: 'var(--brown)'
+            }}
+          />
+        </div>
+
+        {/* Status Filter */}
+        <div style={{ position: 'relative' }}>
+          <select
+            value={selectedFase}
+            onChange={(e) => setSelectedFase(e.target.value)}
+            style={{
+              padding: '14px 40px 14px 20px',
+              border: '1px solid var(--stone)',
+              borderRadius: '24px',
+              fontSize: '14px',
+              background: 'var(--white)',
+              color: 'var(--brown)',
+              appearance: 'none',
+              cursor: 'pointer',
+              minWidth: '180px'
+            }}
+          >
+            <option value="Todas">Todos os estados</option>
+            {fases.filter(f => f !== 'Todas').map(f => <option key={f} value={f}>{f}</option>)}
           </select>
-          <div style={{ display: 'flex', gap: '4px', background: 'var(--stone)', padding: '4px', borderRadius: '10px' }}>
-            <button onClick={() => setViewMode('grid')} style={{ padding: '8px', background: viewMode === 'grid' ? 'var(--white)' : 'transparent', border: 'none', borderRadius: '6px', cursor: 'pointer' }}><LayoutGrid size={18} /></button>
-            <button onClick={() => setViewMode('list')} style={{ padding: '8px', background: viewMode === 'list' ? 'var(--white)' : 'transparent', border: 'none', borderRadius: '6px', cursor: 'pointer' }}><List size={18} /></button>
-          </div>
+          <ChevronDown size={16} style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--brown-light)', pointerEvents: 'none' }} />
+        </div>
+
+        {/* Priority Filter */}
+        <div style={{ position: 'relative' }}>
+          <select
+            value={selectedPrioridade}
+            onChange={(e) => setSelectedPrioridade(e.target.value)}
+            style={{
+              padding: '14px 40px 14px 20px',
+              border: '1px solid var(--stone)',
+              borderRadius: '24px',
+              fontSize: '14px',
+              background: 'var(--white)',
+              color: 'var(--brown)',
+              appearance: 'none',
+              cursor: 'pointer',
+              minWidth: '180px'
+            }}
+          >
+            <option value="Todas">Todas as prioridades</option>
+            {prioridades.filter(p => p !== 'Todas').map(p => <option key={p} value={p.toLowerCase()}>{p}</option>)}
+          </select>
+          <ChevronDown size={16} style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--brown-light)', pointerEvents: 'none' }} />
         </div>
       </div>
 
@@ -279,36 +363,163 @@ export default function Projetos() {
           <button className="btn btn-primary" style={{ marginTop: '16px' }} onClick={handleNewProject}>Criar Primeiro Projeto</button>
         </div>
       ) : viewMode === 'grid' ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
-          {filteredProjects.map((p) => (
-            <div key={p.id} className="card" style={{ cursor: 'pointer', position: 'relative' }} onClick={() => navigate(`/projetos/${p.codigo}`)}>
-              <div style={{ position: 'absolute', top: '16px', right: '16px' }}>
-                <button onClick={(e) => { e.stopPropagation(); setActiveMenu(activeMenu === p.id ? null : p.id) }} className="btn btn-ghost btn-icon"><MoreVertical size={16} /></button>
-                {activeMenu === p.id && (
-                  <div style={{ position: 'absolute', right: 0, top: '100%', background: 'var(--white)', borderRadius: '10px', boxShadow: 'var(--shadow-lg)', minWidth: '150px', zIndex: 100, overflow: 'hidden' }}>
-                    <button onClick={(e) => { e.stopPropagation(); navigate(`/projetos/${p.codigo}`) }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--brown)' }}><Eye size={14} />Ver Detalhe</button>
-                    <button onClick={(e) => { e.stopPropagation(); handleEditProject(p) }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--brown)' }}><Edit size={14} />Editar</button>
-                    <button onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(p); setActiveMenu(null) }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--error)' }}><Trash2 size={14} />Eliminar</button>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '16px' }}>
+          {filteredProjects.map((p) => {
+            const prioridade = getPrioridadeFromOrcamento(p.orcamento_atual)
+            const prioridadeStyle = getPrioridadeStyle(prioridade)
+            return (
+              <div
+                key={p.id}
+                className="card"
+                style={{
+                  cursor: 'pointer',
+                  position: 'relative',
+                  padding: '20px 20px 16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                  transition: 'box-shadow 0.2s ease'
+                }}
+                onClick={() => navigate(`/projetos/${p.codigo}`)}
+                onMouseEnter={(e) => e.currentTarget.style.boxShadow = 'var(--shadow-lg)'}
+                onMouseLeave={(e) => e.currentTarget.style.boxShadow = 'var(--shadow-sm)'}
+              >
+                {/* Header: Título + Badge + Menu */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <h3 style={{
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      color: 'var(--brown)',
+                      marginBottom: '4px',
+                      lineHeight: 1.4,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}>
+                      {p.codigo}_{(p.nome || '').toUpperCase()}
+                    </h3>
+                    <p style={{
+                      fontSize: '13px',
+                      color: 'var(--brown-light)',
+                      margin: 0
+                    }}>
+                      {p.cliente_nome || 'Cliente não definido'}
+                    </p>
                   </div>
-                )}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                <span style={{ fontFamily: 'monospace', fontWeight: 600, color: 'var(--warning)' }}>{p.codigo}</span>
-                <span style={{ padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 600, background: `${getFaseColor(p.fase)}20`, color: getFaseColor(p.fase) }}>{p.fase}</span>
-              </div>
-              <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '12px' }}>{p.nome}</h3>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                <div style={{ flex: 1, height: '6px', background: 'var(--stone)', borderRadius: '3px', overflow: 'hidden' }}>
-                  <div style={{ width: `${p.progresso || 0}%`, height: '100%', background: getStatusColor(p.status), borderRadius: '3px' }} />
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                    {/* Priority Badge */}
+                    <span style={{
+                      padding: '4px 10px',
+                      fontSize: '9px',
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      borderRadius: '4px',
+                      background: prioridadeStyle.bg,
+                      color: 'white'
+                    }}>
+                      {prioridadeStyle.label}
+                    </span>
+
+                    {/* Menu */}
+                    <div style={{ position: 'relative' }}>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setActiveMenu(activeMenu === p.id ? null : p.id) }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          padding: '4px',
+                          color: 'var(--brown-light)',
+                          borderRadius: '4px'
+                        }}
+                      >
+                        <MoreVertical size={16} />
+                      </button>
+                      {activeMenu === p.id && (
+                        <div style={{
+                          position: 'absolute',
+                          right: 0,
+                          top: '100%',
+                          background: 'var(--white)',
+                          borderRadius: '10px',
+                          boxShadow: 'var(--shadow-lg)',
+                          minWidth: '150px',
+                          zIndex: 100,
+                          overflow: 'hidden'
+                        }}>
+                          <button onClick={(e) => { e.stopPropagation(); navigate(`/projetos/${p.codigo}`) }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--brown)' }}><Eye size={14} />Ver Detalhe</button>
+                          <button onClick={(e) => { e.stopPropagation(); handleEditProject(p) }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--brown)' }}><Edit size={14} />Editar</button>
+                          <button onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(p); setActiveMenu(null) }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--error)' }}><Trash2 size={14} />Eliminar</button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <span style={{ fontSize: '12px', fontWeight: 500 }}>{p.progresso || 0}%</span>
+
+                {/* Meta Info: Localização + Datas */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '16px',
+                  fontSize: '12px',
+                  color: 'var(--brown-light)'
+                }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <MapPin size={13} />
+                    {p.cidade || p.localizacao || '—'}
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <Calendar size={13} />
+                    {formatDateRange(p.data_inicio, p.data_prevista_conclusao)}
+                  </span>
+                </div>
+
+                {/* Progress Bar - simples sem percentagem visível */}
+                <div style={{
+                  width: '100%',
+                  height: '3px',
+                  background: 'var(--stone)',
+                  borderRadius: '2px',
+                  overflow: 'hidden',
+                  marginTop: '4px'
+                }}>
+                  <div style={{
+                    width: `${p.progresso || 0}%`,
+                    height: '100%',
+                    background: getStatusColor(p.status),
+                    borderRadius: '2px',
+                    transition: 'width 0.3s ease'
+                  }} />
+                </div>
+
+                {/* Footer: Status */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  marginTop: '4px'
+                }}>
+                  <span style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '12px',
+                    color: 'var(--brown-light)'
+                  }}>
+                    <span style={{
+                      width: '6px',
+                      height: '6px',
+                      borderRadius: '50%',
+                      background: getStatusColor(p.status)
+                    }} />
+                    {getStatusLabel(p.status)}
+                  </span>
+                </div>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--brown-light)' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><MapPin size={12} />{p.cidade || p.localizacao || '-'}</span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ width: '8px', height: '8px', borderRadius: '50%', background: getStatusColor(p.status) }} />{getStatusLabel(p.status)}</span>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       ) : (
         <div className="card">

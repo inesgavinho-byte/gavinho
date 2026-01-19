@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { 
-  Plus, Search, HardHat, MapPin, Calendar, Users, Euro,
+import {
+  Plus, Search, HardHat, MapPin, Calendar, Users,
   MoreVertical, Eye, X, Edit, Trash2, Play, Pause, CheckCircle,
-  Loader2, AlertTriangle
+  Loader2, AlertTriangle, ChevronDown
 } from 'lucide-react'
+
+const statusOptions = ['Todos', 'Planeamento', 'Em Curso', 'Pausada', 'Concluída', 'Cancelada']
+const tipoOptions = ['Todos', 'Construção Nova', 'Remodelação', 'Ampliação', 'Fit-out']
 
 export default function Obras() {
   const navigate = useNavigate()
@@ -18,7 +21,9 @@ export default function Obras() {
   const [activeMenu, setActiveMenu] = useState(null)
   const [saving, setSaving] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
-  
+  const [selectedStatus, setSelectedStatus] = useState('Todos')
+  const [selectedTipo, setSelectedTipo] = useState('Todos')
+
   const [formData, setFormData] = useState({
     nome: '',
     projeto_id: '',
@@ -150,16 +155,12 @@ export default function Obras() {
 
   const handleDeleteObra = async (obra) => {
     try {
-      console.log('Eliminando obra:', obra.id)
       const { error } = await supabase
         .from('obras')
         .delete()
         .eq('id', obra.id)
 
-      if (error) {
-        console.error('Erro Supabase:', error)
-        throw error
-      }
+      if (error) throw error
       setShowDeleteModal(null)
       fetchObras()
     } catch (error) {
@@ -168,75 +169,84 @@ export default function Obras() {
     }
   }
 
-  const handleStatusChange = async (obra, newStatus) => {
-    console.log('=== INICIO handleStatusChange ===')
-    console.log('Obra ID:', obra.id)
-    console.log('Novo Status:', newStatus)
-    
-    try {
-      const { data, error } = await supabase
-        .from('obras')
-        .update({ status: newStatus })
-        .eq('id', obra.id)
-        .select()
-
-      console.log('Resposta Supabase - data:', data)
-      console.log('Resposta Supabase - error:', error)
-
-      if (error) {
-        throw error
-      }
-      
-      if (!data || data.length === 0) {
-        throw new Error('Nenhum registo atualizado - verifique se o ID existe')
-      }
-      
-      setActiveMenu(null)
-      fetchObras()
-    } catch (error) {
-      console.error('Erro completo:', error)
-      alert('Erro ao atualizar status: ' + (error.message || error.details || JSON.stringify(error)))
-    }
-  }
-
+  // Helpers
   const getStatusColor = (status) => {
     const colors = {
-      'planeamento': { bg: 'rgba(138, 158, 184, 0.15)', color: 'var(--info)' },
-      'em_curso': { bg: 'rgba(122, 158, 122, 0.15)', color: 'var(--success)' },
-      'pausada': { bg: 'rgba(201, 168, 130, 0.15)', color: 'var(--warning)' },
-      'concluida': { bg: 'var(--stone)', color: 'var(--brown)' },
-      'cancelada': { bg: 'rgba(184, 138, 138, 0.15)', color: 'var(--error)' }
+      'planeamento': 'var(--info)',
+      'em_curso': 'var(--success)',
+      'pausada': 'var(--warning)',
+      'concluida': 'var(--brown)',
+      'cancelada': 'var(--error)'
     }
-    return colors[status] || colors.planeamento
+    return colors[status] || 'var(--info)'
   }
 
   const getStatusLabel = (status) => {
-    const labels = { 
-      planeamento: 'Planeamento', 
-      em_curso: 'Em Curso', 
-      pausada: 'Pausada', 
+    const labels = {
+      planeamento: 'Planeamento',
+      em_curso: 'Em Curso',
+      pausada: 'Pausada',
       concluida: 'Concluída',
       cancelada: 'Cancelada'
     }
     return labels[status] || status
   }
 
-  const filteredObras = obras.filter(obra =>
-    obra.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    obra.codigo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    obra.localizacao?.toLowerCase().includes(searchTerm.toLowerCase())
-  )
-
-  const totalObras = obras.length
-  const obrasAtivas = obras.filter(o => o.status === 'em_curso').length
-  const progressoMedio = obras.length > 0 
-    ? Math.round(obras.reduce((sum, o) => sum + (o.progresso || 0), 0) / obras.length) : 0
-  const orcamentoTotal = obras.reduce((sum, o) => sum + (o.orcamento || 0), 0)
-
-  const formatCurrency = (value) => {
-    if (!value) return '€0'
-    return new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(value)
+  const getStatusValue = (label) => {
+    const values = {
+      'Planeamento': 'planeamento',
+      'Em Curso': 'em_curso',
+      'Pausada': 'pausada',
+      'Concluída': 'concluida',
+      'Cancelada': 'cancelada'
+    }
+    return values[label] || null
   }
+
+  const getPrioridadeFromOrcamento = (orcamento) => {
+    if (!orcamento) return 'media'
+    if (orcamento >= 500000) return 'urgente'
+    if (orcamento >= 300000) return 'alta'
+    if (orcamento >= 100000) return 'media'
+    return 'baixa'
+  }
+
+  const getPrioridadeStyle = (prioridade) => {
+    const styles = {
+      urgente: { bg: 'var(--priority-urgente)', label: 'URGENTE' },
+      alta: { bg: 'var(--priority-alta)', label: 'ALTA' },
+      media: { bg: 'var(--priority-media)', label: 'MÉDIA' },
+      baixa: { bg: 'var(--priority-baixa)', label: 'BAIXA' }
+    }
+    return styles[prioridade] || styles.media
+  }
+
+  const formatDateRange = (dataInicio, dataFim) => {
+    const format = (d) => {
+      if (!d) return ''
+      return new Date(d).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    }
+    const inicio = format(dataInicio)
+    const fim = format(dataFim)
+    if (inicio && fim) return `${inicio} - ${fim}`
+    if (inicio) return inicio
+    if (fim) return `até ${fim}`
+    return '—'
+  }
+
+  // Filtrar obras
+  const filteredObras = obras.filter(obra => {
+    const matchesSearch =
+      obra.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      obra.codigo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      obra.localizacao?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      obra.encarregado?.toLowerCase().includes(searchTerm.toLowerCase())
+
+    const matchesStatus = selectedStatus === 'Todos' || obra.status === getStatusValue(selectedStatus)
+    const matchesTipo = selectedTipo === 'Todos' || obra.tipo === selectedTipo
+
+    return matchesSearch && matchesStatus && matchesTipo
+  })
 
   if (loading) {
     return (
@@ -252,7 +262,7 @@ export default function Obras() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Obras</h1>
-          <p className="page-subtitle">{totalObras} obras registadas</p>
+          <p className="page-subtitle">Gestão completa de obras de construção</p>
         </div>
         <button className="btn btn-primary" onClick={handleNewObra}>
           <Plus size={18} />
@@ -260,169 +270,268 @@ export default function Obras() {
         </button>
       </div>
 
-      {/* KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-        <div className="card" style={{ padding: '20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '13px', color: 'var(--brown-light)' }}>Total Obras</span>
-            <HardHat size={18} style={{ color: 'var(--brown-light)' }} />
-          </div>
-          <div style={{ fontSize: '28px', fontWeight: 700 }}>{totalObras}</div>
-        </div>
-        <div className="card" style={{ padding: '20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '13px', color: 'var(--brown-light)' }}>Em Curso</span>
-            <Play size={18} style={{ color: 'var(--success)' }} />
-          </div>
-          <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--success)' }}>{obrasAtivas}</div>
-        </div>
-        <div className="card" style={{ padding: '20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '13px', color: 'var(--brown-light)' }}>Progresso Médio</span>
-            <HardHat size={18} style={{ color: 'var(--warning)' }} />
-          </div>
-          <div style={{ fontSize: '28px', fontWeight: 700 }}>{progressoMedio}%</div>
-        </div>
-        <div className="card" style={{ padding: '20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '13px', color: 'var(--brown-light)' }}>Orçamento Total</span>
-            <Euro size={18} style={{ color: 'var(--info)' }} />
-          </div>
-          <div style={{ fontSize: '28px', fontWeight: 700 }}>{formatCurrency(orcamentoTotal)}</div>
-        </div>
-      </div>
-
-      {/* Search */}
-      <div className="card" style={{ marginBottom: '20px', padding: '16px' }}>
-        <div style={{ position: 'relative', maxWidth: '400px' }}>
-          <Search size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--brown-light)' }} />
-          <input 
+      {/* Filtros - Estilo Pill como Projetos */}
+      <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap', alignItems: 'center' }}>
+        {/* Search */}
+        <div style={{ position: 'relative', flex: 1, minWidth: '300px', maxWidth: '450px' }}>
+          <Search size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--brown-light)' }} />
+          <input
             type="text"
-            placeholder="Pesquisar obras..."
+            placeholder="Procurar por nome, cliente ou localização..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            style={{ width: '100%', padding: '12px 12px 12px 40px', border: '1px solid var(--stone)', borderRadius: '10px', fontSize: '14px' }}
+            style={{
+              width: '100%',
+              padding: '14px 16px 14px 48px',
+              border: '1px solid var(--stone)',
+              borderRadius: '24px',
+              fontSize: '14px',
+              background: 'var(--white)',
+              color: 'var(--brown)'
+            }}
           />
+        </div>
+
+        {/* Status Filter */}
+        <div style={{ position: 'relative' }}>
+          <select
+            value={selectedStatus}
+            onChange={(e) => setSelectedStatus(e.target.value)}
+            style={{
+              padding: '14px 40px 14px 20px',
+              border: '1px solid var(--stone)',
+              borderRadius: '24px',
+              fontSize: '14px',
+              background: 'var(--white)',
+              color: 'var(--brown)',
+              appearance: 'none',
+              cursor: 'pointer',
+              minWidth: '180px'
+            }}
+          >
+            <option value="Todos">Todos os estados</option>
+            {statusOptions.filter(s => s !== 'Todos').map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <ChevronDown size={16} style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--brown-light)', pointerEvents: 'none' }} />
+        </div>
+
+        {/* Tipo Filter */}
+        <div style={{ position: 'relative' }}>
+          <select
+            value={selectedTipo}
+            onChange={(e) => setSelectedTipo(e.target.value)}
+            style={{
+              padding: '14px 40px 14px 20px',
+              border: '1px solid var(--stone)',
+              borderRadius: '24px',
+              fontSize: '14px',
+              background: 'var(--white)',
+              color: 'var(--brown)',
+              appearance: 'none',
+              cursor: 'pointer',
+              minWidth: '180px'
+            }}
+          >
+            <option value="Todos">Todos os tipos</option>
+            {tipoOptions.filter(t => t !== 'Todos').map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <ChevronDown size={16} style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--brown-light)', pointerEvents: 'none' }} />
         </div>
       </div>
 
-      {/* Lista de Obras */}
+      {/* Grid de Cards de Obras */}
       {filteredObras.length === 0 ? (
-        <div className="card" style={{ textAlign: 'center', padding: '60px 20px' }}>
-          <HardHat size={48} style={{ color: 'var(--brown-light)', marginBottom: '16px' }} />
-          <h3 style={{ marginBottom: '8px' }}>Sem obras</h3>
-          <p style={{ color: 'var(--brown-light)', marginBottom: '20px' }}>Cria a primeira obra para começar</p>
-          <button className="btn btn-primary" onClick={handleNewObra}>
-            <Plus size={18} /> Nova Obra
-          </button>
+        <div className="card" style={{ padding: '48px', textAlign: 'center', color: 'var(--brown-light)' }}>
+          <HardHat size={48} style={{ opacity: 0.3, marginBottom: '16px' }} />
+          <p>Nenhuma obra encontrada</p>
+          <button className="btn btn-primary" style={{ marginTop: '16px' }} onClick={handleNewObra}>Criar Primeira Obra</button>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {filteredObras.map((obra) => (
-            <div 
-              key={obra.id} 
-              className="card"
-              style={{ padding: '20px', cursor: 'pointer', transition: 'all 0.2s' }}
-              onClick={() => navigate(`/obras/${obra.codigo}`)}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
-                {/* Info Principal */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1, minWidth: '300px' }}>
-                  <div style={{ width: '50px', height: '50px', background: 'linear-gradient(135deg, var(--stone), var(--blush))', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <HardHat size={22} style={{ color: 'var(--brown)' }} />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
-                      <span style={{ fontWeight: 700, color: 'var(--warning)', fontSize: '12px', fontFamily: 'monospace' }}>{obra.codigo}</span>
-                      {obra.projetos?.codigo && (
-                        <span style={{ padding: '2px 8px', background: 'var(--stone)', borderRadius: '4px', fontSize: '11px', fontWeight: 500 }}>{obra.projetos.codigo}</span>
-                      )}
-                      <span style={{ padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 600, background: getStatusColor(obra.status).bg, color: getStatusColor(obra.status).color }}>
-                        {getStatusLabel(obra.status)}
-                      </span>
-                    </div>
-                    <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '4px' }}>{obra.nome}</h3>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '12px', color: 'var(--brown-light)', flexWrap: 'wrap' }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <MapPin size={12} /> {obra.localizacao || 'Sem localização'}
-                      </span>
-                      {obra.data_prevista_conclusao && (
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <Calendar size={12} /> Previsão: {new Date(obra.data_prevista_conclusao).toLocaleDateString('pt-PT', { month: 'short', year: 'numeric' })}
-                        </span>
-                      )}
-                      {obra.encarregado && (
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <Users size={12} /> {obra.encarregado}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Progresso e Ações */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-                  <div style={{ textAlign: 'right', minWidth: '100px' }}>
-                    <div style={{ fontSize: '11px', color: 'var(--brown-light)', marginBottom: '4px' }}>Progresso</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <div style={{ width: '80px', height: '6px', background: 'var(--stone)', borderRadius: '3px', overflow: 'hidden' }}>
-                        <div style={{ width: `${obra.progresso || 0}%`, height: '100%', background: 'var(--success)', borderRadius: '3px', transition: 'width 0.3s' }} />
-                      </div>
-                      <span style={{ fontWeight: 600, fontSize: '13px' }}>{obra.progresso || 0}%</span>
-                    </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '16px' }}>
+          {filteredObras.map((obra) => {
+            const prioridade = getPrioridadeFromOrcamento(obra.orcamento)
+            const prioridadeStyle = getPrioridadeStyle(prioridade)
+            return (
+              <div
+                key={obra.id}
+                className="card"
+                style={{
+                  cursor: 'pointer',
+                  position: 'relative',
+                  padding: '20px 20px 16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                  transition: 'box-shadow 0.2s ease'
+                }}
+                onClick={() => navigate(`/obras/${obra.codigo}`)}
+                onMouseEnter={(e) => e.currentTarget.style.boxShadow = 'var(--shadow-lg)'}
+                onMouseLeave={(e) => e.currentTarget.style.boxShadow = 'var(--shadow-sm)'}
+              >
+                {/* Header: Título + Badge + Menu */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <h3 style={{
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      color: 'var(--brown)',
+                      marginBottom: '4px',
+                      lineHeight: 1.4,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}>
+                      {obra.codigo}_{(obra.nome || '').toUpperCase()}
+                    </h3>
+                    <p style={{
+                      fontSize: '13px',
+                      color: 'var(--brown-light)',
+                      margin: 0
+                    }}>
+                      {obra.projetos?.cliente_nome || obra.encarregado || 'Encarregado não definido'}
+                    </p>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <button 
-                      className="btn btn-outline"
-                      style={{ padding: '8px 14px', fontSize: '12px' }}
-                      onClick={(e) => { e.stopPropagation(); navigate(`/obras/${obra.codigo}`) }}
-                    >
-                      <Eye size={14} /> Ver
-                    </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                    {/* Priority Badge */}
+                    <span style={{
+                      padding: '4px 10px',
+                      fontSize: '9px',
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      borderRadius: '4px',
+                      background: prioridadeStyle.bg,
+                      color: 'white'
+                    }}>
+                      {prioridadeStyle.label}
+                    </span>
+
+                    {/* Menu */}
                     <div style={{ position: 'relative' }}>
-                      <button 
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '8px', color: 'var(--brown-light)' }}
+                      <button
                         onClick={(e) => { e.stopPropagation(); setActiveMenu(activeMenu === obra.id ? null : obra.id) }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          padding: '4px',
+                          color: 'var(--brown-light)',
+                          borderRadius: '4px'
+                        }}
                       >
-                        <MoreVertical size={18} />
+                        <MoreVertical size={16} />
                       </button>
-                      
-                      {/* Menu Dropdown */}
                       {activeMenu === obra.id && (
-                        <div style={{ position: 'absolute', right: 0, top: '100%', background: 'var(--white)', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.15)', minWidth: '180px', zIndex: 100, overflow: 'hidden' }}>
-                          <button onClick={(e) => { e.stopPropagation(); handleEditObra(obra) }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--brown)' }}>
-                            <Edit size={14} /> Editar
-                          </button>
-                          <div style={{ borderTop: '1px solid var(--stone)', margin: '4px 0' }} />
-                          <div style={{ padding: '8px 16px', fontSize: '11px', color: 'var(--brown-light)', fontWeight: 600 }}>MUDAR STATUS</div>
-                          {obra.status !== 'em_curso' && (
-                            <button onClick={(e) => { e.stopPropagation(); handleStatusChange(obra, 'em_curso') }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--success)' }}>
-                              <Play size={14} /> Em Curso
-                            </button>
-                          )}
-                          {obra.status !== 'pausada' && (
-                            <button onClick={(e) => { e.stopPropagation(); handleStatusChange(obra, 'pausada') }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--warning)' }}>
-                              <Pause size={14} /> Pausar
-                            </button>
-                          )}
-                          {obra.status !== 'concluida' && (
-                            <button onClick={(e) => { e.stopPropagation(); handleStatusChange(obra, 'concluida') }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--brown)' }}>
-                              <CheckCircle size={14} /> Concluir
-                            </button>
-                          )}
-                          <div style={{ borderTop: '1px solid var(--stone)', margin: '4px 0' }} />
-                          <button onClick={(e) => { e.stopPropagation(); setShowDeleteModal(obra); setActiveMenu(null) }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--error)' }}>
-                            <Trash2 size={14} /> Eliminar
-                          </button>
+                        <div style={{
+                          position: 'absolute',
+                          right: 0,
+                          top: '100%',
+                          background: 'var(--white)',
+                          borderRadius: '10px',
+                          boxShadow: 'var(--shadow-lg)',
+                          minWidth: '150px',
+                          zIndex: 100,
+                          overflow: 'hidden'
+                        }}>
+                          <button onClick={(e) => { e.stopPropagation(); navigate(`/obras/${obra.codigo}`) }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--brown)' }}><Eye size={14} />Ver Detalhe</button>
+                          <button onClick={(e) => { e.stopPropagation(); handleEditObra(obra) }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--brown)' }}><Edit size={14} />Editar</button>
+                          <button onClick={(e) => { e.stopPropagation(); setShowDeleteModal(obra); setActiveMenu(null) }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--error)' }}><Trash2 size={14} />Eliminar</button>
                         </div>
                       )}
                     </div>
                   </div>
                 </div>
+
+                {/* Meta Info: Localização + Datas */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '16px',
+                  fontSize: '12px',
+                  color: 'var(--brown-light)'
+                }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <MapPin size={13} />
+                    {obra.localizacao || '—'}
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <Calendar size={13} />
+                    {formatDateRange(obra.data_inicio, obra.data_prevista_conclusao)}
+                  </span>
+                </div>
+
+                {/* Tipo Badge - pequeno */}
+                {obra.tipo && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{
+                      padding: '3px 8px',
+                      fontSize: '10px',
+                      fontWeight: 500,
+                      borderRadius: '4px',
+                      background: 'var(--stone)',
+                      color: 'var(--brown)'
+                    }}>
+                      {obra.tipo}
+                    </span>
+                    {obra.projetos?.codigo && (
+                      <span style={{
+                        padding: '3px 8px',
+                        fontSize: '10px',
+                        fontWeight: 500,
+                        borderRadius: '4px',
+                        background: 'var(--blush)',
+                        color: 'var(--brown)'
+                      }}>
+                        {obra.projetos.codigo}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Progress Bar */}
+                <div style={{
+                  width: '100%',
+                  height: '3px',
+                  background: 'var(--stone)',
+                  borderRadius: '2px',
+                  overflow: 'hidden',
+                  marginTop: '4px'
+                }}>
+                  <div style={{
+                    width: `${obra.progresso || 0}%`,
+                    height: '100%',
+                    background: getStatusColor(obra.status),
+                    borderRadius: '2px',
+                    transition: 'width 0.3s ease'
+                  }} />
+                </div>
+
+                {/* Footer: Status */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  marginTop: '4px'
+                }}>
+                  <span style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '12px',
+                    color: 'var(--brown-light)'
+                  }}>
+                    <span style={{
+                      width: '6px',
+                      height: '6px',
+                      borderRadius: '50%',
+                      background: getStatusColor(obra.status)
+                    }} />
+                    {getStatusLabel(obra.status)}
+                  </span>
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 

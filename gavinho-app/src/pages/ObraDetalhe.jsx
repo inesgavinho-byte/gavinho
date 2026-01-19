@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { 
+import {
   ArrowLeft, MapPin, Calendar, Users, HardHat, BookOpen, Grid3X3, Camera, AlertTriangle,
   Plus, Sun, Cloud, CloudRain, Wind, Thermometer, Clock, CheckCircle2, Edit, X, Building2,
   ChevronRight, Trash2, UserPlus, Phone, Mail, Briefcase, ClipboardList, Receipt,
-  Upload, Image, FileText, Download, Loader2, Calculator, Euro
+  Upload, Image, FileText, Download, Loader2, Calculator, Euro, MessageSquare
 } from 'lucide-react'
 import ObraTracking from '../components/ObraTracking'
 import ObraAutos from '../components/ObraAutos'
 import ObraOrcamentacao from '../components/ObraOrcamentacao'
+import { exportDiarioToPDF } from '../utils/exportDiarioToPDF'
 
 const tabs = [
   { id: 'tracking', label: 'Tracking', icon: ClipboardList },
@@ -619,6 +620,14 @@ export default function ObraDetalhe() {
           <h1 className="page-title" style={{ marginBottom: 0 }}>{obra.nome}</h1>
           {obra.projetos?.cliente_nome && <p style={{ color: 'var(--brown-light)', fontSize: '14px', margin: 0 }}>Cliente: {obra.projetos.cliente_nome}</p>}
         </div>
+        <button
+          className="btn btn-outline"
+          onClick={() => navigate(`/obras/${obra.id}/comunicacoes`)}
+          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+        >
+          <MessageSquare size={16} />
+          Comunicacoes
+        </button>
       </div>
 
       {/* KPIs */}
@@ -818,7 +827,7 @@ export default function ObraDetalhe() {
               <button className="btn btn-outline" onClick={() => navigate(`/obras/${obra.codigo}/relatorio-semanal`)}>
                 <FileText size={16} /> Relatório Semanal
               </button>
-              <button className="btn btn-primary" onClick={() => { resetDiarioForm(); setShowDiarioModal(true) }}>
+              <button className="btn btn-primary" onClick={() => navigate(`/obras/${obra.id}/diario`)}>
                 <Plus size={16} /> Novo Registo
               </button>
             </div>
@@ -844,7 +853,8 @@ export default function ObraDetalhe() {
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: '4px' }}>
-                      <button className="btn btn-ghost btn-icon" onClick={() => handleEditDiario(d)}><Edit size={14} /></button>
+                      <button className="btn btn-ghost btn-icon" title="Exportar PDF" onClick={() => exportDiarioToPDF(d, obra, { equipa })}><Download size={14} /></button>
+                      <button className="btn btn-ghost btn-icon" onClick={() => navigate(`/obras/${obra.id}/diario?data=${d.data}`)}><Edit size={14} /></button>
                       <button className="btn btn-ghost btn-icon" onClick={() => setShowDeleteConfirm({ type: 'diario', item: d })}><Trash2 size={14} /></button>
                     </div>
                   </div>

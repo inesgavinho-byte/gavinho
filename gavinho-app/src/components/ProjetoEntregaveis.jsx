@@ -23,6 +23,12 @@ export default function ProjetoEntregaveis({ projeto }) {
   const [saving, setSaving] = useState(false)
   const fileInputRef = useRef(null)
 
+  // Estado para edição inline
+  const [editingCell, setEditingCell] = useState(null) // { id: itemId, field: 'status' | 'executante' }
+
+  // Lista de utilizadores (Recursos Humanos)
+  const [utilizadores, setUtilizadores] = useState([])
+
   const [formData, setFormData] = useState({
     codigo: '',
     nome: '',
@@ -41,8 +47,25 @@ export default function ProjetoEntregaveis({ projeto }) {
   useEffect(() => {
     if (projeto?.id) {
       loadEntregaveis()
+      loadUtilizadores()
     }
   }, [projeto?.id])
+
+  // Carregar utilizadores (Recursos Humanos)
+  const loadUtilizadores = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('utilizadores')
+        .select('id, nome, cargo, departamento')
+        .eq('ativo', true)
+        .order('nome')
+
+      if (error) throw error
+      setUtilizadores(data || [])
+    } catch (err) {
+      console.error('Erro ao carregar utilizadores:', err)
+    }
+  }
 
   const loadEntregaveis = async (resetExpanded = true) => {
     try {
@@ -128,11 +151,21 @@ export default function ProjetoEntregaveis({ projeto }) {
           .update(itemData)
           .eq('id', editingItem.id)
         if (error) throw error
+
+        // Se adicionou executante e tem datas (e não tinha antes), criar tarefa
+        if (itemData.executante && itemData.data_inicio && !editingItem.executante) {
+          await criarTarefaEntregavel(itemData, itemData.executante)
+        }
       } else {
         const { error } = await supabase
           .from('projeto_entregaveis')
           .insert([itemData])
         if (error) throw error
+
+        // Se criou com executante e datas, criar tarefa
+        if (itemData.executante && itemData.data_inicio) {
+          await criarTarefaEntregavel(itemData, itemData.executante)
+        }
       }
 
       setShowModal(false)
@@ -160,6 +193,61 @@ export default function ProjetoEntregaveis({ projeto }) {
     } catch (err) {
       console.error('Erro ao eliminar:', err)
       alert('Erro ao eliminar')
+    }
+  }
+
+  // Atualização inline de um campo específico
+  const handleInlineUpdate = async (itemId, field, value) => {
+    try {
+      const { error } = await supabase
+        .from('projeto_entregaveis')
+        .update({ [field]: value })
+        .eq('id', itemId)
+
+      if (error) throw error
+
+      // Buscar item atualizado para verificar se deve criar tarefa
+      const item = entregaveis.find(e => e.id === itemId)
+      const updatedItem = { ...item, [field]: value }
+
+      // Se atribuiu executante e tem datas, criar tarefa
+      if (field === 'executante' && value && updatedItem.data_inicio) {
+        await criarTarefaEntregavel(updatedItem, value)
+      }
+
+      // Atualizar estado local imediatamente
+      setEntregaveis(prev => prev.map(item =>
+        item.id === itemId ? { ...item, [field]: value } : item
+      ))
+      setEditingCell(null)
+    } catch (err) {
+      console.error('Erro ao atualizar:', err)
+      alert('Erro ao atualizar')
+    }
+  }
+
+  // Criar tarefa automaticamente ao atribuir executante com datas
+  const criarTarefaEntregavel = async (entregavel, executanteNome) => {
+    try {
+      // Encontrar o utilizador pelo nome
+      const utilizador = utilizadores.find(u => u.nome === executanteNome)
+
+      const { error } = await supabase.from('tarefas').insert([{
+        titulo: `[ENTREGÁVEL] ${entregavel.codigo} - ${entregavel.nome}`,
+        descricao: `Entregável do projeto: ${entregavel.nome}\nEscala: ${entregavel.escala || '-'}\nFase: ${entregavel.fase || '-'}`,
+        projeto_id: projeto.id,
+        responsavel_id: utilizador?.id || null,
+        responsavel_nome: executanteNome,
+        status: 'pendente',
+        prioridade: 'media',
+        data_limite: entregavel.data_conclusao || entregavel.data_inicio,
+        categoria: 'entregavel'
+      }])
+
+      if (error) throw error
+      console.log('Tarefa criada para entregável:', entregavel.codigo)
+    } catch (err) {
+      console.error('Erro ao criar tarefa:', err)
     }
   }
 
@@ -223,7 +311,7 @@ export default function ProjetoEntregaveis({ projeto }) {
       const codigoIdx = headers.findIndex(h => h.includes('COD'))
       const nomeIdx = headers.findIndex(h => h.includes('DESENHO') && !h.includes('ESCALA'))
       const escalaIdx = headers.findIndex(h => h.includes('ESCALA'))
-      const dataInicioIdx = headers.findIndex(h => h.includes('INÍCIO') || h.includes('INICIO'))
+      const dataInicioIdx = headers.findIndex(h => h.includes('INÀCIO') || h.includes('INICIO'))
       const dataConclusaoIdx = headers.findIndex(h => h.includes('CONCLUS'))
       const estadoIdx = headers.findIndex(h => h.includes('ESTADO') || h.includes('STATUS'))
       const executanteIdx = headers.findIndex(h => h.includes('EXECUTANTE') || h.includes('PESSOA'))
@@ -266,7 +354,7 @@ export default function ProjetoEntregaveis({ projeto }) {
 
       if (error) throw error
 
-      alert(`✓ Importados ${items.length} entregáveis`)
+      alert(`âœ“ Importados ${items.length} entregáveis`)
       loadEntregaveis()
     } catch (err) {
       console.error('Erro ao importar:', err)
@@ -379,7 +467,7 @@ export default function ProjetoEntregaveis({ projeto }) {
           <div>
             <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0 }}>Lista de Entregáveis</h3>
             <p style={{ fontSize: '12px', color: 'var(--brown-light)', margin: '4px 0 0' }}>
-              {stats.total} entregáveis • {progressPercent}% concluído
+              {stats.total} entregáveis  –  {progressPercent}% concluído
             </p>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
@@ -510,7 +598,7 @@ export default function ProjetoEntregaveis({ projeto }) {
                       <div>
                         <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>{faseNome}</h4>
                         <span style={{ fontSize: '11px', opacity: 0.9 }}>
-                          {faseItems.length} entregáveis • {faseConcluidos} concluídos
+                          {faseItems.length} entregáveis  –  {faseConcluidos} concluídos
                         </span>
                       </div>
                     </div>
@@ -547,7 +635,7 @@ export default function ProjetoEntregaveis({ projeto }) {
                             {expandedFases[`${faseNome}__${catNome}`] ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                             <span style={{ fontWeight: 600, fontSize: '13px', flex: 1 }}>{catNome}</span>
                             <span style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
-                              {items.length} itens • {items.filter(i => i.status === 'concluido' || i.status === 'aprovado').length} ✓
+                              {items.length} itens  –  {items.filter(i => i.status === 'concluido' || i.status === 'aprovado').length} âœ“
                             </span>
                           </div>
                           
@@ -555,75 +643,142 @@ export default function ProjetoEntregaveis({ projeto }) {
                           {expandedFases[`${faseNome}__${catNome}`] && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '20px' }}>
                               {/* Cabeçalho das colunas */}
-                              <div style={{ 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                gap: '12px',
-                                padding: '6px 12px',
+                              <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: '80px 1fr 70px 110px 110px 80px 80px 60px',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '8px 12px',
                                 fontSize: '10px',
                                 fontWeight: 600,
                                 color: 'var(--brown-light)',
                                 textTransform: 'uppercase',
                                 letterSpacing: '0.5px'
                               }}>
-                                <span style={{ minWidth: '70px' }}>Código</span>
-                                <span style={{ flex: 1 }}>Descrição</span>
-                                <span style={{ minWidth: '50px' }}>Escala</span>
-                                <span style={{ minWidth: '80px', textAlign: 'center' }}>Início</span>
-                                <span style={{ minWidth: '80px', textAlign: 'center' }}>Conclusão</span>
-                                <span style={{ minWidth: '80px', textAlign: 'center' }}>Executante</span>
-                                <span style={{ minWidth: '70px' }}>Estado</span>
-                                <span style={{ minWidth: '50px' }}></span>
+                                <span>Código</span>
+                                <span>Descrição</span>
+                                <span style={{ textAlign: 'center' }}>Escala</span>
+                                <span style={{ textAlign: 'center' }}>Estado</span>
+                                <span style={{ textAlign: 'center' }}>Executante</span>
+                                <span style={{ textAlign: 'center' }}>Início</span>
+                                <span style={{ textAlign: 'center' }}>Conclusão</span>
+                                <span></span>
                               </div>
                               {items.sort((a, b) => (a.codigo || '').localeCompare(b.codigo || '', undefined, { numeric: true })).map(item => (
-                                <div 
+                                <div
                                   key={item.id}
-                                  style={{ 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    gap: '12px',
-                                    padding: '8px 12px',
+                                  style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: '80px 1fr 70px 110px 110px 80px 80px 60px',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    padding: '10px 12px',
                                     background: 'var(--white)',
                                     border: '1px solid var(--stone)',
                                     borderRadius: '6px',
                                     fontSize: '13px'
                                   }}
                                 >
-                                  <span style={{ 
-                                    fontFamily: 'monospace', 
-                                    fontSize: '11px', 
-                                    color: 'var(--brown-light)',
-                                    minWidth: '70px'
-                                  }}>
+                                  {/* Código */}
+                                  <span style={{ fontWeight: 500, fontSize: '11px', color: 'var(--brown-light)' }}>
                                     {item.codigo}
                                   </span>
-                                  <span style={{ flex: 1 }}>{item.nome}</span>
-                                  <span style={{ fontSize: '11px', color: 'var(--brown-light)', background: item.escala ? 'var(--stone)' : 'transparent', padding: item.escala ? '2px 6px' : '2px 0', borderRadius: '4px', minWidth: '50px', textAlign: 'center' }}>
+                                  {/* Descrição */}
+                                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.nome}</span>
+                                  {/* Escala */}
+                                  <span style={{ fontSize: '11px', color: 'var(--brown-light)', background: item.escala ? 'var(--stone)' : 'transparent', padding: '2px 6px', borderRadius: '4px', textAlign: 'center' }}>
                                     {item.escala || '-'}
                                   </span>
-                                  {/* Datas e Executante */}
-                                  <span style={{ fontSize: '10px', color: 'var(--brown-light)', minWidth: '80px', textAlign: 'center' }}>
+                                  {/* Estado - Edição Inline */}
+                                  {editingCell?.id === item.id && editingCell?.field === 'status' ? (
+                                    <select
+                                      autoFocus
+                                      value={item.status}
+                                      onChange={(e) => handleInlineUpdate(item.id, 'status', e.target.value)}
+                                      onBlur={() => setEditingCell(null)}
+                                      style={{
+                                        width: '100%',
+                                        padding: '4px 6px',
+                                        fontSize: '11px',
+                                        border: '1px solid var(--info)',
+                                        borderRadius: '6px',
+                                        background: 'var(--white)',
+                                        cursor: 'pointer'
+                                      }}
+                                    >
+                                      {Object.entries(statusConfig).map(([key, val]) => (
+                                        <option key={key} value={key}>{val.label}</option>
+                                      ))}
+                                    </select>
+                                  ) : (
+                                    <span
+                                      onClick={() => setEditingCell({ id: item.id, field: 'status' })}
+                                      style={{
+                                        padding: '4px 8px',
+                                        borderRadius: '10px',
+                                        fontSize: '10px',
+                                        fontWeight: 600,
+                                        background: statusConfig[item.status]?.bg,
+                                        color: statusConfig[item.status]?.color,
+                                        textAlign: 'center',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s'
+                                      }}
+                                      title="Clique para alterar"
+                                    >
+                                      {statusConfig[item.status]?.label}
+                                    </span>
+                                  )}
+                                  {/* Executante - Edição Inline (Dropdown de Recursos Humanos) */}
+                                  {editingCell?.id === item.id && editingCell?.field === 'executante' ? (
+                                    <select
+                                      autoFocus
+                                      value={item.executante || ''}
+                                      onChange={(e) => handleInlineUpdate(item.id, 'executante', e.target.value || null)}
+                                      onBlur={() => setEditingCell(null)}
+                                      style={{
+                                        width: '100%',
+                                        padding: '4px 6px',
+                                        fontSize: '11px',
+                                        border: '1px solid var(--info)',
+                                        borderRadius: '6px',
+                                        background: 'var(--white)',
+                                        cursor: 'pointer'
+                                      }}
+                                    >
+                                      <option value="">— Selecionar —</option>
+                                      {utilizadores.map(u => (
+                                        <option key={u.id} value={u.nome}>{u.nome}</option>
+                                      ))}
+                                    </select>
+                                  ) : (
+                                    <span
+                                      onClick={() => setEditingCell({ id: item.id, field: 'executante' })}
+                                      style={{
+                                        fontSize: '11px',
+                                        color: item.executante ? 'var(--info)' : 'var(--brown-light)',
+                                        textAlign: 'center',
+                                        cursor: 'pointer',
+                                        padding: '4px 6px',
+                                        borderRadius: '6px',
+                                        background: item.executante ? 'rgba(138, 158, 184, 0.1)' : 'transparent',
+                                        transition: 'all 0.2s'
+                                      }}
+                                      title="Clique para alterar"
+                                    >
+                                      {item.executante || '—'}
+                                    </span>
+                                  )}
+                                  {/* Início */}
+                                  <span style={{ fontSize: '11px', color: 'var(--brown-light)', textAlign: 'center' }}>
                                     {item.data_inicio ? new Date(item.data_inicio).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' }) : '-'}
                                   </span>
-                                  <span style={{ fontSize: '10px', color: 'var(--brown-light)', minWidth: '80px', textAlign: 'center' }}>
+                                  {/* Conclusão */}
+                                  <span style={{ fontSize: '11px', color: 'var(--brown-light)', textAlign: 'center' }}>
                                     {item.data_conclusao ? new Date(item.data_conclusao).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' }) : '-'}
                                   </span>
-                                  <span style={{ fontSize: '10px', color: 'var(--info)', minWidth: '80px', textAlign: 'center' }}>
-                                    {item.executante || '-'}
-                                  </span>
-                                  <span style={{ 
-                                    padding: '3px 8px', 
-                                    borderRadius: '10px', 
-                                    fontSize: '10px', 
-                                    fontWeight: 600, 
-                                    background: statusConfig[item.status]?.bg, 
-                                    color: statusConfig[item.status]?.color,
-                                    minWidth: '70px',
-                                    textAlign: 'center'
-                                  }}>
-                                    {statusConfig[item.status]?.label}
-                                  </span>
-                                  <div style={{ display: 'flex', gap: '4px', minWidth: '50px' }}>
+                                  {/* Ações */}
+                                  <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
                                     <button onClick={() => handleEdit(item)} className="btn btn-ghost btn-icon" style={{ padding: '4px' }}>
                                       <Edit2 size={12} />
                                     </button>
@@ -672,7 +827,7 @@ export default function ProjetoEntregaveis({ projeto }) {
                               {expandedGroups[groupCode] ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                             </button>
                           )}
-                          <span style={{ fontWeight: 700, fontFamily: 'monospace', color: 'var(--warning)' }}>{group.item.codigo}</span>
+                          <span style={{ fontWeight: 500, color: 'var(--warning)' }}>{group.item.codigo}</span>
                         </div>
                       </td>
                       <td style={{ padding: '12px 16px', fontWeight: 600 }}>{group.item.nome}</td>
@@ -706,7 +861,7 @@ export default function ProjetoEntregaveis({ projeto }) {
                                   {expandedGroups[subCode] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                                 </button>
                               )}
-                              <span style={{ fontWeight: 600, fontFamily: 'monospace', color: 'var(--info)' }}>{subGroup.item.codigo}</span>
+                              <span style={{ fontWeight: 500, color: 'var(--info)' }}>{subGroup.item.codigo}</span>
                             </div>
                           </td>
                           <td style={{ padding: '12px 16px', fontWeight: 500 }}>{subGroup.item.nome}</td>
@@ -732,7 +887,7 @@ export default function ProjetoEntregaveis({ projeto }) {
                       {expandedGroups[subCode] && subGroup.children.sort((a, b) => a.codigo.localeCompare(b.codigo, undefined, { numeric: true })).map(item => (
                         <tr key={item.id} style={{ borderBottom: '1px solid var(--stone)' }}>
                           <td style={{ padding: '12px 16px', paddingLeft: '64px' }}>
-                            <span style={{ fontFamily: 'monospace', fontSize: '12px', color: 'var(--brown-light)' }}>{item.codigo}</span>
+                            <span style={{ fontWeight: 500, fontSize: '12px', color: 'var(--brown-light)' }}>{item.codigo}</span>
                           </td>
                           <td style={{ padding: '12px 16px' }}>{item.nome}</td>
                           <td style={{ padding: '12px 16px', textAlign: 'center', color: 'var(--brown-light)', fontSize: '12px' }}>{item.escala || '-'}</td>
@@ -840,13 +995,16 @@ export default function ProjetoEntregaveis({ projeto }) {
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, marginBottom: '6px' }}>Executante</label>
-                  <input
-                    type="text"
+                  <select
                     value={formData.executante}
                     onChange={e => setFormData({ ...formData, executante: e.target.value })}
-                    placeholder="Nome do executante"
                     style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
-                  />
+                  >
+                    <option value="">— Selecionar Executante —</option>
+                    {utilizadores.map(u => (
+                      <option key={u.id} value={u.nome}>{u.nome} {u.cargo ? `(${u.cargo})` : ''}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 

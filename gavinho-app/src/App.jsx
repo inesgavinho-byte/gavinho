@@ -8,6 +8,7 @@ import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import Dashboard from './pages/Dashboard'
 import DashboardAdmin from './pages/DashboardAdmin'
+import DashboardProjetos from './pages/DashboardProjetos'
 import Projetos from './pages/Projetos'
 import ProjetoDetalhe from './pages/ProjetoDetalhe'
 import Clientes from './pages/Clientes'
@@ -22,11 +23,17 @@ import Orcamentos from './pages/Orcamentos'
 import OrcamentoDetalhe from './pages/OrcamentoDetalhe'
 import BlockersDecisions from './pages/BlockersDecisions'
 import ChatProjetos from './pages/ChatProjetos'
+import ChatColaborativo from './pages/ChatColaborativo'
 import Finance from './pages/Finance'
 import Planning from './pages/Planning'
 import Calendario from './pages/Calendario'
 import Perfil from './pages/Perfil'
 import PlaceholderPage from './pages/PlaceholderPage'
+import Biblioteca from './pages/Biblioteca'
+import ChatObras from './pages/ChatObras'
+import AdminSeed from './pages/AdminSeed'
+import DiarioObra from './pages/DiarioObra'
+import ObraComunicacoes from './pages/ObraComunicacoes'
 
 function App() {
   return (
@@ -46,6 +53,7 @@ function App() {
             </ProtectedRoute>
           }>
             <Route index element={<Dashboard />} />
+            <Route path="dashboard-projetos" element={<DashboardProjetos />} />
             <Route path="gestao" element={<DashboardAdmin />} />
             <Route path="projetos" element={<Projetos />} />
             <Route path="projetos/:id" element={<ProjetoDetalhe />} />
@@ -55,11 +63,16 @@ function App() {
             <Route path="obras/:id" element={<ObraDetalhe />} />
             <Route path="obras/:id/:tab" element={<ObraDetalhe />} />
             <Route path="obras/:id/relatorio-semanal" element={<RelatorioSemanal />} />
+            <Route path="obras/:id/diario" element={<DiarioObra />} />
+            <Route path="obras/:id/comunicacoes" element={<ObraComunicacoes />} />
+            <Route path="diario-obra" element={<DiarioObra />} />
             <Route path="equipa" element={<Equipa />} />
             <Route path="equipa/:id" element={<PlaceholderPage title="Perfil do Colaborador" subtitle="Informações e alocações" />} />
             <Route path="tarefas" element={<Tarefas />} />
             <Route path="bloqueios" element={<BlockersDecisions />} />
-            <Route path="chat" element={<ChatProjetos />} />
+            <Route path="chat" element={<ChatColaborativo />} />
+            <Route path="chat-obras" element={<ChatObras />} />
+            <Route path="biblioteca" element={<Biblioteca />} />
             <Route path="planning" element={<Planning />} />
             <Route path="calendario" element={<Calendario />} />
             <Route path="orcamentos" element={<Orcamentos />} />
@@ -69,6 +82,7 @@ function App() {
             <Route path="fornecedores/:id" element={<FornecedorDetalhe />} />
             <Route path="perfil" element={<Perfil />} />
             <Route path="configuracoes" element={<PlaceholderPage title="Configurações" subtitle="Definições da plataforma" />} />
+            <Route path="admin/seed" element={<AdminSeed />} />
           </Route>
         </Routes>
       </AuthProvider>
