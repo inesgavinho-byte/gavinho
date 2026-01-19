@@ -316,6 +316,7 @@ export default function ProjetoEntregaveis({ projeto }) {
       if (nomeIdx === -1 && headers.length >= 2) nomeIdx = 1
       console.log('Headers:', headers, 'codigoIdx:', codigoIdx, 'nomeIdx:', nomeIdx)
       const escalaIdx = headers.findIndex(h => h.includes('ESCALA'))
+      const faseIdx = headers.findIndex(h => h.includes('FASE'))
       const dataInicioIdx = headers.findIndex(h => h.includes('INÀCIO') || h.includes('INICIO'))
       const dataConclusaoIdx = headers.findIndex(h => h.includes('CONCLUS'))
       const estadoIdx = headers.findIndex(h => h.includes('ESTADO') || h.includes('STATUS'))
@@ -324,6 +325,15 @@ export default function ProjetoEntregaveis({ projeto }) {
       if (codigoIdx === -1 || nomeIdx === -1) {
         alert('Colunas CÓDIGO e DESCRIÇÃO (ou DESENHO) são obrigatórias')
         return
+      }
+
+      // Perguntar ao utilizador qual a fase
+      let faseDefault = 'Projeto Base'
+      if (typeof faseIdx === 'undefined' || faseIdx === -1) {
+        const faseEscolhida = prompt('Qual a fase destes entregaveis?\n\n1 - Projeto Base\n2 - Projeto de Execucao (PEXA)\n3 - Licenciamento\n4 - Construcao\n\nDigite o numero ou nome:', '1')
+        if (!faseEscolhida) return
+        const faseMap = { '1': 'Projeto Base', '2': 'Projeto de Execução', '3': 'Licenciamento', '4': 'Construção', 'pexa': 'Projeto de Execução' }
+        faseDefault = faseMap[faseEscolhida.toLowerCase().trim()] || faseEscolhida.trim()
       }
 
       const items = []
@@ -335,9 +345,12 @@ export default function ProjetoEntregaveis({ projeto }) {
         const nome = row[nomeIdx]?.toString().trim()
         if (!codigo || !nome) continue
 
+        // Usar fase da coluna ou faseDefault
+        const fase = faseIdx >= 0 ? (row[faseIdx]?.toString().trim() || faseDefault) : faseDefault
+
         items.push({
           projeto_id: projeto.id,
-          fase: 'Projeto Base',
+          fase,
           codigo,
           nome,
           escala: escalaIdx >= 0 ? row[escalaIdx]?.toString().trim() || null : null,
