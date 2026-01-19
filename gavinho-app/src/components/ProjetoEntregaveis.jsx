@@ -293,9 +293,9 @@ export default function ProjetoEntregaveis({ projeto }) {
       let headerRow = -1
       for (let i = 0; i < Math.min(10, rows.length); i++) {
         const row = rows[i]
-        if (row && row.some(cell => 
-          cell && typeof cell === 'string' && 
-          (cell.toUpperCase().includes('COD') || cell.toUpperCase().includes('DESENHO'))
+        if (row && row.some(cell =>
+          cell && typeof cell === 'string' &&
+          (cell.toUpperCase().includes('COD') || cell.toUpperCase().includes('DESENHO') || cell.toUpperCase().includes('DESCRI'))
         )) {
           headerRow = i
           break
@@ -332,6 +332,7 @@ export default function ProjetoEntregaveis({ projeto }) {
 
         items.push({
           projeto_id: projeto.id,
+          fase: 'Projeto Base',
           codigo,
           nome,
           escala: escalaIdx >= 0 ? row[escalaIdx]?.toString().trim() || null : null,
