@@ -38,6 +38,7 @@ import {
   Library,
   Settings,
   Eye,
+  BookOpen,
   Package,
   Send,
   Users
@@ -48,6 +49,7 @@ import { jsPDF } from 'jspdf'
 import ProjetoEntregaveis from '../components/ProjetoEntregaveis'
 import ProjetoDocumentos from '../components/ProjetoDocumentos'
 import CentralEntregas from '../components/CentralEntregas'
+import DiarioBordo from '../components/DiarioBordo'
 
 // Dados de exemplo baseados nos JSONs fornecidos
 const sampleProjectData = {
@@ -1983,6 +1985,7 @@ export default function ProjetoDetalhe() {
   const allTabs = [
     { id: 'dashboard', label: 'Dashboard Projeto', icon: Layers },
     { id: 'fases', label: 'Fases & Entregas', icon: Target },
+    { id: 'diario', label: 'Diário de Bordo', icon: BookOpen },
     { id: 'archviz', label: 'Archviz', icon: Image },
     { id: 'imagens-finais', label: 'Imagens Finais', icon: CheckCircle },
     { id: 'biblioteca', label: 'Biblioteca', icon: Library },
@@ -3114,6 +3117,13 @@ export default function ProjetoDetalhe() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Tab Diário de Bordo */}
+      {activeTab === 'diario' && (
+        <div className="card" style={{ padding: '20px' }}>
+          <DiarioBordo projeto={projeto} />
         </div>
       )}
 
