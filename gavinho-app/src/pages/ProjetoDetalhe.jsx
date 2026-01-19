@@ -742,12 +742,15 @@ export default function ProjetoDetalhe() {
   const [renders, setRenders] = useState([])
   const [showRenderModal, setShowRenderModal] = useState(false)
   const [editingRender, setEditingRender] = useState(null)
+  const [lightboxImage, setLightboxImage] = useState(null) // Para lightbox
+  const [isDragging, setIsDragging] = useState(false) // Para drag & drop
   const [renderForm, setRenderForm] = useState({
     compartimento: '',
     versao: 1,
     descricao: '',
     is_final: false,
-    imagem_url: ''
+    imagem_url: '',
+    data_upload: new Date().toISOString().split('T')[0]
   })
 
   // Lista de compartimentos comuns
@@ -1835,7 +1838,8 @@ export default function ProjetoDetalhe() {
       versao: versao,
       descricao: '',
       is_final: false,
-      imagem_url: ''
+      imagem_url: '',
+      data_upload: new Date().toISOString().split('T')[0]
     })
     setShowRenderModal(true)
   }
@@ -1847,7 +1851,8 @@ export default function ProjetoDetalhe() {
       versao: render.versao,
       descricao: render.descricao || '',
       is_final: render.is_final || false,
-      imagem_url: render.imagem_url || ''
+      imagem_url: render.imagem_url || '',
+      data_upload: render.data_upload || render.created_at?.split('T')[0] || new Date().toISOString().split('T')[0]
     })
     setShowRenderModal(true)
   }
@@ -1871,6 +1876,7 @@ export default function ProjetoDetalhe() {
         descricao: renderForm.descricao,
         is_final: renderForm.is_final,
         imagem_url: renderForm.imagem_url,
+        data_upload: renderForm.data_upload,
         created_at: new Date().toISOString()
       }
 
@@ -1960,13 +1966,45 @@ export default function ProjetoDetalhe() {
   const handleRenderImageUpload = (e) => {
     const file = e.target.files?.[0]
     if (!file) return
+    processImageFile(file)
+  }
 
+  const processImageFile = (file) => {
+    if (!file.type.startsWith('image/')) {
+      alert('Por favor selecione um ficheiro de imagem válido')
+      return
+    }
     // Simular upload - em produção, fazer upload para Supabase Storage
     const reader = new FileReader()
     reader.onload = (event) => {
       setRenderForm(prev => ({ ...prev, imagem_url: event.target?.result }))
     }
     reader.readAsDataURL(file)
+  }
+
+  // Drag & Drop handlers
+  const handleDragOver = (e) => {
+    e.preventDefault()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e) => {
+    e.preventDefault()
+    setIsDragging(false)
+  }
+
+  const handleDrop = (e) => {
+    e.preventDefault()
+    setIsDragging(false)
+    const file = e.dataTransfer.files?.[0]
+    if (file) processImageFile(file)
+  }
+
+  // Abrir lightbox
+  const openLightbox = (render) => {
+    if (render.imagem_url) {
+      setLightboxImage(render)
+    }
   }
 
   // Renders agrupados por compartimento
@@ -3167,7 +3205,7 @@ export default function ProjetoDetalhe() {
                     </button>
                   </div>
                   <div className="grid grid-3" style={{ gap: '16px' }}>
-                    {compartimentoRenders.sort((a, b) => b.versao - a.versao).map((render) => (
+                    {compartimentoRenders.sort((a, b) => new Date(b.data_upload || b.created_at || 0) - new Date(a.data_upload || a.created_at || 0)).map((render) => (
                       <div
                         key={render.id}
                         style={{
@@ -3177,9 +3215,9 @@ export default function ProjetoDetalhe() {
                           borderRadius: '12px',
                           overflow: 'hidden',
                           border: render.is_final ? '3px solid var(--success)' : '1px solid var(--stone)',
-                          cursor: 'pointer'
+                          cursor: render.imagem_url ? 'pointer' : 'default'
                         }}
-                        onClick={() => openEditRenderModal(render)}
+                        onClick={() => openLightbox(render)}
                       >
                         {!render.imagem_url && (
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
@@ -3187,19 +3225,36 @@ export default function ProjetoDetalhe() {
                           </div>
                         )}
 
-                        {/* Versão Badge */}
+                        {/* Versão & Data Badge */}
                         <div style={{
                           position: 'absolute',
                           top: '8px',
                           left: '8px',
-                          padding: '4px 8px',
-                          background: 'rgba(0,0,0,0.7)',
-                          color: 'white',
-                          borderRadius: '6px',
-                          fontSize: '11px',
-                          fontWeight: 600
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '4px'
                         }}>
-                          v{render.versao}
+                          <div style={{
+                            padding: '4px 8px',
+                            background: 'rgba(0,0,0,0.7)',
+                            color: 'white',
+                            borderRadius: '6px',
+                            fontSize: '11px',
+                            fontWeight: 600
+                          }}>
+                            v{render.versao}
+                          </div>
+                          {render.data_upload && (
+                            <div style={{
+                              padding: '3px 6px',
+                              background: 'rgba(0,0,0,0.5)',
+                              color: 'white',
+                              borderRadius: '4px',
+                              fontSize: '9px'
+                            }}>
+                              {new Date(render.data_upload).toLocaleDateString('pt-PT')}
+                            </div>
+                          )}
                         </div>
 
                         {/* Final Badge */}
@@ -3249,11 +3304,26 @@ export default function ProjetoDetalhe() {
                           >
                             {render.is_final ? 'Remover Final' : 'Marcar Final'}
                           </button>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleDeleteRender(render) }}
-                            style={{
-                              padding: '4px',
-                              background: 'rgba(255,255,255,0.2)',
+                          <div style={{ display: 'flex', gap: '4px' }}>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); openEditRenderModal(render) }}
+                              style={{
+                                padding: '4px',
+                                background: 'rgba(255,255,255,0.2)',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer'
+                              }}
+                              title="Editar"
+                            >
+                              <Edit size={14} />
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleDeleteRender(render) }}
+                              style={{
+                                padding: '4px',
+                                background: 'rgba(255,255,255,0.2)',
                               color: 'white',
                               border: 'none',
                               borderRadius: '4px',
@@ -3815,7 +3885,7 @@ export default function ProjetoDetalhe() {
                 </div>
               )}
 
-              {/* Imagem Upload */}
+              {/* Imagem Upload com Drag & Drop */}
               <div style={{ marginBottom: '20px' }}>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '8px', color: 'var(--brown)' }}>
                   Imagem do Render
@@ -3826,21 +3896,26 @@ export default function ProjetoDetalhe() {
                     aspectRatio: '16/10',
                     background: renderForm.imagem_url ? `url(${renderForm.imagem_url}) center/cover` : 'var(--cream)',
                     borderRadius: '12px',
-                    border: '2px dashed var(--stone)',
+                    border: isDragging ? '3px dashed var(--info)' : '2px dashed var(--stone)',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
                     cursor: 'pointer',
-                    overflow: 'hidden'
+                    overflow: 'hidden',
+                    transition: 'all 0.2s',
+                    transform: isDragging ? 'scale(1.02)' : 'scale(1)'
                   }}
                   onClick={() => document.getElementById('render-image-input').click()}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
                 >
                   {!renderForm.imagem_url && (
                     <>
-                      <Upload size={32} style={{ color: 'var(--brown-light)', opacity: 0.5, marginBottom: '8px' }} />
-                      <span style={{ fontSize: '13px', color: 'var(--brown-light)' }}>
-                        Clique para fazer upload
+                      <Upload size={32} style={{ color: isDragging ? 'var(--info)' : 'var(--brown-light)', opacity: isDragging ? 1 : 0.5, marginBottom: '8px' }} />
+                      <span style={{ fontSize: '13px', color: isDragging ? 'var(--info)' : 'var(--brown-light)', fontWeight: isDragging ? 600 : 400 }}>
+                        {isDragging ? 'Largue a imagem aqui' : 'Arraste ou clique para fazer upload'}
                       </span>
                     </>
                   )}
@@ -3855,7 +3930,7 @@ export default function ProjetoDetalhe() {
                       borderRadius: '6px',
                       fontSize: '11px'
                     }}>
-                      Clique para alterar
+                      Arraste ou clique para alterar
                     </div>
                   )}
                 </div>
@@ -3866,6 +3941,30 @@ export default function ProjetoDetalhe() {
                   style={{ display: 'none' }}
                   onChange={handleRenderImageUpload}
                 />
+              </div>
+
+              {/* Data de Carregamento */}
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '8px', color: 'var(--brown)' }}>
+                  Data de Carregamento
+                </label>
+                <input
+                  type="date"
+                  value={renderForm.data_upload}
+                  onChange={(e) => setRenderForm(prev => ({ ...prev, data_upload: e.target.value }))}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid var(--stone)',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    background: 'var(--white)',
+                    color: 'var(--brown)'
+                  }}
+                />
+                <p style={{ fontSize: '11px', color: 'var(--brown-light)', marginTop: '6px' }}>
+                  Altere a data para registar histórico de imagens anteriores
+                </p>
               </div>
 
               {/* Descrição */}
@@ -4598,6 +4697,128 @@ export default function ProjetoDetalhe() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Lightbox para visualizar imagens em grande */}
+      {lightboxImage && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.95)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+            cursor: 'zoom-out'
+          }}
+          onClick={() => setLightboxImage(null)}
+        >
+          {/* Header */}
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            padding: '16px 24px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            background: 'linear-gradient(rgba(0,0,0,0.8), transparent)'
+          }}>
+            <div style={{ color: 'white' }}>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>{lightboxImage.compartimento}</h3>
+              <span style={{ fontSize: '12px', opacity: 0.7 }}>
+                v{lightboxImage.versao} • {lightboxImage.data_upload ? new Date(lightboxImage.data_upload).toLocaleDateString('pt-PT') : ''}
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={(e) => { e.stopPropagation(); openEditRenderModal(lightboxImage); setLightboxImage(null) }}
+                style={{
+                  padding: '8px 16px',
+                  background: 'rgba(255,255,255,0.2)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <Edit size={14} /> Editar
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); setLightboxImage(null) }}
+                style={{
+                  padding: '8px',
+                  background: 'rgba(255,255,255,0.2)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer'
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+          </div>
+
+          {/* Imagem */}
+          <img
+            src={lightboxImage.imagem_url}
+            alt={lightboxImage.compartimento}
+            style={{
+              maxWidth: '95vw',
+              maxHeight: '85vh',
+              objectFit: 'contain',
+              borderRadius: '8px'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          />
+
+          {/* Descrição (se existir) */}
+          {lightboxImage.descricao && (
+            <div style={{
+              position: 'absolute',
+              bottom: '24px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              padding: '12px 24px',
+              background: 'rgba(0,0,0,0.7)',
+              color: 'white',
+              borderRadius: '8px',
+              maxWidth: '80vw',
+              textAlign: 'center',
+              fontSize: '13px'
+            }}>
+              {lightboxImage.descricao}
+            </div>
+          )}
+
+          {/* Badge Final */}
+          {lightboxImage.is_final && (
+            <div style={{
+              position: 'absolute',
+              bottom: '24px',
+              right: '24px',
+              padding: '8px 16px',
+              background: 'var(--success)',
+              color: 'white',
+              borderRadius: '8px',
+              fontSize: '12px',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              <CheckCircle size={14} /> Imagem Final
+            </div>
+          )}
         </div>
       )}
     </div>
