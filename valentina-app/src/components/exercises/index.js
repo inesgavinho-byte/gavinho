@@ -1,0 +1,6 @@
+export { default as ClassifyExercise } from './ClassifyExercise'
+export { default as CycleExercise } from './CycleExercise'
+export { default as MatchExercise } from './MatchExercise'
+export { default as SequenceExercise } from './SequenceExercise'
+export { default as FillBlankExercise } from './FillBlankExercise'
+export { default as QuizExercise } from './QuizExercise'
