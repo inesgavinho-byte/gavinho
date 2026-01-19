@@ -18,6 +18,7 @@ export default function DiarioBordo({ projeto }) {
   const [showModal, setShowModal] = useState(false)
   const [editingItem, setEditingItem] = useState(null)
   const [utilizadores, setUtilizadores] = useState([])
+  const [syncing, setSyncing] = useState(false)
 
   // Filtros
   const [filtroCategoria, setFiltroCategoria] = useState('')
@@ -67,6 +68,35 @@ export default function DiarioBordo({ projeto }) {
       console.error('Erro ao carregar diário:', err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleSyncOutlook = async () => {
+    setSyncing(true)
+    try {
+      const response = await fetch(
+        'https://vctcppuvqjstscbzdykn.supabase.co/functions/v1/outlook-sync',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || ''}`
+          }
+        }
+      )
+      const result = await response.json()
+
+      if (result.success) {
+        alert(`Sincronização concluída!\n${result.imported} emails importados\n${result.skipped} ignorados`)
+        loadData()
+      } else {
+        alert('Erro na sincronização: ' + (result.error || 'Erro desconhecido'))
+      }
+    } catch (err) {
+      console.error('Erro ao sincronizar:', err)
+      alert('Erro ao sincronizar: ' + err.message)
+    } finally {
+      setSyncing(false)
     }
   }
 
