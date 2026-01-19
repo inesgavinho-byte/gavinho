@@ -308,8 +308,13 @@ export default function ProjetoEntregaveis({ projeto }) {
       }
 
       const headers = rows[headerRow].map(h => (h || '').toString().toUpperCase().trim())
-      const codigoIdx = headers.findIndex(h => h.includes('COD'))
-      const nomeIdx = headers.findIndex(h => (h.includes('DESENHO') || h.includes('DESCRI')) && !h.includes('ESCALA'))
+      // Procurar colunas - usar fallback para primeira e segunda coluna
+      let codigoIdx = headers.findIndex(h => h.includes('COD') || h.includes('CODIGO'))
+      let nomeIdx = headers.findIndex(h => (h.includes('DESENHO') || h.includes('DESCRI') || h.includes('DESCRICAO') || h.includes('NOME')) && !h.includes('ESCALA'))
+      // Fallback: usar primeira e segunda coluna se nao encontrar
+      if (codigoIdx === -1 && headers.length >= 2) codigoIdx = 0
+      if (nomeIdx === -1 && headers.length >= 2) nomeIdx = 1
+      console.log('Headers:', headers, 'codigoIdx:', codigoIdx, 'nomeIdx:', nomeIdx)
       const escalaIdx = headers.findIndex(h => h.includes('ESCALA'))
       const dataInicioIdx = headers.findIndex(h => h.includes('INÀCIO') || h.includes('INICIO'))
       const dataConclusaoIdx = headers.findIndex(h => h.includes('CONCLUS'))
