@@ -1984,18 +1984,18 @@ export default function ProjetoDetalhe() {
     reader.readAsDataURL(file)
   }
 
-  // Drag & Drop handlers
-  const handleDragOver = (e) => {
+  // Drag & Drop handlers para Archviz
+  const handleRenderDragOver = (e) => {
     e.preventDefault()
     setIsDragging(true)
   }
 
-  const handleDragLeave = (e) => {
+  const handleRenderDragLeave = (e) => {
     e.preventDefault()
     setIsDragging(false)
   }
 
-  const handleDrop = (e) => {
+  const handleRenderDrop = (e) => {
     e.preventDefault()
     setIsDragging(false)
     const file = e.dataTransfer.files?.[0]
@@ -3915,9 +3915,9 @@ export default function ProjetoDetalhe() {
                     transform: isDragging ? 'scale(1.02)' : 'scale(1)'
                   }}
                   onClick={() => document.getElementById('render-image-input').click()}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
+                  onDragOver={handleRenderDragOver}
+                  onDragLeave={handleRenderDragLeave}
+                  onDrop={handleRenderDrop}
                 >
                   {!renderForm.imagem_url && (
                     <>
