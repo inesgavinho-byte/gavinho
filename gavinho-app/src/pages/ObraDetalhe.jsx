@@ -10,10 +10,12 @@ import {
 import ObraTracking from '../components/ObraTracking'
 import ObraAutos from '../components/ObraAutos'
 import ObraOrcamentacao from '../components/ObraOrcamentacao'
+import ObraProjetoExecucao from '../components/ObraProjetoExecucao'
 import { exportDiarioToPDF } from '../utils/exportDiarioToPDF'
 
 const tabs = [
   { id: 'tracking', label: 'Tracking', icon: ClipboardList },
+  { id: 'projeto-execucao', label: 'Projeto em Execução', icon: FileText },
   { id: 'orcamentacao', label: 'Orçamentação', icon: Calculator },
   { id: 'componentes', label: 'Contratos', icon: Building2 },
   { id: 'autos', label: 'Autos de Medição', icon: Receipt },
@@ -686,6 +688,11 @@ export default function ObraDetalhe() {
       {/* TAB: Tracking */}
       {activeTab === 'tracking' && (
         <ObraTracking obra={obra} />
+      )}
+
+      {/* TAB: Projeto em Execução */}
+      {activeTab === 'projeto-execucao' && (
+        <ObraProjetoExecucao obra={obra} />
       )}
 
       {/* TAB: Orçamentação */}

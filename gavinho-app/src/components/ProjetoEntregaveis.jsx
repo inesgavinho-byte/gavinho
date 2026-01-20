@@ -3,9 +3,10 @@ import { supabase } from '../lib/supabase'
 import {
   Plus, Upload, FileText, ChevronRight, ChevronDown, Edit2, Trash2, Save, X,
   Calendar, User, CheckCircle, Clock, AlertCircle, Download, FileSpreadsheet,
-  Loader2, MoreVertical, Eye, CheckSquare, Square
+  Loader2, MoreVertical, Eye, CheckSquare, Square, Paperclip, Shield
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
+import { DeliveryFileSection } from './deliveries'
 
 const statusConfig = {
   'pendente': { label: 'Pendente', color: 'var(--brown-light)', bg: 'var(--stone)' },
@@ -47,12 +48,45 @@ export default function ProjetoEntregaveis({ projeto }) {
   const [viewMode, setViewMode] = useState('fase') // 'fase' ou 'codigo'
   const [expandedFases, setExpandedFases] = useState({})
 
+  // Estado para modal de ficheiros
+  const [fileModalItem, setFileModalItem] = useState(null)
+
+  // Estado para cache de ficheiros atuais (para mostrar ícones)
+  const [filesCache, setFilesCache] = useState({})
+
   useEffect(() => {
     if (projeto?.id) {
       loadEntregaveis()
       loadUtilizadores()
+      loadFilesCache()
     }
   }, [projeto?.id])
+
+  // Carregar cache de ficheiros para mostrar ícones na lista
+  const loadFilesCache = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('entrega_ficheiros')
+        .select('entregavel_id, versao, aprovado_construcao')
+        .eq('projeto_id', projeto.id)
+        .eq('versao_atual', true)
+
+      if (!error && data) {
+        const cache = {}
+        data.forEach(f => {
+          cache[f.entregavel_id] = {
+            hasFile: true,
+            version: f.versao,
+            approved: f.aprovado_construcao
+          }
+        })
+        setFilesCache(cache)
+      }
+    } catch (err) {
+      // Silently fail - table might not exist yet
+      console.log('Files cache not loaded (table may not exist)')
+    }
+  }
 
   // Carregar utilizadores (Recursos Humanos)
   const loadUtilizadores = async () => {
@@ -715,7 +749,7 @@ export default function ProjetoEntregaveis({ projeto }) {
                               {/* Cabeçalho das colunas */}
                               <div style={{
                                 display: 'grid',
-                                gridTemplateColumns: '32px 80px 1fr 70px 110px 110px 80px 80px 60px',
+                                gridTemplateColumns: '32px 80px 1fr 70px 100px 100px 70px 70px 50px 60px',
                                 alignItems: 'center',
                                 gap: '8px',
                                 padding: '8px 12px',
@@ -743,6 +777,7 @@ export default function ProjetoEntregaveis({ projeto }) {
                                 <span style={{ textAlign: 'center' }}>Executante</span>
                                 <span style={{ textAlign: 'center' }}>Início</span>
                                 <span style={{ textAlign: 'center' }}>Conclusão</span>
+                                <span style={{ textAlign: 'center' }}>Fich.</span>
                                 <span></span>
                               </div>
                               {items.sort((a, b) => (a.codigo || '').localeCompare(b.codigo || '', undefined, { numeric: true })).map(item => (
@@ -750,7 +785,7 @@ export default function ProjetoEntregaveis({ projeto }) {
                                   key={item.id}
                                   style={{
                                     display: 'grid',
-                                    gridTemplateColumns: '32px 80px 1fr 70px 110px 110px 80px 80px 60px',
+                                    gridTemplateColumns: '32px 80px 1fr 70px 100px 100px 70px 70px 50px 60px',
                                     alignItems: 'center',
                                     gap: '8px',
                                     padding: '10px 12px',
@@ -868,6 +903,30 @@ export default function ProjetoEntregaveis({ projeto }) {
                                   {/* Conclusão */}
                                   <span style={{ fontSize: '11px', color: 'var(--brown-light)', textAlign: 'center' }}>
                                     {item.data_conclusao ? new Date(item.data_conclusao).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' }) : '-'}
+                                  </span>
+                                  {/* Ficheiro */}
+                                  <span
+                                    onClick={() => setFileModalItem(item)}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      cursor: 'pointer',
+                                      padding: '4px',
+                                      borderRadius: '4px',
+                                      transition: 'all 0.2s'
+                                    }}
+                                    title={filesCache[item.id]?.hasFile ? `v${filesCache[item.id].version}${filesCache[item.id].approved ? ' - Aprovado' : ''}` : 'Sem ficheiro'}
+                                  >
+                                    {filesCache[item.id]?.hasFile ? (
+                                      filesCache[item.id].approved ? (
+                                        <Shield size={14} style={{ color: 'var(--success)' }} />
+                                      ) : (
+                                        <Paperclip size={14} style={{ color: 'var(--info)' }} />
+                                      )
+                                    ) : (
+                                      <Paperclip size={14} style={{ color: 'var(--stone)', opacity: 0.5 }} />
+                                    )}
                                   </span>
                                   {/* Ações */}
                                   <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
@@ -1165,6 +1224,77 @@ export default function ProjetoEntregaveis({ projeto }) {
               <button onClick={handleSave} className="btn btn-primary" disabled={saving || !formData.codigo.trim() || !formData.nome.trim()}>
                 {saving ? <Loader2 size={16} className="spin" /> : <><Save size={16} /> Guardar</>}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Gestão de Ficheiros */}
+      {fileModalItem && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+          onClick={() => setFileModalItem(null)}
+        >
+          <div
+            style={{
+              background: 'white',
+              borderRadius: '16px',
+              width: '550px',
+              maxWidth: '90vw',
+              maxHeight: '85vh',
+              overflow: 'auto'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{
+              padding: '20px 24px',
+              borderBottom: '1px solid var(--stone)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
+                  Gestão de Ficheiros
+                </h3>
+                <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--brown-light)' }}>
+                  {fileModalItem.codigo} — {fileModalItem.nome}
+                </p>
+              </div>
+              <button
+                onClick={() => setFileModalItem(null)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--brown-light)',
+                  padding: '4px'
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div style={{ padding: '24px' }}>
+              <DeliveryFileSection
+                entregavel={{
+                  ...fileModalItem,
+                  descricao: fileModalItem.nome
+                }}
+                projetoId={projeto.id}
+                isAdmin={true}
+                compact={false}
+              />
             </div>
           </div>
         </div>
