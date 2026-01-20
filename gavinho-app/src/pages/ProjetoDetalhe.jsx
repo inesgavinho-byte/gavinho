@@ -3337,10 +3337,11 @@ export default function ProjetoDetalhe() {
                             </button>
                           </div>
                         </div>
-                      ))}
-                    </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                </div>
+              ))}
             </div>
           ) : (
             <div style={{
