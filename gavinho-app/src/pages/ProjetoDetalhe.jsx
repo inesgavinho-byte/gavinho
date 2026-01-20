@@ -41,7 +41,8 @@ import {
   BookOpen,
   Package,
   Send,
-  Users
+  Users,
+  ClipboardList
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -50,6 +51,7 @@ import ProjetoEntregaveis from '../components/ProjetoEntregaveis'
 import ProjetoDocumentos from '../components/ProjetoDocumentos'
 import CentralEntregas from '../components/CentralEntregas'
 import DiarioBordo from '../components/DiarioBordo'
+import DecisionLog from '../components/DecisionLog'
 
 // Dados de exemplo baseados nos JSONs fornecidos
 const sampleProjectData = {
@@ -2027,6 +2029,7 @@ export default function ProjetoDetalhe() {
     { id: 'archviz', label: 'Archviz', icon: Image },
     { id: 'imagens-finais', label: 'Imagens Finais', icon: CheckCircle },
     { id: 'biblioteca', label: 'Biblioteca', icon: Library },
+    { id: 'decisions', label: 'Decision Log', icon: ClipboardList },
     { id: 'gestao', label: 'Gestão de Projeto', icon: Settings, adminOnly: true }
   ]
 
@@ -3533,6 +3536,11 @@ export default function ProjetoDetalhe() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Tab Decision Log */}
+      {activeTab === 'decisions' && (
+        <DecisionLog projeto={project} />
       )}
 
       {/* Tab Gestão de Projeto - Apenas Admin/PM */}
