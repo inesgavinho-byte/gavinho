@@ -220,7 +220,7 @@ export default function DesignReview({ projeto }) {
           pos_y: newCommentPos.y,
           comentario: newComment.trim(),
           categoria: newCommentCategoria,
-          autor_id: user?.id,
+          autor_id: profile?.id,
           autor_nome: profile?.nome || user?.email || 'Utilizador'
         })
         .select()
@@ -243,7 +243,7 @@ export default function DesignReview({ projeto }) {
         .from('design_review_annotations')
         .update({
           status: 'resolvido',
-          resolvido_por: user?.id,
+          resolvido_por: profile?.id,
           resolvido_por_nome: profile?.nome || user?.email,
           resolvido_em: new Date().toISOString()
         })
@@ -286,14 +286,14 @@ export default function DesignReview({ projeto }) {
 
       console.log('File URL:', urlData.publicUrl)
 
-      // Create review
+      // Create review (use profile.id which is the utilizadores table ID)
       const { data: reviewData, error: reviewError } = await supabase
         .from('design_reviews')
         .insert({
           projeto_id: projeto.id,
           nome: newReviewName.trim(),
           codigo_documento: newReviewCodigo.trim() || null,
-          criado_por: user?.id,
+          criado_por: profile?.id || null,
           criado_por_nome: profile?.nome || user?.email || 'Utilizador'
         })
         .select()
@@ -315,7 +315,7 @@ export default function DesignReview({ projeto }) {
           file_url: urlData.publicUrl,
           file_name: newReviewFile.name,
           file_size: newReviewFile.size,
-          uploaded_by: user?.id,
+          uploaded_by: profile?.id || null,
           uploaded_by_nome: profile?.nome || user?.email || 'Utilizador'
         })
 
@@ -364,7 +364,7 @@ export default function DesignReview({ projeto }) {
           file_url: urlData.publicUrl,
           file_name: file.name,
           file_size: file.size,
-          uploaded_by: user?.id,
+          uploaded_by: profile?.id,
           uploaded_by_nome: profile?.nome || user?.email
         })
 
@@ -383,7 +383,7 @@ export default function DesignReview({ projeto }) {
     switch (activeTab) {
       case 'abertos': return a.status !== 'resolvido'
       case 'resolvidos': return a.status === 'resolvido'
-      case 'meus': return a.autor_id === user?.id
+      case 'meus': return a.autor_id === profile?.id
       default: return true
     }
   })
