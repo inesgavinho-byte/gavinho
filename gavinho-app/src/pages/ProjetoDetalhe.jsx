@@ -3335,12 +3335,12 @@ export default function ProjetoDetalhe() {
                             >
                               <Trash2 size={14} />
                             </button>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
             </div>
           ) : (
             <div style={{
