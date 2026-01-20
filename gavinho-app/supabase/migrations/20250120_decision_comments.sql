@@ -6,7 +6,7 @@
 -- Tabela de comentários/respostas
 CREATE TABLE IF NOT EXISTS decision_comments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  decision_id UUID NOT NULL REFERENCES project_decisions(id) ON DELETE CASCADE,
+  decision_id TEXT NOT NULL REFERENCES project_decisions(id) ON DELETE CASCADE,
 
   -- Conteúdo
   comentario TEXT NOT NULL,
