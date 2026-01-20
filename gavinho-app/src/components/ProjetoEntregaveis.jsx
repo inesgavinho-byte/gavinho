@@ -36,6 +36,8 @@ export default function ProjetoEntregaveis({ projeto }) {
   const [formData, setFormData] = useState({
     codigo: '',
     nome: '',
+    fase: '',
+    categoria: '',
     escala: '',
     data_inicio: '',
     data_conclusao: '',
@@ -43,6 +45,15 @@ export default function ProjetoEntregaveis({ projeto }) {
     executante: '',
     notas: ''
   })
+
+  // Opções de fases predefinidas
+  const FASES_OPCOES = [
+    'Projeto Base',
+    'Projeto de Execução',
+    'Licenciamento',
+    'Construção',
+    'Fiscalização'
+  ]
 
   // Estado para controlar visualização por fase
   const [viewMode, setViewMode] = useState('fase') // 'fase' ou 'codigo'
@@ -174,6 +185,8 @@ export default function ProjetoEntregaveis({ projeto }) {
         projeto_id: projeto.id,
         codigo: formData.codigo.trim(),
         nome: formData.nome.trim(),
+        fase: formData.fase || null,
+        categoria: formData.categoria || null,
         escala: formData.escala || null,
         data_inicio: formData.data_inicio || null,
         data_conclusao: formData.data_conclusao || null,
@@ -332,6 +345,8 @@ export default function ProjetoEntregaveis({ projeto }) {
     setFormData({
       codigo: item.codigo,
       nome: item.nome,
+      fase: item.fase || '',
+      categoria: item.categoria || '',
       escala: item.escala || '',
       data_inicio: item.data_inicio || '',
       data_conclusao: item.data_conclusao || '',
@@ -346,6 +361,8 @@ export default function ProjetoEntregaveis({ projeto }) {
     setFormData({
       codigo: '',
       nome: '',
+      fase: '',
+      categoria: '',
       escala: '',
       data_inicio: '',
       data_conclusao: '',
@@ -896,14 +913,74 @@ export default function ProjetoEntregaveis({ projeto }) {
                                       {item.executante || '—'}
                                     </span>
                                   )}
-                                  {/* Início */}
-                                  <span style={{ fontSize: '11px', color: 'var(--brown-light)', textAlign: 'center' }}>
-                                    {item.data_inicio ? new Date(item.data_inicio).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' }) : '-'}
-                                  </span>
-                                  {/* Conclusão */}
-                                  <span style={{ fontSize: '11px', color: 'var(--brown-light)', textAlign: 'center' }}>
-                                    {item.data_conclusao ? new Date(item.data_conclusao).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' }) : '-'}
-                                  </span>
+                                  {/* Início - Edição Inline */}
+                                  {editingCell?.id === item.id && editingCell?.field === 'data_inicio' ? (
+                                    <input
+                                      type="date"
+                                      autoFocus
+                                      value={item.data_inicio || ''}
+                                      onChange={(e) => handleInlineUpdate(item.id, 'data_inicio', e.target.value || null)}
+                                      onBlur={() => setEditingCell(null)}
+                                      style={{
+                                        width: '100%',
+                                        padding: '4px',
+                                        fontSize: '10px',
+                                        border: '1px solid var(--info)',
+                                        borderRadius: '4px',
+                                        background: 'var(--white)'
+                                      }}
+                                    />
+                                  ) : (
+                                    <span
+                                      onClick={() => setEditingCell({ id: item.id, field: 'data_inicio' })}
+                                      style={{
+                                        fontSize: '11px',
+                                        color: item.data_inicio ? 'var(--brown-light)' : 'var(--stone)',
+                                        textAlign: 'center',
+                                        cursor: 'pointer',
+                                        padding: '4px',
+                                        borderRadius: '4px',
+                                        transition: 'all 0.2s'
+                                      }}
+                                      title="Clique para alterar"
+                                    >
+                                      {item.data_inicio ? new Date(item.data_inicio).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' }) : '—'}
+                                    </span>
+                                  )}
+                                  {/* Conclusão - Edição Inline */}
+                                  {editingCell?.id === item.id && editingCell?.field === 'data_conclusao' ? (
+                                    <input
+                                      type="date"
+                                      autoFocus
+                                      value={item.data_conclusao || ''}
+                                      onChange={(e) => handleInlineUpdate(item.id, 'data_conclusao', e.target.value || null)}
+                                      onBlur={() => setEditingCell(null)}
+                                      style={{
+                                        width: '100%',
+                                        padding: '4px',
+                                        fontSize: '10px',
+                                        border: '1px solid var(--info)',
+                                        borderRadius: '4px',
+                                        background: 'var(--white)'
+                                      }}
+                                    />
+                                  ) : (
+                                    <span
+                                      onClick={() => setEditingCell({ id: item.id, field: 'data_conclusao' })}
+                                      style={{
+                                        fontSize: '11px',
+                                        color: item.data_conclusao ? 'var(--brown-light)' : 'var(--stone)',
+                                        textAlign: 'center',
+                                        cursor: 'pointer',
+                                        padding: '4px',
+                                        borderRadius: '4px',
+                                        transition: 'all 0.2s'
+                                      }}
+                                      title="Clique para alterar"
+                                    >
+                                      {item.data_conclusao ? new Date(item.data_conclusao).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' }) : '—'}
+                                    </span>
+                                  )}
                                   {/* Ficheiro */}
                                   <span
                                     onClick={() => setFileModalItem(item)}
@@ -1143,6 +1220,33 @@ export default function ProjetoEntregaveis({ projeto }) {
                     value={formData.nome}
                     onChange={e => setFormData({ ...formData, nome: e.target.value })}
                     placeholder="Planta Piso 0"
+                    style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
+                  />
+                </div>
+              </div>
+
+              {/* Fase e Categoria */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, marginBottom: '6px' }}>Fase</label>
+                  <select
+                    value={formData.fase}
+                    onChange={e => setFormData({ ...formData, fase: e.target.value })}
+                    style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
+                  >
+                    <option value="">— Selecionar Fase —</option>
+                    {FASES_OPCOES.map(f => (
+                      <option key={f} value={f}>{f}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, marginBottom: '6px' }}>Categoria</label>
+                  <input
+                    type="text"
+                    value={formData.categoria}
+                    onChange={e => setFormData({ ...formData, categoria: e.target.value })}
+                    placeholder="Arquitetura, Estruturas, MEP..."
                     style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
                   />
                 </div>
