@@ -93,6 +93,8 @@ export default function DesignReview({ projeto }) {
   const [newReviewName, setNewReviewName] = useState('')
   const [newReviewCodigo, setNewReviewCodigo] = useState('')
   const [newReviewFile, setNewReviewFile] = useState(null)
+  const [createLoading, setCreateLoading] = useState(false)
+  const [createError, setCreateError] = useState(null)
 
   // Load reviews
   useEffect(() => {
@@ -260,19 +262,29 @@ export default function DesignReview({ projeto }) {
   const handleCreateReview = async () => {
     if (!newReviewName.trim() || !newReviewFile) return
 
+    setCreateLoading(true)
+    setCreateError(null)
+
     try {
       // Upload file to storage
       const fileName = `design-reviews/${projeto.id}/${Date.now()}_${newReviewFile.name}`
+      console.log('Uploading file:', fileName)
+
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('project-files')
         .upload(fileName, newReviewFile)
 
-      if (uploadError) throw uploadError
+      if (uploadError) {
+        console.error('Upload error:', uploadError)
+        throw new Error(`Erro no upload: ${uploadError.message}`)
+      }
 
       // Get public URL
       const { data: urlData } = supabase.storage
         .from('project-files')
         .getPublicUrl(fileName)
+
+      console.log('File URL:', urlData.publicUrl)
 
       // Create review
       const { data: reviewData, error: reviewError } = await supabase
@@ -282,12 +294,17 @@ export default function DesignReview({ projeto }) {
           nome: newReviewName.trim(),
           codigo_documento: newReviewCodigo.trim() || null,
           criado_por: user?.id,
-          criado_por_nome: profile?.nome || user?.email
+          criado_por_nome: profile?.nome || user?.email || 'Utilizador'
         })
         .select()
         .single()
 
-      if (reviewError) throw reviewError
+      if (reviewError) {
+        console.error('Review error:', reviewError)
+        throw new Error(`Erro ao criar review: ${reviewError.message}`)
+      }
+
+      console.log('Review created:', reviewData)
 
       // Create first version
       const { error: versionError } = await supabase
@@ -299,10 +316,13 @@ export default function DesignReview({ projeto }) {
           file_name: newReviewFile.name,
           file_size: newReviewFile.size,
           uploaded_by: user?.id,
-          uploaded_by_nome: profile?.nome || user?.email
+          uploaded_by_nome: profile?.nome || user?.email || 'Utilizador'
         })
 
-      if (versionError) throw versionError
+      if (versionError) {
+        console.error('Version error:', versionError)
+        throw new Error(`Erro ao criar versao: ${versionError.message}`)
+      }
 
       // Reload
       await loadReviews()
@@ -312,6 +332,9 @@ export default function DesignReview({ projeto }) {
       setNewReviewFile(null)
     } catch (err) {
       console.error('Error creating review:', err)
+      setCreateError(err.message || 'Erro ao criar review')
+    } finally {
+      setCreateLoading(false)
     }
   }
 
@@ -413,7 +436,7 @@ export default function DesignReview({ projeto }) {
         {/* New Review Modal */}
         {showNewReviewModal && (
           <NewReviewModal
-            onClose={() => setShowNewReviewModal(false)}
+            onClose={() => { setShowNewReviewModal(false); setCreateError(null) }}
             onSubmit={handleCreateReview}
             name={newReviewName}
             setName={setNewReviewName}
@@ -421,6 +444,8 @@ export default function DesignReview({ projeto }) {
             setCodigo={setNewReviewCodigo}
             file={newReviewFile}
             setFile={setNewReviewFile}
+            loading={createLoading}
+            error={createError}
           />
         )}
       </div>
@@ -1176,7 +1201,7 @@ export default function DesignReview({ projeto }) {
       {/* New Review Modal */}
       {showNewReviewModal && (
         <NewReviewModal
-          onClose={() => setShowNewReviewModal(false)}
+          onClose={() => { setShowNewReviewModal(false); setCreateError(null) }}
           onSubmit={handleCreateReview}
           name={newReviewName}
           setName={setNewReviewName}
@@ -1184,6 +1209,8 @@ export default function DesignReview({ projeto }) {
           setCodigo={setNewReviewCodigo}
           file={newReviewFile}
           setFile={setNewReviewFile}
+          loading={createLoading}
+          error={createError}
         />
       )}
     </div>
@@ -1191,7 +1218,7 @@ export default function DesignReview({ projeto }) {
 }
 
 // New Review Modal Component
-function NewReviewModal({ onClose, onSubmit, name, setName, codigo, setCodigo, file, setFile }) {
+function NewReviewModal({ onClose, onSubmit, name, setName, codigo, setCodigo, file, setFile, loading, error }) {
   return (
     <div style={{
       position: 'fixed',
@@ -1212,6 +1239,20 @@ function NewReviewModal({ onClose, onSubmit, name, setName, codigo, setCodigo, f
         <h3 style={{ marginBottom: '20px', color: 'var(--brown)' }}>
           Novo Design Review
         </h3>
+
+        {error && (
+          <div style={{
+            padding: '12px',
+            marginBottom: '16px',
+            background: '#FEE2E2',
+            border: '1px solid #EF4444',
+            borderRadius: '8px',
+            color: '#B91C1C',
+            fontSize: '13px'
+          }}>
+            {error}
+          </div>
+        )}
 
         <div style={{ marginBottom: '16px' }}>
           <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, marginBottom: '6px', color: 'var(--brown)' }}>
@@ -1303,15 +1344,16 @@ function NewReviewModal({ onClose, onSubmit, name, setName, codigo, setCodigo, f
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-          <button className="btn btn-secondary" onClick={onClose}>
+          <button className="btn btn-secondary" onClick={onClose} disabled={loading}>
             Cancelar
           </button>
           <button
             className="btn btn-primary"
             onClick={onSubmit}
-            disabled={!name.trim() || !file}
+            disabled={!name.trim() || !file || loading}
+            style={{ minWidth: '120px' }}
           >
-            Criar Review
+            {loading ? 'A criar...' : 'Criar Review'}
           </button>
         </div>
       </div>
