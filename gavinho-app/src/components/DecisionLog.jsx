@@ -42,7 +42,25 @@ export default function DecisionLog({ projeto }) {
         .order('submetido_em', { ascending: false })
 
       if (error) throw error
-      setDecisions(data || [])
+
+      // Carregar contagem de comentários para cada decisão
+      const decisionsWithComments = await Promise.all((data || []).map(async (decision) => {
+        try {
+          const { count, error: countError } = await supabase
+            .from('decision_comments')
+            .select('*', { count: 'exact', head: true })
+            .eq('decision_id', decision.id)
+
+          return {
+            ...decision,
+            comment_count: countError ? 0 : (count || 0)
+          }
+        } catch {
+          return { ...decision, comment_count: 0 }
+        }
+      }))
+
+      setDecisions(decisionsWithComments)
     } catch (err) {
       console.error('Erro ao carregar decisões:', err)
     } finally {
@@ -321,71 +339,151 @@ function DecisionCard({ decision, onClick, onDelete }) {
             <User size={12} />
             {decision.submetido_por_nome || 'Utilizador'}
           </span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <Calendar size={12} />
-            {new Date(decision.submetido_em).toLocaleDateString('pt-PT')}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {decision.comment_count > 0 && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--info)' }}>
+                <MessageCircle size={12} />
+                {decision.comment_count}
+              </span>
+            )}
+            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Calendar size={12} />
+              {new Date(decision.submetido_em).toLocaleDateString('pt-PT')}
+            </span>
+          </div>
         </div>
       </div>
     </div>
   )
 }
 
-// Modal para Ver/Responder Decisão
+// Modal para Ver/Responder Decisão (com sistema de thread/comentários)
 function DecisionModal({ decision, utilizadores, onClose, onResponseSubmitted }) {
-  const [response, setResponse] = useState('')
-  const [respondidoPor, setRespondidoPor] = useState('')
+  const [comments, setComments] = useState([])
+  const [loadingComments, setLoadingComments] = useState(true)
+  const [newComment, setNewComment] = useState('')
+  const [autorId, setAutorId] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [resolving, setResolving] = useState(false)
+  const [showResolveForm, setShowResolveForm] = useState(false)
+  const [resolucaoFinal, setResolucaoFinal] = useState('')
   const status = STATUS_CONFIG[decision.status]
 
-  const handleSubmitResponse = async () => {
-    if (!response.trim()) {
-      alert('Por favor escreva uma resposta')
+  // Carregar comentários ao abrir
+  useEffect(() => {
+    loadComments()
+  }, [decision.id])
+
+  const loadComments = async () => {
+    setLoadingComments(true)
+    try {
+      const { data, error } = await supabase
+        .from('decision_comments')
+        .select('*')
+        .eq('decision_id', decision.id)
+        .order('criado_em', { ascending: true })
+
+      if (error) throw error
+      setComments(data || [])
+    } catch (err) {
+      console.error('Erro ao carregar comentários:', err)
+      // Se a tabela não existir, silently fail
+      setComments([])
+    } finally {
+      setLoadingComments(false)
+    }
+  }
+
+  // Adicionar novo comentário
+  const handleAddComment = async () => {
+    if (!newComment.trim()) {
+      alert('Por favor escreva um comentário')
       return
     }
 
     setSubmitting(true)
     try {
-      const respondente = utilizadores.find(u => u.id === respondidoPor)
+      const autor = utilizadores.find(u => u.id === autorId)
+
+      const { error } = await supabase
+        .from('decision_comments')
+        .insert({
+          decision_id: decision.id,
+          comentario: newComment.trim(),
+          autor_id: autorId || null,
+          autor_nome: autor?.nome || 'Utilizador'
+        })
+
+      if (error) throw error
+
+      setNewComment('')
+      loadComments()
+      // Notificar parent para atualizar status se necessário
+      onResponseSubmitted()
+    } catch (err) {
+      console.error('Erro ao adicionar comentário:', err)
+      alert('Erro ao adicionar comentário: ' + err.message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // Marcar como resolvido
+  const handleResolve = async () => {
+    if (!resolucaoFinal.trim()) {
+      alert('Por favor escreva a resolução final')
+      return
+    }
+
+    setResolving(true)
+    try {
+      const autor = utilizadores.find(u => u.id === autorId)
 
       const { error } = await supabase
         .from('project_decisions')
         .update({
-          resposta: response,
-          respondido_por: respondidoPor || null,
-          respondido_por_nome: respondente?.nome || 'Utilizador',
-          respondido_em: new Date().toISOString(),
-          status: 'resolved'
+          status: 'resolved',
+          resolucao_final: resolucaoFinal.trim(),
+          resolvido_em: new Date().toISOString(),
+          resolvido_por: autorId || null,
+          resolvido_por_nome: autor?.nome || 'Utilizador'
         })
         .eq('id', decision.id)
 
       if (error) throw error
       onResponseSubmitted()
     } catch (err) {
-      console.error('Erro ao submeter resposta:', err)
-      alert('Erro ao submeter resposta')
+      console.error('Erro ao resolver:', err)
+      alert('Erro ao marcar como resolvido: ' + err.message)
     } finally {
-      setSubmitting(false)
+      setResolving(false)
     }
   }
 
-  const handleChangeStatus = async (newStatus) => {
+  // Reabrir questão
+  const handleReopen = async () => {
     try {
       const { error } = await supabase
         .from('project_decisions')
-        .update({ status: newStatus })
+        .update({
+          status: 'discussion',
+          resolucao_final: null,
+          resolvido_em: null,
+          resolvido_por: null,
+          resolvido_por_nome: null
+        })
         .eq('id', decision.id)
 
       if (error) throw error
       onResponseSubmitted()
     } catch (err) {
-      console.error('Erro ao alterar estado:', err)
+      console.error('Erro ao reabrir:', err)
     }
   }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px', maxHeight: '90vh', overflow: 'auto' }}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '650px', maxHeight: '90vh', overflow: 'auto' }}>
         <div className="modal-header">
           <h3>{decision.titulo}</h3>
           <button onClick={onClose} className="modal-close">
@@ -461,73 +559,175 @@ function DecisionModal({ decision, utilizadores, onClose, onResponseSubmitted })
             </p>
           </div>
 
-          {/* Response Section */}
-          {decision.status === 'resolved' && decision.resposta ? (
+          {/* Thread de Comentários */}
+          <div>
+            <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--brown)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <MessageCircle size={14} />
+              Discussão ({comments.length} {comments.length === 1 ? 'comentário' : 'comentários'})
+            </label>
+
+            {loadingComments ? (
+              <div style={{ padding: '20px', textAlign: 'center', color: 'var(--brown-light)', fontSize: '12px' }}>
+                A carregar comentários...
+              </div>
+            ) : comments.length === 0 ? (
+              <div style={{
+                padding: '20px',
+                textAlign: 'center',
+                background: 'var(--cream)',
+                borderRadius: '8px',
+                color: 'var(--brown-light)',
+                fontSize: '12px'
+              }}>
+                Ainda não há comentários. Seja o primeiro a responder!
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '300px', overflowY: 'auto', paddingRight: '8px' }}>
+                {comments.map((comment, idx) => (
+                  <div
+                    key={comment.id}
+                    style={{
+                      padding: '12px',
+                      background: idx % 2 === 0 ? 'var(--cream)' : 'rgba(138, 158, 184, 0.08)',
+                      borderRadius: '8px',
+                      borderLeft: '3px solid var(--info)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontWeight: 600, fontSize: '12px', color: 'var(--info)' }}>
+                        {comment.autor_nome}
+                      </span>
+                      <span style={{ fontSize: '10px', color: 'var(--brown-light)' }}>
+                        {new Date(comment.criado_em).toLocaleDateString('pt-PT')} às {new Date(comment.criado_em).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                    <p style={{ margin: 0, fontSize: '13px', lineHeight: 1.5, color: 'var(--brown)' }}>
+                      {comment.comentario}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Resolução Final (se resolvido) */}
+          {decision.status === 'resolved' && (decision.resolucao_final || decision.resposta) && (
             <div style={{
               padding: '16px',
               background: 'rgba(103, 194, 58, 0.1)',
               borderRadius: '8px',
               border: '1px solid rgba(103, 194, 58, 0.3)'
             }}>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--success)', marginBottom: '8px', display: 'block' }}>
-                ✓ Resposta / Decisão
+              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--success)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <CheckCircle size={14} />
+                Resolução Final
               </label>
               <p style={{ margin: '0 0 12px', fontSize: '13px', lineHeight: 1.6, color: 'var(--brown)' }}>
-                {decision.resposta}
+                {decision.resolucao_final || decision.resposta}
               </p>
-              <div style={{ display: 'flex', gap: '16px', fontSize: '11px', color: 'var(--brown-light)' }}>
-                <span><strong>Respondido por:</strong> {decision.respondido_por_nome || 'Utilizador'}</span>
-                <span><strong>Data:</strong> {decision.respondido_em ? new Date(decision.respondido_em).toLocaleDateString('pt-PT') : '-'}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: '16px', fontSize: '11px', color: 'var(--brown-light)' }}>
+                  <span><strong>Resolvido por:</strong> {decision.resolvido_por_nome || decision.respondido_por_nome || 'Utilizador'}</span>
+                  <span><strong>Data:</strong> {(decision.resolvido_em || decision.respondido_em) ? new Date(decision.resolvido_em || decision.respondido_em).toLocaleDateString('pt-PT') : '-'}</span>
+                </div>
+                <button
+                  onClick={handleReopen}
+                  className="btn btn-outline"
+                  style={{ fontSize: '10px', padding: '4px 10px' }}
+                >
+                  Reabrir
+                </button>
               </div>
             </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          )}
+
+          {/* Formulário de Novo Comentário (se não resolvido) */}
+          {decision.status !== 'resolved' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px solid var(--stone)', paddingTop: '16px' }}>
               <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--brown)' }}>
-                Adicionar Resposta / Decisão
+                Adicionar Comentário
               </label>
 
               <select
-                value={respondidoPor}
-                onChange={e => setRespondidoPor(e.target.value)}
+                value={autorId}
+                onChange={e => setAutorId(e.target.value)}
                 style={{ width: '100%', fontSize: '13px' }}
               >
-                <option value="">Quem está a responder?</option>
+                <option value="">Quem está a comentar?</option>
                 {utilizadores.map(u => (
                   <option key={u.id} value={u.id}>{u.nome}</option>
                 ))}
               </select>
 
               <textarea
-                value={response}
-                onChange={e => setResponse(e.target.value)}
-                placeholder="Escreva a resposta ou decisão..."
-                rows={4}
+                value={newComment}
+                onChange={e => setNewComment(e.target.value)}
+                placeholder="Escreva o seu comentário ou resposta..."
+                rows={3}
                 style={{ width: '100%', fontSize: '13px', resize: 'vertical' }}
               />
 
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                {decision.status !== 'discussion' && (
-                  <button
-                    onClick={() => handleChangeStatus('discussion')}
-                    className="btn btn-outline"
-                    style={{ fontSize: '12px' }}
-                  >
-                    Marcar Em Discussão
-                  </button>
-                )}
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'space-between', flexWrap: 'wrap' }}>
                 <button
-                  onClick={handleSubmitResponse}
-                  className="btn btn-primary"
-                  disabled={submitting || !response.trim()}
-                  style={{ fontSize: '12px', marginLeft: 'auto' }}
+                  onClick={() => setShowResolveForm(true)}
+                  className="btn btn-outline"
+                  style={{ fontSize: '12px', color: 'var(--success)', borderColor: 'var(--success)' }}
                 >
-                  {submitting ? 'A submeter...' : 'Submeter Resposta'}
+                  <CheckCircle size={14} /> Marcar como Resolvido
+                </button>
+                <button
+                  onClick={handleAddComment}
+                  className="btn btn-primary"
+                  disabled={submitting || !newComment.trim()}
+                  style={{ fontSize: '12px' }}
+                >
+                  {submitting ? 'A enviar...' : 'Adicionar Comentário'}
                 </button>
               </div>
+            </div>
+          )}
 
-              <p style={{ fontSize: '10px', color: 'var(--brown-light)', margin: 0 }}>
-                * A resposta será registada automaticamente no diário de bordo do projeto
+          {/* Modal/Form para Resolução */}
+          {showResolveForm && (
+            <div style={{
+              padding: '16px',
+              background: 'rgba(103, 194, 58, 0.05)',
+              borderRadius: '8px',
+              border: '1px solid var(--success)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px'
+            }}>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--success)' }}>
+                Resolução Final
+              </label>
+              <p style={{ fontSize: '11px', color: 'var(--brown-light)', margin: 0 }}>
+                Descreva a decisão final que resolve esta questão.
               </p>
+              <textarea
+                value={resolucaoFinal}
+                onChange={e => setResolucaoFinal(e.target.value)}
+                placeholder="Escreva a resolução final..."
+                rows={3}
+                style={{ width: '100%', fontSize: '13px', resize: 'vertical' }}
+              />
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => { setShowResolveForm(false); setResolucaoFinal('') }}
+                  className="btn btn-outline"
+                  style={{ fontSize: '12px' }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleResolve}
+                  className="btn btn-primary"
+                  disabled={resolving || !resolucaoFinal.trim()}
+                  style={{ fontSize: '12px', background: 'var(--success)' }}
+                >
+                  {resolving ? 'A resolver...' : 'Confirmar Resolução'}
+                </button>
+              </div>
             </div>
           )}
         </div>
