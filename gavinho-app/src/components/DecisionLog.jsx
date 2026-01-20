@@ -241,83 +241,123 @@ export default function DecisionLog({ projeto }) {
   )
 }
 
-// Card Component
+// Card Component - Design melhorado
 function DecisionCard({ decision, onClick, onDelete }) {
   const status = STATUS_CONFIG[decision.status]
+  const [isHovered, setIsHovered] = useState(false)
 
   return (
     <div
-      className="card"
       style={{
-        padding: 0,
+        background: 'var(--white)',
+        borderRadius: '16px',
         overflow: 'hidden',
         cursor: 'pointer',
-        transition: 'box-shadow 0.2s'
+        transition: 'all 0.3s ease',
+        boxShadow: isHovered
+          ? '0 12px 40px rgba(0,0,0,0.12)'
+          : '0 2px 12px rgba(0,0,0,0.06)',
+        transform: isHovered ? 'translateY(-4px)' : 'translateY(0)',
+        border: '1px solid var(--stone)',
+        display: 'flex',
+        flexDirection: 'column'
       }}
       onClick={onClick}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Image */}
+      {/* Status Bar no topo */}
+      <div style={{
+        height: '4px',
+        background: status.color,
+        transition: 'all 0.3s'
+      }} />
+
+      {/* Image Area */}
       {decision.imagem_url ? (
         <div style={{
-          height: '160px',
+          height: '140px',
           background: `url(${decision.imagem_url}) center/cover`,
-          borderBottom: '1px solid var(--stone)'
-        }} />
+          position: 'relative'
+        }}>
+          {/* Overlay gradient */}
+          <div style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: '50px',
+            background: 'linear-gradient(transparent, rgba(0,0,0,0.3))'
+          }} />
+        </div>
       ) : (
         <div style={{
-          height: '120px',
-          background: 'var(--cream)',
+          height: '80px',
+          background: 'linear-gradient(135deg, var(--cream) 0%, var(--stone) 100%)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          borderBottom: '1px solid var(--stone)',
-          color: 'var(--brown-light)'
+          position: 'relative'
         }}>
-          <span style={{ fontSize: '12px', opacity: 0.6 }}>Sem imagem</span>
+          <FileText size={28} style={{ color: 'var(--brown-light)', opacity: 0.3 }} />
         </div>
       )}
 
       {/* Content */}
-      <div style={{ padding: '16px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '12px' }}>
-          <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: 'var(--brown)', flex: 1 }}>
-            {decision.titulo}
-          </h4>
+      <div style={{ padding: '16px 18px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+        {/* Header: Status + Entregável */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
           <span style={{
             padding: '4px 10px',
-            borderRadius: '12px',
+            borderRadius: '20px',
             fontSize: '10px',
-            fontWeight: 600,
+            fontWeight: 700,
             backgroundColor: status.bg,
             color: status.color,
-            whiteSpace: 'nowrap'
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px'
           }}>
+            {decision.status === 'pending' && <Clock size={10} style={{ marginRight: '4px', verticalAlign: 'middle' }} />}
+            {decision.status === 'discussion' && <MessageCircle size={10} style={{ marginRight: '4px', verticalAlign: 'middle' }} />}
+            {decision.status === 'resolved' && <CheckCircle size={10} style={{ marginRight: '4px', verticalAlign: 'middle' }} />}
             {status.label}
           </span>
+
+          {decision.entregavel && (
+            <span style={{
+              padding: '4px 8px',
+              background: 'var(--stone)',
+              borderRadius: '6px',
+              fontSize: '10px',
+              fontWeight: 600,
+              color: 'var(--brown)'
+            }}>
+              {decision.entregavel.codigo}
+            </span>
+          )}
         </div>
 
-        {decision.entregavel && (
-          <div style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '4px 10px',
-            background: 'var(--stone)',
-            borderRadius: '6px',
-            fontSize: '11px',
-            color: 'var(--brown)',
-            marginBottom: '10px'
-          }}>
-            <span style={{ fontWeight: 600 }}>{decision.entregavel.codigo}</span>
-            <span style={{ color: 'var(--brown-light)' }}>{decision.entregavel.nome}</span>
-          </div>
-        )}
+        {/* Título */}
+        <h4 style={{
+          margin: '0 0 8px',
+          fontSize: '15px',
+          fontWeight: 600,
+          color: 'var(--brown)',
+          lineHeight: 1.4,
+          display: '-webkit-box',
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: 'vertical',
+          overflow: 'hidden'
+        }}>
+          {decision.titulo}
+        </h4>
 
+        {/* Descrição */}
         <p style={{
-          margin: '0 0 12px',
+          margin: '0 0 auto',
           fontSize: '12px',
           color: 'var(--brown-light)',
-          lineHeight: 1.5,
+          lineHeight: 1.6,
           display: '-webkit-box',
           WebkitLineClamp: 2,
           WebkitBoxOrient: 'vertical',
@@ -326,29 +366,52 @@ function DecisionCard({ decision, onClick, onDelete }) {
           {decision.descricao}
         </p>
 
+        {/* Footer */}
         <div style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          fontSize: '11px',
-          color: 'var(--brown-light)',
+          marginTop: '14px',
           paddingTop: '12px',
           borderTop: '1px solid var(--stone)'
         }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <User size={12} />
-            {decision.submetido_por_nome || 'Utilizador'}
-          </span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {/* Autor */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{
+              width: '24px',
+              height: '24px',
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, var(--blush-dark) 0%, var(--warning) 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <User size={12} style={{ color: 'white' }} />
+            </div>
+            <span style={{ fontSize: '11px', color: 'var(--brown)', fontWeight: 500 }}>
+              {decision.submetido_por_nome || 'Utilizador'}
+            </span>
+          </div>
+
+          {/* Meta info */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             {decision.comment_count > 0 && (
-              <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--info)' }}>
-                <MessageCircle size={12} />
-                {decision.comment_count}
-              </span>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '3px 8px',
+                background: 'rgba(64, 158, 255, 0.1)',
+                borderRadius: '12px'
+              }}>
+                <MessageCircle size={11} style={{ color: 'var(--info)' }} />
+                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--info)' }}>
+                  {decision.comment_count}
+                </span>
+              </div>
             )}
-            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <Calendar size={12} />
-              {new Date(decision.submetido_em).toLocaleDateString('pt-PT')}
+            <span style={{ fontSize: '10px', color: 'var(--brown-light)' }}>
+              {new Date(decision.submetido_em).toLocaleDateString('pt-PT', { day: '2-digit', month: 'short' })}
             </span>
           </div>
         </div>
