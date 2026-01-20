@@ -25,11 +25,23 @@ import {
   MoreVertical,
   Eye,
   Filter,
-  Trash2
+  Trash2,
+  Circle
 } from 'lucide-react'
 
 // Configure PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
+
+// Cores disponiveis para desenho
+const DRAWING_COLORS = [
+  '#EF4444', // red
+  '#F59E0B', // amber
+  '#10B981', // green
+  '#3B82F6', // blue
+  '#8B5CF6', // purple
+  '#EC4899', // pink
+  '#000000', // black
+]
 
 // Categorias de anotacao
 const CATEGORIAS = [
@@ -94,6 +106,15 @@ export default function DesignReview({ projeto }) {
   const [editText, setEditText] = useState('')
   const [editCategoria, setEditCategoria] = useState('geral')
 
+  // Drawing state
+  const canvasRef = useRef(null)
+  const [drawings, setDrawings] = useState([])
+  const [isDrawing, setIsDrawing] = useState(false)
+  const [currentDrawing, setCurrentDrawing] = useState(null)
+  const [drawingColor, setDrawingColor] = useState('#EF4444')
+  const [drawingThickness, setDrawingThickness] = useState(2)
+  const [pdfDimensions, setPdfDimensions] = useState({ width: 0, height: 0 })
+
   // New Review Form
   const [newReviewName, setNewReviewName] = useState('')
   const [newReviewCodigo, setNewReviewCodigo] = useState('')
@@ -115,12 +136,25 @@ export default function DesignReview({ projeto }) {
     }
   }, [selectedReview])
 
-  // Load annotations when version selected
+  // Load annotations and drawings when version selected
   useEffect(() => {
     if (selectedVersion) {
       loadAnnotations()
+      loadDrawings()
     }
   }, [selectedVersion])
+
+  // Load drawings when page changes
+  useEffect(() => {
+    if (selectedVersion && currentPage) {
+      loadDrawings()
+    }
+  }, [currentPage])
+
+  // Redraw canvas when drawings change or scale changes
+  useEffect(() => {
+    redrawCanvas()
+  }, [drawings, scale, pdfDimensions])
 
   // Load replies when annotation selected
   useEffect(() => {
@@ -197,6 +231,348 @@ export default function DesignReview({ projeto }) {
     } catch (err) {
       console.error('Error loading replies:', err)
     }
+  }
+
+  const loadDrawings = async () => {
+    if (!selectedVersion) return
+    try {
+      const { data, error } = await supabase
+        .from('design_review_drawings')
+        .select('*')
+        .eq('version_id', selectedVersion.id)
+        .eq('pagina', currentPage)
+        .order('criado_em', { ascending: true })
+
+      if (error) throw error
+      setDrawings(data || [])
+    } catch (err) {
+      console.error('Error loading drawings:', err)
+    }
+  }
+
+  const saveDrawing = async (drawingData) => {
+    if (!selectedVersion) return
+    try {
+      const { data, error } = await supabase
+        .from('design_review_drawings')
+        .insert({
+          version_id: selectedVersion.id,
+          pagina: currentPage,
+          tipo: drawingData.tipo,
+          data: drawingData.data,
+          cor: drawingColor,
+          espessura: drawingThickness,
+          autor_id: profile?.id,
+          autor_nome: profile?.nome || user?.email || 'Utilizador'
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+      setDrawings(prev => [...prev, data])
+    } catch (err) {
+      console.error('Error saving drawing:', err)
+    }
+  }
+
+  const deleteDrawing = async (drawingId) => {
+    try {
+      const { error } = await supabase
+        .from('design_review_drawings')
+        .delete()
+        .eq('id', drawingId)
+
+      if (error) throw error
+      setDrawings(prev => prev.filter(d => d.id !== drawingId))
+    } catch (err) {
+      console.error('Error deleting drawing:', err)
+    }
+  }
+
+  // Redraw all drawings on canvas
+  const redrawCanvas = useCallback(() => {
+    const canvas = canvasRef.current
+    if (!canvas || pdfDimensions.width === 0) return
+
+    const ctx = canvas.getContext('2d')
+    const scaledWidth = pdfDimensions.width * scale
+    const scaledHeight = pdfDimensions.height * scale
+
+    canvas.width = scaledWidth
+    canvas.height = scaledHeight
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+    // Draw all saved drawings
+    drawings.forEach(drawing => {
+      ctx.strokeStyle = drawing.cor
+      ctx.lineWidth = drawing.espessura * scale
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+
+      const data = drawing.data
+
+      switch (drawing.tipo) {
+        case 'pencil':
+          if (data.points && data.points.length > 1) {
+            ctx.beginPath()
+            ctx.moveTo(data.points[0].x * scaledWidth / 100, data.points[0].y * scaledHeight / 100)
+            for (let i = 1; i < data.points.length; i++) {
+              ctx.lineTo(data.points[i].x * scaledWidth / 100, data.points[i].y * scaledHeight / 100)
+            }
+            ctx.stroke()
+          }
+          break
+
+        case 'rectangle':
+          ctx.strokeRect(
+            data.x * scaledWidth / 100,
+            data.y * scaledHeight / 100,
+            data.width * scaledWidth / 100,
+            data.height * scaledHeight / 100
+          )
+          break
+
+        case 'arrow':
+        case 'line':
+          const x1 = data.x1 * scaledWidth / 100
+          const y1 = data.y1 * scaledHeight / 100
+          const x2 = data.x2 * scaledWidth / 100
+          const y2 = data.y2 * scaledHeight / 100
+
+          ctx.beginPath()
+          ctx.moveTo(x1, y1)
+          ctx.lineTo(x2, y2)
+          ctx.stroke()
+
+          // Draw arrow head
+          if (drawing.tipo === 'arrow') {
+            const angle = Math.atan2(y2 - y1, x2 - x1)
+            const headLength = 15 * scale
+            ctx.beginPath()
+            ctx.moveTo(x2, y2)
+            ctx.lineTo(
+              x2 - headLength * Math.cos(angle - Math.PI / 6),
+              y2 - headLength * Math.sin(angle - Math.PI / 6)
+            )
+            ctx.moveTo(x2, y2)
+            ctx.lineTo(
+              x2 - headLength * Math.cos(angle + Math.PI / 6),
+              y2 - headLength * Math.sin(angle + Math.PI / 6)
+            )
+            ctx.stroke()
+          }
+          break
+
+        case 'circle':
+          ctx.beginPath()
+          ctx.arc(
+            data.cx * scaledWidth / 100,
+            data.cy * scaledHeight / 100,
+            data.radius * scaledWidth / 100,
+            0, 2 * Math.PI
+          )
+          ctx.stroke()
+          break
+      }
+    })
+
+    // Draw current drawing in progress
+    if (currentDrawing) {
+      ctx.strokeStyle = drawingColor
+      ctx.lineWidth = drawingThickness * scale
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+
+      const data = currentDrawing.data
+
+      switch (currentDrawing.tipo) {
+        case 'pencil':
+          if (data.points && data.points.length > 1) {
+            ctx.beginPath()
+            ctx.moveTo(data.points[0].x * scaledWidth / 100, data.points[0].y * scaledHeight / 100)
+            for (let i = 1; i < data.points.length; i++) {
+              ctx.lineTo(data.points[i].x * scaledWidth / 100, data.points[i].y * scaledHeight / 100)
+            }
+            ctx.stroke()
+          }
+          break
+
+        case 'rectangle':
+          ctx.strokeRect(
+            data.x * scaledWidth / 100,
+            data.y * scaledHeight / 100,
+            data.width * scaledWidth / 100,
+            data.height * scaledHeight / 100
+          )
+          break
+
+        case 'arrow':
+        case 'line':
+          const x1 = data.x1 * scaledWidth / 100
+          const y1 = data.y1 * scaledHeight / 100
+          const x2 = data.x2 * scaledWidth / 100
+          const y2 = data.y2 * scaledHeight / 100
+
+          ctx.beginPath()
+          ctx.moveTo(x1, y1)
+          ctx.lineTo(x2, y2)
+          ctx.stroke()
+
+          if (currentDrawing.tipo === 'arrow') {
+            const angle = Math.atan2(y2 - y1, x2 - x1)
+            const headLength = 15 * scale
+            ctx.beginPath()
+            ctx.moveTo(x2, y2)
+            ctx.lineTo(
+              x2 - headLength * Math.cos(angle - Math.PI / 6),
+              y2 - headLength * Math.sin(angle - Math.PI / 6)
+            )
+            ctx.moveTo(x2, y2)
+            ctx.lineTo(
+              x2 - headLength * Math.cos(angle + Math.PI / 6),
+              y2 - headLength * Math.sin(angle + Math.PI / 6)
+            )
+            ctx.stroke()
+          }
+          break
+
+        case 'circle':
+          ctx.beginPath()
+          ctx.arc(
+            data.cx * scaledWidth / 100,
+            data.cy * scaledHeight / 100,
+            data.radius * scaledWidth / 100,
+            0, 2 * Math.PI
+          )
+          ctx.stroke()
+          break
+      }
+    }
+  }, [drawings, currentDrawing, scale, pdfDimensions, drawingColor, drawingThickness])
+
+  // Canvas mouse event handlers
+  const getCanvasCoords = (e) => {
+    const canvas = canvasRef.current
+    if (!canvas) return { x: 0, y: 0 }
+    const rect = canvas.getBoundingClientRect()
+    const x = ((e.clientX - rect.left) / rect.width) * 100
+    const y = ((e.clientY - rect.top) / rect.height) * 100
+    return { x, y }
+  }
+
+  const handleCanvasMouseDown = (e) => {
+    if (!['pencil', 'rectangle', 'arrow', 'circle', 'line'].includes(activeTool)) return
+    e.preventDefault()
+
+    const { x, y } = getCanvasCoords(e)
+    setIsDrawing(true)
+
+    switch (activeTool) {
+      case 'pencil':
+        setCurrentDrawing({ tipo: 'pencil', data: { points: [{ x, y }] } })
+        break
+      case 'rectangle':
+        setCurrentDrawing({ tipo: 'rectangle', data: { x, y, width: 0, height: 0, startX: x, startY: y } })
+        break
+      case 'arrow':
+        setCurrentDrawing({ tipo: 'arrow', data: { x1: x, y1: y, x2: x, y2: y } })
+        break
+      case 'line':
+        setCurrentDrawing({ tipo: 'line', data: { x1: x, y1: y, x2: x, y2: y } })
+        break
+      case 'circle':
+        setCurrentDrawing({ tipo: 'circle', data: { cx: x, cy: y, radius: 0, startX: x, startY: y } })
+        break
+    }
+  }
+
+  const handleCanvasMouseMove = (e) => {
+    if (!isDrawing || !currentDrawing) return
+
+    const { x, y } = getCanvasCoords(e)
+
+    switch (currentDrawing.tipo) {
+      case 'pencil':
+        setCurrentDrawing(prev => ({
+          ...prev,
+          data: { points: [...prev.data.points, { x, y }] }
+        }))
+        break
+      case 'rectangle':
+        const startX = currentDrawing.data.startX
+        const startY = currentDrawing.data.startY
+        setCurrentDrawing(prev => ({
+          ...prev,
+          data: {
+            ...prev.data,
+            x: Math.min(startX, x),
+            y: Math.min(startY, y),
+            width: Math.abs(x - startX),
+            height: Math.abs(y - startY)
+          }
+        }))
+        break
+      case 'arrow':
+      case 'line':
+        setCurrentDrawing(prev => ({
+          ...prev,
+          data: { ...prev.data, x2: x, y2: y }
+        }))
+        break
+      case 'circle':
+        const cx = currentDrawing.data.startX
+        const cy = currentDrawing.data.startY
+        const radius = Math.sqrt(Math.pow(x - cx, 2) + Math.pow(y - cy, 2))
+        setCurrentDrawing(prev => ({
+          ...prev,
+          data: { ...prev.data, cx, cy, radius }
+        }))
+        break
+    }
+
+    redrawCanvas()
+  }
+
+  const handleCanvasMouseUp = () => {
+    if (!isDrawing || !currentDrawing) return
+
+    setIsDrawing(false)
+
+    // Only save if drawing has meaningful size
+    let shouldSave = false
+    switch (currentDrawing.tipo) {
+      case 'pencil':
+        shouldSave = currentDrawing.data.points.length > 2
+        break
+      case 'rectangle':
+        shouldSave = currentDrawing.data.width > 1 && currentDrawing.data.height > 1
+        // Clean up startX, startY before saving
+        if (shouldSave) {
+          const { startX, startY, ...cleanData } = currentDrawing.data
+          currentDrawing.data = cleanData
+        }
+        break
+      case 'arrow':
+      case 'line':
+        const dx = currentDrawing.data.x2 - currentDrawing.data.x1
+        const dy = currentDrawing.data.y2 - currentDrawing.data.y1
+        shouldSave = Math.sqrt(dx * dx + dy * dy) > 2
+        break
+      case 'circle':
+        shouldSave = currentDrawing.data.radius > 1
+        // Clean up startX, startY before saving
+        if (shouldSave) {
+          const { startX, startY, ...cleanData } = currentDrawing.data
+          currentDrawing.data = cleanData
+        }
+        break
+    }
+
+    if (shouldSave) {
+      saveDrawing(currentDrawing)
+    }
+
+    setCurrentDrawing(null)
   }
 
   const handlePdfClick = (e) => {
@@ -549,12 +925,11 @@ export default function DesignReview({ projeto }) {
             {[
               { id: 'select', icon: Eye, label: 'Selecionar' },
               { id: 'comment', icon: MessageCircle, label: 'Comentario' },
-              { id: 'pencil', icon: Pencil, label: 'Desenhar (em breve)' },
-              { id: 'rectangle', icon: Square, label: 'Retangulo (em breve)' },
-              { id: 'arrow', icon: ArrowUpRight, label: 'Seta (em breve)' },
-              { id: 'shape', icon: Triangle, label: 'Forma (em breve)' },
-              { id: 'layers', icon: Layers, label: 'Camadas (em breve)' },
-              { id: 'measure', icon: BarChart3, label: 'Medir (em breve)' }
+              { id: 'pencil', icon: Pencil, label: 'Desenho livre' },
+              { id: 'rectangle', icon: Square, label: 'Retangulo' },
+              { id: 'arrow', icon: ArrowUpRight, label: 'Seta' },
+              { id: 'circle', icon: Circle, label: 'Circulo' },
+              { id: 'line', icon: Minus, label: 'Linha' }
             ].map(tool => (
               <button
                 key={tool.id}
@@ -577,6 +952,61 @@ export default function DesignReview({ projeto }) {
               </button>
             ))}
           </div>
+
+          <div style={{ width: '1px', height: '24px', background: 'var(--stone)' }} />
+
+          {/* Color Picker */}
+          {['pencil', 'rectangle', 'arrow', 'circle', 'line'].includes(activeTool) && (
+            <>
+              <div style={{ display: 'flex', gap: '4px', marginLeft: '8px' }}>
+                {DRAWING_COLORS.map(color => (
+                  <button
+                    key={color}
+                    onClick={() => setDrawingColor(color)}
+                    title={color}
+                    style={{
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      border: drawingColor === color ? '2px solid var(--brown)' : '2px solid transparent',
+                      background: color,
+                      cursor: 'pointer',
+                      padding: 0
+                    }}
+                  />
+                ))}
+              </div>
+              <div style={{ width: '1px', height: '24px', background: 'var(--stone)', marginLeft: '8px' }} />
+            </>
+          )}
+
+          {/* Clear Drawings Button */}
+          {['pencil', 'rectangle', 'arrow', 'circle', 'line'].includes(activeTool) && drawings.length > 0 && (
+            <button
+              onClick={() => {
+                if (confirm('Apagar todos os desenhos desta página?')) {
+                  drawings.forEach(d => deleteDrawing(d.id))
+                }
+              }}
+              title="Apagar desenhos"
+              style={{
+                padding: '6px 12px',
+                borderRadius: '6px',
+                border: '1px solid #EF4444',
+                background: 'transparent',
+                color: '#EF4444',
+                fontSize: '12px',
+                cursor: 'pointer',
+                marginLeft: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              <Trash2 size={14} />
+              Limpar
+            </button>
+          )}
 
           <div style={{ width: '1px', height: '24px', background: 'var(--stone)' }} />
 
@@ -702,7 +1132,8 @@ export default function DesignReview({ projeto }) {
               onClick={handlePdfClick}
               style={{
                 position: 'relative',
-                cursor: activeTool === 'comment' ? 'crosshair' : 'default',
+                cursor: activeTool === 'comment' ? 'crosshair' :
+                        ['pencil', 'rectangle', 'arrow', 'circle', 'line'].includes(activeTool) ? 'crosshair' : 'default',
                 boxShadow: '0 4px 20px rgba(0,0,0,0.15)'
               }}
             >
@@ -721,8 +1152,34 @@ export default function DesignReview({ projeto }) {
                   scale={scale}
                   renderTextLayer={false}
                   renderAnnotationLayer={false}
+                  onRenderSuccess={(page) => {
+                    setPdfDimensions({
+                      width: page.width / scale,
+                      height: page.height / scale
+                    })
+                  }}
                 />
               </Document>
+
+              {/* Drawing Canvas Overlay */}
+              {pdfDimensions.width > 0 && (
+                <canvas
+                  ref={canvasRef}
+                  onMouseDown={handleCanvasMouseDown}
+                  onMouseMove={handleCanvasMouseMove}
+                  onMouseUp={handleCanvasMouseUp}
+                  onMouseLeave={handleCanvasMouseUp}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: pdfDimensions.width * scale,
+                    height: pdfDimensions.height * scale,
+                    pointerEvents: ['pencil', 'rectangle', 'arrow', 'circle', 'line'].includes(activeTool) ? 'auto' : 'none',
+                    zIndex: 5
+                  }}
+                />
+              )}
 
               {/* Annotation Markers */}
               {allPageAnnotations.map((annotation, index) => (
