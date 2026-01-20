@@ -542,7 +542,7 @@ function NewDecisionModal({ projetoId, entregaveis, utilizadores, onClose, onCre
   const [descricao, setDescricao] = useState('')
   const [entregavelId, setEntregavelId] = useState('')
   const [submetidoPor, setSubmetidoPor] = useState('')
-  const [imagemUrl, setImagemUrl] = useState('')
+  const [imagePreview, setImagePreview] = useState('')
   const [imageFile, setImageFile] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
@@ -551,12 +551,10 @@ function NewDecisionModal({ projetoId, entregaveis, utilizadores, onClose, onCre
   const handleImageSelect = (file) => {
     if (!file || !file.type.startsWith('image/')) return
 
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      setImagemUrl(e.target.result)
-      setImageFile(file)
-    }
-    reader.readAsDataURL(file)
+    // Create preview URL for display only
+    const previewUrl = URL.createObjectURL(file)
+    setImagePreview(previewUrl)
+    setImageFile(file)
   }
 
   const handleDrop = (e) => {
@@ -564,6 +562,14 @@ function NewDecisionModal({ projetoId, entregaveis, utilizadores, onClose, onCre
     setIsDragging(false)
     const file = e.dataTransfer.files?.[0]
     if (file) handleImageSelect(file)
+  }
+
+  const handleRemoveImage = () => {
+    if (imagePreview) {
+      URL.revokeObjectURL(imagePreview)
+    }
+    setImagePreview('')
+    setImageFile(null)
   }
 
   const handleSubmit = async () => {
@@ -575,6 +581,34 @@ function NewDecisionModal({ projetoId, entregaveis, utilizadores, onClose, onCre
     setSubmitting(true)
     try {
       const submitter = utilizadores.find(u => u.id === submetidoPor)
+      let finalImageUrl = null
+
+      // Upload image to Supabase Storage if selected
+      if (imageFile) {
+        const fileExt = imageFile.name.split('.').pop().toLowerCase()
+        const timestamp = Date.now()
+        const safeFileName = imageFile.name.replace(/[^a-zA-Z0-9.-]/g, '_')
+        const storagePath = `${projetoId}/${timestamp}_${safeFileName}`
+
+        const { error: uploadError } = await supabase.storage
+          .from('decision-images')
+          .upload(storagePath, imageFile, {
+            cacheControl: '3600',
+            upsert: false
+          })
+
+        if (uploadError) {
+          console.error('Erro no upload da imagem:', uploadError)
+          throw new Error('Erro ao carregar imagem. Verifique se o bucket "decision-images" está configurado.')
+        }
+
+        // Get public URL
+        const { data: urlData } = supabase.storage
+          .from('decision-images')
+          .getPublicUrl(storagePath)
+
+        finalImageUrl = urlData.publicUrl
+      }
 
       const { error } = await supabase
         .from('project_decisions')
@@ -583,7 +617,7 @@ function NewDecisionModal({ projetoId, entregaveis, utilizadores, onClose, onCre
           entregavel_id: entregavelId || null,
           titulo: titulo.trim(),
           descricao: descricao.trim(),
-          imagem_url: imagemUrl || null,
+          imagem_url: finalImageUrl,
           submetido_por: submetidoPor || null,
           submetido_por_nome: submitter?.nome || 'Utilizador'
         })
@@ -687,13 +721,13 @@ function NewDecisionModal({ projetoId, entregaveis, utilizadores, onClose, onCre
                 padding: '20px',
                 textAlign: 'center',
                 cursor: 'pointer',
-                background: isDragging ? 'rgba(64, 158, 255, 0.05)' : imagemUrl ? `url(${imagemUrl}) center/cover` : 'var(--cream)',
-                minHeight: imagemUrl ? '150px' : '80px',
+                background: isDragging ? 'rgba(64, 158, 255, 0.05)' : imagePreview ? `url(${imagePreview}) center/cover` : 'var(--cream)',
+                minHeight: imagePreview ? '150px' : '80px',
                 position: 'relative',
                 transition: 'all 0.2s'
               }}
             >
-              {!imagemUrl && (
+              {!imagePreview && (
                 <>
                   <Upload size={24} style={{ color: 'var(--brown-light)', opacity: 0.5, marginBottom: '8px' }} />
                   <p style={{ margin: 0, fontSize: '12px', color: 'var(--brown-light)' }}>
@@ -701,9 +735,9 @@ function NewDecisionModal({ projetoId, entregaveis, utilizadores, onClose, onCre
                   </p>
                 </>
               )}
-              {imagemUrl && (
+              {imagePreview && (
                 <button
-                  onClick={(e) => { e.stopPropagation(); setImagemUrl(''); setImageFile(null) }}
+                  onClick={(e) => { e.stopPropagation(); handleRemoveImage() }}
                   style={{
                     position: 'absolute',
                     top: '8px',
