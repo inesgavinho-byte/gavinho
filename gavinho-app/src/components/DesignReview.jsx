@@ -89,6 +89,11 @@ export default function DesignReview({ projeto }) {
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [showNewReviewModal, setShowNewReviewModal] = useState(false)
 
+  // Edit/Delete state
+  const [editingAnnotation, setEditingAnnotation] = useState(null)
+  const [editText, setEditText] = useState('')
+  const [editCategoria, setEditCategoria] = useState('geral')
+
   // New Review Form
   const [newReviewName, setNewReviewName] = useState('')
   const [newReviewCodigo, setNewReviewCodigo] = useState('')
@@ -256,6 +261,80 @@ export default function DesignReview({ projeto }) {
       )
     } catch (err) {
       console.error('Error resolving annotation:', err)
+    }
+  }
+
+  const startEditAnnotation = (annotation) => {
+    setEditingAnnotation(annotation)
+    setEditText(annotation.comentario)
+    setEditCategoria(annotation.categoria)
+  }
+
+  const handleEditAnnotation = async () => {
+    if (!editingAnnotation || !editText.trim()) return
+
+    try {
+      const { error } = await supabase
+        .from('design_review_annotations')
+        .update({
+          comentario: editText.trim(),
+          categoria: editCategoria
+        })
+        .eq('id', editingAnnotation.id)
+
+      if (error) throw error
+
+      setAnnotations(prev =>
+        prev.map(a => a.id === editingAnnotation.id
+          ? { ...a, comentario: editText.trim(), categoria: editCategoria }
+          : a)
+      )
+      setEditingAnnotation(null)
+      setEditText('')
+    } catch (err) {
+      console.error('Error editing annotation:', err)
+    }
+  }
+
+  const handleDeleteAnnotation = async (annotation) => {
+    if (!confirm('Tem certeza que deseja apagar esta anotação?')) return
+
+    try {
+      const { error } = await supabase
+        .from('design_review_annotations')
+        .delete()
+        .eq('id', annotation.id)
+
+      if (error) throw error
+
+      setAnnotations(prev => prev.filter(a => a.id !== annotation.id))
+      if (selectedAnnotation?.id === annotation.id) {
+        setSelectedAnnotation(null)
+      }
+    } catch (err) {
+      console.error('Error deleting annotation:', err)
+    }
+  }
+
+  const handleReopenAnnotation = async (annotation) => {
+    try {
+      const { error } = await supabase
+        .from('design_review_annotations')
+        .update({
+          status: 'aberto',
+          resolvido_por: null,
+          resolvido_por_nome: null,
+          resolvido_em: null
+        })
+        .eq('id', annotation.id)
+
+      if (error) throw error
+
+      setAnnotations(prev =>
+        prev.map(a => a.id === annotation.id ? { ...a, status: 'aberto' } : a)
+      )
+    } catch (err) {
+      console.error('Error reopening annotation:', err)
     }
   }
 
@@ -469,18 +548,17 @@ export default function DesignReview({ projeto }) {
           <div style={{ display: 'flex', gap: '4px', marginRight: '8px' }}>
             {[
               { id: 'select', icon: Eye, label: 'Selecionar' },
-              { id: 'comment', icon: MessageCircle, label: 'Comentario', active: true },
-              { id: 'pencil', icon: Pencil, label: 'Desenhar', disabled: true },
-              { id: 'rectangle', icon: Square, label: 'Retangulo', disabled: true },
-              { id: 'arrow', icon: ArrowUpRight, label: 'Seta', disabled: true },
-              { id: 'shape', icon: Triangle, label: 'Forma', disabled: true },
-              { id: 'layers', icon: Layers, label: 'Camadas', disabled: true },
-              { id: 'measure', icon: BarChart3, label: 'Medir', disabled: true }
+              { id: 'comment', icon: MessageCircle, label: 'Comentario' },
+              { id: 'pencil', icon: Pencil, label: 'Desenhar (em breve)' },
+              { id: 'rectangle', icon: Square, label: 'Retangulo (em breve)' },
+              { id: 'arrow', icon: ArrowUpRight, label: 'Seta (em breve)' },
+              { id: 'shape', icon: Triangle, label: 'Forma (em breve)' },
+              { id: 'layers', icon: Layers, label: 'Camadas (em breve)' },
+              { id: 'measure', icon: BarChart3, label: 'Medir (em breve)' }
             ].map(tool => (
               <button
                 key={tool.id}
-                onClick={() => !tool.disabled && setActiveTool(tool.id)}
-                disabled={tool.disabled}
+                onClick={() => setActiveTool(tool.id)}
                 title={tool.label}
                 style={{
                   width: '36px',
@@ -491,9 +569,8 @@ export default function DesignReview({ projeto }) {
                   borderRadius: '8px',
                   border: 'none',
                   background: activeTool === tool.id ? 'var(--brown)' : 'transparent',
-                  color: activeTool === tool.id ? 'var(--white)' : tool.disabled ? 'var(--stone-dark)' : 'var(--brown)',
-                  cursor: tool.disabled ? 'not-allowed' : 'pointer',
-                  opacity: tool.disabled ? 0.5 : 1
+                  color: activeTool === tool.id ? 'var(--white)' : 'var(--brown)',
+                  cursor: 'pointer'
                 }}
               >
                 <tool.icon size={18} />
@@ -903,96 +980,215 @@ export default function DesignReview({ projeto }) {
                     cursor: 'pointer'
                   }}
                 >
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '10px'
-                  }}>
-                    <div
-                      style={{
-                        width: '24px',
-                        height: '24px',
-                        borderRadius: '50%',
-                        background: annotation.status === 'resolvido'
-                          ? '#10B981'
-                          : getCategoriaColor(annotation.categoria),
-                        color: 'white',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '11px',
-                        fontWeight: 600,
-                        flexShrink: 0
-                      }}
-                    >
-                      {annotation.status === 'resolvido' ? <Check size={12} /> : index + 1}
+                  {/* Edit Mode */}
+                  {editingAnnotation?.id === annotation.id ? (
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <textarea
+                        value={editText}
+                        onChange={(e) => setEditText(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '8px',
+                          borderRadius: '6px',
+                          border: '1px solid var(--stone)',
+                          fontSize: '13px',
+                          resize: 'none',
+                          minHeight: '60px',
+                          marginBottom: '8px'
+                        }}
+                        autoFocus
+                      />
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <select
+                          value={editCategoria}
+                          onChange={(e) => setEditCategoria(e.target.value)}
+                          style={{
+                            flex: 1,
+                            padding: '6px 8px',
+                            borderRadius: '6px',
+                            border: '1px solid var(--stone)',
+                            fontSize: '12px'
+                          }}
+                        >
+                          {CATEGORIAS.map(cat => (
+                            <option key={cat.id} value={cat.id}>{cat.label}</option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={() => setEditingAnnotation(null)}
+                          style={{
+                            padding: '6px 10px',
+                            borderRadius: '6px',
+                            border: '1px solid var(--stone)',
+                            background: 'var(--white)',
+                            fontSize: '12px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          onClick={handleEditAnnotation}
+                          className="btn btn-primary"
+                          style={{ padding: '6px 12px', fontSize: '12px' }}
+                        >
+                          Guardar
+                        </button>
+                      </div>
                     </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        marginBottom: '4px'
-                      }}>
-                        <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--brown)' }}>
-                          {annotation.autor_nome}
-                        </span>
-                        <span style={{
-                          fontSize: '10px',
-                          padding: '2px 6px',
-                          borderRadius: '4px',
-                          background: `${getCategoriaColor(annotation.categoria)}20`,
-                          color: getCategoriaColor(annotation.categoria)
+                  ) : (
+                    /* View Mode */
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '10px'
+                    }}>
+                      <div
+                        style={{
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '50%',
+                          background: annotation.status === 'resolvido'
+                            ? '#10B981'
+                            : getCategoriaColor(annotation.categoria),
+                          color: 'white',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          flexShrink: 0
+                        }}
+                      >
+                        {annotation.status === 'resolvido' ? <Check size={12} /> : index + 1}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          marginBottom: '4px'
                         }}>
-                          {CATEGORIAS.find(c => c.id === annotation.categoria)?.label}
-                        </span>
-                      </div>
-                      <p style={{
-                        fontSize: '13px',
-                        color: 'var(--brown)',
-                        lineHeight: 1.4,
-                        margin: 0
-                      }}>
-                        {annotation.comentario}
-                      </p>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        marginTop: '8px'
-                      }}>
-                        <span style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
-                          {new Date(annotation.criado_em).toLocaleDateString('pt-PT', {
-                            day: '2-digit',
-                            month: 'short',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </span>
-                        {annotation.status !== 'resolvido' && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleResolveAnnotation(annotation)
-                            }}
-                            style={{
-                              fontSize: '11px',
-                              color: '#10B981',
-                              background: 'none',
-                              border: 'none',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}
-                          >
-                            <Check size={12} />
-                            Resolver
-                          </button>
-                        )}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--brown)' }}>
+                              {annotation.autor_nome}
+                            </span>
+                            <span style={{
+                              fontSize: '10px',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              background: `${getCategoriaColor(annotation.categoria)}20`,
+                              color: getCategoriaColor(annotation.categoria)
+                            }}>
+                              {CATEGORIAS.find(c => c.id === annotation.categoria)?.label}
+                            </span>
+                          </div>
+                          {/* Edit/Delete buttons */}
+                          <div style={{ display: 'flex', gap: '4px' }}>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                startEditAnnotation(annotation)
+                              }}
+                              title="Editar"
+                              style={{
+                                padding: '4px',
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                color: 'var(--brown-light)',
+                                borderRadius: '4px'
+                              }}
+                            >
+                              <Pencil size={14} />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleDeleteAnnotation(annotation)
+                              }}
+                              title="Apagar"
+                              style={{
+                                padding: '4px',
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                color: '#EF4444',
+                                borderRadius: '4px'
+                              }}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                        <p style={{
+                          fontSize: '13px',
+                          color: 'var(--brown)',
+                          lineHeight: 1.4,
+                          margin: 0
+                        }}>
+                          {annotation.comentario}
+                        </p>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          marginTop: '8px',
+                          flexWrap: 'wrap'
+                        }}>
+                          <span style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
+                            {new Date(annotation.criado_em).toLocaleDateString('pt-PT', {
+                              day: '2-digit',
+                              month: 'short',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </span>
+                          {annotation.status !== 'resolvido' ? (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleResolveAnnotation(annotation)
+                              }}
+                              style={{
+                                fontSize: '11px',
+                                color: '#10B981',
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}
+                            >
+                              <Check size={12} />
+                              Resolver
+                            </button>
+                          ) : (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleReopenAnnotation(annotation)
+                              }}
+                              style={{
+                                fontSize: '11px',
+                                color: '#F59E0B',
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}
+                            >
+                              <RefreshCw size={12} />
+                              Reabrir
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               ))}
             </div>
