@@ -52,6 +52,7 @@ import ProjetoDocumentos from '../components/ProjetoDocumentos'
 import CentralEntregas from '../components/CentralEntregas'
 import DiarioBordo from '../components/DiarioBordo'
 import DecisionLog from '../components/DecisionLog'
+import DesignReview from '../components/DesignReview'
 
 // Dados de exemplo baseados nos JSONs fornecidos
 const sampleProjectData = {
@@ -3116,21 +3117,7 @@ export default function ProjetoDetalhe() {
 
             {/* Design Review */}
             {activeFaseSection === 'design-review' && (
-              <div style={{
-                padding: '48px',
-                background: 'var(--cream)',
-                borderRadius: '12px',
-                textAlign: 'center',
-                color: 'var(--brown-light)'
-              }}>
-                <Eye size={48} style={{ opacity: 0.3, marginBottom: '16px' }} />
-                <h4 style={{ color: 'var(--brown)', marginBottom: '8px' }}>Design Review</h4>
-                <p>Sistema de revisão de design com comentários e aprovações.</p>
-                <button className="btn btn-secondary" style={{ marginTop: '16px' }}>
-                  <Plus size={16} style={{ marginRight: '8px' }} />
-                  Iniciar Design Review
-                </button>
-              </div>
+              <DesignReview projeto={project} />
             )}
 
             {/* Atas */}
