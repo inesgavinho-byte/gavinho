@@ -3327,14 +3327,14 @@ export default function ProjetoDetalhe() {
                               style={{
                                 padding: '4px',
                                 background: 'rgba(255,255,255,0.2)',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '4px',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              <Trash2 size={14} />
+                            </button>
                         </div>
                       </div>
                     ))}
