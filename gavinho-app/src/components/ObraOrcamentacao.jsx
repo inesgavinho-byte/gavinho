@@ -392,7 +392,7 @@ export default function ObraOrcamentacao({ obra, activeSubTab = 'custo' }) {
         .eq('obra_id', obra.id)
       
       // Inserir items com colunas corretas:
-      // 0: Àrea, 1: Proposta, 2: Ref, 3: Descrição, 4: UN, 5: Quant, 6: P.Unit, 7: P.Total
+      // 0: Área, 1: Proposta, 2: Ref, 3: Descrição, 4: UN, 5: Quant, 6: P.Unit, 7: P.Total
       const itemsToInsert = dataRows.map((row, idx) => {
         const propostaCodigo = String(row[1] || '').trim()
         const proposta = novasPropostas?.find(p => p.codigo === propostaCodigo)
@@ -437,31 +437,31 @@ export default function ObraOrcamentacao({ obra, activeSubTab = 'custo' }) {
     }
   }
 
-  // ==================== EXPORTAÀ‡ÀƒO ====================
+  // ==================== EXPORTAÇÁO ====================
   
   const exportarPropostaExcel = (proposta) => {
     const propostaItems = items.filter(i => i.proposta_id === proposta.id && i.status === 'ativo')
     
     const data = propostaItems.map(item => ({
       'Ref.': item.ref,
-      'Àrea': item.area,
+      'Área': item.area,
       'Descrição': item.descricao,
       'UN': item.unidade,
       'Quant.': item.quantidade,
-      'P. Unit. â‚¬': item.preco_venda_unit?.toFixed(2),
-      'P. Total â‚¬': item.preco_venda_total?.toFixed(2)
+      'P. Unit. €': item.preco_venda_unit?.toFixed(2),
+      'P. Total €': item.preco_venda_total?.toFixed(2)
     }))
     
     // Adicionar total
     const total = propostaItems.reduce((sum, i) => sum + (i.preco_venda_total || 0), 0)
     data.push({
       'Ref.': '',
-      'Àrea': '',
+      'Área': '',
       'Descrição': 'TOTAL',
       'UN': '',
       'Quant.': '',
-      'P. Unit. â‚¬': '',
-      'P. Total â‚¬': total.toFixed(2)
+      'P. Unit. €': '',
+      'P. Total €': total.toFixed(2)
     })
     
     const ws = XLSX.utils.json_to_sheet(data)
@@ -565,13 +565,13 @@ export default function ObraOrcamentacao({ obra, activeSubTab = 'custo' }) {
         </div>
         <div className="card" style={{ padding: '16px', textAlign: 'center' }}>
           <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--info)' }}>
-            {totaisGerais.totalCusto.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} â‚¬
+            {totaisGerais.totalCusto.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} €
           </div>
           <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>Total Custo</div>
         </div>
         <div className="card" style={{ padding: '16px', textAlign: 'center' }}>
           <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--success)' }}>
-            {totaisGerais.totalVenda.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} â‚¬
+            {totaisGerais.totalVenda.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} €
           </div>
           <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>Total Venda</div>
         </div>
@@ -613,7 +613,7 @@ export default function ObraOrcamentacao({ obra, activeSubTab = 'custo' }) {
               onChange={e => setFiltros({ ...filtros, area: e.target.value })}
               style={{ padding: '8px 12px', border: '1px solid var(--stone)', borderRadius: '6px', fontSize: '13px' }}
             >
-              <option value="">Todas Àreas</option>
+              <option value="">Todas Áreas</option>
               {areasUnicas.map(a => (
                 <option key={a} value={a}>{a}</option>
               ))}
@@ -689,7 +689,7 @@ export default function ObraOrcamentacao({ obra, activeSubTab = 'custo' }) {
                   <span style={{ fontWeight: 600 }}>{p.codigo}</span>
                   <span style={{ color: 'var(--brown-light)' }}>({pItems.length})</span>
                   <span style={{ fontWeight: 500, color: 'var(--success)' }}>
-                    {(pTotal / 1000).toFixed(0)}kâ‚¬
+                    {(pTotal / 1000).toFixed(0)}k€
                   </span>
                   <span style={{ 
                     padding: '1px 6px', 
@@ -727,7 +727,7 @@ export default function ObraOrcamentacao({ obra, activeSubTab = 'custo' }) {
             <tr style={{ background: 'var(--cream)', borderBottom: '2px solid var(--stone)' }}>
               <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, width: '80px' }}>Proposta</th>
               <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, width: '60px' }}>Ref.</th>
-              <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, width: '120px' }}>Àrea</th>
+              <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, width: '120px' }}>Área</th>
               <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600 }}>Descrição</th>
               <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600, width: '40px' }}>UN</th>
               <th style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600, width: '60px' }}>Quant.</th>
@@ -805,10 +805,10 @@ export default function ObraOrcamentacao({ obra, activeSubTab = 'custo' }) {
                   {subTab === 'custo' && (
                     <>
                       <td style={{ padding: '10px 12px', textAlign: 'right' }}>
-                        {item.preco_custo_unit?.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} â‚¬
+                        {item.preco_custo_unit?.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} €
                       </td>
                       <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600 }}>
-                        {item.preco_custo_total?.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} â‚¬
+                        {item.preco_custo_total?.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} €
                       </td>
                     </>
                   )}
@@ -833,10 +833,10 @@ export default function ObraOrcamentacao({ obra, activeSubTab = 'custo' }) {
                         />
                       </td>
                       <td style={{ padding: '10px 12px', textAlign: 'right' }}>
-                        {item.preco_venda_unit?.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} â‚¬
+                        {item.preco_venda_unit?.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} €
                       </td>
                       <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--success)' }}>
-                        {item.preco_venda_total?.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} â‚¬
+                        {item.preco_venda_total?.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} €
                       </td>
                     </>
                   )}
@@ -924,7 +924,7 @@ export default function ObraOrcamentacao({ obra, activeSubTab = 'custo' }) {
                   <>
                     <td style={{ padding: '12px', textAlign: 'right' }}></td>
                     <td style={{ padding: '12px', textAlign: 'right', fontSize: '14px' }}>
-                      {totaisFiltrados.totalCusto.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} â‚¬
+                      {totaisFiltrados.totalCusto.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} €
                     </td>
                   </>
                 )}
@@ -933,7 +933,7 @@ export default function ObraOrcamentacao({ obra, activeSubTab = 'custo' }) {
                     <td style={{ padding: '12px', textAlign: 'center' }}></td>
                     <td style={{ padding: '12px', textAlign: 'right' }}></td>
                     <td style={{ padding: '12px', textAlign: 'right', fontSize: '14px', color: 'var(--success)' }}>
-                      {totaisFiltrados.totalVenda.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} â‚¬
+                      {totaisFiltrados.totalVenda.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} €
                     </td>
                   </>
                 )}
@@ -1049,7 +1049,7 @@ export default function ObraOrcamentacao({ obra, activeSubTab = 'custo' }) {
                 </div>
               </div>
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '6px' }}>Àrea/Piso</label>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '6px' }}>Área/Piso</label>
                 <input
                   type="text"
                   value={itemForm.area}
@@ -1094,7 +1094,7 @@ export default function ObraOrcamentacao({ obra, activeSubTab = 'custo' }) {
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '6px' }}>P. Unit. Custo (â‚¬)</label>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '6px' }}>P. Unit. Custo (€)</label>
                   <input
                     type="number"
                     value={itemForm.preco_custo_unit}
@@ -1124,11 +1124,11 @@ export default function ObraOrcamentacao({ obra, activeSubTab = 'custo' }) {
                   <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--success)' }}>
                     {(() => {
                       const precos = calcularPrecos(itemForm)
-                      return `${precos.vendaTotal.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} â‚¬`
+                      return `${precos.vendaTotal.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} €`
                     })()}
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
-                    ({((itemForm.preco_custo_unit || 0) * (itemForm.margem_k || 1)).toFixed(2)} â‚¬/un)
+                    ({((itemForm.preco_custo_unit || 0) * (itemForm.margem_k || 1)).toFixed(2)} €/un)
                   </div>
                 </div>
               </div>
