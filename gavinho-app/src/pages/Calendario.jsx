@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import {
   ChevronLeft, ChevronRight, Plus, Clock, MapPin, X, Edit, Trash2,
-  Flag, Building2, RefreshCw, Link2
+  Flag, Building2, RefreshCw, Link2, Palmtree
 } from 'lucide-react'
 
 const TIPOS_EVENTO = [
@@ -14,6 +14,7 @@ const TIPOS_EVENTO = [
   { id: 'entrega', label: 'Entrega', color: '#B88A8A' },
   { id: 'feriado', label: 'Feriado', color: '#dc2626' },
   { id: 'encerramento', label: 'Encerramento', color: '#7c3aed' },
+  { id: 'ferias', label: 'Férias', color: '#0891b2' },
   { id: 'outro', label: 'Outro', color: '#999999' }
 ]
 
@@ -83,6 +84,7 @@ export default function Calendario() {
   const [eventos, setEventos] = useState([])
   const [projetos, setProjetos] = useState([])
   const [encerramentos, setEncerramentos] = useState([])
+  const [ferias, setFerias] = useState([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingEvento, setEditingEvento] = useState(null)
@@ -90,6 +92,7 @@ export default function Calendario() {
   const [showEventDetail, setShowEventDetail] = useState(null)
   const [showFeriados, setShowFeriados] = useState(true)
   const [showEncerramentos, setShowEncerramentos] = useState(true)
+  const [showFerias, setShowFerias] = useState(true)
   
   const [form, setForm] = useState({
     titulo: '', tipo: 'reuniao_cliente', projeto_id: '', data: '',
@@ -102,15 +105,20 @@ export default function Calendario() {
 
   const fetchData = async () => {
     try {
-      const [eventosRes, projetosRes, encRes] = await Promise.all([
+      const [eventosRes, projetosRes, encRes, feriasRes] = await Promise.all([
         supabase.from('eventos').select('*').order('data', { ascending: true }),
         supabase.from('projetos').select('id, codigo, nome').eq('arquivado', false).order('codigo', { ascending: false }),
-        supabase.from('encerramentos_empresa').select('*').order('data')
+        supabase.from('encerramentos_empresa').select('*').order('data'),
+        supabase.from('ausencias').select(`
+          *,
+          utilizador:utilizadores(id, nome)
+        `).eq('tipo', 'ferias').order('data_inicio')
       ])
 
       setEventos(eventosRes.data || [])
       setProjetos(projetosRes.data || [])
       setEncerramentos(encRes.data || [])
+      setFerias(feriasRes.data || [])
     } catch (err) {
       console.error('Erro:', err)
     } finally {
@@ -141,6 +149,17 @@ export default function Calendario() {
     if (!showEncerramentos) return null
     const dateStr = date.toISOString().split('T')[0]
     return encerramentos.find(enc => enc.data === dateStr)
+  }
+
+  // Obter férias para uma data (pode haver múltiplas pessoas)
+  const getFeriasForDate = (date) => {
+    if (!showFerias) return []
+    const dateStr = date.toISOString().split('T')[0]
+    return ferias.filter(f => {
+      const inicio = f.data_inicio
+      const fim = f.data_fim || f.data_inicio
+      return dateStr >= inicio && dateStr <= fim
+    })
   }
 
   // Navegação
@@ -243,7 +262,7 @@ export default function Calendario() {
   const getEventsForDate = (date) => {
     const dateStr = date.toISOString().split('T')[0]
     const dayEvents = eventos.filter(e => e.data === dateStr)
-    
+
     // Adicionar feriado se existir
     const feriado = getFeriadoForDate(date)
     if (feriado) {
@@ -255,7 +274,7 @@ export default function Calendario() {
         isFeriado: true
       })
     }
-    
+
     // Adicionar encerramento se existir
     const encerramento = getEncerramentoForDate(date)
     if (encerramento) {
@@ -267,7 +286,21 @@ export default function Calendario() {
         isEncerramento: true
       })
     }
-    
+
+    // Adicionar férias da equipa
+    const feriasHoje = getFeriasForDate(date)
+    feriasHoje.forEach(f => {
+      const nomeUtilizador = f.utilizador?.nome || 'Colaborador'
+      dayEvents.push({
+        id: `ferias-${f.id}-${dateStr}`,
+        titulo: `Férias ${nomeUtilizador}`,
+        tipo: 'ferias',
+        data: dateStr,
+        isFerias: true,
+        utilizador: f.utilizador
+      })
+    })
+
     return dayEvents
   }
 
@@ -472,6 +505,18 @@ export default function Calendario() {
             >
               <Building2 size={12} /> Encerramentos
             </button>
+            <button
+              onClick={() => setShowFerias(!showFerias)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '4px',
+                padding: '6px 10px', border: 'none', borderRadius: '6px',
+                fontSize: '11px', fontWeight: 500, cursor: 'pointer',
+                background: showFerias ? '#cffafe' : 'var(--stone)',
+                color: showFerias ? '#0891b2' : 'var(--brown-light)'
+              }}
+            >
+              <Palmtree size={12} /> Férias
+            </button>
           </div>
         </div>
 
@@ -522,11 +567,13 @@ export default function Calendario() {
               const today = isToday(day.date)
               const feriado = getFeriadoForDate(day.date)
               const encerramento = getEncerramentoForDate(day.date)
+              const feriasHoje = getFeriasForDate(day.date)
 
               let bgColor = day.isCurrentMonth ? 'var(--white)' : 'var(--cream)'
               if (today) bgColor = 'rgba(201, 168, 130, 0.08)'
               if (feriado && showFeriados) bgColor = 'rgba(220, 38, 38, 0.06)'
               if (encerramento && showEncerramentos) bgColor = 'rgba(124, 58, 237, 0.06)'
+              if (feriasHoje.length > 0 && showFerias) bgColor = 'rgba(8, 145, 178, 0.04)'
 
               return (
                 <div
@@ -555,7 +602,7 @@ export default function Calendario() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                     {dayEvents.slice(0, 3).map(evento => {
                       const tipoConfig = getTipoConfig(evento.tipo)
-                      const isSpecialEvent = evento.isFeriado || evento.isEncerramento
+                      const isSpecialEvent = evento.isFeriado || evento.isEncerramento || evento.isFerias
                       return (
                         <div
                           key={evento.id}
@@ -569,6 +616,7 @@ export default function Calendario() {
                         >
                           {evento.isFeriado && <Flag size={10} />}
                           {evento.isEncerramento && <Building2 size={10} />}
+                          {evento.isFerias && <Palmtree size={10} />}
                           {evento.titulo}
                         </div>
                       )
