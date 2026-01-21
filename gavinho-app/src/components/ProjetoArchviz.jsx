@@ -1,11 +1,76 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, memo } from 'react'
 import { supabase } from '../lib/supabase'
 import {
   Plus, Upload, Image, X, ChevronLeft, ChevronRight, Trash2,
   Star, MessageSquare, Edit2, Eye, Download, Loader2, Send,
   User, Calendar, Clock, Check, AlertCircle, HelpCircle,
-  Maximize2, ZoomIn, ZoomOut, RotateCcw
+  Maximize2, ZoomIn, ZoomOut, RotateCcw, RefreshCw
 } from 'lucide-react'
+
+// Lazy loading image component with error handling
+const LazyImage = memo(({ src, alt, className, onClick }) => {
+  const [loaded, setLoaded] = useState(false)
+  const [error, setError] = useState(false)
+  const imgRef = useRef(null)
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && imgRef.current) {
+            imgRef.current.src = src
+            observer.unobserve(entry.target)
+          }
+        })
+      },
+      { rootMargin: '100px' }
+    )
+
+    if (imgRef.current) {
+      observer.observe(imgRef.current)
+    }
+
+    return () => observer.disconnect()
+  }, [src])
+
+  if (error) {
+    return (
+      <div className="archviz-image-error" onClick={onClick}>
+        <AlertCircle size={24} />
+        <span>Erro ao carregar</span>
+        <button
+          className="btn btn-sm btn-ghost"
+          onClick={(e) => {
+            e.stopPropagation()
+            setError(false)
+            setLoaded(false)
+          }}
+        >
+          <RefreshCw size={14} /> Tentar novamente
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <>
+      {!loaded && (
+        <div className="archviz-image-loading">
+          <Loader2 size={24} className="spin" />
+        </div>
+      )}
+      <img
+        ref={imgRef}
+        alt={alt}
+        className={`${className} ${loaded ? 'loaded' : 'loading'}`}
+        onClick={onClick}
+        onLoad={() => setLoaded(true)}
+        onError={() => setError(true)}
+        loading="lazy"
+      />
+    </>
+  )
+})
 
 export default function ProjetoArchviz({ projeto, userId, userName }) {
   // State
@@ -13,6 +78,7 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
   const [compartimentos, setCompartimentos] = useState([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
+  const [loadError, setLoadError] = useState(null)
 
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false)
@@ -57,9 +123,11 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
     }
   }, [projeto?.id])
 
-  const loadRenders = async () => {
+  const loadRenders = async (retryCount = 0) => {
     try {
       setLoading(true)
+      setLoadError(null)
+
       const { data, error } = await supabase
         .from('projeto_renders')
         .select(`
@@ -72,8 +140,14 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
 
       if (error) throw error
 
+      // Sort versions by versao number descending for each render
+      const sortedData = (data || []).map(render => ({
+        ...render,
+        versoes: (render.versoes || []).sort((a, b) => b.versao - a.versao)
+      }))
+
       // Group by compartimento
-      const grouped = (data || []).reduce((acc, render) => {
+      const grouped = sortedData.reduce((acc, render) => {
         const key = render.compartimento || 'Sem Compartimento'
         if (!acc[key]) acc[key] = []
         acc[key].push(render)
@@ -83,6 +157,14 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
       setRenders(grouped)
     } catch (err) {
       console.error('Erro ao carregar renders:', err)
+      setLoadError(err.message)
+
+      // Retry up to 3 times with exponential backoff
+      if (retryCount < 3) {
+        setTimeout(() => {
+          loadRenders(retryCount + 1)
+        }, Math.pow(2, retryCount) * 1000)
+      }
     } finally {
       setLoading(false)
     }
@@ -415,6 +497,19 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
     )
   }
 
+  if (loadError) {
+    return (
+      <div className="archviz-error">
+        <AlertCircle size={48} />
+        <h3>Erro ao carregar renders</h3>
+        <p>{loadError}</p>
+        <button className="btn btn-primary" onClick={() => loadRenders()}>
+          <RefreshCw size={16} /> Tentar novamente
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div className="archviz-container">
       {/* Header */}
@@ -478,7 +573,12 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
                         onClick={() => latestVersion && openLightbox(latestVersion, globalIdx)}
                       >
                         {latestVersion ? (
-                          <img src={latestVersion.url} alt={render.vista} />
+                          <LazyImage
+                            src={latestVersion.url}
+                            alt={render.vista}
+                            className="archviz-img"
+                            onClick={() => openLightbox(latestVersion, globalIdx)}
+                          />
                         ) : (
                           <div className="archviz-placeholder">
                             <Image size={32} />

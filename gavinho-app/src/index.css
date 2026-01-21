@@ -4737,6 +4737,75 @@ tbody tr:last-child td {
   background: rgba(255,255,255,0.2);
 }
 
+/* Lazy Loading States */
+.archviz-image-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--cream);
+  color: var(--brown-light);
+}
+
+.archviz-image-error {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  background: var(--cream);
+  color: var(--brown-light);
+  cursor: pointer;
+  padding: var(--space-md);
+  text-align: center;
+}
+
+.archviz-image-error span {
+  font-size: 12px;
+}
+
+.archviz-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.archviz-img.loaded {
+  opacity: 1;
+}
+
+.archviz-img.loading {
+  opacity: 0;
+}
+
+.archviz-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 40px;
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  text-align: center;
+  color: var(--brown-light);
+  gap: var(--space-md);
+}
+
+.archviz-error h3 {
+  margin: 0;
+  color: var(--error);
+}
+
+.archviz-error p {
+  margin: 0;
+  font-size: 13px;
+}
+
 /* Responsive Archviz */
 @media (max-width: 768px) {
   .archviz-header {
@@ -4769,5 +4838,4 @@ tbody tr:last-child td {
   .archviz-lightbox-next {
     right: var(--space-sm);
   }
-}
 }
