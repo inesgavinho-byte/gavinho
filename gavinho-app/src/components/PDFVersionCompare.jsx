@@ -5,7 +5,8 @@ import {
   X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Loader2,
   GitCompare, CheckCircle, XCircle, AlertTriangle, Clock,
   MessageSquare, Lock, Send, FileText, History, Eye,
-  ChevronDown, ChevronUp, Filter, User, Calendar
+  ChevronDown, ChevronUp, Filter, User, Calendar, Maximize,
+  Flag, Reply, CornerDownRight
 } from 'lucide-react'
 
 // Configurar worker do PDF.js
@@ -17,6 +18,14 @@ const CORRECTION_STATUS = {
   PENDING: { key: 'pendente', label: 'Pendente', icon: Clock, color: 'var(--warning)' },
   ERROR: { key: 'erro', label: 'Erro', icon: XCircle, color: 'var(--error)' },
   OMISSION: { key: 'omissao', label: 'Omissao', icon: AlertTriangle, color: 'var(--info)' }
+}
+
+// Prioridades para anotacoes
+const PRIORITY_LEVELS = {
+  urgente: { label: 'Urgente', color: '#dc2626', bg: 'rgba(220, 38, 38, 0.15)' },
+  alta: { label: 'Alta', color: '#ea580c', bg: 'rgba(234, 88, 12, 0.15)' },
+  normal: { label: 'Normal', color: '#2563eb', bg: 'rgba(37, 99, 235, 0.15)' },
+  baixa: { label: 'Baixa', color: '#6b7280', bg: 'rgba(107, 114, 128, 0.15)' }
 }
 
 export default function PDFVersionCompare({
@@ -46,8 +55,12 @@ export default function PDFVersionCompare({
   const [reviewItems, setReviewItems] = useState([])
   const [newComment, setNewComment] = useState('')
   const [selectedStatus, setSelectedStatus] = useState('pendente')
+  const [selectedPriority, setSelectedPriority] = useState('normal')
   const [filterStatus, setFilterStatus] = useState('todos')
   const [showFilters, setShowFilters] = useState(false)
+  const [replyingTo, setReplyingTo] = useState(null)
+  const [replyText, setReplyText] = useState('')
+  const [expandedThreads, setExpandedThreads] = useState(new Set())
 
   // Submission State
   const [submitting, setSubmitting] = useState(false)
@@ -61,6 +74,7 @@ export default function PDFVersionCompare({
   // Refs
   const canvasAnteriorRef = useRef(null)
   const canvasAtualRef = useRef(null)
+  const pdfContainerRef = useRef(null)
 
   // Load PDFs
   useEffect(() => {
@@ -194,6 +208,22 @@ export default function PDFVersionCompare({
   const zoomIn = () => setScale(prev => Math.min(prev + 0.2, 2))
   const zoomOut = () => setScale(prev => Math.max(prev - 0.2, 0.4))
 
+  // Fit to width
+  const fitToWidth = useCallback(async () => {
+    if (!pdfAtual || !pdfContainerRef.current) return
+
+    try {
+      const page = await pdfAtual.getPage(currentPage)
+      const viewport = page.getViewport({ scale: 1 })
+      // Each panel is roughly half the container width minus padding
+      const panelWidth = (pdfContainerRef.current.clientWidth / 2) - 32
+      const newScale = panelWidth / viewport.width
+      setScale(Math.min(Math.max(newScale, 0.4), 2))
+    } catch (err) {
+      console.error('Erro ao ajustar zoom:', err)
+    }
+  }, [pdfAtual, currentPage])
+
   // Add new review item
   const handleAddComment = () => {
     if (!newComment.trim()) return
@@ -203,15 +233,58 @@ export default function PDFVersionCompare({
       pagina: currentPage,
       comentario: newComment,
       status: selectedStatus,
+      prioridade: selectedPriority,
       autor: userName || 'Utilizador',
       data: new Date().toISOString(),
       tipo: 'comentario',
       resolvido: false,
-      notasResolucao: ''
+      notasResolucao: '',
+      respostas: []
     }
 
     setReviewItems(prev => [...prev, newItem])
     setNewComment('')
+  }
+
+  // Add reply to a comment
+  const handleAddReply = (parentId) => {
+    if (!replyText.trim()) return
+
+    const reply = {
+      id: `reply-${Date.now()}`,
+      autor: userName || 'Utilizador',
+      data: new Date().toISOString(),
+      texto: replyText
+    }
+
+    setReviewItems(prev => prev.map(item =>
+      item.id === parentId
+        ? { ...item, respostas: [...(item.respostas || []), reply] }
+        : item
+    ))
+
+    setReplyText('')
+    setReplyingTo(null)
+  }
+
+  // Toggle thread expansion
+  const toggleThread = (itemId) => {
+    setExpandedThreads(prev => {
+      const next = new Set(prev)
+      if (next.has(itemId)) {
+        next.delete(itemId)
+      } else {
+        next.add(itemId)
+      }
+      return next
+    })
+  }
+
+  // Update item priority
+  const handleUpdatePriority = (itemId, newPriority) => {
+    setReviewItems(prev => prev.map(item =>
+      item.id === itemId ? { ...item, prioridade: newPriority } : item
+    ))
   }
 
   // Update item status
@@ -349,6 +422,9 @@ export default function PDFVersionCompare({
             <button onClick={zoomIn} disabled={scale >= 2} className="pdf-tool-btn">
               <ZoomIn size={16} />
             </button>
+            <button onClick={fitToWidth} className="pdf-tool-btn" title="Ajustar a largura">
+              <Maximize size={16} />
+            </button>
           </div>
 
           <div className="version-compare-actions">
@@ -399,7 +475,7 @@ export default function PDFVersionCompare({
         {/* Main Content */}
         <div className="version-compare-body">
           {/* PDF Comparison Panel */}
-          <div className="version-compare-pdfs">
+          <div className="version-compare-pdfs" ref={pdfContainerRef}>
             {/* Versao Anterior */}
             <div className="version-pdf-panel">
               <div className="version-pdf-header">
@@ -500,7 +576,7 @@ export default function PDFVersionCompare({
                 </div>
               ) : (
                 filteredItems.map(item => (
-                  <div key={item.id} className={`review-item ${item.resolvido ? 'resolved' : ''}`}>
+                  <div key={item.id} className={`review-item ${item.resolvido ? 'resolved' : ''} priority-${item.prioridade || 'normal'}`}>
                     <div className="review-item-header">
                       <div className="review-item-meta">
                         <span className="review-page">Pag. {item.pagina}</span>
@@ -509,6 +585,18 @@ export default function PDFVersionCompare({
                             React.createElement(CORRECTION_STATUS[item.status.toUpperCase()].icon, { size: 12 })}
                           {CORRECTION_STATUS[item.status.toUpperCase()]?.label || item.status}
                         </span>
+                        {item.prioridade && (
+                          <span
+                            className="review-priority"
+                            style={{
+                              background: PRIORITY_LEVELS[item.prioridade]?.bg,
+                              color: PRIORITY_LEVELS[item.prioridade]?.color
+                            }}
+                          >
+                            <Flag size={10} />
+                            {PRIORITY_LEVELS[item.prioridade]?.label}
+                          </span>
+                        )}
                       </div>
                       <div className="review-item-author">
                         <User size={12} />
@@ -520,7 +608,7 @@ export default function PDFVersionCompare({
 
                     <p className="review-item-comment">{item.comentario}</p>
 
-                    {/* Status Selector */}
+                    {/* Status & Priority Selectors */}
                     <div className="review-item-actions">
                       <select
                         value={item.status}
@@ -533,12 +621,31 @@ export default function PDFVersionCompare({
                         <option value="omissao">Omissao</option>
                       </select>
 
+                      <select
+                        value={item.prioridade || 'normal'}
+                        onChange={(e) => handleUpdatePriority(item.id, e.target.value)}
+                        className="review-priority-select"
+                      >
+                        <option value="urgente">Urgente</option>
+                        <option value="alta">Alta</option>
+                        <option value="normal">Normal</option>
+                        <option value="baixa">Baixa</option>
+                      </select>
+
                       <button
                         className={`btn btn-sm ${item.resolvido ? 'btn-success' : 'btn-outline'}`}
                         onClick={() => handleToggleResolved(item.id)}
                       >
                         <CheckCircle size={14} />
-                        {item.resolvido ? 'Resolvido' : 'Marcar Resolvido'}
+                        {item.resolvido ? 'Resolvido' : 'Marcar'}
+                      </button>
+
+                      <button
+                        className="btn btn-sm btn-outline"
+                        onClick={() => setReplyingTo(replyingTo === item.id ? null : item.id)}
+                      >
+                        <Reply size={14} />
+                        Responder
                       </button>
                     </div>
 
@@ -551,6 +658,64 @@ export default function PDFVersionCompare({
                         rows={2}
                       />
                     </div>
+
+                    {/* Replies Thread */}
+                    {item.respostas && item.respostas.length > 0 && (
+                      <div className="review-thread">
+                        <button
+                          className="thread-toggle"
+                          onClick={() => toggleThread(item.id)}
+                        >
+                          <CornerDownRight size={14} />
+                          {expandedThreads.has(item.id) ? 'Ocultar' : 'Ver'} {item.respostas.length} {item.respostas.length === 1 ? 'resposta' : 'respostas'}
+                          {expandedThreads.has(item.id) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                        </button>
+
+                        {expandedThreads.has(item.id) && (
+                          <div className="thread-replies">
+                            {item.respostas.map(reply => (
+                              <div key={reply.id} className="thread-reply">
+                                <div className="reply-header">
+                                  <User size={10} />
+                                  <span className="reply-author">{reply.autor}</span>
+                                  <span className="reply-date">{new Date(reply.data).toLocaleDateString('pt-PT')}</span>
+                                </div>
+                                <p className="reply-text">{reply.texto}</p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Reply Input */}
+                    {replyingTo === item.id && (
+                      <div className="review-reply-input">
+                        <textarea
+                          placeholder="Escreva a sua resposta..."
+                          value={replyText}
+                          onChange={(e) => setReplyText(e.target.value)}
+                          rows={2}
+                          autoFocus
+                        />
+                        <div className="reply-actions">
+                          <button
+                            className="btn btn-sm btn-outline"
+                            onClick={() => { setReplyingTo(null); setReplyText('') }}
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            className="btn btn-sm btn-primary"
+                            onClick={() => handleAddReply(item.id)}
+                            disabled={!replyText.trim()}
+                          >
+                            <Send size={12} />
+                            Enviar
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))
               )}
@@ -560,16 +725,28 @@ export default function PDFVersionCompare({
             <div className="review-add-comment">
               <div className="add-comment-header">
                 <span>Adicionar Comentario na Pagina {currentPage}</span>
-                <select
-                  value={selectedStatus}
-                  onChange={(e) => setSelectedStatus(e.target.value)}
-                  className="review-status-select"
-                >
-                  <option value="implementado">Implementado</option>
-                  <option value="pendente">Pendente</option>
-                  <option value="erro">Erro</option>
-                  <option value="omissao">Omissao</option>
-                </select>
+                <div className="add-comment-selects">
+                  <select
+                    value={selectedStatus}
+                    onChange={(e) => setSelectedStatus(e.target.value)}
+                    className="review-status-select"
+                  >
+                    <option value="implementado">Implementado</option>
+                    <option value="pendente">Pendente</option>
+                    <option value="erro">Erro</option>
+                    <option value="omissao">Omissao</option>
+                  </select>
+                  <select
+                    value={selectedPriority}
+                    onChange={(e) => setSelectedPriority(e.target.value)}
+                    className="review-priority-select"
+                  >
+                    <option value="urgente">Urgente</option>
+                    <option value="alta">Alta</option>
+                    <option value="normal">Normal</option>
+                    <option value="baixa">Baixa</option>
+                  </select>
+                </div>
               </div>
               <div className="add-comment-input">
                 <textarea

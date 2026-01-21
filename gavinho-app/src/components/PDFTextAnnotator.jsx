@@ -3,7 +3,7 @@ import * as pdfjsLib from 'pdfjs-dist'
 import {
   X, Type, ChevronLeft, ChevronRight, ZoomIn, ZoomOut,
   Trash2, Save, Download, Loader2, Move, Undo, Redo,
-  Palette, ALargeSmall
+  Palette, ALargeSmall, Maximize
 } from 'lucide-react'
 
 // Configurar worker do PDF.js
@@ -260,6 +260,21 @@ export default function PDFTextAnnotator({
   const zoomIn = () => setScale(prev => Math.min(prev + 0.2, 3))
   const zoomOut = () => setScale(prev => Math.max(prev - 0.2, 0.5))
 
+  // Fit to width
+  const fitToWidth = useCallback(async () => {
+    if (!pdfDoc || !containerRef.current) return
+
+    try {
+      const page = await pdfDoc.getPage(currentPage)
+      const viewport = page.getViewport({ scale: 1 })
+      const containerWidth = containerRef.current.clientWidth - 48 // padding
+      const newScale = containerWidth / viewport.width
+      setScale(Math.min(Math.max(newScale, 0.5), 3))
+    } catch (err) {
+      console.error('Erro ao ajustar zoom:', err)
+    }
+  }, [pdfDoc, currentPage])
+
   // Export/Save annotated PDF (generates canvas with annotations)
   const handleExport = async () => {
     setSaving(true)
@@ -460,6 +475,13 @@ export default function PDFTextAnnotator({
               title="Aumentar zoom"
             >
               <ZoomIn size={18} />
+            </button>
+            <button
+              className="pdf-tool-btn"
+              onClick={fitToWidth}
+              title="Ajustar a largura"
+            >
+              <Maximize size={18} />
             </button>
           </div>
 

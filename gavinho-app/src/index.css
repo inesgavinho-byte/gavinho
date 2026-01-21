@@ -3479,6 +3479,145 @@ tbody tr:last-child td {
   color: var(--brown);
 }
 
+/* Priority Badge */
+.review-priority {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.review-priority-select {
+  padding: 4px 8px;
+  font-size: 11px;
+  border: 1px solid var(--stone);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  color: var(--brown);
+  cursor: pointer;
+}
+
+/* Priority item borders */
+.review-item.priority-urgente {
+  border-left-color: #dc2626;
+}
+
+.review-item.priority-alta {
+  border-left-color: #ea580c;
+}
+
+.review-item.priority-normal {
+  border-left-color: #2563eb;
+}
+
+.review-item.priority-baixa {
+  border-left-color: #6b7280;
+}
+
+/* Add comment selects */
+.add-comment-selects {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+/* Thread Replies */
+.review-thread {
+  margin-top: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: 1px dashed var(--stone);
+}
+
+.thread-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: transparent;
+  border: none;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--brown-light);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s ease;
+}
+
+.thread-toggle:hover {
+  background: var(--stone);
+  color: var(--brown);
+}
+
+.thread-replies {
+  margin-top: var(--space-sm);
+  padding-left: var(--space-md);
+  border-left: 2px solid var(--stone);
+}
+
+.thread-reply {
+  padding: var(--space-sm);
+  margin-bottom: var(--space-xs);
+  background: var(--white);
+  border-radius: var(--radius-sm);
+}
+
+.reply-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  font-size: 11px;
+  color: var(--brown-light);
+}
+
+.reply-author {
+  font-weight: 600;
+  color: var(--brown);
+}
+
+.reply-date {
+  margin-left: auto;
+}
+
+.reply-text {
+  font-size: 12px;
+  color: var(--brown);
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Reply Input */
+.review-reply-input {
+  margin-top: var(--space-sm);
+  padding: var(--space-sm);
+  background: var(--white);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--blush);
+}
+
+.review-reply-input textarea {
+  width: 100%;
+  padding: var(--space-sm);
+  font-size: 12px;
+  border: 1px solid var(--stone);
+  border-radius: var(--radius-sm);
+  resize: vertical;
+  margin-bottom: var(--space-xs);
+}
+
+.review-reply-input textarea:focus {
+  outline: none;
+  border-color: var(--blush);
+}
+
+.reply-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-xs);
+}
+
 /* Responsive */
 @media (max-width: 1200px) {
   .version-compare-pdfs {
