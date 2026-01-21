@@ -6,7 +6,8 @@ import {
   GitCompare, CheckCircle, XCircle, AlertTriangle, Clock,
   MessageSquare, Lock, Send, FileText, History, Eye,
   ChevronDown, ChevronUp, Filter, User, Calendar, Maximize,
-  Flag, Reply, CornerDownRight, ThumbsUp, ThumbsDown, Edit3
+  Flag, Reply, CornerDownRight, ThumbsUp, ThumbsDown, Edit3,
+  AtSign, LayoutGrid
 } from 'lucide-react'
 
 // Configurar worker do PDF.js
@@ -75,10 +76,24 @@ export default function PDFVersionCompare({
   const [showHistory, setShowHistory] = useState(false)
   const [revisionHistory, setRevisionHistory] = useState([])
 
+  // Mentions State
+  const [teamMembers, setTeamMembers] = useState([])
+  const [showMentionSuggestions, setShowMentionSuggestions] = useState(false)
+  const [mentionSearch, setMentionSearch] = useState('')
+  const [mentionCursorPos, setMentionCursorPos] = useState(0)
+  const [activeMentionField, setActiveMentionField] = useState(null) // 'comment' | 'reply'
+
+  // Thumbnails State
+  const [showThumbnails, setShowThumbnails] = useState(false)
+  const [thumbnails, setThumbnails] = useState([])
+  const [loadingThumbnails, setLoadingThumbnails] = useState(false)
+
   // Refs
   const canvasAnteriorRef = useRef(null)
   const canvasAtualRef = useRef(null)
   const pdfContainerRef = useRef(null)
+  const commentInputRef = useRef(null)
+  const replyInputRef = useRef(null)
 
   // Load PDFs
   useEffect(() => {
@@ -154,6 +169,68 @@ export default function PDFVersionCompare({
     loadHistory()
   }, [documentoId])
 
+  // Load team members for mentions
+  useEffect(() => {
+    const loadTeamMembers = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('utilizadores')
+          .select('id, nome, email, cargo, avatar_url')
+          .eq('ativo', true)
+          .order('nome')
+
+        if (error) throw error
+        setTeamMembers(data || [])
+      } catch (err) {
+        console.error('Erro ao carregar equipa:', err)
+      }
+    }
+
+    loadTeamMembers()
+  }, [])
+
+  // Generate thumbnails when PDF loads
+  useEffect(() => {
+    const generateThumbnails = async () => {
+      if (!pdfAtual || loadingThumbnails) return
+
+      setLoadingThumbnails(true)
+      const thumbs = []
+
+      try {
+        for (let i = 1; i <= totalPagesAtual; i++) {
+          const page = await pdfAtual.getPage(i)
+          const viewport = page.getViewport({ scale: 0.2 })
+
+          const canvas = document.createElement('canvas')
+          const context = canvas.getContext('2d')
+          canvas.height = viewport.height
+          canvas.width = viewport.width
+
+          await page.render({
+            canvasContext: context,
+            viewport: viewport
+          }).promise
+
+          thumbs.push({
+            page: i,
+            dataUrl: canvas.toDataURL('image/jpeg', 0.6)
+          })
+        }
+
+        setThumbnails(thumbs)
+      } catch (err) {
+        console.error('Erro ao gerar miniaturas:', err)
+      } finally {
+        setLoadingThumbnails(false)
+      }
+    }
+
+    if (pdfAtual && totalPagesAtual > 0 && thumbnails.length === 0) {
+      generateThumbnails()
+    }
+  }, [pdfAtual, totalPagesAtual])
+
   // Render PDF pages
   useEffect(() => {
     const renderPages = async () => {
@@ -228,12 +305,124 @@ export default function PDFVersionCompare({
     }
   }, [pdfAtual, currentPage])
 
+  // Handle mention input
+  const handleMentionInput = (text, field, cursorPos) => {
+    // Check for @ symbol before cursor
+    const textBeforeCursor = text.substring(0, cursorPos)
+    const lastAtIndex = textBeforeCursor.lastIndexOf('@')
+
+    if (lastAtIndex !== -1) {
+      const textAfterAt = textBeforeCursor.substring(lastAtIndex + 1)
+      // Check if there's no space after @ (user is typing a mention)
+      if (!textAfterAt.includes(' ')) {
+        setMentionSearch(textAfterAt.toLowerCase())
+        setMentionCursorPos(lastAtIndex)
+        setActiveMentionField(field)
+        setShowMentionSuggestions(true)
+        return
+      }
+    }
+
+    setShowMentionSuggestions(false)
+    setActiveMentionField(null)
+  }
+
+  // Filter team members by search
+  const filteredMembers = teamMembers.filter(member =>
+    member.nome.toLowerCase().includes(mentionSearch) ||
+    (member.email && member.email.toLowerCase().includes(mentionSearch))
+  ).slice(0, 5)
+
+  // Insert mention into text
+  const insertMention = (member) => {
+    const mention = `@${member.nome}`
+
+    if (activeMentionField === 'comment') {
+      const before = newComment.substring(0, mentionCursorPos)
+      const after = newComment.substring(mentionCursorPos + mentionSearch.length + 1)
+      setNewComment(before + mention + ' ' + after)
+      // Focus back on input
+      setTimeout(() => commentInputRef.current?.focus(), 0)
+    } else if (activeMentionField === 'reply') {
+      const before = replyText.substring(0, mentionCursorPos)
+      const after = replyText.substring(mentionCursorPos + mentionSearch.length + 1)
+      setReplyText(before + mention + ' ' + after)
+      setTimeout(() => replyInputRef.current?.focus(), 0)
+    }
+
+    setShowMentionSuggestions(false)
+    setActiveMentionField(null)
+  }
+
+  // Extract mentions from text and save to database
+  const extractAndSaveMentions = async (text, reviewItemId) => {
+    const mentionRegex = /@([A-Za-zÀ-ÿ\s]+?)(?=\s|$|@)/g
+    const mentions = []
+    let match
+
+    while ((match = mentionRegex.exec(text)) !== null) {
+      const mentionedName = match[1].trim()
+      const member = teamMembers.find(m =>
+        m.nome.toLowerCase() === mentionedName.toLowerCase()
+      )
+      if (member) {
+        mentions.push(member)
+      }
+    }
+
+    if (mentions.length > 0 && documentoId) {
+      try {
+        const mentionRecords = mentions.map(member => ({
+          documento_id: documentoId,
+          review_item_id: reviewItemId,
+          mentioned_user_id: member.id,
+          mentioned_by_user_id: userId,
+          mentioned_by_name: userName,
+          created_at: new Date().toISOString()
+        }))
+
+        await supabase
+          .from('design_review_mentions')
+          .insert(mentionRecords)
+      } catch (err) {
+        console.error('Erro ao guardar mencoes:', err)
+      }
+    }
+
+    return mentions
+  }
+
+  // Render text with highlighted mentions
+  const renderTextWithMentions = (text) => {
+    if (!text) return null
+
+    const parts = text.split(/(@[A-Za-zÀ-ÿ\s]+?)(?=\s|$|@)/g)
+    return parts.map((part, index) => {
+      if (part.startsWith('@')) {
+        const name = part.substring(1).trim()
+        const member = teamMembers.find(m =>
+          m.nome.toLowerCase() === name.toLowerCase()
+        )
+        if (member) {
+          return (
+            <span key={index} className="mention-tag" title={member.email}>
+              <AtSign size={12} />
+              {name}
+            </span>
+          )
+        }
+      }
+      return part
+    })
+  }
+
   // Add new review item
-  const handleAddComment = () => {
+  const handleAddComment = async () => {
     if (!newComment.trim()) return
 
+    const newItemId = `new-${Date.now()}`
     const newItem = {
-      id: `new-${Date.now()}`,
+      id: newItemId,
       pagina: currentPage,
       comentario: newComment,
       status: selectedStatus,
@@ -247,15 +436,21 @@ export default function PDFVersionCompare({
     }
 
     setReviewItems(prev => [...prev, newItem])
+
+    // Extract and save mentions
+    await extractAndSaveMentions(newComment, newItemId)
+
     setNewComment('')
+    setShowMentionSuggestions(false)
   }
 
   // Add reply to a comment
-  const handleAddReply = (parentId) => {
+  const handleAddReply = async (parentId) => {
     if (!replyText.trim()) return
 
+    const replyId = `reply-${Date.now()}`
     const reply = {
-      id: `reply-${Date.now()}`,
+      id: replyId,
       autor: userName || 'Utilizador',
       data: new Date().toISOString(),
       texto: replyText
@@ -267,8 +462,12 @@ export default function PDFVersionCompare({
         : item
     ))
 
+    // Extract and save mentions
+    await extractAndSaveMentions(replyText, replyId)
+
     setReplyText('')
     setReplyingTo(null)
+    setShowMentionSuggestions(false)
   }
 
   // Toggle thread expansion
@@ -488,6 +687,14 @@ export default function PDFVersionCompare({
 
           <div className="version-compare-actions">
             <button
+              className={`btn btn-outline ${showThumbnails ? 'active' : ''}`}
+              onClick={() => setShowThumbnails(!showThumbnails)}
+              title="Miniaturas das paginas"
+            >
+              <LayoutGrid size={16} />
+              Miniaturas
+            </button>
+            <button
               className="btn btn-outline"
               onClick={() => setShowHistory(!showHistory)}
             >
@@ -555,6 +762,47 @@ export default function PDFVersionCompare({
 
         {/* Main Content */}
         <div className="version-compare-body">
+          {/* Thumbnails Panel */}
+          {showThumbnails && (
+            <div className="thumbnails-panel">
+              <div className="thumbnails-header">
+                <h4><LayoutGrid size={16} /> Paginas</h4>
+                <button className="btn btn-ghost btn-sm" onClick={() => setShowThumbnails(false)}>
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="thumbnails-list">
+                {loadingThumbnails ? (
+                  <div className="thumbnails-loading">
+                    <Loader2 size={24} className="spin" />
+                    <p>A gerar miniaturas...</p>
+                  </div>
+                ) : thumbnails.length === 0 ? (
+                  <div className="thumbnails-empty">
+                    <FileText size={24} />
+                    <p>Sem miniaturas disponiveis</p>
+                  </div>
+                ) : (
+                  thumbnails.map(thumb => (
+                    <div
+                      key={thumb.page}
+                      className={`thumbnail-item ${currentPage === thumb.page ? 'active' : ''}`}
+                      onClick={() => setCurrentPage(thumb.page)}
+                    >
+                      <img src={thumb.dataUrl} alt={`Pagina ${thumb.page}`} />
+                      <span className="thumbnail-page">Pag. {thumb.page}</span>
+                      {reviewItems.filter(item => item.pagina === thumb.page).length > 0 && (
+                        <span className="thumbnail-badge">
+                          {reviewItems.filter(item => item.pagina === thumb.page).length}
+                        </span>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
           {/* PDF Comparison Panel */}
           <div className="version-compare-pdfs" ref={pdfContainerRef}>
             {/* Versao Anterior */}
@@ -687,7 +935,7 @@ export default function PDFVersionCompare({
                       </div>
                     </div>
 
-                    <p className="review-item-comment">{item.comentario}</p>
+                    <p className="review-item-comment">{renderTextWithMentions(item.comentario)}</p>
 
                     {/* Status & Priority Selectors */}
                     <div className="review-item-actions">
@@ -761,7 +1009,7 @@ export default function PDFVersionCompare({
                                   <span className="reply-author">{reply.autor}</span>
                                   <span className="reply-date">{new Date(reply.data).toLocaleDateString('pt-PT')}</span>
                                 </div>
-                                <p className="reply-text">{reply.texto}</p>
+                                <p className="reply-text">{renderTextWithMentions(reply.texto)}</p>
                               </div>
                             ))}
                           </div>
@@ -772,17 +1020,57 @@ export default function PDFVersionCompare({
                     {/* Reply Input */}
                     {replyingTo === item.id && (
                       <div className="review-reply-input">
-                        <textarea
-                          placeholder="Escreva a sua resposta..."
-                          value={replyText}
-                          onChange={(e) => setReplyText(e.target.value)}
-                          rows={2}
-                          autoFocus
-                        />
+                        <div className="mention-input-wrapper">
+                          <textarea
+                            ref={replyInputRef}
+                            placeholder="Escreva a sua resposta... Use @ para mencionar"
+                            value={replyText}
+                            onChange={(e) => {
+                              setReplyText(e.target.value)
+                              handleMentionInput(e.target.value, 'reply', e.target.selectionStart)
+                            }}
+                            onKeyDown={(e) => {
+                              if (showMentionSuggestions && activeMentionField === 'reply') {
+                                if (e.key === 'Escape') {
+                                  setShowMentionSuggestions(false)
+                                } else if (e.key === 'Enter' && filteredMembers.length > 0) {
+                                  e.preventDefault()
+                                  insertMention(filteredMembers[0])
+                                }
+                              }
+                            }}
+                            rows={2}
+                            autoFocus
+                          />
+                          {/* Mention Suggestions Dropdown for Reply */}
+                          {showMentionSuggestions && activeMentionField === 'reply' && filteredMembers.length > 0 && (
+                            <div className="mention-suggestions">
+                              {filteredMembers.map(member => (
+                                <div
+                                  key={member.id}
+                                  className="mention-suggestion-item"
+                                  onClick={() => insertMention(member)}
+                                >
+                                  <div className="mention-avatar">
+                                    {member.avatar_url ? (
+                                      <img src={member.avatar_url} alt={member.nome} />
+                                    ) : (
+                                      <User size={16} />
+                                    )}
+                                  </div>
+                                  <div className="mention-info">
+                                    <span className="mention-name">{member.nome}</span>
+                                    {member.cargo && <span className="mention-cargo">{member.cargo}</span>}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                         <div className="reply-actions">
                           <button
                             className="btn btn-sm btn-outline"
-                            onClick={() => { setReplyingTo(null); setReplyText('') }}
+                            onClick={() => { setReplyingTo(null); setReplyText(''); setShowMentionSuggestions(false) }}
                           >
                             Cancelar
                           </button>
@@ -830,20 +1118,65 @@ export default function PDFVersionCompare({
                 </div>
               </div>
               <div className="add-comment-input">
-                <textarea
-                  placeholder="Descreva a diferenca, erro ou omissao..."
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  rows={3}
-                />
-                <button
-                  className="btn btn-primary"
-                  onClick={handleAddComment}
-                  disabled={!newComment.trim()}
-                >
-                  <Send size={16} />
-                  Adicionar
-                </button>
+                <div className="mention-input-wrapper">
+                  <textarea
+                    ref={commentInputRef}
+                    placeholder="Descreva a diferenca, erro ou omissao... Use @ para mencionar pessoas"
+                    value={newComment}
+                    onChange={(e) => {
+                      setNewComment(e.target.value)
+                      handleMentionInput(e.target.value, 'comment', e.target.selectionStart)
+                    }}
+                    onKeyDown={(e) => {
+                      if (showMentionSuggestions && activeMentionField === 'comment') {
+                        if (e.key === 'Escape') {
+                          setShowMentionSuggestions(false)
+                        } else if (e.key === 'Enter' && filteredMembers.length > 0) {
+                          e.preventDefault()
+                          insertMention(filteredMembers[0])
+                        }
+                      }
+                    }}
+                    rows={3}
+                  />
+                  {/* Mention Suggestions Dropdown */}
+                  {showMentionSuggestions && activeMentionField === 'comment' && filteredMembers.length > 0 && (
+                    <div className="mention-suggestions">
+                      {filteredMembers.map(member => (
+                        <div
+                          key={member.id}
+                          className="mention-suggestion-item"
+                          onClick={() => insertMention(member)}
+                        >
+                          <div className="mention-avatar">
+                            {member.avatar_url ? (
+                              <img src={member.avatar_url} alt={member.nome} />
+                            ) : (
+                              <User size={16} />
+                            )}
+                          </div>
+                          <div className="mention-info">
+                            <span className="mention-name">{member.nome}</span>
+                            {member.cargo && <span className="mention-cargo">{member.cargo}</span>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="add-comment-actions">
+                  <span className="mention-hint">
+                    <AtSign size={12} /> Use @ para mencionar
+                  </span>
+                  <button
+                    className="btn btn-primary"
+                    onClick={handleAddComment}
+                    disabled={!newComment.trim()}
+                  >
+                    <Send size={16} />
+                    Adicionar
+                  </button>
+                </div>
               </div>
             </div>
           </div>
