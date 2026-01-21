@@ -33,12 +33,14 @@ import {
   File,
   ListChecks,
   FileCheck,
-  Lock
+  Lock,
+  Image
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import ProjetoEntregaveis from '../components/ProjetoEntregaveis'
 import ProjetoDocumentos from '../components/ProjetoDocumentos'
+import ProjetoArchviz from '../components/ProjetoArchviz'
 
 // Dados de exemplo baseados nos JSONs fornecidos
 const sampleProjectData = {
@@ -1269,6 +1271,7 @@ export default function ProjetoDetalhe() {
   const allTabs = [
     { id: 'geral', label: 'Geral', icon: Layers },
     { id: 'entregaveis', label: 'Entregáveis', icon: ListChecks },
+    { id: 'archviz', label: 'Archviz', icon: Image },
     { id: 'contratos', label: 'Contratos', icon: FileCheck, adminOnly: true },
     { id: 'fases', label: 'Fases & Entregas', icon: Target },
     { id: 'financeiro', label: 'Financeiro', icon: Euro, adminOnly: true },
@@ -1670,6 +1673,11 @@ export default function ProjetoDetalhe() {
       {/* Tab Entregáveis */}
       {activeTab === 'entregaveis' && (
         <ProjetoEntregaveis projeto={project} />
+      )}
+
+      {/* Tab Archviz */}
+      {activeTab === 'archviz' && (
+        <ProjetoArchviz projeto={project} userId={profile?.id} userName={profile?.nome} />
       )}
 
       {/* Tab Contratos - Apenas Administração */}
