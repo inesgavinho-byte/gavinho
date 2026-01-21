@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
-import { 
+import {
   Plus, Upload, FileText, Download, Trash2, Edit2, Save, X,
   Calendar, Euro, CheckCircle, Clock, AlertCircle, File,
-  Loader2, Eye, FileCheck, FilePlus2
+  Loader2, Eye, FileCheck, FilePlus2, Type
 } from 'lucide-react'
+import PDFTextAnnotator from './PDFTextAnnotator'
 
 const tipoConfig = {
   'proposta': { label: 'Proposta', color: 'var(--warning)', icon: FileText },
@@ -39,6 +40,9 @@ export default function ProjetoDocumentos({ projeto, onValorUpdate }) {
     ficheiro_url: '',
     ficheiro_nome: ''
   })
+
+  // PDF Annotator state
+  const [annotatingDoc, setAnnotatingDoc] = useState(null)
 
   useEffect(() => {
     if (projeto?.id) {
@@ -305,6 +309,16 @@ export default function ProjetoDocumentos({ projeto, onValorUpdate }) {
                         <Eye size={16} />
                       </a>
                     )}
+                    {doc.ficheiro_url && doc.ficheiro_nome?.toLowerCase().endsWith('.pdf') && (
+                      <button
+                        onClick={() => setAnnotatingDoc(doc)}
+                        className="btn btn-outline btn-icon"
+                        style={{ padding: '8px' }}
+                        title="Anotar PDF com texto"
+                      >
+                        <Type size={16} />
+                      </button>
+                    )}
                     <button onClick={() => handleEdit(doc)} className="btn btn-ghost btn-icon" style={{ padding: '8px' }} title="Editar">
                       <Edit2 size={16} />
                     </button>
@@ -446,6 +460,19 @@ export default function ProjetoDocumentos({ projeto, onValorUpdate }) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* PDF Text Annotator Modal */}
+      {annotatingDoc && (
+        <PDFTextAnnotator
+          pdfUrl={annotatingDoc.ficheiro_url}
+          documentName={annotatingDoc.nome}
+          onClose={() => setAnnotatingDoc(null)}
+          onSave={async (annotations) => {
+            console.log('Anotacoes guardadas:', annotations)
+            // Aqui pode-se guardar as anotacoes na base de dados se necessario
+          }}
+        />
       )}
     </div>
   )
