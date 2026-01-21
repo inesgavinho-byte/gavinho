@@ -3,9 +3,10 @@ import { supabase } from '../lib/supabase'
 import {
   Plus, Upload, FileText, Download, Trash2, Edit2, Save, X,
   Calendar, Euro, CheckCircle, Clock, AlertCircle, File,
-  Loader2, Eye, FileCheck, FilePlus2, Type
+  Loader2, Eye, FileCheck, FilePlus2, Type, GitCompare
 } from 'lucide-react'
 import PDFTextAnnotator from './PDFTextAnnotator'
+import PDFVersionCompare from './PDFVersionCompare'
 
 const tipoConfig = {
   'proposta': { label: 'Proposta', color: 'var(--warning)', icon: FileText },
@@ -43,6 +44,10 @@ export default function ProjetoDocumentos({ projeto, onValorUpdate }) {
 
   // PDF Annotator state
   const [annotatingDoc, setAnnotatingDoc] = useState(null)
+
+  // PDF Version Compare state
+  const [comparingDoc, setComparingDoc] = useState(null)
+  const [selectedForCompare, setSelectedForCompare] = useState(null)
 
   useEffect(() => {
     if (projeto?.id) {
@@ -310,14 +315,36 @@ export default function ProjetoDocumentos({ projeto, onValorUpdate }) {
                       </a>
                     )}
                     {doc.ficheiro_url && doc.ficheiro_nome?.toLowerCase().endsWith('.pdf') && (
-                      <button
-                        onClick={() => setAnnotatingDoc(doc)}
-                        className="btn btn-outline btn-icon"
-                        style={{ padding: '8px' }}
-                        title="Anotar PDF com texto"
-                      >
-                        <Type size={16} />
-                      </button>
+                      <>
+                        <button
+                          onClick={() => setAnnotatingDoc(doc)}
+                          className="btn btn-outline btn-icon"
+                          style={{ padding: '8px' }}
+                          title="Anotar PDF com texto"
+                        >
+                          <Type size={16} />
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (selectedForCompare && selectedForCompare.id !== doc.id) {
+                              // Open compare with selected + this doc
+                              setComparingDoc({
+                                anterior: selectedForCompare,
+                                atual: doc
+                              })
+                              setSelectedForCompare(null)
+                            } else {
+                              // Select this doc for comparison
+                              setSelectedForCompare(selectedForCompare?.id === doc.id ? null : doc)
+                            }
+                          }}
+                          className={`btn btn-icon ${selectedForCompare?.id === doc.id ? 'btn-primary' : 'btn-outline'}`}
+                          style={{ padding: '8px' }}
+                          title={selectedForCompare?.id === doc.id ? 'Cancelar selecao' : selectedForCompare ? 'Comparar com selecionado' : 'Selecionar para comparar'}
+                        >
+                          <GitCompare size={16} />
+                        </button>
+                      </>
                     )}
                     <button onClick={() => handleEdit(doc)} className="btn btn-ghost btn-icon" style={{ padding: '8px' }} title="Editar">
                       <Edit2 size={16} />
@@ -473,6 +500,66 @@ export default function ProjetoDocumentos({ projeto, onValorUpdate }) {
             // Aqui pode-se guardar as anotacoes na base de dados se necessario
           }}
         />
+      )}
+
+      {/* PDF Version Compare Modal */}
+      {comparingDoc && (
+        <PDFVersionCompare
+          documentoId={comparingDoc.atual.id}
+          versaoAnteriorUrl={comparingDoc.anterior?.ficheiro_url}
+          versaoAtualUrl={comparingDoc.atual.ficheiro_url}
+          versaoAnteriorNome={comparingDoc.anterior?.nome}
+          versaoAtualNome={comparingDoc.atual.nome}
+          projetoId={projeto?.id}
+          onClose={() => setComparingDoc(null)}
+          onSubmitReview={async (reviewData) => {
+            console.log('Revisao submetida:', reviewData)
+            // Recarregar documentos apos submissao
+            loadDocumentos()
+          }}
+        />
+      )}
+
+      {/* Selected for Compare Indicator */}
+      {selectedForCompare && (
+        <div style={{
+          position: 'fixed',
+          bottom: '24px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          padding: '12px 24px',
+          background: 'var(--brown)',
+          color: 'var(--sandy-beach)',
+          borderRadius: '980px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          boxShadow: 'var(--shadow-lg)',
+          zIndex: 100,
+          animation: 'fadeIn 0.3s ease'
+        }}>
+          <GitCompare size={18} />
+          <span style={{ fontSize: '14px', fontWeight: 500 }}>
+            "{selectedForCompare.nome}" selecionado - clique noutro PDF para comparar
+          </span>
+          <button
+            onClick={() => setSelectedForCompare(null)}
+            style={{
+              background: 'rgba(255,255,255,0.2)',
+              border: 'none',
+              borderRadius: '50%',
+              width: '24px',
+              height: '24px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              color: 'var(--sandy-beach)'
+            }}
+          >
+            <X size={14} />
+          </button>
+        </div>
       )}
     </div>
   )
