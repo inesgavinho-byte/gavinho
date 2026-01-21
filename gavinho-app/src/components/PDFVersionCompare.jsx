@@ -6,7 +6,7 @@ import {
   GitCompare, CheckCircle, XCircle, AlertTriangle, Clock,
   MessageSquare, Lock, Send, FileText, History, Eye,
   ChevronDown, ChevronUp, Filter, User, Calendar, Maximize,
-  Flag, Reply, CornerDownRight
+  Flag, Reply, CornerDownRight, ThumbsUp, ThumbsDown, Edit3
 } from 'lucide-react'
 
 // Configurar worker do PDF.js
@@ -66,6 +66,10 @@ export default function PDFVersionCompare({
   const [submitting, setSubmitting] = useState(false)
   const [reviewNotes, setReviewNotes] = useState('')
   const [showSubmitModal, setShowSubmitModal] = useState(false)
+
+  // Decision State
+  const [showDecisionModal, setShowDecisionModal] = useState(null) // 'approve' | 'changes' | null
+  const [decisionNotes, setDecisionNotes] = useState('')
 
   // History State
   const [showHistory, setShowHistory] = useState(false)
@@ -371,6 +375,61 @@ export default function PDFVersionCompare({
     }
   }
 
+  // Handle decision (Approve or Request Changes)
+  const handleDecision = async (decision) => {
+    if (!decisionNotes.trim()) {
+      alert('Por favor adicione notas sobre esta decisao')
+      return
+    }
+
+    setSubmitting(true)
+
+    try {
+      const decisionData = {
+        documento_id: documentoId,
+        projeto_id: projetoId,
+        user_id: userId,
+        user_name: userName,
+        versao_anterior: versaoAnteriorNome,
+        versao_atual: versaoAtualNome,
+        notas: decisionNotes,
+        items: reviewItems,
+        estatisticas: stats,
+        decisao: decision, // 'aprovado' ou 'alteracoes'
+        status: decision === 'aprovado' ? 'aprovado' : 'alteracoes_pedidas',
+        created_at: new Date().toISOString()
+      }
+
+      // Save to database
+      const { error: saveError } = await supabase
+        .from('documento_revisoes')
+        .insert([decisionData])
+
+      if (saveError) throw saveError
+
+      // Call callback
+      if (onSubmitReview) {
+        await onSubmitReview(decisionData)
+      }
+
+      setShowDecisionModal(null)
+      setDecisionNotes('')
+
+      if (decision === 'aprovado') {
+        alert('Documento aprovado e versao trancada com sucesso!')
+      } else {
+        alert('Pedido de alteracoes registado com sucesso!')
+      }
+
+      onClose()
+    } catch (err) {
+      console.error('Erro ao registar decisao:', err)
+      alert('Erro ao registar decisao. Por favor tente novamente.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="version-compare-overlay">
@@ -435,12 +494,34 @@ export default function PDFVersionCompare({
               <History size={16} />
               Historico
             </button>
+
+            {/* Decision Buttons */}
+            <div className="decision-buttons">
+              <button
+                className="btn btn-success decision-btn"
+                onClick={() => setShowDecisionModal('approve')}
+                title="Aprovar documento"
+              >
+                <ThumbsUp size={16} />
+                Aprovar
+              </button>
+              <button
+                className="btn btn-warning decision-btn"
+                onClick={() => setShowDecisionModal('changes')}
+                title="Pedir alteracoes"
+              >
+                <Edit3 size={16} />
+                Pedir Alteracoes
+              </button>
+            </div>
+
             <button
-              className="btn btn-primary"
+              className="btn btn-outline"
               onClick={() => setShowSubmitModal(true)}
+              title="Submeter revisao detalhada"
             >
               <Lock size={16} />
-              Submeter e Trancar
+              Submeter Log
             </button>
             <button className="pdf-close-btn" onClick={onClose}>
               <X size={20} />
@@ -860,6 +941,102 @@ export default function PDFVersionCompare({
                 >
                   {submitting ? <Loader2 size={16} className="spin" /> : <Lock size={16} />}
                   Submeter e Trancar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Decision Modal (Approve / Request Changes) */}
+        {showDecisionModal && (
+          <div className="modal-overlay" onClick={() => { setShowDecisionModal(null); setDecisionNotes('') }}>
+            <div className="modal decision-modal" onClick={e => e.stopPropagation()}>
+              <div className={`modal-header ${showDecisionModal === 'approve' ? 'modal-header-success' : 'modal-header-warning'}`}>
+                <h3>
+                  {showDecisionModal === 'approve' ? (
+                    <><ThumbsUp size={20} /> Aprovar Documento</>
+                  ) : (
+                    <><Edit3 size={20} /> Pedir Alteracoes</>
+                  )}
+                </h3>
+                <button className="btn btn-ghost btn-icon" onClick={() => { setShowDecisionModal(null); setDecisionNotes('') }}>
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="modal-body">
+                {/* Stats Summary */}
+                <div className="decision-summary">
+                  <div className="decision-stats">
+                    <div className="stat-row">
+                      <span className="stat-icon success"><CheckCircle size={16} /></span>
+                      <span>{stats.implementado} Implementado</span>
+                    </div>
+                    <div className="stat-row">
+                      <span className="stat-icon warning"><Clock size={16} /></span>
+                      <span>{stats.pendente} Pendente</span>
+                    </div>
+                    <div className="stat-row">
+                      <span className="stat-icon error"><XCircle size={16} /></span>
+                      <span>{stats.erro} Erros</span>
+                    </div>
+                    <div className="stat-row">
+                      <span className="stat-icon info"><AlertTriangle size={16} /></span>
+                      <span>{stats.omissao} Omissoes</span>
+                    </div>
+                  </div>
+
+                  {showDecisionModal === 'approve' && (stats.pendente > 0 || stats.erro > 0) && (
+                    <div className="alert alert-warning" style={{ marginTop: '16px' }}>
+                      <AlertTriangle size={16} />
+                      <span>Atencao: Existem {stats.pendente + stats.erro} items por resolver. Tem a certeza que deseja aprovar?</span>
+                    </div>
+                  )}
+
+                  {showDecisionModal === 'changes' && (
+                    <div className="alert alert-info" style={{ marginTop: '16px' }}>
+                      <Edit3 size={16} />
+                      <span>Descreva as alteracoes necessarias para que o documento seja aprovado.</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="input-group">
+                  <label className="input-label">
+                    {showDecisionModal === 'approve' ? 'Notas de Aprovacao *' : 'Alteracoes Necessarias *'}
+                  </label>
+                  <textarea
+                    className="textarea"
+                    placeholder={showDecisionModal === 'approve'
+                      ? 'Adicione comentarios sobre a aprovacao, condicoes ou observacoes...'
+                      : 'Descreva detalhadamente as alteracoes que devem ser feitas...'}
+                    value={decisionNotes}
+                    onChange={(e) => setDecisionNotes(e.target.value)}
+                    rows={5}
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button
+                  className="btn btn-outline"
+                  onClick={() => { setShowDecisionModal(null); setDecisionNotes('') }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  className={`btn ${showDecisionModal === 'approve' ? 'btn-success' : 'btn-warning'}`}
+                  onClick={() => handleDecision(showDecisionModal === 'approve' ? 'aprovado' : 'alteracoes')}
+                  disabled={submitting || !decisionNotes.trim()}
+                >
+                  {submitting ? (
+                    <Loader2 size={16} className="spin" />
+                  ) : showDecisionModal === 'approve' ? (
+                    <><ThumbsUp size={16} /> Confirmar Aprovacao</>
+                  ) : (
+                    <><Send size={16} /> Enviar Pedido</>
+                  )}
                 </button>
               </div>
             </div>
