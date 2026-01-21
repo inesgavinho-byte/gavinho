@@ -26,7 +26,10 @@ import {
   Eye,
   Filter,
   Trash2,
-  Circle
+  Circle,
+  Eraser,
+  Undo2,
+  Redo2
 } from 'lucide-react'
 
 // Configure PDF.js worker
@@ -114,6 +117,10 @@ export default function DesignReview({ projeto }) {
   const [drawingColor, setDrawingColor] = useState('#EF4444')
   const [drawingThickness, setDrawingThickness] = useState(2)
   const [pdfDimensions, setPdfDimensions] = useState({ width: 0, height: 0 })
+
+  // Undo/Redo state (max 3 actions)
+  const [undoStack, setUndoStack] = useState([]) // Stack of deleted drawing IDs
+  const [redoStack, setRedoStack] = useState([]) // Stack of drawings to redo
 
   // New Review Form
   const [newReviewName, setNewReviewName] = useState('')
@@ -275,17 +282,158 @@ export default function DesignReview({ projeto }) {
     }
   }
 
-  const deleteDrawing = async (drawingId) => {
+  const deleteDrawing = async (drawingId, addToUndo = false) => {
     try {
+      // Find the drawing before deleting (for undo)
+      const drawingToDelete = drawings.find(d => d.id === drawingId)
+
       const { error } = await supabase
         .from('design_review_drawings')
         .delete()
         .eq('id', drawingId)
 
       if (error) throw error
+
       setDrawings(prev => prev.filter(d => d.id !== drawingId))
+
+      // Add to undo stack if requested (max 3)
+      if (addToUndo && drawingToDelete) {
+        setUndoStack(prev => [...prev.slice(-2), drawingToDelete])
+        setRedoStack([]) // Clear redo when new action is performed
+      }
     } catch (err) {
       console.error('Error deleting drawing:', err)
+    }
+  }
+
+  // Undo last drawing action (restore deleted drawing)
+  const handleUndo = async () => {
+    if (undoStack.length === 0) return
+
+    const lastDeleted = undoStack[undoStack.length - 1]
+
+    try {
+      // Re-insert the drawing
+      const { data, error } = await supabase
+        .from('design_review_drawings')
+        .insert({
+          version_id: lastDeleted.version_id,
+          pagina: lastDeleted.pagina,
+          tipo: lastDeleted.tipo,
+          data: lastDeleted.data,
+          cor: lastDeleted.cor,
+          espessura: lastDeleted.espessura,
+          autor_id: lastDeleted.autor_id,
+          autor_nome: lastDeleted.autor_nome
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+
+      setDrawings(prev => [...prev, data])
+      setUndoStack(prev => prev.slice(0, -1))
+      setRedoStack(prev => [...prev.slice(-2), data]) // Add to redo stack (max 3)
+    } catch (err) {
+      console.error('Error undoing:', err)
+    }
+  }
+
+  // Redo last undone action (delete the restored drawing)
+  const handleRedo = async () => {
+    if (redoStack.length === 0) return
+
+    const lastRestored = redoStack[redoStack.length - 1]
+
+    try {
+      const { error } = await supabase
+        .from('design_review_drawings')
+        .delete()
+        .eq('id', lastRestored.id)
+
+      if (error) throw error
+
+      setDrawings(prev => prev.filter(d => d.id !== lastRestored.id))
+      setRedoStack(prev => prev.slice(0, -1))
+      // Don't add back to undo stack to avoid loops
+    } catch (err) {
+      console.error('Error redoing:', err)
+    }
+  }
+
+  // Eraser: find and delete drawing at click position
+  const handleEraserClick = (e) => {
+    if (activeTool !== 'eraser') return
+
+    const { x, y } = getCanvasCoords(e)
+    const threshold = 3 // percentage threshold for hit detection
+
+    // Find drawing near click position (reverse order to get topmost first)
+    for (let i = drawings.length - 1; i >= 0; i--) {
+      const drawing = drawings[i]
+      const data = drawing.data
+
+      let hit = false
+
+      switch (drawing.tipo) {
+        case 'pencil':
+          // Check if click is near any point in the path
+          if (data.points) {
+            for (const point of data.points) {
+              const dist = Math.sqrt(Math.pow(x - point.x, 2) + Math.pow(y - point.y, 2))
+              if (dist < threshold) {
+                hit = true
+                break
+              }
+            }
+          }
+          break
+
+        case 'rectangle':
+          // Check if click is near rectangle edges
+          const inXRange = x >= data.x - threshold && x <= data.x + data.width + threshold
+          const inYRange = y >= data.y - threshold && y <= data.y + data.height + threshold
+          const nearLeftEdge = Math.abs(x - data.x) < threshold
+          const nearRightEdge = Math.abs(x - (data.x + data.width)) < threshold
+          const nearTopEdge = Math.abs(y - data.y) < threshold
+          const nearBottomEdge = Math.abs(y - (data.y + data.height)) < threshold
+
+          if ((inYRange && (nearLeftEdge || nearRightEdge)) ||
+              (inXRange && (nearTopEdge || nearBottomEdge))) {
+            hit = true
+          }
+          break
+
+        case 'arrow':
+        case 'line':
+          // Check if click is near line
+          const lineLength = Math.sqrt(Math.pow(data.x2 - data.x1, 2) + Math.pow(data.y2 - data.y1, 2))
+          if (lineLength > 0) {
+            const t = Math.max(0, Math.min(1,
+              ((x - data.x1) * (data.x2 - data.x1) + (y - data.y1) * (data.y2 - data.y1)) / (lineLength * lineLength)
+            ))
+            const nearestX = data.x1 + t * (data.x2 - data.x1)
+            const nearestY = data.y1 + t * (data.y2 - data.y1)
+            const dist = Math.sqrt(Math.pow(x - nearestX, 2) + Math.pow(y - nearestY, 2))
+            if (dist < threshold) {
+              hit = true
+            }
+          }
+          break
+
+        case 'circle':
+          // Check if click is near circle edge
+          const distFromCenter = Math.sqrt(Math.pow(x - data.cx, 2) + Math.pow(y - data.cy, 2))
+          if (Math.abs(distFromCenter - data.radius) < threshold) {
+            hit = true
+          }
+          break
+      }
+
+      if (hit) {
+        deleteDrawing(drawing.id, true) // Delete with undo support
+        break
+      }
     }
   }
 
@@ -929,7 +1077,8 @@ export default function DesignReview({ projeto }) {
               { id: 'rectangle', icon: Square, label: 'Retangulo' },
               { id: 'arrow', icon: ArrowUpRight, label: 'Seta' },
               { id: 'circle', icon: Circle, label: 'Circulo' },
-              { id: 'line', icon: Minus, label: 'Linha' }
+              { id: 'line', icon: Minus, label: 'Linha' },
+              { id: 'eraser', icon: Eraser, label: 'Borracha' }
             ].map(tool => (
               <button
                 key={tool.id}
@@ -951,6 +1100,50 @@ export default function DesignReview({ projeto }) {
                 <tool.icon size={18} />
               </button>
             ))}
+          </div>
+
+          {/* Undo/Redo */}
+          <div style={{ display: 'flex', gap: '2px', marginRight: '8px' }}>
+            <button
+              onClick={handleUndo}
+              disabled={undoStack.length === 0}
+              title={`Desfazer (${undoStack.length}/3)`}
+              style={{
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '6px',
+                border: '1px solid var(--stone)',
+                background: 'var(--white)',
+                color: undoStack.length === 0 ? 'var(--stone)' : 'var(--brown)',
+                cursor: undoStack.length === 0 ? 'not-allowed' : 'pointer',
+                opacity: undoStack.length === 0 ? 0.5 : 1
+              }}
+            >
+              <Undo2 size={16} />
+            </button>
+            <button
+              onClick={handleRedo}
+              disabled={redoStack.length === 0}
+              title={`Refazer (${redoStack.length}/3)`}
+              style={{
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '6px',
+                border: '1px solid var(--stone)',
+                background: 'var(--white)',
+                color: redoStack.length === 0 ? 'var(--stone)' : 'var(--brown)',
+                cursor: redoStack.length === 0 ? 'not-allowed' : 'pointer',
+                opacity: redoStack.length === 0 ? 0.5 : 1
+              }}
+            >
+              <Redo2 size={16} />
+            </button>
           </div>
 
           <div style={{ width: '1px', height: '24px', background: 'var(--stone)' }} />
@@ -1165,7 +1358,13 @@ export default function DesignReview({ projeto }) {
               {pdfDimensions.width > 0 && (
                 <canvas
                   ref={canvasRef}
-                  onMouseDown={handleCanvasMouseDown}
+                  onMouseDown={(e) => {
+                    if (activeTool === 'eraser') {
+                      handleEraserClick(e)
+                    } else {
+                      handleCanvasMouseDown(e)
+                    }
+                  }}
                   onMouseMove={handleCanvasMouseMove}
                   onMouseUp={handleCanvasMouseUp}
                   onMouseLeave={handleCanvasMouseUp}
@@ -1175,7 +1374,8 @@ export default function DesignReview({ projeto }) {
                     left: 0,
                     width: pdfDimensions.width * scale,
                     height: pdfDimensions.height * scale,
-                    pointerEvents: ['pencil', 'rectangle', 'arrow', 'circle', 'line'].includes(activeTool) ? 'auto' : 'none',
+                    pointerEvents: ['pencil', 'rectangle', 'arrow', 'circle', 'line', 'eraser'].includes(activeTool) ? 'auto' : 'none',
+                    cursor: activeTool === 'eraser' ? 'crosshair' : 'crosshair',
                     zIndex: 5
                   }}
                 />
