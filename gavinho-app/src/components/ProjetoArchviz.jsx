@@ -11,64 +11,81 @@ import {
 const LazyImage = memo(({ src, alt, className, onClick }) => {
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState(false)
-  const imgRef = useRef(null)
+  const [shouldLoad, setShouldLoad] = useState(false)
+  const containerRef = useRef(null)
 
   useEffect(() => {
+    // Reset state when src changes
+    setLoaded(false)
+    setError(false)
+    setShouldLoad(false)
+  }, [src])
+
+  useEffect(() => {
+    if (!containerRef.current || shouldLoad) return
+
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          if (entry.isIntersecting && imgRef.current) {
-            imgRef.current.src = src
-            observer.unobserve(entry.target)
+          if (entry.isIntersecting) {
+            setShouldLoad(true)
+            observer.disconnect()
           }
         })
       },
-      { rootMargin: '100px' }
+      { rootMargin: '200px', threshold: 0 }
     )
 
-    if (imgRef.current) {
-      observer.observe(imgRef.current)
+    observer.observe(containerRef.current)
+
+    // Check if already visible
+    const rect = containerRef.current.getBoundingClientRect()
+    if (rect.top < window.innerHeight + 200 && rect.bottom > -200) {
+      setShouldLoad(true)
+      observer.disconnect()
     }
 
     return () => observer.disconnect()
-  }, [src])
+  }, [shouldLoad])
 
-  if (error) {
-    return (
-      <div className="archviz-image-error" onClick={onClick}>
-        <AlertCircle size={24} />
-        <span>Erro ao carregar</span>
-        <button
-          className="btn btn-sm btn-ghost"
-          onClick={(e) => {
-            e.stopPropagation()
-            setError(false)
-            setLoaded(false)
-          }}
-        >
-          <RefreshCw size={14} /> Tentar novamente
-        </button>
-      </div>
-    )
+  const handleRetry = (e) => {
+    e.stopPropagation()
+    setError(false)
+    setLoaded(false)
+    setShouldLoad(true)
   }
 
   return (
-    <>
-      {!loaded && (
-        <div className="archviz-image-loading">
-          <Loader2 size={24} className="spin" />
+    <div ref={containerRef} className="archviz-image-wrapper" onClick={onClick}>
+      {error ? (
+        <div className="archviz-image-error">
+          <AlertCircle size={24} />
+          <span>Erro ao carregar</span>
+          <button className="btn btn-sm btn-ghost" onClick={handleRetry}>
+            <RefreshCw size={14} /> Tentar novamente
+          </button>
         </div>
+      ) : !shouldLoad ? (
+        <div className="archviz-image-placeholder">
+          <Image size={24} />
+        </div>
+      ) : (
+        <>
+          {!loaded && (
+            <div className="archviz-image-loading">
+              <Loader2 size={24} className="spin" />
+            </div>
+          )}
+          <img
+            src={src}
+            alt={alt}
+            className={`${className} ${loaded ? 'loaded' : ''}`}
+            onLoad={() => setLoaded(true)}
+            onError={() => setError(true)}
+          />
+        </>
       )}
-      <img
-        ref={imgRef}
-        alt={alt}
-        className={`${className} ${loaded ? 'loaded' : 'loading'}`}
-        onClick={onClick}
-        onLoad={() => setLoaded(true)}
-        onError={() => setError(true)}
-        loading="lazy"
-      />
-    </>
+    </div>
   )
 })
 
@@ -107,6 +124,10 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
   const [newComment, setNewComment] = useState('')
   const [comments, setComments] = useState({})
 
+  // Pagination per section - show only 4 initially
+  const [expandedSections, setExpandedSections] = useState({})
+  const ITEMS_PER_SECTION = 4
+
   // Team members for @mentions and assignees
   const [teamMembers, setTeamMembers] = useState([])
 
@@ -118,7 +139,6 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
   useEffect(() => {
     if (projeto?.id) {
       loadRenders()
-      loadCompartimentos()
       loadTeamMembers()
     }
   }, [projeto?.id])
@@ -131,8 +151,11 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
       const { data, error } = await supabase
         .from('projeto_renders')
         .select(`
-          *,
-          versoes:projeto_render_versoes(*)
+          id,
+          compartimento,
+          vista,
+          created_at,
+          versoes:projeto_render_versoes(id, versao, url, is_final, created_at)
         `)
         .eq('projeto_id', projeto.id)
         .order('compartimento')
@@ -155,6 +178,10 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
       }, {})
 
       setRenders(grouped)
+
+      // Extract compartimentos from the data (avoid extra query)
+      const uniqueCompartimentos = [...new Set(sortedData.map(r => r.compartimento).filter(Boolean))]
+      setCompartimentos(uniqueCompartimentos)
     } catch (err) {
       console.error('Erro ao carregar renders:', err)
       setLoadError(err.message)
@@ -167,24 +194,6 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
       }
     } finally {
       setLoading(false)
-    }
-  }
-
-  const loadCompartimentos = async () => {
-    try {
-      // Get unique compartimentos from existing renders
-      const { data, error } = await supabase
-        .from('projeto_renders')
-        .select('compartimento')
-        .eq('projeto_id', projeto.id)
-        .not('compartimento', 'is', null)
-
-      if (error) throw error
-
-      const unique = [...new Set((data || []).map(r => r.compartimento).filter(Boolean))]
-      setCompartimentos(unique)
-    } catch (err) {
-      console.error('Erro ao carregar compartimentos:', err)
     }
   }
 
@@ -286,7 +295,6 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
       setNewRender({ compartimento: '', novoCompartimento: '', vista: '', arquivo: null })
       setShowAddModal(false)
       loadRenders()
-      loadCompartimentos()
     } catch (err) {
       console.error('Erro ao adicionar render:', err)
       alert('Erro ao adicionar render: ' + err.message)
@@ -551,17 +559,22 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
         </div>
       ) : (
         <div className="archviz-grid">
-          {Object.entries(renders).map(([compartimento, items]) => (
+          {Object.entries(renders).map(([compartimento, items]) => {
+            const isExpanded = expandedSections[compartimento]
+            const visibleItems = isExpanded ? items : items.slice(0, ITEMS_PER_SECTION)
+            const hasMore = items.length > ITEMS_PER_SECTION
+
+            return (
             <div key={compartimento} className="archviz-section">
               <div className="archviz-section-header">
                 <h3>{compartimento}</h3>
                 <span className="archviz-count">
-                  {items.length} {items.length === 1 ? 'versao' : 'versoes'}
+                  {items.length} {items.length === 1 ? 'render' : 'renders'}
                 </span>
               </div>
 
               <div className="archviz-items">
-                {items.map((render, idx) => {
+                {visibleItems.map((render, idx) => {
                   const latestVersion = render.versoes?.sort((a, b) => b.versao - a.versao)[0]
                   const isFinal = latestVersion?.is_final
                   const globalIdx = allImages.findIndex(img => img.id === latestVersion?.id)
@@ -714,8 +727,28 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
                   <span>Adicionar Versao</span>
                 </div>
               </div>
+
+              {/* Show more/less button */}
+              {hasMore && (
+                <button
+                  className="archviz-show-more"
+                  onClick={() => setExpandedSections(prev => ({
+                    ...prev,
+                    [compartimento]: !isExpanded
+                  }))}
+                >
+                  {isExpanded
+                    ? `Ver menos`
+                    : `Ver mais ${items.length - ITEMS_PER_SECTION} imagens`
+                  }
+                  <ChevronRight
+                    size={16}
+                    className={isExpanded ? 'rotated-up' : 'rotated-down'}
+                  />
+                </button>
+              )}
             </div>
-          ))}
+          )})}
         </div>
       )}
 

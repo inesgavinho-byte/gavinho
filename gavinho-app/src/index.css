@@ -4738,7 +4738,16 @@ tbody tr:last-child td {
 }
 
 /* Lazy Loading States */
-.archviz-image-loading {
+.archviz-image-wrapper {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.archviz-image-loading,
+.archviz-image-placeholder {
   position: absolute;
   inset: 0;
   display: flex;
@@ -4746,6 +4755,10 @@ tbody tr:last-child td {
   justify-content: center;
   background: var(--cream);
   color: var(--brown-light);
+}
+
+.archviz-image-placeholder {
+  background: linear-gradient(135deg, var(--cream) 0%, var(--cream-dark, #f5f0e8) 100%);
 }
 
 .archviz-image-error {
@@ -4772,15 +4785,11 @@ tbody tr:last-child td {
   height: 100%;
   object-fit: cover;
   opacity: 0;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.2s ease;
 }
 
 .archviz-img.loaded {
   opacity: 1;
-}
-
-.archviz-img.loading {
-  opacity: 0;
 }
 
 .archviz-error {
@@ -4804,6 +4813,42 @@ tbody tr:last-child td {
 .archviz-error p {
   margin: 0;
   font-size: 13px;
+}
+
+/* Show more button */
+.archviz-show-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  margin-top: var(--space-sm);
+  background: var(--cream);
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--brown);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.archviz-show-more:hover {
+  background: var(--cream-hover, #f5f0e8);
+  border-color: var(--brown-light);
+}
+
+.archviz-show-more svg {
+  transition: transform 0.2s ease;
+}
+
+.archviz-show-more svg.rotated-down {
+  transform: rotate(90deg);
+}
+
+.archviz-show-more svg.rotated-up {
+  transform: rotate(-90deg);
 }
 
 /* Responsive Archviz */
