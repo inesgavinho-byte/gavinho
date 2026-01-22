@@ -646,6 +646,58 @@ export default function AdminSeed() {
   // ============================================
   // SEED: Entregas Cliente MYRYAD (GA00469)
   // ============================================
+  // Atualizar datas de entrada dos colaboradores
+  const updateEmployeeDates = async () => {
+    setLoading(true)
+    setLogs([])
+    setResult(null)
+
+    addLog('👥 Atualizando datas de entrada dos colaboradores...', 'info')
+
+    const employeeDates = [
+      { nome: 'Luciana Ortega', data_entrada: '2025-02-14' },
+      { nome: 'Leonardo Ribeiro', data_entrada: '2025-03-10' },
+      { nome: 'Caroline Roda', data_entrada: '2025-03-24' },
+      { nome: 'Giovana Martins', data_entrada: '2025-04-01' },
+      { nome: 'Carolina Cipriano', data_entrada: '2025-06-23' },
+      { nome: 'Laís Silva', data_entrada: '2025-07-14' },
+      { nome: 'Alana Oliveira', data_entrada: '2025-09-22' },
+      { nome: 'Ana Miranda', data_entrada: '2025-11-10' },
+      { nome: 'Patrícia Morais', data_entrada: '2025-11-17' }
+    ]
+
+    try {
+      let updated = 0
+      let notFound = 0
+
+      for (const employee of employeeDates) {
+        const { data, error } = await supabase
+          .from('utilizadores')
+          .update({ data_entrada: employee.data_entrada })
+          .ilike('nome', `%${employee.nome}%`)
+          .select()
+
+        if (error) {
+          addLog(`❌ Erro ao atualizar ${employee.nome}: ${error.message}`, 'error')
+        } else if (data && data.length > 0) {
+          addLog(`✅ ${employee.nome} → ${employee.data_entrada}`, 'success')
+          updated++
+        } else {
+          addLog(`⚠️ ${employee.nome} não encontrado`, 'warning')
+          notFound++
+        }
+      }
+
+      addLog(`📊 Resumo: ${updated} atualizados, ${notFound} não encontrados`, 'info')
+      setResult({ success: true })
+    } catch (err) {
+      addLog(`💥 Erro: ${err.message}`, 'error')
+      setResult({ success: false, error: err.message })
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const seedEntregasMYRYAD = async () => {
     setLoading(true)
     setLogs([])
@@ -1141,6 +1193,74 @@ export default function AdminSeed() {
               <>
                 <Play size={18} style={{ marginRight: '8px' }} />
                 Executar Seed
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Employee Dates Update Card */}
+        <div className="card" style={{ padding: '24px' }}>
+          <div className="flex items-center gap-md" style={{ marginBottom: '20px' }}>
+            <div style={{
+              width: '56px',
+              height: '56px',
+              borderRadius: '12px',
+              background: 'linear-gradient(135deg, #8b5cf6, #6366f1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white'
+            }}>
+              <Users size={28} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--brown)' }}>
+                Datas de Colaboração
+              </h3>
+              <p style={{ fontSize: '13px', color: 'var(--brown-light)' }}>
+                Atualizar datas de entrada dos colaboradores
+              </p>
+            </div>
+          </div>
+
+          {/* Lista de colaboradores */}
+          <div style={{
+            background: 'var(--cream)',
+            borderRadius: '12px',
+            padding: '16px',
+            marginBottom: '20px'
+          }}>
+            <h4 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--brown)', marginBottom: '12px' }}>
+              Colaboradores a atualizar:
+            </h4>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px', color: 'var(--brown-light)' }}>
+              <div>Luciana Ortega → 14/02/2025</div>
+              <div>Leonardo Ribeiro → 10/03/2025</div>
+              <div>Caroline Roda → 24/03/2025</div>
+              <div>Giovana Martins → 01/04/2025</div>
+              <div>Carolina Cipriano → 23/06/2025</div>
+              <div>Laís Silva → 14/07/2025</div>
+              <div>Alana Oliveira → 22/09/2025</div>
+              <div>Ana Miranda → 10/11/2025</div>
+              <div>Patrícia Morais → 17/11/2025</div>
+            </div>
+          </div>
+
+          <button
+            onClick={updateEmployeeDates}
+            disabled={loading}
+            className="btn btn-primary"
+            style={{ width: '100%', padding: '14px' }}
+          >
+            {loading ? (
+              <>
+                <Loader size={18} style={{ marginRight: '8px', animation: 'spin 1s linear infinite' }} />
+                A processar...
+              </>
+            ) : (
+              <>
+                <Play size={18} style={{ marginRight: '8px' }} />
+                Atualizar Datas de Entrada
               </>
             )}
           </button>

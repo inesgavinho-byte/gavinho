@@ -359,6 +359,7 @@ export default function Equipa() {
       horario_fim: selectedUser.horario_fim || '18:00',
       dias_ferias_disponiveis: selectedUser.dias_ferias_disponiveis || 22,
       data_entrada: selectedUser.data_entrada || '',
+      data_saida: selectedUser.data_saida || '',
       data_nascimento: selectedUser.data_nascimento || ''
     });
     setIsEditing(true);
@@ -389,6 +390,7 @@ export default function Equipa() {
           horario_fim: editForm.horario_fim || null,
           dias_ferias_disponiveis: parseInt(editForm.dias_ferias_disponiveis) || 22,
           data_entrada: editForm.data_entrada || null,
+          data_saida: editForm.data_saida || null,
           data_nascimento: editForm.data_nascimento || null
         })
         .eq('id', selectedUser.id);
@@ -1514,8 +1516,15 @@ export default function Equipa() {
 
             {/* Data Entrada */}
             <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, marginBottom: '6px', color: '#78716c' }}>Data de Entrada</label>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, marginBottom: '6px', color: '#78716c' }}>Data de Entrada na Empresa</label>
               <input type="date" value={editForm.data_entrada} onChange={e => setEditForm({...editForm, data_entrada: e.target.value})} style={{ width: '100%', padding: '10px 12px', border: '1px solid #e7e5e4', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }} />
+            </div>
+
+            {/* Data Saída */}
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, marginBottom: '6px', color: '#78716c' }}>Data de Saída da Empresa</label>
+              <input type="date" value={editForm.data_saida} onChange={e => setEditForm({...editForm, data_saida: e.target.value})} style={{ width: '100%', padding: '10px 12px', border: '1px solid #e7e5e4', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }} />
+              <span style={{ fontSize: '11px', color: '#a8a29e', marginTop: '4px', display: 'block' }}>Deixe vazio se ainda colabora</span>
             </div>
 
             {/* Data Nascimento */}
@@ -1602,9 +1611,16 @@ export default function Equipa() {
             </div>
             <div style={styles.statBox}>
               <div style={styles.statValue}>
-                {selectedUser.data_entrada ? new Date(selectedUser.data_entrada).getFullYear() : '"”'}
+                {selectedUser.data_entrada ? new Date(selectedUser.data_entrada).toLocaleDateString('pt-PT', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
               </div>
-              <div style={styles.statLabel}>Na Empresa Desde</div>
+              <div style={styles.statLabel}>
+                {selectedUser.data_saida ? 'Colaborou de' : 'Na Empresa Desde'}
+              </div>
+              {selectedUser.data_saida && (
+                <div style={{ fontSize: '11px', color: '#dc2626', marginTop: '4px' }}>
+                  até {new Date(selectedUser.data_saida).toLocaleDateString('pt-PT', { day: '2-digit', month: 'short', year: 'numeric' })}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1651,7 +1667,19 @@ export default function Equipa() {
               </div>
               <div style={{ gridColumn: 'span 2' }}>
                 <div style={{ fontSize: '12px', color: '#a8a29e', marginBottom: '4px' }}>Morada</div>
-                <div style={{ fontSize: '14px', color: '#44403c' }}>{selectedUser.morada || '"”'}</div>
+                <div style={{ fontSize: '14px', color: '#44403c' }}>{selectedUser.morada || '""'}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '12px', color: '#a8a29e', marginBottom: '4px' }}>Data de Entrada</div>
+                <div style={{ fontSize: '14px', color: '#44403c' }}>
+                  {selectedUser.data_entrada ? new Date(selectedUser.data_entrada).toLocaleDateString('pt-PT') : '-'}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: '12px', color: '#a8a29e', marginBottom: '4px' }}>Data de Saída</div>
+                <div style={{ fontSize: '14px', color: selectedUser.data_saida ? '#dc2626' : '#44403c' }}>
+                  {selectedUser.data_saida ? new Date(selectedUser.data_saida).toLocaleDateString('pt-PT') : 'Em atividade'}
+                </div>
               </div>
               {selectedUser.horario_trabalho && (
                 <div>
