@@ -1055,6 +1055,9 @@ export default function DesignReview({ projeto }) {
     )
   }
 
+  // Track if we've done initial fit
+  const hasInitialFit = useRef(false)
+
   // Auto-fit scale when PDF loads
   const fitToWidth = useCallback(() => {
     if (containerRef.current && pdfDimensions.width > 0) {
@@ -1064,10 +1067,18 @@ export default function DesignReview({ projeto }) {
     }
   }, [pdfDimensions.width])
 
-  // Auto-fit on first load
+  // Auto-fit on first load only
   useEffect(() => {
-    if (pdfDimensions.width > 0 && scale === 1) {
-      fitToWidth()
+    if (pdfDimensions.width > 0 && !hasInitialFit.current) {
+      hasInitialFit.current = true
+      // Small delay to ensure container is measured
+      setTimeout(() => {
+        if (containerRef.current && pdfDimensions.width > 0) {
+          const containerWidth = containerRef.current.clientWidth - 48
+          const newScale = Math.min(containerWidth / pdfDimensions.width, 2)
+          setScale(Math.max(0.5, newScale))
+        }
+      }, 100)
     }
   }, [pdfDimensions.width])
 
