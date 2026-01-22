@@ -58,10 +58,12 @@ function App() {
             <Route path="projetos" element={<Projetos />} />
             <Route path="projetos/:id" element={<ProjetoDetalhe />} />
             <Route path="projetos/:id/:tab" element={<ProjetoDetalhe />} />
+            <Route path="projetos/:id/:tab/:subtab" element={<ProjetoDetalhe />} />
             <Route path="clientes" element={<Clientes />} />
             <Route path="obras" element={<Obras />} />
             <Route path="obras/:id" element={<ObraDetalhe />} />
             <Route path="obras/:id/:tab" element={<ObraDetalhe />} />
+            <Route path="obras/:id/:tab/:subtab" element={<ObraDetalhe />} />
             <Route path="obras/:id/relatorio-semanal" element={<RelatorioSemanal />} />
             <Route path="obras/:id/diario" element={<DiarioObra />} />
             <Route path="obras/:id/comunicacoes" element={<ObraComunicacoes />} />

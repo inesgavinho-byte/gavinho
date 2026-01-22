@@ -688,7 +688,7 @@ const projectsMap = {
 }
 
 export default function ProjetoDetalhe() {
-  const { id, tab: urlTab } = useParams()
+  const { id, tab: urlTab, subtab: urlSubtab } = useParams()
   const navigate = useNavigate()
   const { isAdmin } = useAuth()
   const [activeTab, setActiveTab] = useState(urlTab || 'dashboard')
@@ -739,7 +739,7 @@ export default function ProjetoDetalhe() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   // Sub-tabs para Fases & Entregas
-    const [activeFaseSection, setActiveFaseSection] = useState('entregaveis')
+  const [activeFaseSection, setActiveFaseSection] = useState(urlSubtab || 'entregaveis')
 
   // Gestão de Renders/Archviz
   const [renders, setRenders] = useState([])
@@ -896,12 +896,15 @@ export default function ProjetoDetalhe() {
     setSaving(false)
   }
 
-  // Sincronizar tab da URL com estado - só atualiza se urlTab mudar
+  // Sincronizar tab e subtab da URL com estado
   useEffect(() => {
     if (urlTab) {
       setActiveTab(urlTab)
     }
-  }, [urlTab])
+    if (urlSubtab) {
+      setActiveFaseSection(urlSubtab)
+    }
+  }, [urlTab, urlSubtab])
 
   // Carregar clientes e utilizadores para edição
   useEffect(() => {
@@ -1215,9 +1218,19 @@ export default function ProjetoDetalhe() {
   }
 
   // Navegar para tab
-  const handleTabChange = (tabId) => {
-    navigate(`/projetos/${id}/${tabId}`, { replace: true })
+  const handleTabChange = (tabId, subtab = null) => {
+    const path = subtab ? `/projetos/${id}/${tabId}/${subtab}` : `/projetos/${id}/${tabId}`
+    navigate(path)
     setActiveTab(tabId)
+    if (subtab) {
+      setActiveFaseSection(subtab)
+    }
+  }
+
+  // Navegar para sub-tab (dentro de Fases & Entregas)
+  const handleSubtabChange = (subtabId) => {
+    navigate(`/projetos/${id}/${activeTab}/${subtabId}`)
+    setActiveFaseSection(subtabId)
   }
 
   // Duplicar projeto
@@ -2049,8 +2062,8 @@ export default function ProjetoDetalhe() {
     <div className="fade-in">
       {/* Header */}
       <div style={{ marginBottom: '24px' }}>
-        <button 
-          onClick={() => navigate('/projetos')}
+        <button
+          onClick={() => navigate(-1)}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -2065,7 +2078,7 @@ export default function ProjetoDetalhe() {
           }}
         >
           <ArrowLeft size={16} />
-          Voltar aos Projetos
+          Voltar
         </button>
 
         <div className="flex items-center justify-between">
@@ -2902,7 +2915,7 @@ export default function ProjetoDetalhe() {
             {faseSections.map(section => (
               <button
                 key={section.id}
-                onClick={() => setActiveFaseSection(section.id)}
+                onClick={() => handleSubtabChange(section.id)}
                 style={{
                   padding: '8px 16px',
                   background: activeFaseSection === section.id ? 'var(--brown)' : 'transparent',

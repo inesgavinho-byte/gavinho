@@ -654,7 +654,7 @@ export default function ObraDetalhe() {
     <div className="fade-in">
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
-        <button className="btn btn-ghost btn-icon" onClick={() => navigate('/obras')}>
+        <button className="btn btn-ghost btn-icon" onClick={() => navigate(-1)} title="Voltar">
           <ArrowLeft size={20} />
         </button>
         <div style={{ flex: 1 }}>
