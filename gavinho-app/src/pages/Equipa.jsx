@@ -35,9 +35,7 @@ import {
   Send,
   Shield,
   Lock,
-  BarChart3
 } from 'lucide-react';
-import TeamWorkloadGantt from '../components/TeamWorkloadGantt';
 
 export default function Equipa() {
   const { profile, isAdmin } = useAuth();
@@ -931,25 +929,6 @@ export default function Equipa() {
               </span>
             )}
           </button>
-          <button
-            onClick={() => setMainView('cronograma')}
-            style={{
-              padding: '10px 20px',
-              borderRadius: '8px',
-              border: 'none',
-              background: mainView === 'cronograma' ? 'white' : 'transparent',
-              boxShadow: mainView === 'cronograma' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-              color: mainView === 'cronograma' ? '#44403c' : '#78716c',
-              fontWeight: mainView === 'cronograma' ? 600 : 500,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-          >
-            <BarChart3 size={16} />
-            Cronograma
-          </button>
         </div>
 
         {/* Vista de Aprovações */}
@@ -1054,11 +1033,6 @@ export default function Equipa() {
               </div>
             )}
           </div>
-        )}
-
-        {/* Vista de Cronograma da Equipa */}
-        {mainView === 'cronograma' && (
-          <TeamWorkloadGantt />
         )}
 
         {/* Vista de Gestão RH */}

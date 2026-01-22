@@ -6,6 +6,7 @@ import {
   Database, RefreshCw
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import TeamWorkloadGantt from '../components/TeamWorkloadGantt'
 
 export default function DashboardProjetos() {
   const navigate = useNavigate()
@@ -576,6 +577,11 @@ export default function DashboardProjetos() {
             })}
           </div>
         </div>
+      </div>
+
+      {/* Cronograma da Equipa */}
+      <div style={{ marginTop: '24px' }}>
+        <TeamWorkloadGantt />
       </div>
     </div>
   )
