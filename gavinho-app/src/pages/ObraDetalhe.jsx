@@ -5,24 +5,61 @@ import {
   ArrowLeft, MapPin, Calendar, Users, HardHat, BookOpen, Grid3X3, Camera, AlertTriangle,
   Plus, Sun, Cloud, CloudRain, Wind, Thermometer, Clock, CheckCircle2, Edit, X, Building2,
   ChevronRight, Trash2, UserPlus, Phone, Mail, Briefcase, ClipboardList, Receipt,
-  Upload, Image, FileText, Download, Loader2, Calculator, Euro, NotebookPen
+  Upload, Image, FileText, Download, Loader2, Calculator, Euro, NotebookPen,
+  ShoppingCart, TrendingUp, Shield, Truck, ChevronDown, FolderOpen
 } from 'lucide-react'
 import ObraTracking from '../components/ObraTracking'
 import ObraAutos from '../components/ObraAutos'
 import ObraOrcamentacao from '../components/ObraOrcamentacao'
 import DiarioObraProjeto from '../components/DiarioObraProjeto'
 
-const tabs = [
-  { id: 'tracking', label: 'Tracking', icon: ClipboardList },
-  { id: 'orcamentacao', label: 'Orçamentação', icon: Calculator },
-  { id: 'componentes', label: 'Contratos', icon: Building2 },
-  { id: 'autos', label: 'Autos de Medição', icon: Receipt },
-  { id: 'diario', label: 'Diário de Obra', icon: BookOpen },
-  { id: 'diario-projeto', label: 'Diário de Projeto', icon: NotebookPen },
-  { id: 'zonas', label: 'Zonas', icon: Grid3X3 },
-  { id: 'equipa', label: 'Equipa em Obra', icon: Users },
-  { id: 'ocorrencias', label: 'Ocorrências', icon: AlertTriangle },
+// Tabs organizados em grupos
+const tabGroups = [
+  {
+    id: 'financeira',
+    label: 'Gestão Financeira',
+    icon: Euro,
+    tabs: [
+      { id: 'mqt', label: 'MQT', icon: ClipboardList },
+      { id: 'orcamentacao', label: 'Orçamentação', icon: Calculator },
+      { id: 'compras', label: 'Compras', icon: ShoppingCart },
+      { id: 'controle-executado', label: 'Controle Executado', icon: TrendingUp },
+      { id: 'contratos', label: 'Contratos', icon: Building2 },
+    ]
+  },
+  {
+    id: 'acompanhamento',
+    label: 'Acompanhamento Obra',
+    icon: Camera,
+    tabs: [
+      { id: 'fotografias', label: 'Fotografias', icon: Image },
+      { id: 'relatorios', label: 'Relatórios Obra', icon: FileText },
+      { id: 'nao-conformidades', label: 'Não Conformidades', icon: AlertTriangle },
+      { id: 'diario', label: 'Diário de Obra', icon: BookOpen },
+    ]
+  },
+  {
+    id: 'fiscalizacao',
+    label: 'Fiscalização',
+    icon: Shield,
+    tabs: [
+      { id: 'autos', label: 'Autos Medição', icon: Receipt },
+      { id: 'hso', label: 'HSO', icon: HardHat },
+      { id: 'ocorrencias', label: 'Ocorrências', icon: AlertTriangle },
+    ]
+  },
+  {
+    id: 'equipas',
+    label: 'Equipas e SubEmpreiteiros',
+    icon: Truck,
+    tabs: [
+      { id: 'equipa', label: 'Equipas', icon: Users },
+    ]
+  }
 ]
+
+// Flat list de todos os tabs para lookup
+const allTabs = tabGroups.flatMap(g => g.tabs)
 
 // Tipos de componentes de obra
 const TIPOS_COMPONENTE = [
@@ -48,7 +85,8 @@ export default function ObraDetalhe() {
   const [componentes, setComponentes] = useState([])
   const [entidadesFaturacao, setEntidadesFaturacao] = useState([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState(urlTab || 'tracking')
+  const [activeTab, setActiveTab] = useState(urlTab || 'mqt')
+  const [expandedGroups, setExpandedGroups] = useState(['financeira', 'acompanhamento', 'fiscalizacao', 'equipas'])
   
   // Sincronizar tab da URL
   useEffect(() => {
@@ -660,24 +698,52 @@ export default function ObraDetalhe() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid var(--stone)', marginBottom: '24px' }}>
-        {tabs.map((tab) => {
-          const Icon = tab.icon
-          const count = tab.id === 'zonas' ? zonas.length : tab.id === 'diario' ? diarios.length : tab.id === 'ocorrencias' ? ocorrenciasAbertas : tab.id === 'equipa' ? equipaAtiva : 0
+      {/* Tabs Agrupados */}
+      <div className="obra-tabs-container">
+        {tabGroups.map((group) => {
+          const GroupIcon = group.icon
+          const isExpanded = expandedGroups.includes(group.id)
+          const hasActiveTab = group.tabs.some(t => t.id === activeTab)
+
           return (
-            <button key={tab.id} onClick={() => handleTabChange(tab.id)}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '12px 16px', background: 'none', border: 'none', borderBottom: activeTab === tab.id ? '2px solid var(--warning)' : '2px solid transparent', color: activeTab === tab.id ? 'var(--brown)' : 'var(--brown-light)', fontWeight: activeTab === tab.id ? 600 : 400, cursor: 'pointer' }}>
-              <Icon size={16} />
-              {tab.label}
-              {count > 0 && <span style={{ background: activeTab === tab.id ? 'var(--warning)' : 'var(--stone)', color: activeTab === tab.id ? 'white' : 'var(--brown)', padding: '2px 8px', borderRadius: '10px', fontSize: '11px', fontWeight: 600 }}>{count}</span>}
-            </button>
+            <div key={group.id} className={`tab-group ${hasActiveTab ? 'active' : ''}`}>
+              <button
+                className="tab-group-header"
+                onClick={() => setExpandedGroups(prev =>
+                  prev.includes(group.id) ? prev.filter(g => g !== group.id) : [...prev, group.id]
+                )}
+              >
+                <GroupIcon size={16} />
+                <span>{group.label}</span>
+                <ChevronDown size={14} className={isExpanded ? 'rotated' : ''} />
+              </button>
+
+              {isExpanded && (
+                <div className="tab-group-items">
+                  {group.tabs.map((tab) => {
+                    const Icon = tab.icon
+                    const count = tab.id === 'diario' ? diarios.length : tab.id === 'ocorrencias' ? ocorrenciasAbertas : tab.id === 'equipa' ? equipaAtiva : 0
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => handleTabChange(tab.id)}
+                        className={`tab-item ${activeTab === tab.id ? 'active' : ''}`}
+                      >
+                        <Icon size={14} />
+                        {tab.label}
+                        {count > 0 && <span className="tab-count">{count}</span>}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
           )
         })}
       </div>
 
-      {/* TAB: Tracking */}
-      {activeTab === 'tracking' && (
+      {/* TAB: MQT (ex-Tracking) */}
+      {activeTab === 'mqt' && (
         <ObraTracking obra={obra} />
       )}
 
@@ -686,8 +752,26 @@ export default function ObraDetalhe() {
         <ObraOrcamentacao obra={obra} />
       )}
 
-      {/* TAB: Contratos/Componentes */}
-      {activeTab === 'componentes' && (
+      {/* TAB: Compras */}
+      {activeTab === 'compras' && (
+        <div className="tab-placeholder">
+          <ShoppingCart size={48} strokeWidth={1} />
+          <h3>Gestão de Compras</h3>
+          <p>Módulo de gestão de compras e encomendas em desenvolvimento.</p>
+        </div>
+      )}
+
+      {/* TAB: Controle Executado */}
+      {activeTab === 'controle-executado' && (
+        <div className="tab-placeholder">
+          <TrendingUp size={48} strokeWidth={1} />
+          <h3>Controle Executado</h3>
+          <p>Módulo de controlo do trabalho executado em desenvolvimento.</p>
+        </div>
+      )}
+
+      {/* TAB: Contratos */}
+      {activeTab === 'contratos' && (
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <div>
@@ -811,8 +895,26 @@ export default function ObraDetalhe() {
         <ObraAutos obra={obra} />
       )}
 
-      {/* TAB: Diário */}
-      {activeTab === 'diario' && (
+      {/* TAB: HSO */}
+      {activeTab === 'hso' && (
+        <div className="tab-placeholder">
+          <HardHat size={48} strokeWidth={1} />
+          <h3>Higiene e Segurança no Trabalho</h3>
+          <p>Módulo de gestão de HSO em desenvolvimento.</p>
+        </div>
+      )}
+
+      {/* TAB: Fotografias */}
+      {activeTab === 'fotografias' && (
+        <div className="tab-placeholder">
+          <Image size={48} strokeWidth={1} />
+          <h3>Fotografias da Obra</h3>
+          <p>Galeria de fotografias da obra em desenvolvimento.</p>
+        </div>
+      )}
+
+      {/* TAB: Relatórios Obra (antigo Diário de Obra diário) */}
+      {activeTab === 'relatorios' && (
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <h2 style={{ fontSize: '20px', fontWeight: 600, margin: 0 }}>Diário de Obra</h2>
@@ -895,12 +997,21 @@ export default function ObraDetalhe() {
         </div>
       )}
 
-      {/* TAB: Diário de Projeto */}
-      {activeTab === 'diario-projeto' && (
+      {/* TAB: Não Conformidades */}
+      {activeTab === 'nao-conformidades' && (
+        <div className="tab-placeholder">
+          <AlertTriangle size={48} strokeWidth={1} />
+          <h3>Não Conformidades</h3>
+          <p>Módulo de gestão de não conformidades em desenvolvimento.</p>
+        </div>
+      )}
+
+      {/* TAB: Diário de Obra (projeto) */}
+      {activeTab === 'diario' && (
         <DiarioObraProjeto obraId={obra.id} obraCodigo={obra.codigo} />
       )}
 
-      {/* TAB: Zonas */}
+      {/* TAB: Zonas (legacy - não visível no menu) */}
       {activeTab === 'zonas' && (
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>

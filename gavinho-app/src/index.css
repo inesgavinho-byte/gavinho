@@ -5348,3 +5348,161 @@ textarea.form-input {
     opacity: 1;
   }
 }
+
+/* ============================================
+   OBRA TABS AGRUPADOS
+   ============================================ */
+
+.obra-tabs-container {
+  display: flex;
+  gap: var(--space-xs);
+  padding: var(--space-sm) 0;
+  margin-bottom: var(--space-lg);
+  border-bottom: 1px solid var(--border-color);
+  overflow-x: auto;
+}
+
+.tab-group {
+  display: flex;
+  flex-direction: column;
+  min-width: fit-content;
+}
+
+.tab-group.active .tab-group-header {
+  color: var(--brown);
+  background: var(--cream);
+}
+
+.tab-group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--brown-light);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.tab-group-header:hover {
+  background: var(--cream);
+  color: var(--brown);
+}
+
+.tab-group-header svg:last-child {
+  transition: transform 0.2s ease;
+  margin-left: 4px;
+}
+
+.tab-group-header svg:last-child.rotated {
+  transform: rotate(180deg);
+}
+
+.tab-group-items {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-xs) 0;
+  padding-left: var(--space-md);
+  gap: 2px;
+}
+
+.tab-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--brown-light);
+  font-size: 12px;
+  font-weight: 400;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.tab-item:hover {
+  background: var(--cream);
+  color: var(--brown);
+}
+
+.tab-item.active {
+  background: var(--warning);
+  color: white;
+  font-weight: 500;
+}
+
+.tab-item .tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.tab-item:not(.active) .tab-count {
+  background: var(--stone);
+  color: var(--brown);
+}
+
+/* Tab placeholder for modules in development */
+.tab-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  padding: var(--space-2xl);
+  background: var(--white);
+  border: 2px dashed var(--border-color);
+  border-radius: var(--radius-lg);
+  text-align: center;
+  color: var(--brown-light);
+  min-height: 300px;
+}
+
+.tab-placeholder h3 {
+  margin: 0;
+  font-size: 18px;
+  color: var(--brown);
+}
+
+.tab-placeholder p {
+  margin: 0;
+  font-size: 14px;
+  max-width: 300px;
+}
+
+/* Responsive tabs */
+@media (max-width: 1024px) {
+  .obra-tabs-container {
+    flex-wrap: wrap;
+  }
+
+  .tab-group {
+    flex: 1 1 auto;
+  }
+}
+
+@media (max-width: 768px) {
+  .obra-tabs-container {
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .tab-group-items {
+    padding-left: var(--space-lg);
+  }
+}
