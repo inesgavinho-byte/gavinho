@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, memo } from 'react'
+import { useState, useEffect, useRef, useCallback, memo, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import {
   Plus, Upload, Image, X, ChevronLeft, ChevronRight, Trash2,
@@ -7,12 +7,40 @@ import {
   Maximize2, ZoomIn, ZoomOut, RotateCcw, RefreshCw
 } from 'lucide-react'
 
-// Lazy loading image component with error handling
-const LazyImage = memo(({ src, alt, className, onClick }) => {
+// Image cache for prefetching
+const imageCache = new Map()
+
+// Generate optimized thumbnail URL with Supabase transformations
+const getThumbnailUrl = (url, width = 400) => {
+  if (!url) return ''
+  // If using Supabase storage with image transformations
+  if (url.includes('supabase.co/storage')) {
+    // Add render/image transformation params
+    const separator = url.includes('?') ? '&' : '?'
+    return `${url}${separator}width=${width}&quality=75`
+  }
+  return url
+}
+
+// Prefetch image into cache
+const prefetchImage = (url) => {
+  if (!url || imageCache.has(url)) return
+  const img = new window.Image()
+  img.src = url
+  imageCache.set(url, img)
+}
+
+// Lazy loading image component with error handling and thumbnail support
+const LazyImage = memo(({ src, alt, className, onClick, useThumbnail = true }) => {
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState(false)
   const [shouldLoad, setShouldLoad] = useState(false)
   const containerRef = useRef(null)
+
+  // Use thumbnail for grid view, full image otherwise
+  const displayUrl = useMemo(() => {
+    return useThumbnail ? getThumbnailUrl(src, 400) : src
+  }, [src, useThumbnail])
 
   useEffect(() => {
     // Reset state when src changes
@@ -33,14 +61,14 @@ const LazyImage = memo(({ src, alt, className, onClick }) => {
           }
         })
       },
-      { rootMargin: '200px', threshold: 0 }
+      { rootMargin: '300px', threshold: 0 }
     )
 
     observer.observe(containerRef.current)
 
     // Check if already visible
     const rect = containerRef.current.getBoundingClientRect()
-    if (rect.top < window.innerHeight + 200 && rect.bottom > -200) {
+    if (rect.top < window.innerHeight + 300 && rect.bottom > -300) {
       setShouldLoad(true)
       observer.disconnect()
     }
@@ -77,11 +105,13 @@ const LazyImage = memo(({ src, alt, className, onClick }) => {
             </div>
           )}
           <img
-            src={src}
+            src={displayUrl}
             alt={alt}
             className={`${className} ${loaded ? 'loaded' : ''}`}
             onLoad={() => setLoaded(true)}
             onError={() => setError(true)}
+            loading="lazy"
+            decoding="async"
           />
         </>
       )}
@@ -455,10 +485,12 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
     }
   }
 
-  // Lightbox navigation
-  const allImages = Object.values(renders).flat().flatMap(r =>
-    (r.versoes || []).map(v => ({ ...v, render: r }))
-  )
+  // Memoize all images for lightbox navigation
+  const allImages = useMemo(() => {
+    return Object.values(renders).flat().flatMap(r =>
+      (r.versoes || []).map(v => ({ ...v, render: r }))
+    )
+  }, [renders])
 
   const openLightbox = (image, index) => {
     setLightboxImage(image)
@@ -490,11 +522,48 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [lightboxImage, lightboxIndex])
 
-  // Calculate stats
-  const totalRenders = Object.values(renders).flat().length
-  const totalFinais = Object.values(renders).flat().filter(r =>
-    r.versoes?.some(v => v.is_final)
-  ).length
+  // Prefetch adjacent images when lightbox is open
+  useEffect(() => {
+    if (!lightboxImage || allImages.length === 0) return
+
+    // Prefetch next 2 and previous 2 images
+    const prefetchIndexes = [
+      lightboxIndex - 2,
+      lightboxIndex - 1,
+      lightboxIndex + 1,
+      lightboxIndex + 2
+    ].filter(i => i >= 0 && i < allImages.length && i !== lightboxIndex)
+
+    prefetchIndexes.forEach(i => {
+      if (allImages[i]?.url) {
+        prefetchImage(allImages[i].url)
+      }
+    })
+  }, [lightboxImage, lightboxIndex, allImages])
+
+  // Memoize stats calculation
+  const { totalRenders, totalFinais } = useMemo(() => {
+    const allRenders = Object.values(renders).flat()
+    return {
+      totalRenders: allRenders.length,
+      totalFinais: allRenders.filter(r => r.versoes?.some(v => v.is_final)).length
+    }
+  }, [renders])
+
+  // Preload first batch of visible thumbnails on mount
+  useEffect(() => {
+    if (Object.keys(renders).length === 0) return
+
+    // Preload thumbnails for first ITEMS_PER_SECTION items of each section
+    Object.values(renders).forEach(items => {
+      items.slice(0, ITEMS_PER_SECTION).forEach(render => {
+        const latestVersion = render.versoes?.[0]
+        if (latestVersion?.url) {
+          prefetchImage(getThumbnailUrl(latestVersion.url, 400))
+        }
+      })
+    })
+  }, [renders])
 
   if (loading) {
     return (
