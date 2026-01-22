@@ -62,6 +62,11 @@ export default function ProjetoEntregaveis({ projeto }) {
   // Estado para modal de ficheiros
   const [fileModalItem, setFileModalItem] = useState(null)
 
+  // Estado para modal de nova fase
+  const [showFaseModal, setShowFaseModal] = useState(false)
+  const [newFaseName, setNewFaseName] = useState('')
+  const [savingFase, setSavingFase] = useState(false)
+
   // Estado para cache de ficheiros atuais (para mostrar ícones)
   const [filesCache, setFilesCache] = useState({})
 
@@ -516,6 +521,62 @@ export default function ProjetoEntregaveis({ projeto }) {
     setExpandedGroups(prev => ({ ...prev, [codigo]: !prev[codigo] }))
   }
 
+  // Criar nova fase de projeto
+  const handleCreateFase = async () => {
+    if (!newFaseName.trim()) {
+      alert('O nome da fase é obrigatório')
+      return
+    }
+
+    // Verificar se a fase já existe
+    if (FASES_OPCOES.includes(newFaseName.trim()) ||
+        entregaveis.some(e => e.fase === newFaseName.trim())) {
+      alert('Esta fase já existe')
+      return
+    }
+
+    setSavingFase(true)
+    try {
+      // Criar um item "placeholder" para a fase (sem código de desenho)
+      // Isso permite que a fase apareça mesmo vazia
+      const { error } = await supabase
+        .from('projeto_entregaveis')
+        .insert([{
+          projeto_id: projeto.id,
+          fase: newFaseName.trim(),
+          codigo: `${newFaseName.trim().substring(0, 3).toUpperCase()}.00`,
+          nome: `Fase: ${newFaseName.trim()}`,
+          categoria: 'Geral',
+          status: 'pendente'
+        }])
+
+      if (error) throw error
+
+      setShowFaseModal(false)
+      setNewFaseName('')
+      loadEntregaveis(false)
+      // Expandir a nova fase
+      setExpandedFases(prev => ({ ...prev, [newFaseName.trim()]: true }))
+    } catch (err) {
+      console.error('Erro ao criar fase:', err)
+      alert('Erro ao criar fase: ' + err.message)
+    } finally {
+      setSavingFase(false)
+    }
+  }
+
+  // Adicionar entregável a uma fase específica
+  const handleAddToFase = (faseNome, categoriaNome = null) => {
+    resetForm()
+    setFormData(prev => ({
+      ...prev,
+      fase: faseNome,
+      categoria: categoriaNome || ''
+    }))
+    setEditingItem(null)
+    setShowModal(true)
+  }
+
   const formatDate = (date) => {
     if (!date) return '-'
     return new Date(date).toLocaleDateString('pt-PT', { day: '2-digit', month: 'short' })
@@ -605,6 +666,13 @@ export default function ProjetoEntregaveis({ projeto }) {
               style={{ fontSize: '12px', padding: '8px 12px' }}
             >
               <FileSpreadsheet size={14} /> Importar Excel
+            </button>
+            <button
+              onClick={() => setShowFaseModal(true)}
+              className="btn btn-secondary"
+              style={{ fontSize: '12px', padding: '8px 12px' }}
+            >
+              <Plus size={14} /> Nova Fase
             </button>
             <button
               onClick={() => { resetForm(); setEditingItem(null); setShowModal(true) }}
@@ -702,19 +770,20 @@ export default function ProjetoEntregaveis({ projeto }) {
               return (
                 <div key={faseNome} className="card" style={{ padding: 0, overflow: 'hidden' }}>
                   {/* Header da Fase */}
-                  <div 
-                    onClick={() => toggleFase(faseNome)}
-                    style={{ 
-                      padding: '16px 20px', 
+                  <div
+                    style={{
+                      padding: '16px 20px',
                       background: 'linear-gradient(135deg, var(--blush-dark) 0%, var(--warning) 100%)',
                       color: 'white',
-                      cursor: 'pointer',
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center'
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div
+                      onClick={() => toggleFase(faseNome)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', flex: 1 }}
+                    >
                       {expandedFases[faseNome] ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
                       <div>
                         <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>{faseNome}</h4>
@@ -723,14 +792,41 @@ export default function ProjetoEntregaveis({ projeto }) {
                         </span>
                       </div>
                     </div>
-                    <div style={{ 
-                      background: 'rgba(255,255,255,0.2)', 
-                      padding: '6px 12px', 
-                      borderRadius: '20px',
-                      fontSize: '13px',
-                      fontWeight: 600
-                    }}>
-                      {fasePercent}%
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{
+                        background: 'rgba(255,255,255,0.2)',
+                        padding: '6px 12px',
+                        borderRadius: '20px',
+                        fontSize: '13px',
+                        fontWeight: 600
+                      }}>
+                        {fasePercent}%
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleAddToFase(faseNome)
+                        }}
+                        title="Adicionar desenho a esta fase"
+                        style={{
+                          background: 'rgba(255,255,255,0.25)',
+                          border: '1px solid rgba(255,255,255,0.4)',
+                          borderRadius: '6px',
+                          padding: '6px 10px',
+                          cursor: 'pointer',
+                          color: 'white',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          fontSize: '11px',
+                          fontWeight: 500,
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.35)'}
+                        onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
+                      >
+                        <Plus size={14} />
+                      </button>
                     </div>
                   </div>
                   
@@ -740,24 +836,52 @@ export default function ProjetoEntregaveis({ projeto }) {
                       {Object.entries(categorias).map(([catNome, items]) => (
                         <div key={catNome} style={{ marginBottom: '12px' }}>
                           {/* Header da Categoria */}
-                          <div 
-                            onClick={() => toggleFase(`${faseNome}__${catNome}`)}
-                            style={{ 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              gap: '8px', 
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px',
                               padding: '10px 12px',
                               background: 'var(--cream)',
                               borderRadius: '8px',
-                              cursor: 'pointer',
                               marginBottom: expandedFases[`${faseNome}__${catNome}`] ? '8px' : 0
                             }}
                           >
-                            {expandedFases[`${faseNome}__${catNome}`] ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                            <span style={{ fontWeight: 600, fontSize: '13px', flex: 1 }}>{catNome}</span>
-                            <span style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
-                              {items.length} itens  –  {items.filter(i => i.status === 'concluido' || i.status === 'aprovado').length} âœ“
-                            </span>
+                            <div
+                              onClick={() => toggleFase(`${faseNome}__${catNome}`)}
+                              style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, cursor: 'pointer' }}
+                            >
+                              {expandedFases[`${faseNome}__${catNome}`] ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                              <span style={{ fontWeight: 600, fontSize: '13px', flex: 1 }}>{catNome}</span>
+                              <span style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
+                                {items.length} itens  –  {items.filter(i => i.status === 'concluido' || i.status === 'aprovado').length} ✓
+                              </span>
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleAddToFase(faseNome, catNome)
+                              }}
+                              title={`Adicionar desenho a ${catNome}`}
+                              style={{
+                                background: 'var(--stone)',
+                                border: 'none',
+                                borderRadius: '4px',
+                                padding: '4px 8px',
+                                cursor: 'pointer',
+                                color: 'var(--brown)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '2px',
+                                fontSize: '10px',
+                                fontWeight: 500,
+                                transition: 'all 0.2s'
+                              }}
+                              onMouseOver={(e) => e.currentTarget.style.background = 'var(--brown-light)'}
+                              onMouseOut={(e) => e.currentTarget.style.background = 'var(--stone)'}
+                            >
+                              <Plus size={12} />
+                            </button>
                           </div>
                           
                           {/* Lista de Items */}
@@ -1399,6 +1523,130 @@ export default function ProjetoEntregaveis({ projeto }) {
                 isAdmin={true}
                 compact={false}
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Nova Fase */}
+      {showFaseModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+          onClick={() => setShowFaseModal(false)}
+        >
+          <div
+            style={{
+              background: 'white',
+              borderRadius: '16px',
+              width: '400px',
+              maxWidth: '90vw'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{
+              padding: '20px 24px',
+              borderBottom: '1px solid var(--stone)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
+                Nova Fase de Projeto
+              </h3>
+              <button
+                onClick={() => setShowFaseModal(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--brown-light)',
+                  padding: '4px'
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ padding: '24px' }}>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--brown)', marginBottom: '6px' }}>
+                  Nome da Fase *
+                </label>
+                <input
+                  type="text"
+                  value={newFaseName}
+                  onChange={(e) => setNewFaseName(e.target.value)}
+                  placeholder="Ex: Projeto de Interiores, MEP, etc."
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid var(--stone)',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    boxSizing: 'border-box'
+                  }}
+                  autoFocus
+                />
+              </div>
+
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '12px', color: 'var(--brown-light)', marginBottom: '8px' }}>
+                  Fases existentes:
+                </label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {[...new Set([...FASES_OPCOES, ...entregaveis.map(e => e.fase).filter(Boolean)])].map(fase => (
+                    <span
+                      key={fase}
+                      style={{
+                        padding: '4px 10px',
+                        background: 'var(--cream)',
+                        borderRadius: '12px',
+                        fontSize: '11px',
+                        color: 'var(--brown-light)'
+                      }}
+                    >
+                      {fase}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div style={{
+              padding: '16px 24px',
+              borderTop: '1px solid var(--stone)',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '12px',
+              background: 'var(--cream)'
+            }}>
+              <button
+                onClick={() => {
+                  setShowFaseModal(false)
+                  setNewFaseName('')
+                }}
+                className="btn btn-outline"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleCreateFase}
+                disabled={savingFase || !newFaseName.trim()}
+                className="btn btn-primary"
+              >
+                {savingFase ? <Loader2 size={16} className="spin" /> : <><Plus size={16} /> Criar Fase</>}
+              </button>
             </div>
           </div>
         </div>
