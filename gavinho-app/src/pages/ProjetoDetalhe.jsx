@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { 
-  ArrowLeft, 
-  MapPin, 
-  Calendar, 
-  User, 
+import {
+  ArrowLeft,
+  MapPin,
+  Calendar,
+  User,
   Building2,
   FileText,
   Euro,
@@ -42,7 +42,12 @@ import {
   Package,
   Send,
   Users,
-  ClipboardList
+  ClipboardList,
+  Lightbulb,
+  Palette,
+  ImagePlus,
+  FolderOpen,
+  UserCircle
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -741,6 +746,12 @@ export default function ProjetoDetalhe() {
   // Sub-tabs para Fases & Entregas
   const [activeFaseSection, setActiveFaseSection] = useState(urlSubtab || 'entregaveis')
 
+  // Sub-tabs para Archviz
+  const [activeArchvizSection, setActiveArchvizSection] = useState(urlSubtab || 'inspiracoes')
+
+  // Sub-tabs para Gestão de Projeto
+  const [activeGestaoSection, setActiveGestaoSection] = useState(urlSubtab || 'contratos')
+
   // Gestão de Renders/Archviz
   const [renders, setRenders] = useState([])
   const [showRenderModal, setShowRenderModal] = useState(false)
@@ -902,7 +913,14 @@ export default function ProjetoDetalhe() {
       setActiveTab(urlTab)
     }
     if (urlSubtab) {
-      setActiveFaseSection(urlSubtab)
+      // Definir o subtab correto baseado no tab ativo
+      if (urlTab === 'fases') {
+        setActiveFaseSection(urlSubtab)
+      } else if (urlTab === 'archviz') {
+        setActiveArchvizSection(urlSubtab)
+      } else if (urlTab === 'gestao') {
+        setActiveGestaoSection(urlSubtab)
+      }
     }
   }, [urlTab, urlSubtab])
 
@@ -1227,10 +1245,16 @@ export default function ProjetoDetalhe() {
     }
   }
 
-  // Navegar para sub-tab (dentro de Fases & Entregas)
-  const handleSubtabChange = (subtabId) => {
-    navigate(`/projetos/${id}/${activeTab}/${subtabId}`)
-    setActiveFaseSection(subtabId)
+  // Navegar para sub-tab (genérico para todos os tabs com subtabs)
+  const handleSubtabChange = (subtabId, tabType = activeTab) => {
+    navigate(`/projetos/${id}/${tabType}/${subtabId}`)
+    if (tabType === 'fases') {
+      setActiveFaseSection(subtabId)
+    } else if (tabType === 'archviz') {
+      setActiveArchvizSection(subtabId)
+    } else if (tabType === 'gestao') {
+      setActiveGestaoSection(subtabId)
+    }
   }
 
   // Duplicar projeto
@@ -2035,25 +2059,39 @@ export default function ProjetoDetalhe() {
   // Imagens finais do projeto
   const imagensFinais = renders.filter(r => r.is_final)
 
-  // Tabs - Contratos e Financeiro apenas visíveis para administração
+  // Tabs principais
   const allTabs = [
-    { id: 'dashboard', label: 'Dashboard Projeto', icon: Layers },
-    { id: 'fases', label: 'Fases & Entregas', icon: Target },
-    { id: 'diario', label: 'Diário de Bordo', icon: BookOpen },
-    { id: 'archviz', label: 'Archviz', icon: Image },
-    { id: 'imagens-finais', label: 'Imagens Finais', icon: CheckCircle },
-    { id: 'biblioteca', label: 'Biblioteca', icon: Library },
+    { id: 'dashboard', label: 'Dashboard', icon: Layers },
+    { id: 'briefing', label: 'Briefing & Conceito', icon: Lightbulb },
+    { id: 'fases', label: 'Fases & Entregas', icon: Target, hasSubtabs: true },
     { id: 'decisions', label: 'Decision Log', icon: ClipboardList },
-    { id: 'gestao', label: 'Gestão de Projeto', icon: Settings, adminOnly: true }
+    { id: 'archviz', label: 'Archviz', icon: Image, hasSubtabs: true },
+    { id: 'biblioteca', label: 'Biblioteca', icon: Library },
+    { id: 'gestao', label: 'Gestão de Projeto', icon: Settings, hasSubtabs: true }
   ]
 
   // Secções dentro de Fases & Entregas
   const faseSections = [
-    { id: 'prazo', label: 'Prazo Contratual', icon: Calendar },
+    { id: 'prazo', label: 'Prazo Contratual & Escopo', icon: Calendar },
     { id: 'entregaveis', label: 'Entregáveis', icon: ListChecks },
-    { id: 'entregas', label: 'Central de Entregas', icon: Package },
+    { id: 'entregas', label: 'Central Entregas', icon: Package },
     { id: 'design-review', label: 'Design Review', icon: Eye },
     { id: 'atas', label: 'Atas', icon: FileText }
+  ]
+
+  // Secções dentro de Archviz
+  const archvizSections = [
+    { id: 'inspiracoes', label: 'Inspirações & Referências', icon: Palette },
+    { id: 'processo', label: 'Imagens Processo', icon: ImagePlus },
+    { id: 'finais', label: 'Imagens Finais', icon: CheckCircle }
+  ]
+
+  // Secções dentro de Gestão de Projeto
+  const gestaoSections = [
+    { id: 'contratos', label: 'Contratos', icon: FileText },
+    { id: 'diario-projeto', label: 'Diário de Projeto', icon: BookOpen },
+    { id: 'faturacao', label: 'Faturação', icon: Euro },
+    { id: 'ficha-cliente', label: 'Ficha de Cliente', icon: UserCircle }
   ]
 
   const tabs = allTabs.filter(tab => !tab.adminOnly || isAdmin())
@@ -3161,16 +3199,63 @@ export default function ProjetoDetalhe() {
         </div>
       )}
 
-      {/* Tab Diário de Bordo */}
-      {activeTab === 'diario' && (
-        <div className="card" style={{ padding: '20px' }}>
-          <DiarioBordo projeto={project} />
+      {/* Tab Briefing & Conceito */}
+      {activeTab === 'briefing' && (
+        <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
+          <Lightbulb size={48} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '16px' }} />
+          <h3 style={{ margin: '0 0 8px', color: 'var(--brown)' }}>Briefing & Conceito</h3>
+          <p style={{ color: 'var(--brown-light)', margin: 0 }}>Módulo de briefing e conceito em desenvolvimento</p>
         </div>
       )}
 
-      {/* Tab Archviz */}
+      {/* Tab Archviz com subtabs */}
       {activeTab === 'archviz' && (
-        <div className="card">
+        <div>
+          {/* Section navigation */}
+          <div style={{
+            display: 'flex',
+            gap: '8px',
+            marginBottom: '20px',
+            borderBottom: '1px solid var(--stone)',
+            paddingBottom: '12px'
+          }}>
+            {archvizSections.map(section => (
+              <button
+                key={section.id}
+                onClick={() => handleSubtabChange(section.id, 'archviz')}
+                style={{
+                  padding: '8px 16px',
+                  background: activeArchvizSection === section.id ? 'var(--brown)' : 'transparent',
+                  color: activeArchvizSection === section.id ? 'white' : 'var(--brown-light)',
+                  border: activeArchvizSection === section.id ? 'none' : '1px solid var(--stone)',
+                  borderRadius: '20px',
+                  fontSize: '12px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <section.icon size={14} />
+                {section.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Inspirações & Referências */}
+          {activeArchvizSection === 'inspiracoes' && (
+            <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
+              <Palette size={48} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '16px' }} />
+              <h3 style={{ margin: '0 0 8px', color: 'var(--brown)' }}>Inspirações & Referências</h3>
+              <p style={{ color: 'var(--brown-light)', margin: 0 }}>Galeria de inspirações e referências visuais em desenvolvimento</p>
+            </div>
+          )}
+
+          {/* Imagens Processo */}
+          {activeArchvizSection === 'processo' && (
+            <div className="card">
           <div className="flex items-center justify-between" style={{ marginBottom: '24px' }}>
             <div>
               <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
@@ -3362,20 +3447,20 @@ export default function ProjetoDetalhe() {
             </div>
           )}
         </div>
-      )}
+          )}
 
-      {/* Tab Imagens Finais */}
-      {activeTab === 'imagens-finais' && (
-        <div className="card">
-          <div className="flex items-center justify-between" style={{ marginBottom: '24px' }}>
-            <div>
-              <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
-                Imagens Finais do Projeto
-              </h3>
-              <p style={{ fontSize: '13px', color: 'var(--brown-light)', marginTop: '4px' }}>
-                Imagens aprovadas para entrega ao cliente
-              </p>
-            </div>
+          {/* Imagens Finais */}
+          {activeArchvizSection === 'finais' && (
+            <div className="card">
+              <div className="flex items-center justify-between" style={{ marginBottom: '24px' }}>
+                <div>
+                  <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
+                    Imagens Finais do Projeto
+                  </h3>
+                  <p style={{ fontSize: '13px', color: 'var(--brown-light)', marginTop: '4px' }}>
+                    Imagens aprovadas para entrega ao cliente
+                  </p>
+                </div>
             <span style={{
               padding: '8px 16px',
               background: 'var(--success)',
@@ -3455,8 +3540,10 @@ export default function ProjetoDetalhe() {
               <CheckCircle size={48} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '16px' }} />
               <h4 style={{ color: 'var(--brown)', marginBottom: '8px' }}>Nenhuma Imagem Final</h4>
               <p style={{ color: 'var(--brown-light)', fontSize: '13px' }}>
-                Vá à tab "Archviz" e marque as imagens que devem aparecer nas entregas ao cliente.
+                Vá a "Imagens Processo" e marque as imagens que devem aparecer nas entregas ao cliente.
               </p>
+            </div>
+          )}
             </div>
           )}
         </div>
@@ -3544,112 +3631,99 @@ export default function ProjetoDetalhe() {
         <DecisionLog projeto={project} />
       )}
 
-      {/* Tab Gestão de Projeto - Apenas Admin/PM */}
-      {activeTab === 'gestao' && isAdmin() && (
-        <div className="card">
-          <div className="flex items-center gap-md" style={{ marginBottom: '24px' }}>
-            <div style={{
-              width: '48px',
-              height: '48px',
-              borderRadius: '12px',
-              background: 'var(--brown)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'white'
-            }}>
-              <Settings size={24} />
-            </div>
-            <div>
-              <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)', margin: 0 }}>
-                Gestão de Projeto
-              </h3>
-              <p style={{ fontSize: '13px', color: 'var(--brown-light)', margin: 0 }}>
-                Acesso restrito a administradores e gestores de projeto
-              </p>
-            </div>
+      {/* Tab Gestão de Projeto com subtabs */}
+      {activeTab === 'gestao' && (
+        <div>
+          {/* Section navigation */}
+          <div style={{
+            display: 'flex',
+            gap: '8px',
+            marginBottom: '20px',
+            borderBottom: '1px solid var(--stone)',
+            paddingBottom: '12px'
+          }}>
+            {gestaoSections.map(section => (
+              <button
+                key={section.id}
+                onClick={() => handleSubtabChange(section.id, 'gestao')}
+                style={{
+                  padding: '8px 16px',
+                  background: activeGestaoSection === section.id ? 'var(--brown)' : 'transparent',
+                  color: activeGestaoSection === section.id ? 'white' : 'var(--brown-light)',
+                  border: activeGestaoSection === section.id ? 'none' : '1px solid var(--stone)',
+                  borderRadius: '20px',
+                  fontSize: '12px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <section.icon size={14} />
+                {section.label}
+              </button>
+            ))}
           </div>
 
-          <div className="grid grid-2" style={{ gap: '16px' }}>
-            <button
-              onClick={() => navigate(`/gestao/projeto/${project.id}`)}
-              style={{
-                padding: '24px',
-                background: 'var(--cream)',
-                border: '1px solid var(--stone)',
-                borderRadius: '12px',
-                textAlign: 'left',
-                cursor: 'pointer',
-                transition: 'all 0.2s'
-              }}
-            >
-              <h4 style={{ color: 'var(--brown)', marginBottom: '8px', fontSize: '14px', fontWeight: 600 }}>
-                Dashboard de Gestão
-              </h4>
-              <p style={{ color: 'var(--brown-light)', fontSize: '12px', margin: 0 }}>
-                Visão geral financeira, contratos e documentação administrativa
-              </p>
-            </button>
+          {/* Contratos */}
+          {activeGestaoSection === 'contratos' && (
+            <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
+              <FileText size={48} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '16px' }} />
+              <h3 style={{ margin: '0 0 8px', color: 'var(--brown)' }}>Contratos & Documentos</h3>
+              <p style={{ color: 'var(--brown-light)', margin: 0 }}>Propostas, contratos e documentação legal</p>
+            </div>
+          )}
 
-            <button
-              onClick={() => navigate(`/financeiro?projeto=${project.id}`)}
-              style={{
-                padding: '24px',
-                background: 'var(--cream)',
-                border: '1px solid var(--stone)',
-                borderRadius: '12px',
-                textAlign: 'left',
-                cursor: 'pointer',
-                transition: 'all 0.2s'
-              }}
-            >
-              <h4 style={{ color: 'var(--brown)', marginBottom: '8px', fontSize: '14px', fontWeight: 600 }}>
-                Gestão Financeira
-              </h4>
-              <p style={{ color: 'var(--brown-light)', fontSize: '12px', margin: 0 }}>
-                Orçamentos, compras e controlo de execução
-              </p>
-            </button>
+          {/* Diário de Projeto */}
+          {activeGestaoSection === 'diario-projeto' && (
+            <div className="card" style={{ padding: '20px' }}>
+              <DiarioBordo projeto={project} />
+            </div>
+          )}
 
-            <button
-              onClick={() => navigate(`/clientes/${project.cliente?.id}`)}
-              style={{
-                padding: '24px',
-                background: 'var(--cream)',
-                border: '1px solid var(--stone)',
-                borderRadius: '12px',
-                textAlign: 'left',
-                cursor: 'pointer',
-                transition: 'all 0.2s'
-              }}
-            >
-              <h4 style={{ color: 'var(--brown)', marginBottom: '8px', fontSize: '14px', fontWeight: 600 }}>
-                Ficha de Cliente
-              </h4>
-              <p style={{ color: 'var(--brown-light)', fontSize: '12px', margin: 0 }}>
-                Dados do cliente, histórico e comunicações
-              </p>
-            </button>
+          {/* Faturação */}
+          {activeGestaoSection === 'faturacao' && (
+            <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
+              <Euro size={48} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '16px' }} />
+              <h3 style={{ margin: '0 0 8px', color: 'var(--brown)' }}>Faturação</h3>
+              <p style={{ color: 'var(--brown-light)', margin: 0 }}>Gestão de faturação e pagamentos</p>
+            </div>
+          )}
 
-            <button
-              style={{
-                padding: '24px',
-                background: 'var(--cream)',
-                border: '1px solid var(--stone)',
-                borderRadius: '12px',
-                textAlign: 'left',
-                cursor: 'pointer',
-                transition: 'all 0.2s'
-              }}
-            >
-              <h4 style={{ color: 'var(--brown)', marginBottom: '8px', fontSize: '14px', fontWeight: 600 }}>
-                Contratos & Documentos
-              </h4>
-              <p style={{ color: 'var(--brown-light)', fontSize: '12px', margin: 0 }}>
-                Propostas, contratos e documentação legal
-              </p>
-            </button>
-          </div>
+          {/* Ficha de Cliente */}
+          {activeGestaoSection === 'ficha-cliente' && (
+            <div className="card">
+              <div className="flex items-center gap-md" style={{ marginBottom: '24px' }}>
+                <div style={{
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '12px',
+                  background: 'var(--cream)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <UserCircle size={24} style={{ color: 'var(--brown)' }} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)', margin: 0 }}>
+                    {project.cliente_nome || 'Cliente'}
+                  </h3>
+                  <p style={{ fontSize: '13px', color: 'var(--brown-light)', margin: 0 }}>
+                    Dados e histórico do cliente
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => navigate(`/clientes/${project.cliente?.id}`)}
+                className="btn btn-primary"
+              >
+                Ver Ficha Completa
+              </button>
+            </div>
+          )}
         </div>
       )}
 
