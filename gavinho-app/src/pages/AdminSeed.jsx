@@ -834,36 +834,63 @@ export default function AdminSeed() {
 
     addLog('👥 Atualizando datas de entrada dos colaboradores...', 'info')
 
+    // Buscar por múltiplos padrões para maior flexibilidade
     const employeeDates = [
-      { nome: 'Luciana Ortega', data_entrada: '2025-02-14' },
-      { nome: 'Leonardo Ribeiro', data_entrada: '2025-03-10' },
-      { nome: 'Caroline Roda', data_entrada: '2025-03-24' },
-      { nome: 'Giovana Martins', data_entrada: '2025-04-01' },
-      { nome: 'Carolina Cipriano', data_entrada: '2025-06-23' },
-      { nome: 'Laís Silva', data_entrada: '2025-07-14' },
-      { nome: 'Alana Oliveira', data_entrada: '2025-09-22' },
-      { nome: 'Ana Miranda', data_entrada: '2025-11-10' },
-      { nome: 'Patrícia Morais', data_entrada: '2025-11-17' }
+      { patterns: ['Luciana Ortega', 'Luciana%Ortega'], data_entrada: '2025-02-14', display: 'Luciana Ortega' },
+      { patterns: ['Leonardo Ribeiro', 'Leonardo%Ribeiro'], data_entrada: '2025-03-10', display: 'Leonardo Ribeiro' },
+      { patterns: ['Caroline Roda', 'Caroline%Roda'], data_entrada: '2025-03-24', display: 'Caroline Roda' },
+      { patterns: ['Giovana Martins', 'Giovana%Martins'], data_entrada: '2025-04-01', display: 'Giovana Martins' },
+      { patterns: ['Carolina Cipriano', 'Carolina%Cipriano'], data_entrada: '2025-06-23', display: 'Carolina Cipriano' },
+      { patterns: ['Laís Silva', 'Lais Silva', 'La_s%Silva'], data_entrada: '2025-07-14', display: 'Laís Silva' },
+      { patterns: ['Alana Oliveira', 'Alana%Oliveira', 'Alana'], data_entrada: '2025-09-22', display: 'Alana Oliveira' },
+      { patterns: ['Ana Miranda', 'Ana%Miranda'], data_entrada: '2025-11-10', display: 'Ana Miranda' },
+      { patterns: ['Patrícia Morais', 'Patricia Morais', 'Patr_cia%Morais'], data_entrada: '2025-11-17', display: 'Patrícia Morais' }
     ]
 
     try {
       let updated = 0
       let notFound = 0
 
-      for (const employee of employeeDates) {
-        const { data, error } = await supabase
-          .from('utilizadores')
-          .update({ data_entrada: employee.data_entrada })
-          .ilike('nome', `%${employee.nome}%`)
-          .select()
+      // Primeiro, listar todos os utilizadores para debug
+      const { data: allUsers } = await supabase
+        .from('utilizadores')
+        .select('id, nome')
+        .order('nome')
 
-        if (error) {
-          addLog(`❌ Erro ao atualizar ${employee.nome}: ${error.message}`, 'error')
-        } else if (data && data.length > 0) {
-          addLog(`✅ ${employee.nome} → ${employee.data_entrada}`, 'success')
-          updated++
-        } else {
-          addLog(`⚠️ ${employee.nome} não encontrado`, 'warning')
+      if (allUsers) {
+        addLog(`📋 ${allUsers.length} utilizadores na base de dados`, 'info')
+      }
+
+      for (const employee of employeeDates) {
+        let found = false
+
+        // Tentar cada padrão de pesquisa
+        for (const pattern of employee.patterns) {
+          if (found) break
+
+          const { data, error } = await supabase
+            .from('utilizadores')
+            .update({ data_entrada: employee.data_entrada })
+            .ilike('nome', `%${pattern}%`)
+            .select('id, nome')
+
+          if (!error && data && data.length > 0) {
+            addLog(`✅ ${data[0].nome} → ${employee.data_entrada}`, 'success')
+            updated++
+            found = true
+          }
+        }
+
+        if (!found) {
+          // Mostrar nomes similares para ajudar a identificar
+          const similar = allUsers?.filter(u =>
+            u.nome.toLowerCase().includes(employee.display.split(' ')[0].toLowerCase())
+          )
+          if (similar && similar.length > 0) {
+            addLog(`⚠️ ${employee.display} não encontrado. Similares: ${similar.map(s => s.nome).join(', ')}`, 'warning')
+          } else {
+            addLog(`⚠️ ${employee.display} não encontrado`, 'warning')
+          }
           notFound++
         }
       }
