@@ -1012,6 +1012,114 @@ export default function AdminSeed() {
     }
   }
 
+  // Seed férias já gozadas
+  const seedFeriasGozadas = async () => {
+    setLoading(true)
+    setLogs([])
+    setResult(null)
+
+    addLog('🏖️ A adicionar férias já gozadas...', 'info')
+
+    const feriasData = [
+      {
+        nome: 'Caroline Roda',
+        patterns: ['Caroline Roda', 'Caroline%Roda'],
+        data_inicio: '2025-08-11',
+        data_fim: '2025-08-18',
+        dias_uteis: 6,
+        notas: 'Férias de verão 2025'
+      },
+      {
+        nome: 'Leonardo Ribeiro',
+        patterns: ['Leonardo Ribeiro', 'Leonardo%Ribeiro'],
+        data_inicio: '2025-10-06',
+        data_fim: '2025-10-17',
+        dias_uteis: 10,
+        notas: 'Férias outubro 2025'
+      },
+      {
+        nome: 'Ana Miranda',
+        patterns: ['Ana Miranda', 'Ana%Miranda'],
+        data_inicio: '2026-01-05',
+        data_fim: '2026-01-12',
+        dias_uteis: 6,
+        notas: 'Férias janeiro 2026'
+      }
+    ]
+
+    try {
+      let inserted = 0
+      let errors = 0
+
+      for (const ferias of feriasData) {
+        // Encontrar o utilizador
+        let userId = null
+
+        for (const pattern of ferias.patterns) {
+          const { data: users } = await supabase
+            .from('utilizadores')
+            .select('id, nome')
+            .ilike('nome', `%${pattern}%`)
+            .limit(1)
+
+          if (users && users.length > 0) {
+            userId = users[0].id
+            addLog(`👤 Encontrado: ${users[0].nome}`, 'info')
+            break
+          }
+        }
+
+        if (!userId) {
+          addLog(`⚠️ ${ferias.nome} não encontrado`, 'warning')
+          errors++
+          continue
+        }
+
+        // Verificar se já existe esta ausência
+        const { data: existing } = await supabase
+          .from('ausencias')
+          .select('id')
+          .eq('utilizador_id', userId)
+          .eq('data_inicio', ferias.data_inicio)
+          .eq('data_fim', ferias.data_fim)
+
+        if (existing && existing.length > 0) {
+          addLog(`ℹ️ ${ferias.nome}: férias ${ferias.data_inicio} já existem`, 'info')
+          continue
+        }
+
+        // Inserir ausência
+        const { error } = await supabase
+          .from('ausencias')
+          .insert({
+            utilizador_id: userId,
+            tipo: 'ferias',
+            data_inicio: ferias.data_inicio,
+            data_fim: ferias.data_fim,
+            dias_uteis: ferias.dias_uteis,
+            notas: ferias.notas,
+            status: 'aprovada'
+          })
+
+        if (error) {
+          addLog(`❌ Erro ${ferias.nome}: ${error.message}`, 'error')
+          errors++
+        } else {
+          addLog(`✅ ${ferias.nome}: ${ferias.data_inicio} a ${ferias.data_fim} (${ferias.dias_uteis} dias)`, 'success')
+          inserted++
+        }
+      }
+
+      addLog(`📊 Resumo: ${inserted} férias adicionadas, ${errors} erros`, 'info')
+      setResult({ success: errors === 0 })
+    } catch (err) {
+      addLog(`💥 Erro: ${err.message}`, 'error')
+      setResult({ success: false, error: err.message })
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const seedEntregasMYRYAD = async () => {
     setLoading(true)
     setLogs([])
@@ -1649,6 +1757,69 @@ export default function AdminSeed() {
               <>
                 <Play size={18} style={{ marginRight: '8px' }} />
                 Adicionar Feriados 2025-2027
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Férias Gozadas Card */}
+        <div className="card" style={{ padding: '24px' }}>
+          <div className="flex items-center gap-md" style={{ marginBottom: '20px' }}>
+            <div style={{
+              width: '56px',
+              height: '56px',
+              borderRadius: '12px',
+              background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white',
+              fontSize: '24px'
+            }}>
+              🏖️
+            </div>
+            <div>
+              <h3 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--brown)' }}>
+                Férias Gozadas
+              </h3>
+              <p style={{ fontSize: '13px', color: 'var(--brown-light)' }}>
+                Registar férias já aprovadas
+              </p>
+            </div>
+          </div>
+
+          {/* Lista de férias */}
+          <div style={{
+            background: 'var(--cream)',
+            borderRadius: '12px',
+            padding: '16px',
+            marginBottom: '20px'
+          }}>
+            <h4 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--brown)', marginBottom: '12px' }}>
+              Férias a registar:
+            </h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12px', color: 'var(--brown-light)' }}>
+              <div>🧑 Caroline Roda → 11 a 18/08/2025 (6 dias)</div>
+              <div>🧑 Leonardo Ribeiro → 6 a 17/10/2025 (10 dias)</div>
+              <div>🧑 Ana Miranda → 5 a 12/01/2026 (6 dias)</div>
+            </div>
+          </div>
+
+          <button
+            onClick={seedFeriasGozadas}
+            disabled={loading}
+            className="btn btn-primary"
+            style={{ width: '100%', padding: '14px' }}
+          >
+            {loading ? (
+              <>
+                <Loader size={18} style={{ marginRight: '8px', animation: 'spin 1s linear infinite' }} />
+                A processar...
+              </>
+            ) : (
+              <>
+                <Play size={18} style={{ marginRight: '8px' }} />
+                Registar Férias
               </>
             )}
           </button>
