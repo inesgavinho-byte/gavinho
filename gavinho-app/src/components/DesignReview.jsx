@@ -1055,12 +1055,15 @@ export default function DesignReview({ projeto }) {
     )
   }
 
-  // Fit PDF to container width
-  const fitToWidth = () => {
-    if (containerRef.current && pdfDimensions.width > 0) {
+  // Fit PDF to screen (both width and height)
+  const fitToScreen = () => {
+    if (containerRef.current && pdfDimensions.width > 0 && pdfDimensions.height > 0) {
       const containerWidth = containerRef.current.clientWidth - 48
-      const newScale = Math.min(containerWidth / pdfDimensions.width, 2)
-      setScale(Math.max(0.5, newScale))
+      const containerHeight = containerRef.current.clientHeight - 48
+      const scaleX = containerWidth / pdfDimensions.width
+      const scaleY = containerHeight / pdfDimensions.height
+      const newScale = Math.min(scaleX, scaleY, 2)
+      setScale(Math.max(0.25, newScale))
     }
   }
 
@@ -1250,8 +1253,8 @@ export default function DesignReview({ projeto }) {
               <Plus size={16} />
             </button>
             <button
-              onClick={fitToWidth}
-              title="Ajustar à largura"
+              onClick={fitToScreen}
+              title="Ajustar ao ecrã"
               style={{
                 padding: '6px 10px',
                 borderRadius: '6px',
