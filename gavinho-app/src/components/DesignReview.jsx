@@ -1056,7 +1056,7 @@ export default function DesignReview({ projeto }) {
   }
 
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh - 300px)', minHeight: '600px' }}>
+    <div style={{ display: 'flex', height: 'calc(100vh - 380px)', minHeight: '500px', maxHeight: '800px' }}>
       {/* Main PDF Viewer Area */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#F5F5F0' }}>
         {/* Toolbar */}
@@ -1533,7 +1533,8 @@ export default function DesignReview({ projeto }) {
 
       {/* Comments Panel */}
       <div style={{
-        width: '360px',
+        width: '320px',
+        minWidth: '280px',
         borderLeft: '1px solid var(--stone)',
         display: 'flex',
         flexDirection: 'column',
