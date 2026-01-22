@@ -260,26 +260,26 @@ export default function ObraAutos({ obra }) {
       .then(({ data }) => {
         const rows = (data || []).map(ai => ({
           'Ref.': ai.orcamento_item?.ref || '',
-          'Área': ai.orcamento_item?.area || '',
+          'Àrea': ai.orcamento_item?.area || '',
           'Descrição': ai.orcamento_item?.descricao || '',
           'UN': ai.orcamento_item?.unidade || '',
           'Quant. Total': ai.orcamento_item?.quantidade || 0,
-          'P. Unit. €': ai.orcamento_item?.preco_venda_unit?.toFixed(2) || '0.00',
-          'P. Total €': ((ai.orcamento_item?.quantidade || 0) * (ai.orcamento_item?.preco_venda_unit || 0)).toFixed(2),
+          'P. Unit. â‚¬': ai.orcamento_item?.preco_venda_unit?.toFixed(2) || '0.00',
+          'P. Total â‚¬': ((ai.orcamento_item?.quantidade || 0) * (ai.orcamento_item?.preco_venda_unit || 0)).toFixed(2),
           '% Anterior': ai.percentagem_anterior?.toFixed(2) || '0.00',
           '% Atual': ai.percentagem_atual?.toFixed(2) || '0.00',
           'Quant. Medida': ai.quantidade_medida?.toFixed(2) || '0.00',
-          'Valor Período €': ai.valor_periodo?.toFixed(2) || '0.00'
+          'Valor Período â‚¬': ai.valor_periodo?.toFixed(2) || '0.00'
         }))
         
         rows.push({})
         rows.push({ 'Descrição': 'RESUMO DO AUTO' })
-        rows.push({ 'Descrição': 'Valor Acumulado Anterior', 'Valor Período €': auto.valor_acumulado_anterior?.toFixed(2) })
-        rows.push({ 'Descrição': 'Valor Acumulado Atual', 'Valor Período €': auto.valor_acumulado_atual?.toFixed(2) })
-        rows.push({ 'Descrição': 'Valor do Período', 'Valor Período €': auto.valor_periodo?.toFixed(2) })
-        rows.push({ 'Descrição': `Dedução Adiantamento (${percentAdiantamento}%)`, 'Valor Período €': (-auto.deducao_adiantamento || 0).toFixed(2) })
-        rows.push({ 'Descrição': `Retenção Garantia (${percentRetencao}%)`, 'Valor Período €': (-auto.retencao_garantia || 0).toFixed(2) })
-        rows.push({ 'Descrição': 'VALOR A FATURAR', 'Valor Período €': auto.valor_a_faturar?.toFixed(2) })
+        rows.push({ 'Descrição': 'Valor Acumulado Anterior', 'Valor Período â‚¬': auto.valor_acumulado_anterior?.toFixed(2) })
+        rows.push({ 'Descrição': 'Valor Acumulado Atual', 'Valor Período â‚¬': auto.valor_acumulado_atual?.toFixed(2) })
+        rows.push({ 'Descrição': 'Valor do Período', 'Valor Período â‚¬': auto.valor_periodo?.toFixed(2) })
+        rows.push({ 'Descrição': `Dedução Adiantamento (${percentAdiantamento}%)`, 'Valor Período â‚¬': (-auto.deducao_adiantamento || 0).toFixed(2) })
+        rows.push({ 'Descrição': `Retenção Garantia (${percentRetencao}%)`, 'Valor Período â‚¬': (-auto.retencao_garantia || 0).toFixed(2) })
+        rows.push({ 'Descrição': 'VALOR A FATURAR', 'Valor Período â‚¬': auto.valor_a_faturar?.toFixed(2) })
         
         const ws = XLSX.utils.json_to_sheet(rows)
         const wb = XLSX.utils.book_new()
@@ -318,11 +318,11 @@ export default function ObraAutos({ obra }) {
           <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>Autos</div>
         </div>
         <div className="card" style={{ padding: '16px', textAlign: 'center' }}>
-          <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--info)' }}>{totalContrato.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} €</div>
+          <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--info)' }}>{totalContrato.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} â‚¬</div>
           <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>Valor Contrato</div>
         </div>
         <div className="card" style={{ padding: '16px', textAlign: 'center' }}>
-          <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--success)' }}>{totalExecutado.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} €</div>
+          <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--success)' }}>{totalExecutado.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} â‚¬</div>
           <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>Faturado</div>
         </div>
         <div className="card" style={{ padding: '16px', textAlign: 'center' }}>
@@ -330,7 +330,7 @@ export default function ObraAutos({ obra }) {
           <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>Execução</div>
         </div>
         <div className="card" style={{ padding: '16px', textAlign: 'center' }}>
-          <div style={{ fontSize: '24px', fontWeight: 700, color: '#78716c' }}>{(totalContrato - totalExecutado).toLocaleString('pt-PT', { minimumFractionDigits: 2 })} €</div>
+          <div style={{ fontSize: '24px', fontWeight: 700, color: '#78716c' }}>{(totalContrato - totalExecutado).toLocaleString('pt-PT', { minimumFractionDigits: 2 })} â‚¬</div>
           <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>Por Faturar</div>
         </div>
       </div>
@@ -344,7 +344,7 @@ export default function ObraAutos({ obra }) {
           </button>
         </div>
         {orcamentoItems.length === 0 && (
-          <p style={{ fontSize: '13px', color: 'var(--brown-light)', marginTop: '12px' }}>⚠️ Adicione artigos adjudicados na tab Orçamentação para criar autos.</p>
+          <p style={{ fontSize: '13px', color: 'var(--brown-light)', marginTop: '12px' }}>âš ï¸ Adicione artigos adjudicados na tab Orçamentação para criar autos.</p>
         )}
       </div>
 
@@ -374,8 +374,8 @@ export default function ObraAutos({ obra }) {
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>Valor do Período</div>
-                    <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--success)' }}>{(auto.valor_periodo || 0).toLocaleString('pt-PT', { minimumFractionDigits: 2 })} €</div>
-                    <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>A Faturar: {(auto.valor_a_faturar || 0).toLocaleString('pt-PT', { minimumFractionDigits: 2 })} €</div>
+                    <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--success)' }}>{(auto.valor_periodo || 0).toLocaleString('pt-PT', { minimumFractionDigits: 2 })} â‚¬</div>
+                    <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>A Faturar: {(auto.valor_a_faturar || 0).toLocaleString('pt-PT', { minimumFractionDigits: 2 })} â‚¬</div>
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '8px', marginTop: '12px', justifyContent: 'flex-end' }}>
@@ -425,12 +425,12 @@ export default function ObraAutos({ obra }) {
             
             <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--stone)', background: '#f0fdf4' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '16px', fontSize: '13px' }}>
-                <div><div style={{ color: 'var(--brown-light)', marginBottom: '2px' }}>Acumulado Anterior</div><div style={{ fontWeight: 600 }}>{valoresCalculados.valorAcumuladoAnterior.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} €</div></div>
-                <div><div style={{ color: 'var(--brown-light)', marginBottom: '2px' }}>Acumulado Atual</div><div style={{ fontWeight: 600 }}>{valoresCalculados.valorAcumuladoAtual.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} €</div></div>
-                <div><div style={{ color: 'var(--brown-light)', marginBottom: '2px' }}>Valor Período</div><div style={{ fontWeight: 700, color: 'var(--success)', fontSize: '16px' }}>{valoresCalculados.valorPeriodo.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} €</div></div>
-                <div><div style={{ color: 'var(--brown-light)', marginBottom: '2px' }}>Adiantamento ({percentAdiantamento}%)</div><div style={{ fontWeight: 600, color: '#dc2626' }}>-{valoresCalculados.deducaoAdiantamento.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} €</div></div>
-                <div><div style={{ color: 'var(--brown-light)', marginBottom: '2px' }}>Retenção ({percentRetencao}%)</div><div style={{ fontWeight: 600, color: '#d97706' }}>-{valoresCalculados.retencaoGarantia.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} €</div></div>
-                <div><div style={{ color: 'var(--brown-light)', marginBottom: '2px' }}>A Faturar</div><div style={{ fontWeight: 700, color: 'var(--info)', fontSize: '16px' }}>{valoresCalculados.valorAFaturar.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} €</div></div>
+                <div><div style={{ color: 'var(--brown-light)', marginBottom: '2px' }}>Acumulado Anterior</div><div style={{ fontWeight: 600 }}>{valoresCalculados.valorAcumuladoAnterior.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} â‚¬</div></div>
+                <div><div style={{ color: 'var(--brown-light)', marginBottom: '2px' }}>Acumulado Atual</div><div style={{ fontWeight: 600 }}>{valoresCalculados.valorAcumuladoAtual.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} â‚¬</div></div>
+                <div><div style={{ color: 'var(--brown-light)', marginBottom: '2px' }}>Valor Período</div><div style={{ fontWeight: 700, color: 'var(--success)', fontSize: '16px' }}>{valoresCalculados.valorPeriodo.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} â‚¬</div></div>
+                <div><div style={{ color: 'var(--brown-light)', marginBottom: '2px' }}>Adiantamento ({percentAdiantamento}%)</div><div style={{ fontWeight: 600, color: '#dc2626' }}>-{valoresCalculados.deducaoAdiantamento.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} â‚¬</div></div>
+                <div><div style={{ color: 'var(--brown-light)', marginBottom: '2px' }}>Retenção ({percentRetencao}%)</div><div style={{ fontWeight: 600, color: '#d97706' }}>-{valoresCalculados.retencaoGarantia.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} â‚¬</div></div>
+                <div><div style={{ color: 'var(--brown-light)', marginBottom: '2px' }}>A Faturar</div><div style={{ fontWeight: 700, color: 'var(--info)', fontSize: '16px' }}>{valoresCalculados.valorAFaturar.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} â‚¬</div></div>
               </div>
             </div>
             
@@ -439,12 +439,12 @@ export default function ObraAutos({ obra }) {
                 <thead style={{ position: 'sticky', top: 0, background: 'var(--cream)', zIndex: 1 }}>
                   <tr>
                     <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, width: '60px' }}>Ref.</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, width: '120px' }}>Área</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, width: '120px' }}>Àrea</th>
                     <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600 }}>Descrição</th>
                     <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600, width: '40px' }}>UN</th>
                     <th style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600, width: '70px' }}>Quant.</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600, width: '80px' }}>P.Unit €</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600, width: '90px' }}>Total €</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600, width: '80px' }}>P.Unit â‚¬</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600, width: '90px' }}>Total â‚¬</th>
                     <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600, width: '70px' }}>% Ant.</th>
                     <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600, width: '80px', background: '#fef3c7' }}>% Atual</th>
                     <th style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600, width: '90px' }}>Valor Per.</th>
@@ -465,7 +465,7 @@ export default function ObraAutos({ obra }) {
                             <input type="number" placeholder="%" min="0" max="100" onClick={e => e.stopPropagation()} onChange={e => handleAplicarPercentArea(area, parseFloat(e.target.value) || 0)} style={{ width: '50px', padding: '4px', textAlign: 'center', border: '1px solid var(--brown-light)', borderRadius: '4px', fontSize: '11px' }} />
                           </td>
                           <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600 }}>
-                            {areaItems.reduce((sum, ai) => { const v = (ai.quantidade_total || 0) * (ai.preco_venda_unit || 0); return sum + v * ((ai.percentagem_atual - ai.percentagem_anterior) / 100) }, 0).toLocaleString('pt-PT', { minimumFractionDigits: 2 })} €
+                            {areaItems.reduce((sum, ai) => { const v = (ai.quantidade_total || 0) * (ai.preco_venda_unit || 0); return sum + v * ((ai.percentagem_atual - ai.percentagem_anterior) / 100) }, 0).toLocaleString('pt-PT', { minimumFractionDigits: 2 })} â‚¬
                           </td>
                         </tr>
                         {isExpanded && areaItems.map(ai => {
@@ -484,7 +484,7 @@ export default function ObraAutos({ obra }) {
                               <td style={{ padding: '8px', textAlign: 'center', background: '#fffbeb' }}>
                                 <input type="number" value={ai.percentagem_atual} onChange={e => handleUpdatePercentagem(ai.orcamento_item_id, e.target.value)} min={ai.percentagem_anterior} max="100" step="5" style={{ width: '55px', padding: '4px', textAlign: 'center', border: '1px solid var(--stone)', borderRadius: '4px', fontSize: '12px', fontWeight: 600 }} />
                               </td>
-                              <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, color: valorPeriodo > 0 ? 'var(--success)' : 'var(--brown-light)' }}>{valorPeriodo.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} €</td>
+                              <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, color: valorPeriodo > 0 ? 'var(--success)' : 'var(--brown-light)' }}>{valorPeriodo.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} â‚¬</td>
                             </tr>
                           )
                         })}
@@ -493,7 +493,7 @@ export default function ObraAutos({ obra }) {
                   })}
                   {autoItems.filter(ai => !ai.item.area).length > 0 && (
                     <>
-                      <tr style={{ background: 'var(--stone)' }}><td colSpan={10} style={{ padding: '8px 12px', fontWeight: 600 }}>Sem Área ({autoItems.filter(ai => !ai.item.area).length})</td></tr>
+                      <tr style={{ background: 'var(--stone)' }}><td colSpan={10} style={{ padding: '8px 12px', fontWeight: 600 }}>Sem Àrea ({autoItems.filter(ai => !ai.item.area).length})</td></tr>
                       {autoItems.filter(ai => !ai.item.area).map(ai => {
                         const valorTotal = (ai.quantidade_total || 0) * (ai.preco_venda_unit || 0)
                         const valorPeriodo = valorTotal * ((ai.percentagem_atual - ai.percentagem_anterior) / 100)
@@ -510,7 +510,7 @@ export default function ObraAutos({ obra }) {
                             <td style={{ padding: '8px', textAlign: 'center', background: '#fffbeb' }}>
                               <input type="number" value={ai.percentagem_atual} onChange={e => handleUpdatePercentagem(ai.orcamento_item_id, e.target.value)} min={ai.percentagem_anterior} max="100" style={{ width: '55px', padding: '4px', textAlign: 'center', border: '1px solid var(--stone)', borderRadius: '4px' }} />
                             </td>
-                            <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, color: valorPeriodo > 0 ? 'var(--success)' : 'inherit' }}>{valorPeriodo.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} €</td>
+                            <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, color: valorPeriodo > 0 ? 'var(--success)' : 'inherit' }}>{valorPeriodo.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} â‚¬</td>
                           </tr>
                         )
                       })}
@@ -541,14 +541,14 @@ export default function ObraAutos({ obra }) {
             </div>
             <div style={{ padding: '24px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
-                <div><div style={{ fontSize: '12px', color: 'var(--brown-light)', marginBottom: '4px' }}>Valor Acumulado Anterior</div><div style={{ fontSize: '16px', fontWeight: 600 }}>{(showAutoDetalhe.valor_acumulado_anterior || 0).toLocaleString('pt-PT', { minimumFractionDigits: 2 })} €</div></div>
-                <div><div style={{ fontSize: '12px', color: 'var(--brown-light)', marginBottom: '4px' }}>Valor Acumulado Atual</div><div style={{ fontSize: '16px', fontWeight: 600 }}>{(showAutoDetalhe.valor_acumulado_atual || 0).toLocaleString('pt-PT', { minimumFractionDigits: 2 })} €</div></div>
-                <div><div style={{ fontSize: '12px', color: 'var(--brown-light)', marginBottom: '4px' }}>Valor do Período</div><div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--success)' }}>{(showAutoDetalhe.valor_periodo || 0).toLocaleString('pt-PT', { minimumFractionDigits: 2 })} €</div></div>
-                <div><div style={{ fontSize: '12px', color: 'var(--brown-light)', marginBottom: '4px' }}>Valor a Faturar</div><div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--info)' }}>{(showAutoDetalhe.valor_a_faturar || 0).toLocaleString('pt-PT', { minimumFractionDigits: 2 })} €</div></div>
+                <div><div style={{ fontSize: '12px', color: 'var(--brown-light)', marginBottom: '4px' }}>Valor Acumulado Anterior</div><div style={{ fontSize: '16px', fontWeight: 600 }}>{(showAutoDetalhe.valor_acumulado_anterior || 0).toLocaleString('pt-PT', { minimumFractionDigits: 2 })} â‚¬</div></div>
+                <div><div style={{ fontSize: '12px', color: 'var(--brown-light)', marginBottom: '4px' }}>Valor Acumulado Atual</div><div style={{ fontSize: '16px', fontWeight: 600 }}>{(showAutoDetalhe.valor_acumulado_atual || 0).toLocaleString('pt-PT', { minimumFractionDigits: 2 })} â‚¬</div></div>
+                <div><div style={{ fontSize: '12px', color: 'var(--brown-light)', marginBottom: '4px' }}>Valor do Período</div><div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--success)' }}>{(showAutoDetalhe.valor_periodo || 0).toLocaleString('pt-PT', { minimumFractionDigits: 2 })} â‚¬</div></div>
+                <div><div style={{ fontSize: '12px', color: 'var(--brown-light)', marginBottom: '4px' }}>Valor a Faturar</div><div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--info)' }}>{(showAutoDetalhe.valor_a_faturar || 0).toLocaleString('pt-PT', { minimumFractionDigits: 2 })} â‚¬</div></div>
               </div>
               <div style={{ background: 'var(--cream)', padding: '16px', borderRadius: '8px', marginBottom: '16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}><span>Dedução Adiantamento ({percentAdiantamento}%)</span><span style={{ color: '#dc2626' }}>-{(showAutoDetalhe.deducao_adiantamento || 0).toLocaleString('pt-PT', { minimumFractionDigits: 2 })} €</span></div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Retenção Garantia ({percentRetencao}%)</span><span style={{ color: '#d97706' }}>-{(showAutoDetalhe.retencao_garantia || 0).toLocaleString('pt-PT', { minimumFractionDigits: 2 })} €</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}><span>Dedução Adiantamento ({percentAdiantamento}%)</span><span style={{ color: '#dc2626' }}>-{(showAutoDetalhe.deducao_adiantamento || 0).toLocaleString('pt-PT', { minimumFractionDigits: 2 })} â‚¬</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Retenção Garantia ({percentRetencao}%)</span><span style={{ color: '#d97706' }}>-{(showAutoDetalhe.retencao_garantia || 0).toLocaleString('pt-PT', { minimumFractionDigits: 2 })} â‚¬</span></div>
               </div>
               {showAutoDetalhe.notas && <div style={{ background: 'var(--stone)', padding: '12px', borderRadius: '8px', fontSize: '13px' }}><strong>Notas:</strong> {showAutoDetalhe.notas}</div>}
             </div>

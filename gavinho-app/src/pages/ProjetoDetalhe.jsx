@@ -34,13 +34,25 @@ import {
   ListChecks,
   FileCheck,
   Lock,
-  Image
+  Image,
+  Library,
+  Settings,
+  Eye,
+  BookOpen,
+  Package,
+  Send,
+  Users,
+  ClipboardList
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { jsPDF } from 'jspdf'
 import ProjetoEntregaveis from '../components/ProjetoEntregaveis'
 import ProjetoDocumentos from '../components/ProjetoDocumentos'
-import ProjetoArchviz from '../components/ProjetoArchviz'
+import CentralEntregas from '../components/CentralEntregas'
+import DiarioBordo from '../components/DiarioBordo'
+import DecisionLog from '../components/DecisionLog'
+import DesignReview from '../components/DesignReview'
 
 // Dados de exemplo baseados nos JSONs fornecidos
 const sampleProjectData = {
@@ -89,7 +101,7 @@ const sampleProjectData = {
         descricao: 'Acompanhamento e controlo do projeto até conclusão',
         data_fim: '2027-12-20',
         inclui: [
-          'Visitas mensais ÃƒÂ  obra',
+          'Visitas mensais à obra',
           'Relatórios trimestrais',
           'Controlo de qualidade',
           'Controlo de prazos',
@@ -563,7 +575,7 @@ const sampleProjectData = {
     subtipo: 'Prédio Urbano',
     numero_pisos: 5,
     numero_fogos: 5,
-    composicao: 'R/C + 3 Pisos + ÃƒÂguas-Furtadas',
+    composicao: 'R/C + 3 Pisos + Águas-Furtadas',
     localizacao: {
       morada: 'Rua José Estêvão, Nº29',
       cidade: 'Lisboa',
@@ -626,7 +638,7 @@ const sampleProjectData = {
         valor: 30500,
         fases: [
           { numero: 5, nome: 'Especialidades', prazo: '60 dias úteis', status: 'pendente',
-            entregaveis: ['Demolição', 'Estabilidade', 'ÃƒÂguas', 'Esgotos', 'Gás', 'Eletricidade/Domótica', 'ITED', 'Térmico+PCE', 'AVAC/AQS', 'SCIE', 'Acústico', 'Eletromecânico', 'Intrusão/Videoporteiro', 'PSS'] }
+            entregaveis: ['Demolição', 'Estabilidade', 'Águas', 'Esgotos', 'Gás', 'Eletricidade/Domótica', 'ITED', 'Térmico+PCE', 'AVAC/AQS', 'SCIE', 'Acústico', 'Eletromecânico', 'Intrusão/Videoporteiro', 'PSS'] }
         ]
       }
     ],
@@ -678,8 +690,8 @@ const projectsMap = {
 export default function ProjetoDetalhe() {
   const { id, tab: urlTab } = useParams()
   const navigate = useNavigate()
-  const { isAdmin, profile } = useAuth()
-  const [activeTab, setActiveTab] = useState(urlTab || 'geral')
+  const { isAdmin } = useAuth()
+  const [activeTab, setActiveTab] = useState(urlTab || 'dashboard')
   const [showActions, setShowActions] = useState(false)
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [uploadingDoc, setUploadingDoc] = useState(null)
@@ -695,7 +707,80 @@ export default function ProjetoDetalhe() {
   const [clientes, setClientes] = useState([])
   const [utilizadores, setUtilizadores] = useState([])
   const [equipaProjeto, setEquipaProjeto] = useState([])
+  const [intervenientes, setIntervenientes] = useState([])
   const [showEquipaModal, setShowEquipaModal] = useState(false)
+  const [showIntervenienteModal, setShowIntervenienteModal] = useState(false)
+  const [editingInterveniente, setEditingInterveniente] = useState(null)
+  const [intervenienteForm, setIntervenienteForm] = useState({
+    tipo: '',
+    entidade: '',
+    contacto_geral: '',
+    responsavel_nome: '',
+    responsavel_email: '',
+    responsavel_secundario_nome: '',
+    responsavel_secundario_email: ''
+  })
+
+  // Fases Contratuais
+  const [fasesContratuais, setFasesContratuais] = useState([])
+  const [showFaseModal, setShowFaseModal] = useState(false)
+  const [editingFase, setEditingFase] = useState(null)
+  const [faseForm, setFaseForm] = useState({
+    numero: '',
+    nome: '',
+    data_inicio: '',
+    num_dias: '',
+    conclusao_prevista: '',
+    data_entrega: '',
+    estado: 'nao_iniciado',
+    avaliacao: ''
+  })
+
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+
+  // Sub-tabs para Fases & Entregas
+    const [activeFaseSection, setActiveFaseSection] = useState('entregaveis')
+
+  // Gestão de Renders/Archviz
+  const [renders, setRenders] = useState([])
+  const [showRenderModal, setShowRenderModal] = useState(false)
+  const [editingRender, setEditingRender] = useState(null)
+  const [lightboxImage, setLightboxImage] = useState(null) // Para lightbox
+  const [isDragging, setIsDragging] = useState(false) // Para drag & drop
+  const [renderForm, setRenderForm] = useState({
+    compartimento: '',
+    versao: 1,
+    descricao: '',
+    is_final: false,
+    imagem_url: '',
+    data_upload: new Date().toISOString().split('T')[0]
+  })
+
+  // Lista de compartimentos comuns
+  const COMPARTIMENTOS = [
+    'Sala de Estar',
+    'Sala de Jantar',
+    'Cozinha',
+    'Suite Principal',
+    'Suite 1',
+    'Suite 2',
+    'Quarto 1',
+    'Quarto 2',
+    'Casa de Banho Social',
+    'Casa de Banho Suite',
+    'Hall de Entrada',
+    'Varanda',
+    'Terraço',
+    'Jardim',
+    'Piscina',
+    'Escritório',
+    'Closet',
+    'Lavandaria',
+    'Garagem',
+    'Exterior - Fachada',
+    'Exterior - Vista Geral',
+    'Outro'
+  ]
 
   // Opções para selects
   const TIPOLOGIAS = ['Residencial', 'Comercial', 'Hospitality', 'Misto']
@@ -811,9 +896,9 @@ export default function ProjetoDetalhe() {
     setSaving(false)
   }
 
-  // Sincronizar tab da URL com estado
+  // Sincronizar tab da URL com estado - só atualiza se urlTab mudar
   useEffect(() => {
-    if (urlTab && urlTab !== activeTab) {
+    if (urlTab) {
       setActiveTab(urlTab)
     }
   }, [urlTab])
@@ -882,10 +967,482 @@ export default function ProjetoDetalhe() {
     }
   }
 
+  // Tipos de intervenientes
+  const TIPOS_INTERVENIENTES = [
+    'Dono de Obra',
+    'Cliente',
+    'Representante Dono de Obra',
+    'Autor Licenciamento Arquitectura',
+    'Arquitectura Paisagista',
+    'Especialidade Estruturas',
+    'Especialidades',
+    'Especialidade Acústica',
+    'Especialidade Térmica',
+    'Especialidade Segurança',
+    'Outro'
+  ]
+
+  // Carregar intervenientes do projeto
+  const fetchIntervenientes = async (projetoId) => {
+    try {
+      const { data } = await supabase
+        .from('projeto_intervenientes')
+        .select('*')
+        .eq('projeto_id', projetoId)
+        .order('created_at')
+      setIntervenientes(data || [])
+    } catch (err) {
+      console.error('Erro ao carregar intervenientes:', err)
+    }
+  }
+
+  // Adicionar/Editar interveniente
+  const handleSaveInterveniente = async () => {
+    if (!project?.id || !intervenienteForm.tipo) return
+    try {
+      if (editingInterveniente) {
+        const { error } = await supabase
+          .from('projeto_intervenientes')
+          .update({
+            tipo: intervenienteForm.tipo,
+            entidade: intervenienteForm.entidade,
+            contacto_geral: intervenienteForm.contacto_geral,
+            responsavel_nome: intervenienteForm.responsavel_nome,
+            responsavel_email: intervenienteForm.responsavel_email,
+            responsavel_secundario_nome: intervenienteForm.responsavel_secundario_nome,
+            responsavel_secundario_email: intervenienteForm.responsavel_secundario_email
+          })
+          .eq('id', editingInterveniente.id)
+        if (error) throw error
+      } else {
+        const { error } = await supabase
+          .from('projeto_intervenientes')
+          .insert({
+            projeto_id: project.id,
+            tipo: intervenienteForm.tipo,
+            entidade: intervenienteForm.entidade,
+            contacto_geral: intervenienteForm.contacto_geral,
+            responsavel_nome: intervenienteForm.responsavel_nome,
+            responsavel_email: intervenienteForm.responsavel_email,
+            responsavel_secundario_nome: intervenienteForm.responsavel_secundario_nome,
+            responsavel_secundario_email: intervenienteForm.responsavel_secundario_email
+          })
+        if (error) throw error
+      }
+      fetchIntervenientes(project.id)
+      setShowIntervenienteModal(false)
+      setEditingInterveniente(null)
+      setIntervenienteForm({
+        tipo: '',
+        entidade: '',
+        contacto_geral: '',
+        responsavel_nome: '',
+        responsavel_email: '',
+        responsavel_secundario_nome: '',
+        responsavel_secundario_email: ''
+      })
+    } catch (err) {
+      console.error('Erro ao salvar interveniente:', err)
+      alert(`Erro: ${err.message}`)
+    }
+  }
+
+  // Editar interveniente
+  const handleEditInterveniente = (interveniente) => {
+    setEditingInterveniente(interveniente)
+    setIntervenienteForm({
+      tipo: interveniente.tipo || '',
+      entidade: interveniente.entidade || '',
+      contacto_geral: interveniente.contacto_geral || '',
+      responsavel_nome: interveniente.responsavel_nome || '',
+      responsavel_email: interveniente.responsavel_email || '',
+      responsavel_secundario_nome: interveniente.responsavel_secundario_nome || '',
+      responsavel_secundario_email: interveniente.responsavel_secundario_email || ''
+    })
+    setShowIntervenienteModal(true)
+  }
+
+  // Remover interveniente
+  const handleRemoveInterveniente = async (id) => {
+    if (!confirm('Remover este interveniente?')) return
+    try {
+      const { error } = await supabase
+        .from('projeto_intervenientes')
+        .delete()
+        .eq('id', id)
+      if (error) throw error
+      fetchIntervenientes(project.id)
+    } catch (err) {
+      console.error('Erro ao remover interveniente:', err)
+    }
+  }
+
+  // Carregar fases contratuais
+  const fetchFasesContratuais = async (projetoId) => {
+    try {
+      const { data } = await supabase
+        .from('projeto_fases_contratuais')
+        .select('*')
+        .eq('projeto_id', projetoId)
+        .order('numero')
+      setFasesContratuais(data || [])
+    } catch (err) {
+      console.error('Erro ao carregar fases:', err)
+    }
+  }
+
+  // Salvar fase contratual
+  const handleSaveFase = async () => {
+    if (!project?.id || !faseForm.nome) return
+    try {
+      const faseData = {
+        projeto_id: project.id,
+        numero: parseInt(faseForm.numero) || 1,
+        nome: faseForm.nome,
+        data_inicio: faseForm.data_inicio || null,
+        num_dias: faseForm.num_dias || null,
+        conclusao_prevista: faseForm.conclusao_prevista || null,
+        data_entrega: faseForm.data_entrega || null,
+        estado: faseForm.estado,
+        avaliacao: faseForm.avaliacao || null
+      }
+
+      if (editingFase) {
+        const { error } = await supabase
+          .from('projeto_fases_contratuais')
+          .update(faseData)
+          .eq('id', editingFase.id)
+        if (error) throw error
+      } else {
+        const { error } = await supabase
+          .from('projeto_fases_contratuais')
+          .insert(faseData)
+        if (error) throw error
+      }
+
+      fetchFasesContratuais(project.id)
+      setShowFaseModal(false)
+      setEditingFase(null)
+      setFaseForm({
+        numero: '',
+        nome: '',
+        data_inicio: '',
+        num_dias: '',
+        conclusao_prevista: '',
+        data_entrega: '',
+        estado: 'nao_iniciado',
+        avaliacao: ''
+      })
+    } catch (err) {
+      console.error('Erro ao salvar fase:', err)
+      alert(`Erro: ${err.message}`)
+    }
+  }
+
+  // Editar fase
+  const handleEditFase = (fase) => {
+    setEditingFase(fase)
+    setFaseForm({
+      numero: fase.numero || '',
+      nome: fase.nome || '',
+      data_inicio: fase.data_inicio || '',
+      num_dias: fase.num_dias || '',
+      conclusao_prevista: fase.conclusao_prevista || '',
+      data_entrega: fase.data_entrega || '',
+      estado: fase.estado || 'nao_iniciado',
+      avaliacao: fase.avaliacao || ''
+    })
+    setShowFaseModal(true)
+  }
+
+  // Atualizar estado da fase inline
+  const handleUpdateFaseEstado = async (faseId, novoEstado) => {
+    try {
+      const { error } = await supabase
+        .from('projeto_fases_contratuais')
+        .update({ estado: novoEstado })
+        .eq('id', faseId)
+      if (error) throw error
+      fetchFasesContratuais(project.id)
+    } catch (err) {
+      console.error('Erro ao atualizar estado:', err)
+    }
+  }
+
+  // Atualizar avaliação inline
+  const handleUpdateFaseAvaliacao = async (faseId, novaAvaliacao) => {
+    try {
+      const { error } = await supabase
+        .from('projeto_fases_contratuais')
+        .update({ avaliacao: novaAvaliacao })
+        .eq('id', faseId)
+      if (error) throw error
+      fetchFasesContratuais(project.id)
+    } catch (err) {
+      console.error('Erro ao atualizar avaliação:', err)
+    }
+  }
+
+  // Remover fase
+  const handleRemoveFase = async (id) => {
+    if (!confirm('Remover esta fase?')) return
+    try {
+      const { error } = await supabase
+        .from('projeto_fases_contratuais')
+        .delete()
+        .eq('id', id)
+      if (error) throw error
+      fetchFasesContratuais(project.id)
+    } catch (err) {
+      console.error('Erro ao remover fase:', err)
+    }
+  }
+
+  // Carregar renders do projeto
+  const fetchRenders = async (projetoId) => {
+    try {
+      const { data, error } = await supabase
+        .from('projeto_renders')
+        .select('*')
+        .eq('projeto_id', projetoId)
+        .order('compartimento')
+        .order('versao', { ascending: false })
+      if (error) throw error
+      setRenders(data || [])
+    } catch (err) {
+      console.error('Erro ao carregar renders:', err)
+    }
+  }
+
   // Navegar para tab
   const handleTabChange = (tabId) => {
     navigate(`/projetos/${id}/${tabId}`, { replace: true })
     setActiveTab(tabId)
+  }
+
+  // Duplicar projeto
+  const handleDuplicate = async () => {
+    if (!project) return
+    if (!confirm('Deseja duplicar este projeto?')) return
+
+    try {
+      // Gerar novo código
+      const { data: lastProject } = await supabase
+        .from('projetos')
+        .select('codigo')
+        .order('codigo', { ascending: false })
+        .limit(1)
+
+      let nextNum = 1
+      if (lastProject && lastProject.length > 0) {
+        const match = lastProject[0].codigo.match(/GA(\d+)/)
+        if (match) nextNum = parseInt(match[1]) + 1
+      }
+      const newCode = `GA${String(nextNum).padStart(5, '0')}`
+
+      // Criar cópia do projeto
+      const { error } = await supabase
+        .from('projetos')
+        .insert({
+          codigo: newCode,
+          nome: `${project.nome} (cópia)`,
+          tipologia: project.tipologia,
+          subtipo: project.subtipo,
+          fase: 'Conceito',
+          status: 'on_track',
+          progresso: 0,
+          cliente_id: project.cliente_id,
+          morada: project.morada,
+          cidade: project.cidade,
+          pais: project.pais || 'Portugal',
+          data_inicio: new Date().toISOString().split('T')[0]
+        })
+
+      if (error) throw error
+
+      alert(`Projeto duplicado com sucesso! Novo código: ${newCode}`)
+      navigate(`/projetos/${newCode}`)
+    } catch (err) {
+      console.error('Erro ao duplicar:', err)
+      alert(`Erro ao duplicar: ${err.message}`)
+    }
+    setShowActions(false)
+  }
+
+  // Partilhar projeto
+  const handleShare = () => {
+    const url = window.location.href
+    if (navigator.share) {
+      navigator.share({
+        title: `Projeto ${project?.codigo} - ${project?.nome}`,
+        url: url
+      })
+    } else {
+      navigator.clipboard.writeText(url)
+      alert('Link copiado para a área de transferência!')
+    }
+    setShowActions(false)
+  }
+
+  // Exportar PDF
+  const handleExportPDF = () => {
+    if (!project) return
+
+    try {
+      const doc = new jsPDF()
+      const pageWidth = doc.internal.pageSize.getWidth()
+      let y = 20
+
+      // Cores
+      const brown = [44, 44, 44]
+      const brownLight = [139, 119, 101]
+      const gray = [128, 128, 128]
+
+      // Header
+      doc.setFontSize(24)
+      doc.setTextColor(...brown)
+      doc.text('GAVINHO', 20, y)
+
+      y += 15
+      doc.setFontSize(10)
+      doc.setTextColor(...gray)
+      doc.text('Ficha de Projeto', 20, y)
+
+      // Linha separadora
+      y += 10
+      doc.setDrawColor(...brownLight)
+      doc.line(20, y, pageWidth - 20, y)
+
+      // Informações principais
+      y += 15
+      doc.setFontSize(18)
+      doc.setTextColor(...brown)
+      doc.text(project.nome || 'Sem nome', 20, y)
+
+      y += 8
+      doc.setFontSize(11)
+      doc.setTextColor(...brownLight)
+      doc.text(`${project.codigo} | ${project.tipologia || ''} | ${project.fase || ''}`, 20, y)
+
+      // Seção: Detalhes
+      y += 20
+      doc.setFontSize(12)
+      doc.setTextColor(...brown)
+      doc.text('DETALHES DO PROJETO', 20, y)
+
+      y += 10
+      doc.setFontSize(10)
+      doc.setTextColor(...gray)
+
+      const details = [
+        ['Cliente:', project.cliente?.nome || project.cliente_nome || '-'],
+        ['Localização:', `${project.cidade || ''}, ${project.pais || 'Portugal'}`],
+        ['Morada:', project.morada || project.localizacao || '-'],
+        ['Área Bruta:', project.area_bruta ? `${project.area_bruta} m²` : '-'],
+        ['Área Exterior:', project.area_exterior ? `${project.area_exterior} m²` : '-'],
+        ['Status:', project.status === 'on_track' ? 'No Prazo' : project.status === 'at_risk' ? 'Em Risco' : project.status || '-'],
+        ['Progresso:', `${project.progresso || 0}%`]
+      ]
+
+      details.forEach(([label, value]) => {
+        doc.setTextColor(...brown)
+        doc.text(label, 20, y)
+        doc.setTextColor(...gray)
+        doc.text(String(value), 70, y)
+        y += 7
+      })
+
+      // Seção: Datas
+      y += 10
+      doc.setFontSize(12)
+      doc.setTextColor(...brown)
+      doc.text('DATAS', 20, y)
+
+      y += 10
+      doc.setFontSize(10)
+
+      const datas = [
+        ['Data Início:', project.data_inicio || project.datas?.data_inicio || '-'],
+        ['Previsão Conclusão:', project.data_prevista || project.datas?.data_prevista || '-']
+      ]
+
+      datas.forEach(([label, value]) => {
+        doc.setTextColor(...brown)
+        doc.text(label, 20, y)
+        doc.setTextColor(...gray)
+        doc.text(String(value), 70, y)
+        y += 7
+      })
+
+      // Seção: Financeiro
+      if (project.orcamento_atual || project.valor_contratado) {
+        y += 10
+        doc.setFontSize(12)
+        doc.setTextColor(...brown)
+        doc.text('FINANCEIRO', 20, y)
+
+        y += 10
+        doc.setFontSize(10)
+
+        const formatCurrency = (val) => {
+          if (!val) return '-'
+          return new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(val)
+        }
+
+        const financeiro = [
+          ['Orçamento:', formatCurrency(project.orcamento_atual)],
+          ['Valor Contratado:', formatCurrency(project.valor_contratado)]
+        ]
+
+        financeiro.forEach(([label, value]) => {
+          doc.setTextColor(...brown)
+          doc.text(label, 20, y)
+          doc.setTextColor(...gray)
+          doc.text(String(value), 70, y)
+          y += 7
+        })
+      }
+
+      // Footer
+      y = doc.internal.pageSize.getHeight() - 20
+      doc.setFontSize(8)
+      doc.setTextColor(...gray)
+      doc.text(`Gerado em ${new Date().toLocaleDateString('pt-PT')} | GAVINHO Group`, 20, y)
+
+      // Download
+      doc.save(`Projeto_${project.codigo}_${project.nome?.replace(/\s+/g, '_') || 'export'}.pdf`)
+
+    } catch (err) {
+      console.error('Erro ao gerar PDF:', err)
+      alert('Erro ao gerar PDF: ' + err.message)
+    }
+    setShowActions(false)
+  }
+
+  // Eliminar projeto
+  const handleDelete = async () => {
+    setShowDeleteConfirm(true)
+    setShowActions(false)
+  }
+
+  const confirmDelete = async () => {
+    if (!project) return
+
+    try {
+      const { error } = await supabase
+        .from('projetos')
+        .delete()
+        .eq('codigo', project.codigo)
+
+      if (error) throw error
+
+      alert('Projeto eliminado com sucesso!')
+      navigate('/projetos')
+    } catch (err) {
+      console.error('Erro ao eliminar:', err)
+      alert(`Erro ao eliminar: ${err.message}. Verifique se não existem dados associados.`)
+    }
+    setShowDeleteConfirm(false)
   }
 
   // Buscar projeto do Supabase com dados relacionados
@@ -923,65 +1480,62 @@ export default function ProjetoDetalhe() {
           clienteData = cliente
         }
         
-        // Buscar serviços do projeto
-        const { data: servicosData } = await supabase
-          .from('projeto_servicos')
-          .select('*')
-          .eq('projeto_id', projetoData.id)
-          .order('ordem')
-        
-        // Buscar fases para cada serviço
-        let fasesData = []
-        if (servicosData && servicosData.length > 0) {
-          const servicoIds = servicosData.map(s => s.id)
-          const { data: fases } = await supabase
-            .from('servico_fases')
+        // Buscar dados relacionados com tratamento de erro (tabelas podem não existir)
+        let servicosData = []
+        let pagamentosData = []
+        let faturasData = []
+        let projetoEntregaveis = []
+        let equipaData = []
+
+        // Tentar buscar serviços do projeto (silenciar erro se tabela não existir)
+        try {
+          const { data, error } = await supabase
+            .from('projeto_servicos')
             .select('*')
-            .in('servico_id', servicoIds)
+            .eq('projeto_id', projetoData.id)
             .order('ordem')
-          fasesData = fases || []
-          
-          // Buscar entregáveis para cada fase
-          if (fasesData.length > 0) {
-            const faseIds = fasesData.map(f => f.id)
-            const { data: entregaveis } = await supabase
-              .from('fase_entregaveis')
-              .select('*')
-              .in('fase_id', faseIds)
-              .order('ordem')
-            
-            // Anexar entregáveis ÃƒÂ s fases
-            fasesData = fasesData.map(fase => ({
-              ...fase,
-              entregaveis: (entregaveis || []).filter(e => e.fase_id === fase.id)
-            }))
-          }
-          
-          // Anexar fases aos serviços
-          servicosData.forEach(servico => {
-            servico.fases = fasesData.filter(f => f.servico_id === servico.id)
-          })
-        }
-        
-        // Buscar pagamentos
-        const { data: pagamentosData } = await supabase
-          .from('projeto_pagamentos')
-          .select('*')
-          .eq('projeto_id', projetoData.id)
-          .order('prestacao_numero')
-        
-        // Buscar faturas
-        const { data: faturasData } = await supabase
-          .from('faturas')
-          .select('*')
-          .eq('projeto_id', projetoData.id)
-          .order('data_emissao')
-        
-        // Buscar entregáveis do projeto para calcular progresso
-        const { data: projetoEntregaveis } = await supabase
-          .from('projeto_entregaveis')
-          .select('status')
-          .eq('projeto_id', projetoData.id)
+          if (!error) servicosData = data || []
+        } catch (e) { /* tabela não existe */ }
+
+        // Tentar buscar pagamentos
+        try {
+          const { data, error } = await supabase
+            .from('projeto_pagamentos')
+            .select('*')
+            .eq('projeto_id', projetoData.id)
+            .order('prestacao_numero')
+          if (!error) pagamentosData = data || []
+        } catch (e) { /* tabela não existe */ }
+
+        // Tentar buscar faturas
+        try {
+          const { data, error } = await supabase
+            .from('faturas')
+            .select('*')
+            .eq('projeto_id', projetoData.id)
+            .order('data_emissao')
+          if (!error) faturasData = data || []
+        } catch (e) { /* tabela não existe */ }
+
+        // Tentar buscar entregáveis do projeto
+        try {
+          const { data, error } = await supabase
+            .from('projeto_entregaveis')
+            .select('status')
+            .eq('projeto_id', projetoData.id)
+          if (!error) projetoEntregaveis = data || []
+        } catch (e) { /* tabela não existe */ }
+
+        // Tentar buscar equipa do projeto
+        try {
+          const { data, error } = await supabase
+            .from('projeto_equipa')
+            .select('*, utilizadores(id, nome, cargo, departamento, avatar_url)')
+            .eq('projeto_id', projetoData.id)
+          if (!error) equipaData = data || []
+        } catch (e) { /* tabela não existe */ }
+
+        setEquipaProjeto(equipaData)
         
         // Calcular progresso baseado nos entregáveis
         let progressoCalculado = projetoData.progresso || 0
@@ -1109,7 +1663,13 @@ export default function ProjetoDetalhe() {
         }
         
         setProject(fullProject)
-        
+
+        // Carregar equipa, intervenientes, fases e renders
+        fetchEquipaProjeto(projetoData.id)
+        fetchIntervenientes(projetoData.id)
+        fetchFasesContratuais(projetoData.id)
+        fetchRenders(projetoData.id)
+
       } catch (err) {
         console.error('Erro ao buscar projeto:', err)
         // Fallback para dados locais
@@ -1267,17 +1827,222 @@ export default function ProjetoDetalhe() {
     handleFileUpload(file)
   }
 
+  // Funções de gestão de renders
+  const getNextVersion = (compartimento) => {
+    const compartimentoRenders = renders.filter(r => r.compartimento === compartimento)
+    return compartimentoRenders.length + 1
+  }
+
+  const openAddRenderModal = (compartimento = '') => {
+    setEditingRender(null)
+    const versao = compartimento ? getNextVersion(compartimento) : 1
+    setRenderForm({
+      compartimento: compartimento,
+      versao: versao,
+      descricao: '',
+      is_final: false,
+      imagem_url: '',
+      data_upload: new Date().toISOString().split('T')[0]
+    })
+    setShowRenderModal(true)
+  }
+
+  const openEditRenderModal = (render) => {
+    setEditingRender(render)
+    setRenderForm({
+      compartimento: render.compartimento,
+      versao: render.versao,
+      descricao: render.descricao || '',
+      is_final: render.is_final || false,
+      imagem_url: render.imagem_url || '',
+      data_upload: render.data_upload || render.created_at?.split('T')[0] || new Date().toISOString().split('T')[0]
+    })
+    setShowRenderModal(true)
+  }
+
+  const handleRenderCompartimentoChange = (compartimento) => {
+    const versao = getNextVersion(compartimento)
+    setRenderForm(prev => ({ ...prev, compartimento, versao }))
+  }
+
+  const handleSaveRender = async () => {
+    if (!renderForm.compartimento) {
+      alert('Por favor selecione um compartimento')
+      return
+    }
+
+    try {
+      const renderData = {
+        projeto_id: project.id,
+        compartimento: renderForm.compartimento,
+        versao: editingRender ? renderForm.versao : getNextVersion(renderForm.compartimento),
+        descricao: renderForm.descricao,
+        is_final: renderForm.is_final,
+        imagem_url: renderForm.imagem_url,
+        data_upload: renderForm.data_upload,
+        created_at: new Date().toISOString()
+      }
+
+      if (editingRender) {
+        // Atualizar render existente
+        const { error } = await supabase
+          .from('projeto_renders')
+          .update(renderData)
+          .eq('id', editingRender.id)
+
+        if (error) throw error
+
+        setRenders(prev => prev.map(r =>
+          r.id === editingRender.id ? { ...r, ...renderData } : r
+        ))
+      } else {
+        // Criar novo render
+        const { data, error } = await supabase
+          .from('projeto_renders')
+          .insert([renderData])
+          .select()
+          .single()
+
+        if (error) {
+          // Se tabela não existe, guardar localmente
+          console.warn('Tabela projeto_renders não existe, guardando localmente')
+          const newRender = { ...renderData, id: Date.now() }
+          setRenders(prev => [...prev, newRender])
+        } else {
+          setRenders(prev => [...prev, data])
+        }
+      }
+
+      setShowRenderModal(false)
+      setEditingRender(null)
+    } catch (err) {
+      console.error('Erro ao guardar render:', err)
+      // Fallback para armazenamento local
+      const newRender = {
+        ...renderForm,
+        id: Date.now(),
+        versao: getNextVersion(renderForm.compartimento)
+      }
+      setRenders(prev => editingRender
+        ? prev.map(r => r.id === editingRender.id ? { ...r, ...renderForm } : r)
+        : [...prev, newRender]
+      )
+      setShowRenderModal(false)
+      setEditingRender(null)
+    }
+  }
+
+  const handleDeleteRender = async (render) => {
+    if (!confirm('Tem certeza que deseja eliminar este render?')) return
+
+    try {
+      const { error } = await supabase
+        .from('projeto_renders')
+        .delete()
+        .eq('id', render.id)
+
+      if (error) throw error
+    } catch (err) {
+      console.error('Erro ao eliminar:', err)
+    }
+
+    setRenders(prev => prev.filter(r => r.id !== render.id))
+  }
+
+  const toggleFinalImage = async (render) => {
+    const newIsFinal = !render.is_final
+
+    try {
+      await supabase
+        .from('projeto_renders')
+        .update({ is_final: newIsFinal })
+        .eq('id', render.id)
+    } catch (err) {
+      console.error('Erro ao atualizar:', err)
+    }
+
+    setRenders(prev => prev.map(r =>
+      r.id === render.id ? { ...r, is_final: newIsFinal } : r
+    ))
+  }
+
+  const handleRenderImageUpload = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    processImageFile(file)
+  }
+
+  const processImageFile = (file) => {
+    if (!file.type.startsWith('image/')) {
+      alert('Por favor selecione um ficheiro de imagem válido')
+      return
+    }
+    // Simular upload - em produção, fazer upload para Supabase Storage
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      setRenderForm(prev => ({ ...prev, imagem_url: event.target?.result }))
+    }
+    reader.readAsDataURL(file)
+  }
+
+  // Drag & Drop handlers para Archviz
+  const handleRenderDragOver = (e) => {
+    e.preventDefault()
+    setIsDragging(true)
+  }
+
+  const handleRenderDragLeave = (e) => {
+    e.preventDefault()
+    setIsDragging(false)
+  }
+
+  const handleRenderDrop = (e) => {
+    e.preventDefault()
+    setIsDragging(false)
+    const file = e.dataTransfer.files?.[0]
+    if (file) processImageFile(file)
+  }
+
+  // Abrir lightbox
+  const openLightbox = (render) => {
+    if (render.imagem_url) {
+      setLightboxImage(render)
+    }
+  }
+
+  // Renders agrupados por compartimento
+  const rendersByCompartimento = renders.reduce((acc, render) => {
+    if (!acc[render.compartimento]) {
+      acc[render.compartimento] = []
+    }
+    acc[render.compartimento].push(render)
+    return acc
+  }, {})
+
+  // Imagens finais do projeto
+  const imagensFinais = renders.filter(r => r.is_final)
+
   // Tabs - Contratos e Financeiro apenas visíveis para administração
   const allTabs = [
-    { id: 'geral', label: 'Geral', icon: Layers },
-    { id: 'entregaveis', label: 'Entregáveis', icon: ListChecks },
-    { id: 'archviz', label: 'Archviz', icon: Image },
-    { id: 'contratos', label: 'Contratos', icon: FileCheck, adminOnly: true },
+    { id: 'dashboard', label: 'Dashboard Projeto', icon: Layers },
     { id: 'fases', label: 'Fases & Entregas', icon: Target },
-    { id: 'financeiro', label: 'Financeiro', icon: Euro, adminOnly: true },
-    { id: 'documentos', label: 'Documentos', icon: FileText }
+    { id: 'diario', label: 'Diário de Bordo', icon: BookOpen },
+    { id: 'archviz', label: 'Archviz', icon: Image },
+    { id: 'imagens-finais', label: 'Imagens Finais', icon: CheckCircle },
+    { id: 'biblioteca', label: 'Biblioteca', icon: Library },
+    { id: 'decisions', label: 'Decision Log', icon: ClipboardList },
+    { id: 'gestao', label: 'Gestão de Projeto', icon: Settings, adminOnly: true }
   ]
-  
+
+  // Secções dentro de Fases & Entregas
+  const faseSections = [
+    { id: 'prazo', label: 'Prazo Contratual', icon: Calendar },
+    { id: 'entregaveis', label: 'Entregáveis', icon: ListChecks },
+    { id: 'entregas', label: 'Central de Entregas', icon: Package },
+    { id: 'design-review', label: 'Design Review', icon: Eye },
+    { id: 'atas', label: 'Atas', icon: FileText }
+  ]
+
   const tabs = allTabs.filter(tab => !tab.adminOnly || isAdmin())
 
   return (
@@ -1384,13 +2149,14 @@ export default function ProjetoDetalhe() {
                   }}
                 >
                   {[
-                    { icon: Copy, label: 'Duplicar Projeto' },
-                    { icon: Share, label: 'Partilhar' },
-                    { icon: Download, label: 'Exportar PDF' },
-                    { icon: Trash2, label: 'Eliminar', danger: true }
+                    { icon: Copy, label: 'Duplicar Projeto', onClick: handleDuplicate },
+                    { icon: Share, label: 'Partilhar', onClick: handleShare },
+                    { icon: Download, label: 'Exportar PDF', onClick: handleExportPDF },
+                    { icon: Trash2, label: 'Eliminar', danger: true, onClick: handleDelete }
                   ].map((action, i) => (
                     <button
                       key={i}
+                      onClick={action.onClick}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -1413,25 +2179,6 @@ export default function ProjetoDetalhe() {
               )}
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* Progress Bar */}
-      <div className="card mb-lg">
-        <div className="flex items-center justify-between mb-md">
-          <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--brown)' }}>
-            Progresso Global
-          </span>
-          <span style={{ fontSize: '20px', fontWeight: 700, color: 'var(--brown)' }}>
-            {project.progresso}%
-          </span>
-        </div>
-        <div className="progress-bar" style={{ height: '8px' }}>
-          <div className="progress-fill" style={{ width: `${project.progresso}%` }} />
-        </div>
-        <div className="flex items-center justify-between mt-md text-muted" style={{ fontSize: '12px' }}>
-          <span>Início: {formatDate(project.datas.data_inicio)}</span>
-          <span>Previsão: {formatDate(project.datas.data_prevista)}</span>
         </div>
       </div>
 
@@ -1474,7 +2221,7 @@ export default function ProjetoDetalhe() {
       </div>
 
       {/* Tab Content */}
-      {activeTab === 'geral' && (
+      {activeTab === 'dashboard' && (
         <div className="grid grid-2" style={{ gap: '24px' }}>
           {/* Cliente */}
           <div className="card">
@@ -1511,31 +2258,37 @@ export default function ProjetoDetalhe() {
                 fontWeight: 600,
                 fontSize: '16px'
               }}>
-                {project.cliente.nome.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                {(project.cliente?.nome || 'Cliente').split(' ').map(n => n[0]).join('').slice(0, 2)}
               </div>
               <div>
                 <div style={{ fontWeight: 600, color: 'var(--brown)' }}>
-                  {project.cliente.titulo} {project.cliente.nome}
+                  {project.cliente?.titulo} {project.cliente?.nome || 'Cliente'}
                 </div>
                 <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>
-                  {project.cliente.codigo} • {project.cliente.tipo}
+                  {project.cliente?.codigo || 'N/D'} • {project.cliente?.tipo || 'Particular'}
                 </div>
               </div>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div className="flex items-center gap-sm text-muted" style={{ fontSize: '13px' }}>
-                <Mail size={14} />
-                {project.cliente.email}
-              </div>
-              <div className="flex items-center gap-sm text-muted" style={{ fontSize: '13px' }}>
-                <Phone size={14} />
-                {project.cliente.telefone}
-              </div>
-              <div className="flex items-center gap-sm text-muted" style={{ fontSize: '13px' }}>
-                <Globe size={14} />
-                {project.cliente.segmento} • {project.cliente.idioma}
-              </div>
+              {project.cliente?.email && (
+                <div className="flex items-center gap-sm text-muted" style={{ fontSize: '13px' }}>
+                  <Mail size={14} />
+                  {project.cliente.email}
+                </div>
+              )}
+              {project.cliente?.telefone && (
+                <div className="flex items-center gap-sm text-muted" style={{ fontSize: '13px' }}>
+                  <Phone size={14} />
+                  {project.cliente.telefone}
+                </div>
+              )}
+              {(project.cliente?.segmento || project.cliente?.idioma) && (
+                <div className="flex items-center gap-sm text-muted" style={{ fontSize: '13px' }}>
+                  <Globe size={14} />
+                  {[project.cliente?.segmento, project.cliente?.idioma].filter(Boolean).join(' • ')}
+                </div>
+              )}
             </div>
           </div>
 
@@ -1552,14 +2305,14 @@ export default function ProjetoDetalhe() {
               marginBottom: '16px'
             }}>
               <div style={{ fontSize: '14px', fontWeight: 500, color: 'var(--brown)', marginBottom: '8px' }}>
-                {project.localizacao.morada}
+                {project.localizacao?.morada || project.morada || '—'}
               </div>
               <div style={{ fontSize: '13px', color: 'var(--brown-light)' }}>
-                {project.localizacao.codigo_postal} {project.localizacao.cidade}
-                {project.localizacao.estado && `, ${project.localizacao.estado}`}
+                {[project.localizacao?.codigo_postal, project.localizacao?.cidade || project.cidade].filter(Boolean).join(' ')}
+                {project.localizacao?.estado && `, ${project.localizacao.estado}`}
               </div>
               <div style={{ fontSize: '13px', color: 'var(--brown-light)' }}>
-                {project.localizacao.pais}
+                {project.localizacao?.pais || project.pais || 'Portugal'}
               </div>
             </div>
 
@@ -1588,9 +2341,13 @@ export default function ProjetoDetalhe() {
             <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)', marginBottom: '16px' }}>
               Serviços Contratados
             </h3>
-            
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {project.servicos.map((servico, idx) => (
+              {(!project.servicos || project.servicos.length === 0) ? (
+                <p style={{ fontSize: '13px', color: 'var(--brown-light)', textAlign: 'center', padding: '24px', background: 'var(--cream)', borderRadius: '12px' }}>
+                  Nenhum serviço contratado.
+                </p>
+              ) : project.servicos.map((servico, idx) => (
                 <div 
                   key={idx}
                   style={{
@@ -1641,439 +2398,1248 @@ export default function ProjetoDetalhe() {
             <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)', marginBottom: '16px' }}>
               Equipa do Projeto
             </h3>
-            
-            <div className="grid grid-3" style={{ gap: '16px' }}>
-              {[
-                { role: 'Project Manager', name: project.equipa.project_manager },
-                { role: 'Designer de Interiores', name: project.equipa.designer },
-                { role: 'Arquiteto', name: project.equipa.arquiteto }
-              ].map((member, idx) => (
-                <div 
-                  key={idx}
-                  style={{
-                    padding: '16px',
-                    background: 'var(--cream)',
-                    borderRadius: '12px',
-                    opacity: member.name ? 1 : 0.5
-                  }}
-                >
-                  <div style={{ fontSize: '11px', color: 'var(--brown-light)', marginBottom: '8px' }}>
-                    {member.role}
+
+            {equipaProjeto.length === 0 ? (
+              <p style={{ fontSize: '13px', color: 'var(--brown-light)', textAlign: 'center', padding: '24px', background: 'var(--cream)', borderRadius: '12px' }}>
+                Nenhum membro atribuído. Clique em Editar para adicionar membros.
+              </p>
+            ) : (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+                {equipaProjeto.map((membro) => (
+                  <div
+                    key={membro.id}
+                    style={{
+                      padding: '16px',
+                      background: 'var(--cream)',
+                      borderRadius: '12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      minWidth: '200px'
+                    }}
+                  >
+                    <div style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '50%',
+                      background: 'var(--brown)',
+                      color: 'white',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '14px',
+                      fontWeight: 600
+                    }}>
+                      {membro.utilizadores?.nome?.substring(0, 2).toUpperCase() || '??'}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 500, color: 'var(--brown)', fontSize: '14px' }}>
+                        {membro.utilizadores?.nome || 'Sem nome'}
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>
+                        {membro.funcao || membro.utilizadores?.cargo || 'Membro'}
+                      </div>
+                    </div>
                   </div>
-                  <div style={{ fontWeight: 500, color: 'var(--brown)' }}>
-                    {member.name || 'Não atribuído'}
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Intervenientes do Projeto */}
+          <div className="card" style={{ gridColumn: 'span 2' }}>
+            <div className="flex items-center justify-between mb-lg">
+              <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
+                Intervenientes do Projeto
+              </h3>
+              <button
+                className="btn btn-primary"
+                style={{ padding: '6px 12px', fontSize: '12px' }}
+                onClick={() => {
+                  setEditingInterveniente(null)
+                  setIntervenienteForm({
+                    tipo: '',
+                    entidade: '',
+                    contacto_geral: '',
+                    responsavel_nome: '',
+                    responsavel_email: '',
+                    responsavel_secundario_nome: '',
+                    responsavel_secundario_email: ''
+                  })
+                  setShowIntervenienteModal(true)
+                }}
+              >
+                <Plus size={14} /> Adicionar
+              </button>
+            </div>
+
+            {intervenientes.length === 0 ? (
+              <p style={{ fontSize: '13px', color: 'var(--brown-light)', textAlign: 'center', padding: '24px', background: 'var(--cream)', borderRadius: '12px' }}>
+                Nenhum interveniente registado.
+              </p>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid var(--stone)' }}>
+                      <th style={{ textAlign: 'left', padding: '12px 8px', color: 'var(--brown)', fontWeight: 600 }}>Tipo</th>
+                      <th style={{ textAlign: 'left', padding: '12px 8px', color: 'var(--brown)', fontWeight: 600 }}>Entidade</th>
+                      <th style={{ textAlign: 'left', padding: '12px 8px', color: 'var(--brown)', fontWeight: 600 }}>Responsável</th>
+                      <th style={{ textAlign: 'left', padding: '12px 8px', color: 'var(--brown)', fontWeight: 600 }}>Responsável Secundário</th>
+                      <th style={{ width: '60px' }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {intervenientes.map((item) => (
+                      <tr key={item.id} style={{ borderBottom: '1px solid var(--cream)' }}>
+                        <td style={{ padding: '12px 8px', color: 'var(--brown)', fontWeight: 500 }}>
+                          {item.tipo}
+                        </td>
+                        <td style={{ padding: '12px 8px', color: 'var(--brown-light)' }}>
+                          <div>{item.entidade || '—'}</div>
+                          {item.contacto_geral && (
+                            <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>{item.contacto_geral}</div>
+                          )}
+                        </td>
+                        <td style={{ padding: '12px 8px' }}>
+                          <div style={{ color: 'var(--brown)' }}>{item.responsavel_nome || '—'}</div>
+                          {item.responsavel_email && (
+                            <a href={`mailto:${item.responsavel_email}`} style={{ fontSize: '11px', color: 'var(--gold-dark)' }}>
+                              {item.responsavel_email}
+                            </a>
+                          )}
+                        </td>
+                        <td style={{ padding: '12px 8px' }}>
+                          <div style={{ color: 'var(--brown)' }}>{item.responsavel_secundario_nome || '—'}</div>
+                          {item.responsavel_secundario_email && (
+                            <a href={`mailto:${item.responsavel_secundario_email}`} style={{ fontSize: '11px', color: 'var(--gold-dark)' }}>
+                              {item.responsavel_secundario_email}
+                            </a>
+                          )}
+                        </td>
+                        <td style={{ padding: '12px 8px' }}>
+                          <div style={{ display: 'flex', gap: '4px' }}>
+                            <button
+                              onClick={() => handleEditInterveniente(item)}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                padding: '4px',
+                                color: 'var(--brown-light)'
+                              }}
+                            >
+                              <Edit size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleRemoveInterveniente(item.id)}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                padding: '4px',
+                                color: 'var(--danger)'
+                              }}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal Adicionar/Editar Interveniente */}
+      {showIntervenienteModal && (
+        <div className="modal-overlay" onClick={() => setShowIntervenienteModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '650px', width: '95%' }}>
+            <div className="modal-header" style={{ borderBottom: '1px solid var(--stone)', paddingBottom: '16px' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--brown)' }}>
+                  {editingInterveniente ? 'Editar Interveniente' : 'Adicionar Interveniente'}
+                </h3>
+                <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--brown-light)' }}>
+                  Registe os intervenientes externos do projeto
+                </p>
+              </div>
+              <button className="modal-close" onClick={() => setShowIntervenienteModal(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body" style={{ padding: '24px' }}>
+              {/* Tipo e Entidade */}
+              <div style={{
+                background: 'var(--cream)',
+                padding: '20px',
+                borderRadius: '12px',
+                marginBottom: '20px'
+              }}>
+                <h4 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--brown)', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Identificação
+                </h4>
+                <div className="form-group" style={{ marginBottom: '16px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--brown)', marginBottom: '6px', display: 'block' }}>
+                    Tipo de Interveniente *
+                  </label>
+                  <select
+                    value={intervenienteForm.tipo}
+                    onChange={(e) => setIntervenienteForm(prev => ({ ...prev, tipo: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: '12px 14px',
+                      border: '1px solid var(--stone)',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      background: 'var(--white)',
+                      color: 'var(--brown)'
+                    }}
+                  >
+                    <option value="">Selecionar tipo...</option>
+                    {TIPOS_INTERVENIENTES.map(tipo => (
+                      <option key={tipo} value={tipo}>{tipo}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--brown)', marginBottom: '6px', display: 'block' }}>
+                      Entidade / Empresa
+                    </label>
+                    <input
+                      type="text"
+                      value={intervenienteForm.entidade}
+                      onChange={(e) => setIntervenienteForm(prev => ({ ...prev, entidade: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        padding: '12px 14px',
+                        border: '1px solid var(--stone)',
+                        borderRadius: '8px',
+                        fontSize: '14px'
+                      }}
+                      placeholder="Nome da empresa ou entidade"
+                    />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--brown)', marginBottom: '6px', display: 'block' }}>
+                      Contacto Geral
+                    </label>
+                    <input
+                      type="text"
+                      value={intervenienteForm.contacto_geral}
+                      onChange={(e) => setIntervenienteForm(prev => ({ ...prev, contacto_geral: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        padding: '12px 14px',
+                        border: '1px solid var(--stone)',
+                        borderRadius: '8px',
+                        fontSize: '14px'
+                      }}
+                      placeholder="email@empresa.pt ou telefone"
+                    />
                   </div>
                 </div>
-              ))}
+              </div>
+
+              {/* Responsável Principal */}
+              <div style={{
+                background: 'var(--cream)',
+                padding: '20px',
+                borderRadius: '12px',
+                marginBottom: '20px'
+              }}>
+                <h4 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--brown)', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Responsável Principal
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--brown)', marginBottom: '6px', display: 'block' }}>
+                      Nome
+                    </label>
+                    <input
+                      type="text"
+                      value={intervenienteForm.responsavel_nome}
+                      onChange={(e) => setIntervenienteForm(prev => ({ ...prev, responsavel_nome: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        padding: '12px 14px',
+                        border: '1px solid var(--stone)',
+                        borderRadius: '8px',
+                        fontSize: '14px'
+                      }}
+                      placeholder="Nome do responsável"
+                    />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--brown)', marginBottom: '6px', display: 'block' }}>
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      value={intervenienteForm.responsavel_email}
+                      onChange={(e) => setIntervenienteForm(prev => ({ ...prev, responsavel_email: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        padding: '12px 14px',
+                        border: '1px solid var(--stone)',
+                        borderRadius: '8px',
+                        fontSize: '14px'
+                      }}
+                      placeholder="email@exemplo.pt"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Responsável Secundário */}
+              <div style={{
+                background: 'var(--cream)',
+                padding: '20px',
+                borderRadius: '12px'
+              }}>
+                <h4 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--brown)', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Responsável Secundário <span style={{ fontWeight: 400, textTransform: 'none' }}>(opcional)</span>
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--brown)', marginBottom: '6px', display: 'block' }}>
+                      Nome
+                    </label>
+                    <input
+                      type="text"
+                      value={intervenienteForm.responsavel_secundario_nome}
+                      onChange={(e) => setIntervenienteForm(prev => ({ ...prev, responsavel_secundario_nome: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        padding: '12px 14px',
+                        border: '1px solid var(--stone)',
+                        borderRadius: '8px',
+                        fontSize: '14px'
+                      }}
+                      placeholder="Nome do responsável"
+                    />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--brown)', marginBottom: '6px', display: 'block' }}>
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      value={intervenienteForm.responsavel_secundario_email}
+                      onChange={(e) => setIntervenienteForm(prev => ({ ...prev, responsavel_secundario_email: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        padding: '12px 14px',
+                        border: '1px solid var(--stone)',
+                        borderRadius: '8px',
+                        fontSize: '14px'
+                      }}
+                      placeholder="email@exemplo.pt"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer" style={{ borderTop: '1px solid var(--stone)', padding: '16px 24px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setShowIntervenienteModal(false)}
+                style={{ padding: '10px 20px' }}
+              >
+                Cancelar
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handleSaveInterveniente}
+                disabled={!intervenienteForm.tipo}
+                style={{ padding: '10px 24px' }}
+              >
+                {editingInterveniente ? 'Guardar Alterações' : 'Adicionar'}
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Tab Entregáveis */}
-      {activeTab === 'entregaveis' && (
-        <ProjetoEntregaveis projeto={project} />
+      {/* Modal Adicionar/Editar Fase Contratual */}
+      {showFaseModal && (
+        <div className="modal-overlay" onClick={() => setShowFaseModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+            <div className="modal-header">
+              <h3>{editingFase ? 'Editar Fase' : 'Adicionar Fase Contratual'}</h3>
+              <button className="modal-close" onClick={() => setShowFaseModal(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: '16px' }}>
+                <div className="form-group">
+                  <label>Nº Fase *</label>
+                  <input
+                    type="number"
+                    value={faseForm.numero}
+                    onChange={(e) => setFaseForm(prev => ({ ...prev, numero: e.target.value }))}
+                    className="form-control"
+                    min="1"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Nome da Fase *</label>
+                  <input
+                    type="text"
+                    value={faseForm.nome}
+                    onChange={(e) => setFaseForm(prev => ({ ...prev, nome: e.target.value }))}
+                    className="form-control"
+                    placeholder="Ex: Estudos de Layout/Revisão do Projeto de Arquitetura"
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="form-group">
+                  <label>Data Início</label>
+                  <input
+                    type="date"
+                    value={faseForm.data_inicio}
+                    onChange={(e) => setFaseForm(prev => ({ ...prev, data_inicio: e.target.value }))}
+                    className="form-control"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Nº Dias da Fase</label>
+                  <input
+                    type="text"
+                    value={faseForm.num_dias}
+                    onChange={(e) => setFaseForm(prev => ({ ...prev, num_dias: e.target.value }))}
+                    className="form-control"
+                    placeholder="Ex: 40 ou 60 dias úteis após entrega do PB"
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="form-group">
+                  <label>Conclusão Prevista</label>
+                  <input
+                    type="text"
+                    value={faseForm.conclusao_prevista}
+                    onChange={(e) => setFaseForm(prev => ({ ...prev, conclusao_prevista: e.target.value }))}
+                    className="form-control"
+                    placeholder="Ex: Março 2025 ou Final de Outubro 2025"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Data Entrega</label>
+                  <input
+                    type="date"
+                    value={faseForm.data_entrega}
+                    onChange={(e) => setFaseForm(prev => ({ ...prev, data_entrega: e.target.value }))}
+                    className="form-control"
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="form-group">
+                  <label>Estado</label>
+                  <select
+                    value={faseForm.estado}
+                    onChange={(e) => setFaseForm(prev => ({ ...prev, estado: e.target.value }))}
+                    className="form-control"
+                  >
+                    <option value="nao_iniciado">Não iniciado</option>
+                    <option value="em_curso">Em curso</option>
+                    <option value="concluido">Concluído</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Avaliação Performance</label>
+                  <select
+                    value={faseForm.avaliacao}
+                    onChange={(e) => setFaseForm(prev => ({ ...prev, avaliacao: e.target.value }))}
+                    className="form-control"
+                  >
+                    <option value="">—</option>
+                    <option value="on_time">On Time</option>
+                    <option value="delayed">Delayed</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowFaseModal(false)}>
+                Cancelar
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handleSaveFase}
+                disabled={!faseForm.nome}
+              >
+                {editingFase ? 'Guardar Alterações' : 'Adicionar Fase'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab Fases & Entregas */}
+      {activeTab === 'fases' && (
+        <div>
+          {/* Section navigation */}
+          <div style={{
+            display: 'flex',
+            gap: '8px',
+            marginBottom: '20px',
+            borderBottom: '1px solid var(--stone)',
+            paddingBottom: '12px'
+          }}>
+            {faseSections.map(section => (
+              <button
+                key={section.id}
+                onClick={() => setActiveFaseSection(section.id)}
+                style={{
+                  padding: '8px 16px',
+                  background: activeFaseSection === section.id ? 'var(--brown)' : 'transparent',
+                  color: activeFaseSection === section.id ? 'white' : 'var(--brown-light)',
+                  border: activeFaseSection === section.id ? 'none' : '1px solid var(--stone)',
+                  borderRadius: '20px',
+                  fontSize: '12px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <section.icon size={14} />
+                {section.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Content based on active section */}
+          <div className="card">
+            <h3 style={{
+              fontSize: '16px',
+              fontWeight: 600,
+              color: 'var(--brown)',
+              marginBottom: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px'
+            }}>
+              {faseSections.find(s => s.id === activeFaseSection)?.label}
+              <span className="badge badge-gold" style={{ fontSize: '11px' }}>
+                {project.fase || 'Fase não definida'}
+              </span>
+            </h3>
+
+            {/* Prazo Contratual */}
+            {activeFaseSection === 'prazo' && (
+              <div>
+                {/* Resumo do projeto */}
+                <div className="grid grid-3" style={{ gap: '16px', marginBottom: '24px' }}>
+                  <div style={{ padding: '16px', background: 'var(--cream)', borderRadius: '12px' }}>
+                    <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginBottom: '4px' }}>Data Início Projeto</div>
+                    <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
+                      {project.data_inicio ? new Date(project.data_inicio).toLocaleDateString('pt-PT') : 'A definir'}
+                    </div>
+                  </div>
+                  <div style={{ padding: '16px', background: 'var(--cream)', borderRadius: '12px' }}>
+                    <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginBottom: '4px' }}>Data Fim Prevista</div>
+                    <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
+                      {project.data_fim_prevista ? new Date(project.data_fim_prevista).toLocaleDateString('pt-PT') : 'A definir'}
+                    </div>
+                  </div>
+                  <div style={{ padding: '16px', background: 'var(--cream)', borderRadius: '12px' }}>
+                    <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginBottom: '4px' }}>Duração Total</div>
+                    <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
+                      {project.prazo_execucao || '—'} {project.prazo_execucao ? 'dias' : ''}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tabela de Fases */}
+                <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h4 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--brown)' }}>Fases e Prazos Contratuais</h4>
+                  <button
+                    className="btn btn-primary"
+                    style={{ padding: '6px 12px', fontSize: '12px' }}
+                    onClick={() => {
+                      setEditingFase(null)
+                      setFaseForm({
+                        numero: (fasesContratuais.length + 1).toString(),
+                        nome: '',
+                        data_inicio: '',
+                        num_dias: '',
+                        conclusao_prevista: '',
+                        data_entrega: '',
+                        estado: 'nao_iniciado',
+                        avaliacao: ''
+                      })
+                      setShowFaseModal(true)
+                    }}
+                  >
+                    <Plus size={14} /> Adicionar Fase
+                  </button>
+                </div>
+
+                {fasesContratuais.length === 0 ? (
+                  <div style={{
+                    padding: '32px',
+                    background: 'var(--cream)',
+                    borderRadius: '12px',
+                    textAlign: 'center',
+                    color: 'var(--brown-light)'
+                  }}>
+                    <Calendar size={32} style={{ opacity: 0.3, marginBottom: '12px' }} />
+                    <p>Nenhuma fase contratual definida.</p>
+                  </div>
+                ) : (
+                  <div style={{ overflowX: 'auto', border: '1px solid var(--stone)', borderRadius: '12px' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                      <thead>
+                        <tr style={{ background: 'var(--cream)' }}>
+                          <th style={{ textAlign: 'left', padding: '12px 10px', color: 'var(--brown)', fontWeight: 600, borderBottom: '2px solid var(--stone)' }}>FASE</th>
+                          <th style={{ textAlign: 'center', padding: '12px 10px', color: 'var(--brown)', fontWeight: 600, borderBottom: '2px solid var(--stone)', width: '100px' }}>INÍCIO</th>
+                          <th style={{ textAlign: 'center', padding: '12px 10px', color: 'var(--brown)', fontWeight: 600, borderBottom: '2px solid var(--stone)', width: '100px' }}>Nº DIAS FASE</th>
+                          <th style={{ textAlign: 'center', padding: '12px 10px', color: 'var(--brown)', fontWeight: 600, borderBottom: '2px solid var(--stone)', width: '120px' }}>CONCLUSÃO PREVISTA</th>
+                          <th style={{ textAlign: 'center', padding: '12px 10px', color: 'var(--brown)', fontWeight: 600, borderBottom: '2px solid var(--stone)', width: '100px' }}>DATA ENTREGA</th>
+                          <th style={{ textAlign: 'center', padding: '12px 10px', color: 'var(--brown)', fontWeight: 600, borderBottom: '2px solid var(--stone)', width: '120px' }}>ESTADO</th>
+                          <th style={{ textAlign: 'center', padding: '12px 10px', color: 'var(--brown)', fontWeight: 600, borderBottom: '2px solid var(--stone)', width: '120px' }}>AVALIAÇÃO PERFORMANCE</th>
+                          <th style={{ width: '50px', borderBottom: '2px solid var(--stone)' }}></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {fasesContratuais.map((fase) => (
+                          <tr key={fase.id} style={{ borderBottom: '1px solid var(--cream)' }}>
+                            <td style={{ padding: '12px 10px', color: 'var(--brown)' }}>
+                              <span style={{ fontWeight: 500 }}>{fase.numero}ª Fase – </span>
+                              {fase.nome}
+                            </td>
+                            <td style={{ padding: '12px 10px', textAlign: 'center', color: 'var(--brown-light)' }}>
+                              {fase.data_inicio ? new Date(fase.data_inicio).toLocaleDateString('pt-PT') : '—'}
+                            </td>
+                            <td style={{ padding: '12px 10px', textAlign: 'center', color: 'var(--brown-light)' }}>
+                              {fase.num_dias || '—'}
+                            </td>
+                            <td style={{ padding: '12px 10px', textAlign: 'center', color: 'var(--brown-light)' }}>
+                              {fase.conclusao_prevista || '—'}
+                            </td>
+                            <td style={{ padding: '12px 10px', textAlign: 'center', color: 'var(--brown-light)' }}>
+                              {fase.data_entrega ? new Date(fase.data_entrega).toLocaleDateString('pt-PT') : '—'}
+                            </td>
+                            <td style={{ padding: '12px 10px', textAlign: 'center' }}>
+                              <select
+                                value={fase.estado}
+                                onChange={(e) => handleUpdateFaseEstado(fase.id, e.target.value)}
+                                style={{
+                                  padding: '4px 8px',
+                                  borderRadius: '12px',
+                                  border: 'none',
+                                  fontSize: '11px',
+                                  fontWeight: 500,
+                                  cursor: 'pointer',
+                                  background: fase.estado === 'concluido' ? '#dcfce7' :
+                                              fase.estado === 'em_curso' ? '#fef9c3' : '#f3f4f6',
+                                  color: fase.estado === 'concluido' ? '#166534' :
+                                         fase.estado === 'em_curso' ? '#854d0e' : '#6b7280'
+                                }}
+                              >
+                                <option value="nao_iniciado">Não iniciado</option>
+                                <option value="em_curso">Em curso</option>
+                                <option value="concluido">Concluído</option>
+                              </select>
+                            </td>
+                            <td style={{ padding: '12px 10px', textAlign: 'center' }}>
+                              <select
+                                value={fase.avaliacao || ''}
+                                onChange={(e) => handleUpdateFaseAvaliacao(fase.id, e.target.value)}
+                                style={{
+                                  padding: '4px 8px',
+                                  borderRadius: '12px',
+                                  border: 'none',
+                                  fontSize: '11px',
+                                  fontWeight: 500,
+                                  cursor: 'pointer',
+                                  background: fase.avaliacao === 'on_time' ? '#dcfce7' :
+                                              fase.avaliacao === 'delayed' ? '#fee2e2' : '#f3f4f6',
+                                  color: fase.avaliacao === 'on_time' ? '#166534' :
+                                         fase.avaliacao === 'delayed' ? '#dc2626' : '#6b7280'
+                                }}
+                              >
+                                <option value="">—</option>
+                                <option value="on_time">On Time</option>
+                                <option value="delayed">Delayed</option>
+                              </select>
+                            </td>
+                            <td style={{ padding: '12px 10px' }}>
+                              <div style={{ display: 'flex', gap: '4px' }}>
+                                <button
+                                  onClick={() => handleEditFase(fase)}
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--brown-light)' }}
+                                >
+                                  <Edit size={14} />
+                                </button>
+                                <button
+                                  onClick={() => handleRemoveFase(fase.id)}
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--danger)' }}
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Entregáveis */}
+            {activeFaseSection === 'entregaveis' && (
+              <ProjetoEntregaveis projeto={project} />
+            )}
+
+            {/* Central de Entregas */}
+            {activeFaseSection === 'entregas' && (
+              <CentralEntregas projeto={project} />
+            )}
+
+            {/* Design Review */}
+            {activeFaseSection === 'design-review' && (
+              <DesignReview projeto={project} />
+            )}
+
+            {/* Atas */}
+            {activeFaseSection === 'atas' && (
+              <div>
+                <div className="flex items-center justify-between" style={{ marginBottom: '20px' }}>
+                  <span style={{ fontSize: '13px', color: 'var(--brown-light)' }}>
+                    Atas de reunião desta fase
+                  </span>
+                  <button className="btn btn-primary" style={{ padding: '8px 16px' }}>
+                    <Plus size={16} style={{ marginRight: '8px' }} />
+                    Nova Ata
+                  </button>
+                </div>
+                <div style={{
+                  padding: '48px',
+                  background: 'var(--cream)',
+                  borderRadius: '12px',
+                  textAlign: 'center',
+                  color: 'var(--brown-light)'
+                }}>
+                  <FileText size={48} style={{ opacity: 0.3, marginBottom: '16px' }} />
+                  <p>Nenhuma ata registada para esta fase.</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Tab Diário de Bordo */}
+      {activeTab === 'diario' && (
+        <div className="card" style={{ padding: '20px' }}>
+          <DiarioBordo projeto={project} />
+        </div>
       )}
 
       {/* Tab Archviz */}
       {activeTab === 'archviz' && (
-        <ProjetoArchviz projeto={project} userId={profile?.id} userName={profile?.nome} />
-      )}
-
-      {/* Tab Contratos - Apenas Administração */}
-      {activeTab === 'contratos' && isAdmin() && (
-        <ProjetoDocumentos projeto={project} />
-      )}
-
-      {activeTab === 'fases' && (
         <div className="card">
-          <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)', marginBottom: '24px' }}>
-            Fases do Design de Interiores
-          </h3>
-          
-          {project.servicos[1]?.fases?.map((fase, idx) => (
-            <div 
-              key={idx}
-              style={{
-                padding: '24px',
-                background: fase.status === 'em_progresso' ? 'var(--cream)' : 'transparent',
-                borderRadius: '16px',
-                marginBottom: '16px',
-                border: fase.status === 'em_progresso' ? '2px solid var(--blush)' : '1px solid var(--stone)'
-              }}
-            >
-              <div className="flex items-center justify-between mb-lg">
-                <div className="flex items-center gap-md">
-                  <div style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '50%',
-                    background: fase.status === 'em_progresso' ? 'var(--blush)' : 
-                                fase.status === 'concluido' ? 'var(--success)' : 'var(--stone)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: fase.status === 'pendente' ? 'var(--brown-light)' : 'var(--white)',
-                    fontWeight: 700,
-                    fontSize: '14px'
-                  }}>
-                    {fase.status === 'concluido' ? <CheckCircle size={18} /> : fase.numero}
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: 600, color: 'var(--brown)' }}>
-                      Fase {fase.numero}: {fase.nome}
-                    </div>
-                    <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>
-                      Prazo: {fase.prazo}
-                    </div>
-                  </div>
-                </div>
-                <div 
-                  style={{
-                    padding: '6px 12px',
-                    borderRadius: '20px',
-                    background: `${getStatusColor(fase.status)}15`,
-                    color: getStatusColor(fase.status),
-                    fontSize: '12px',
-                    fontWeight: 600
-                  }}
-                >
-                  {getStatusLabel(fase.status)}
-                </div>
-              </div>
-
-              <div style={{ 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(2, 1fr)', 
-                gap: '10px',
-                marginLeft: '52px'
-              }}>
-                {fase.entregaveis.map((item, i) => (
-                  <div 
-                    key={i}
-                    className="flex items-center gap-sm"
-                    style={{ fontSize: '13px', color: 'var(--brown-light)' }}
-                  >
-                    <div style={{
-                      width: '6px',
-                      height: '6px',
-                      borderRadius: '50%',
-                      background: 'var(--stone-dark)'
-                    }} />
-                    {item}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Tab Financeiro - Apenas Administração */}
-      {activeTab === 'financeiro' && isAdmin() && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          {/* KPIs Financeiros */}
-          <div className="grid grid-4" style={{ gap: '16px' }}>
-            {[
-              { label: 'Total Contratado', value: project.financeiro.total_contratado, color: 'var(--brown)' },
-              { label: 'Total Faturado', value: project.financeiro.total_faturado, color: 'var(--info)' },
-              { label: 'Total Pago', value: project.financeiro.total_pago, color: 'var(--success)' },
-              { label: 'Total Pendente', value: project.financeiro.total_pendente, color: 'var(--warning)' }
-            ].map((kpi, idx) => (
-              <div key={idx} className="card" style={{ padding: '20px' }}>
-                <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginBottom: '8px' }}>
-                  {kpi.label}
-                </div>
-                <div style={{ fontSize: '24px', fontWeight: 700, color: kpi.color }}>
-                  {formatCurrency(kpi.value)}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Plano de Pagamentos */}
-          <div className="card">
-            <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)', marginBottom: '20px' }}>
-              Plano de Pagamentos
-            </h3>
-            
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <th style={{ textAlign: 'left', padding: '12px', borderBottom: '1px solid var(--stone)', fontSize: '12px', color: 'var(--brown-light)', fontWeight: 600 }}>Prestação</th>
-                  <th style={{ textAlign: 'left', padding: '12px', borderBottom: '1px solid var(--stone)', fontSize: '12px', color: 'var(--brown-light)', fontWeight: 600 }}>Descrição</th>
-                  <th style={{ textAlign: 'left', padding: '12px', borderBottom: '1px solid var(--stone)', fontSize: '12px', color: 'var(--brown-light)', fontWeight: 600 }}>Data Limite</th>
-                  <th style={{ textAlign: 'right', padding: '12px', borderBottom: '1px solid var(--stone)', fontSize: '12px', color: 'var(--brown-light)', fontWeight: 600 }}>Valor</th>
-                  <th style={{ textAlign: 'center', padding: '12px', borderBottom: '1px solid var(--stone)', fontSize: '12px', color: 'var(--brown-light)', fontWeight: 600 }}>Estado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {project.pagamentos.map((pag, idx) => (
-                  <tr key={idx} style={{ borderBottom: '1px solid var(--stone)' }}>
-                    <td style={{ padding: '14px 12px', fontWeight: 600, color: 'var(--brown)' }}>
-                      #{pag.prestacao}
-                    </td>
-                    <td style={{ padding: '14px 12px', color: 'var(--brown)' }}>
-                      {pag.descricao}
-                    </td>
-                    <td style={{ padding: '14px 12px', color: 'var(--brown-light)', fontSize: '13px' }}>
-                      {formatDate(pag.data)}
-                    </td>
-                    <td style={{ padding: '14px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--brown)' }}>
-                      {formatCurrency(pag.valor)}
-                    </td>
-                    <td style={{ padding: '14px 12px', textAlign: 'center' }}>
-                      <span style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        padding: '4px 10px',
-                        borderRadius: '20px',
-                        background: `${getStatusColor(pag.estado)}15`,
-                        color: getStatusColor(pag.estado),
-                        fontSize: '11px',
-                        fontWeight: 600
-                      }}>
-                        {pag.estado === 'pago' ? <CheckCircle size={12} /> : <Clock size={12} />}
-                        {getStatusLabel(pag.estado)}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Faturas */}
-          <div className="card">
-            <div className="flex items-center justify-between mb-lg">
+          <div className="flex items-center justify-between" style={{ marginBottom: '24px' }}>
+            <div>
               <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
-                Faturas Emitidas
+                Visualizações 3D & Renders
               </h3>
-              <button className="btn btn-secondary" style={{ padding: '8px 14px', fontSize: '12px' }}>
-                <Receipt size={14} />
-                Nova Fatura
-              </button>
+              <p style={{ fontSize: '13px', color: 'var(--brown-light)', marginTop: '4px' }}>
+                {renders.length} render{renders.length !== 1 ? 's' : ''} • {imagensFinais.length} imagem{imagensFinais.length !== 1 ? 'ns' : ''} final{imagensFinais.length !== 1 ? 'is' : ''}
+              </p>
             </div>
-            
-            {project.faturas.map((fatura, idx) => (
-              <div 
-                key={idx}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '16px',
-                  background: 'var(--cream)',
-                  borderRadius: '12px'
-                }}
-              >
-                <div className="flex items-center gap-md">
-                  <div style={{
-                    width: '40px',
-                    height: '40px',
-                    borderRadius: '10px',
-                    background: 'var(--white)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    <Receipt size={18} style={{ color: 'var(--brown-light)' }} />
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: 600, color: 'var(--brown)' }}>
-                      {fatura.numero}
-                    </div>
-                    <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>
-                      {fatura.descricao} • {formatDate(fatura.data)}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-lg">
-                  <div style={{ fontWeight: 600, color: 'var(--brown)' }}>
-                    {formatCurrency(fatura.valor)}
-                  </div>
-                  <span style={{
-                    padding: '4px 10px',
-                    borderRadius: '20px',
-                    background: `${getStatusColor(fatura.estado)}15`,
-                    color: getStatusColor(fatura.estado),
-                    fontSize: '11px',
-                    fontWeight: 600
-                  }}>
-                    {getStatusLabel(fatura.estado)}
-                  </span>
-                  <button style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--brown-light)',
-                    cursor: 'pointer'
-                  }}>
-                    <Download size={16} />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'documentos' && (
-        <div className="card">
-          <div className="flex items-center justify-between mb-lg">
-            <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
-              Documentos do Projeto
-            </h3>
-            <button 
-              className="btn btn-primary" 
-              style={{ padding: '8px 14px', fontSize: '12px' }}
-              onClick={() => openUploadModal()}
-            >
-              <Plus size={14} />
-              Novo Documento
+            <button onClick={openAddRenderModal} className="btn btn-primary" style={{ padding: '10px 16px' }}>
+              <Plus size={16} style={{ marginRight: '8px' }} />
+              Adicionar Render
             </button>
           </div>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {projectDocs.map((doc, idx) => (
-              <div 
-                key={idx}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '16px',
-                  background: 'var(--cream)',
-                  borderRadius: '12px',
-                  border: doc.estado === 'assinado' ? '1px solid var(--success)' : '1px solid transparent'
-                }}
-              >
-                <div className="flex items-center gap-md">
-                  <div style={{
-                    width: '40px',
-                    height: '40px',
-                    borderRadius: '10px',
-                    background: doc.tipo === 'Proposta' ? 'rgba(138, 158, 184, 0.15)' : 
-                                doc.estado === 'assinado' ? 'rgba(122, 158, 122, 0.15)' : 'var(--stone)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    {doc.estado === 'assinado' ? (
-                      <CheckCircle size={18} style={{ color: 'var(--success)' }} />
-                    ) : (
-                      <FileText size={18} style={{ color: doc.tipo === 'Proposta' ? 'var(--info)' : 'var(--brown-light)' }} />
-                    )}
+
+          {/* Renders por Compartimento */}
+          {Object.keys(rendersByCompartimento).length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              {Object.entries(rendersByCompartimento).map(([compartimento, compartimentoRenders]) => (
+                <div key={compartimento}>
+                  <div className="flex items-center justify-between" style={{ marginBottom: '12px' }}>
+                    <h4 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--brown)' }}>
+                      {compartimento}
+                      <span style={{ fontWeight: 400, color: 'var(--brown-light)', marginLeft: '8px' }}>
+                        ({compartimentoRenders.length} versão{compartimentoRenders.length !== 1 ? 'ões' : ''})
+                      </span>
+                    </h4>
+                    <button
+                      onClick={() => openAddRenderModal(compartimento)}
+                      className="btn btn-secondary"
+                      style={{ padding: '6px 12px', fontSize: '12px' }}
+                    >
+                      <Plus size={14} style={{ marginRight: '6px' }} />
+                      Adicionar Versão
+                    </button>
                   </div>
-                  <div>
-                    <div style={{ fontWeight: 500, color: 'var(--brown)', fontSize: '14px' }}>
-                      {doc.nome}
-                    </div>
-                    <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>
-                      {doc.tipo} • {formatDate(doc.data)}
-                      {doc.ficheiro_assinado && (
-                        <span style={{ color: 'var(--success)', marginLeft: '8px' }}>
-                          • Assinado: {doc.ficheiro_assinado}
-                        </span>
-                      )}
-                    </div>
+                  <div className="grid grid-3" style={{ gap: '16px' }}>
+                    {compartimentoRenders.sort((a, b) => new Date(b.data_upload || b.created_at || 0) - new Date(a.data_upload || a.created_at || 0)).map((render) => (
+                      <div
+                        key={render.id}
+                        style={{
+                          position: 'relative',
+                          aspectRatio: '16/10',
+                          background: render.imagem_url ? `url(${render.imagem_url}) center/cover` : 'var(--cream)',
+                          borderRadius: '12px',
+                          overflow: 'hidden',
+                          border: render.is_final ? '3px solid var(--success)' : '1px solid var(--stone)',
+                          cursor: render.imagem_url ? 'pointer' : 'default'
+                        }}
+                        onClick={() => openLightbox(render)}
+                      >
+                        {!render.imagem_url && (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                            <Image size={24} style={{ color: 'var(--brown-light)', opacity: 0.4 }} />
+                          </div>
+                        )}
+
+                        {/* Versão & Data Badge */}
+                        <div style={{
+                          position: 'absolute',
+                          top: '8px',
+                          left: '8px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '4px'
+                        }}>
+                          <div style={{
+                            padding: '4px 8px',
+                            background: 'rgba(0,0,0,0.7)',
+                            color: 'white',
+                            borderRadius: '6px',
+                            fontSize: '11px',
+                            fontWeight: 600
+                          }}>
+                            v{render.versao}
+                          </div>
+                          {render.data_upload && (
+                            <div style={{
+                              padding: '3px 6px',
+                              background: 'rgba(0,0,0,0.5)',
+                              color: 'white',
+                              borderRadius: '4px',
+                              fontSize: '9px'
+                            }}>
+                              {new Date(render.data_upload).toLocaleDateString('pt-PT')}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Final Badge */}
+                        {render.is_final && (
+                          <div style={{
+                            position: 'absolute',
+                            top: '8px',
+                            right: '8px',
+                            padding: '4px 8px',
+                            background: 'var(--success)',
+                            color: 'white',
+                            borderRadius: '6px',
+                            fontSize: '10px',
+                            fontWeight: 600,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}>
+                            <CheckCircle size={12} />
+                            FINAL
+                          </div>
+                        )}
+
+                        {/* Hover Actions */}
+                        <div style={{
+                          position: 'absolute',
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          padding: '8px',
+                          background: 'linear-gradient(transparent, rgba(0,0,0,0.8))',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
+                        }}>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); toggleFinalImage(render) }}
+                            style={{
+                              padding: '4px 8px',
+                              background: render.is_final ? 'var(--error)' : 'var(--success)',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              fontSize: '10px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {render.is_final ? 'Remover Final' : 'Marcar Final'}
+                          </button>
+                          <div style={{ display: 'flex', gap: '4px' }}>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); openEditRenderModal(render) }}
+                              style={{
+                                padding: '4px',
+                                background: 'rgba(255,255,255,0.2)',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer'
+                              }}
+                              title="Editar"
+                            >
+                              <Edit size={14} />
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleDeleteRender(render) }}
+                              style={{
+                                padding: '4px',
+                                background: 'rgba(255,255,255,0.2)',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-                <div className="flex items-center gap-sm">
-                  {/* Botão de anexar versão assinada - só aparece para documentos pendentes do tipo Proposta */}
-                  {(doc.estado === 'pendente' || doc.estado === 'emitido') && doc.tipo === 'Proposta' && (
-                    <button 
-                      onClick={() => openUploadModal(doc)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        padding: '6px 12px',
-                        background: 'var(--blush)',
-                        border: 'none',
-                        borderRadius: '8px',
-                        color: 'var(--brown-dark)',
-                        fontSize: '11px',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease'
-                      }}
-                    >
-                      <Upload size={12} />
-                      Anexar Assinada
-                    </button>
+              ))}
+            </div>
+          ) : (
+            <div style={{
+              padding: '48px',
+              background: 'var(--cream)',
+              borderRadius: '12px',
+              textAlign: 'center'
+            }}>
+              <Image size={48} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '16px' }} />
+              <h4 style={{ color: 'var(--brown)', marginBottom: '8px' }}>Galeria Archviz Vazia</h4>
+              <p style={{ color: 'var(--brown-light)', fontSize: '13px', marginBottom: '16px' }}>
+                Adicione renders e visualizações 3D organizados por compartimento.
+              </p>
+              <button onClick={openAddRenderModal} className="btn btn-secondary">
+                <Plus size={16} style={{ marginRight: '8px' }} />
+                Adicionar Primeiro Render
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tab Imagens Finais */}
+      {activeTab === 'imagens-finais' && (
+        <div className="card">
+          <div className="flex items-center justify-between" style={{ marginBottom: '24px' }}>
+            <div>
+              <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
+                Imagens Finais do Projeto
+              </h3>
+              <p style={{ fontSize: '13px', color: 'var(--brown-light)', marginTop: '4px' }}>
+                Imagens aprovadas para entrega ao cliente
+              </p>
+            </div>
+            <span style={{
+              padding: '8px 16px',
+              background: 'var(--success)',
+              color: 'white',
+              borderRadius: '20px',
+              fontSize: '13px',
+              fontWeight: 600
+            }}>
+              {imagensFinais.length} imagem{imagensFinais.length !== 1 ? 'ns' : ''}
+            </span>
+          </div>
+
+          {imagensFinais.length > 0 ? (
+            <div className="grid grid-3" style={{ gap: '16px' }}>
+              {imagensFinais.map((render) => (
+                <div
+                  key={render.id}
+                  style={{
+                    position: 'relative',
+                    aspectRatio: '16/10',
+                    background: render.imagem_url ? `url(${render.imagem_url}) center/cover` : 'var(--cream)',
+                    borderRadius: '12px',
+                    overflow: 'hidden',
+                    border: '3px solid var(--success)'
+                  }}
+                >
+                  {!render.imagem_url && (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                      <Image size={32} style={{ color: 'var(--brown-light)', opacity: 0.4 }} />
+                    </div>
                   )}
-                  <span style={{
-                    padding: '4px 10px',
-                    borderRadius: '20px',
-                    background: doc.estado === 'assinado' ? 'rgba(122, 158, 122, 0.15)' : 
-                                doc.estado === 'pendente' ? 'rgba(201, 168, 130, 0.15)' : 'var(--stone)',
-                    color: doc.estado === 'assinado' ? 'var(--success)' : 
-                           doc.estado === 'pendente' ? 'var(--warning)' : 'var(--brown-light)',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    textTransform: 'capitalize'
+
+                  <div style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    padding: '12px',
+                    background: 'linear-gradient(transparent, rgba(0,0,0,0.8))',
+                    color: 'white'
                   }}>
-                    {doc.estado}
-                  </span>
-                  <button style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--brown-light)',
-                    cursor: 'pointer',
-                    padding: '4px'
-                  }}>
-                    <Download size={16} />
+                    <div style={{ fontSize: '13px', fontWeight: 600 }}>{render.compartimento}</div>
+                    <div style={{ fontSize: '11px', opacity: 0.8 }}>Versão {render.versao}</div>
+                  </div>
+
+                  <button
+                    onClick={() => toggleFinalImage(render)}
+                    style={{
+                      position: 'absolute',
+                      top: '8px',
+                      right: '8px',
+                      padding: '6px 10px',
+                      background: 'var(--error)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      fontSize: '11px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <X size={12} />
+                    Remover
                   </button>
-                  <button style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--brown-light)',
-                    cursor: 'pointer',
-                    padding: '4px'
-                  }}>
-                    <ExternalLink size={16} />
-                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{
+              padding: '48px',
+              background: 'var(--cream)',
+              borderRadius: '12px',
+              textAlign: 'center'
+            }}>
+              <CheckCircle size={48} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '16px' }} />
+              <h4 style={{ color: 'var(--brown)', marginBottom: '8px' }}>Nenhuma Imagem Final</h4>
+              <p style={{ color: 'var(--brown-light)', fontSize: '13px' }}>
+                Vá à tab "Archviz" e marque as imagens que devem aparecer nas entregas ao cliente.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tab Biblioteca do Projeto */}
+      {activeTab === 'biblioteca' && (
+        <div>
+          <div className="grid grid-3" style={{ gap: '16px', marginBottom: '24px' }}>
+            {/* KPI Cards */}
+            {[
+              { label: 'Materiais', count: 12, icon: '🎨' },
+              { label: 'Objetos 3D', count: 8, icon: '📦' },
+              { label: 'Texturas', count: 24, icon: '🖼️' }
+            ].map((item, idx) => (
+              <div key={idx} className="card" style={{ padding: '20px' }}>
+                <div className="flex items-center gap-md">
+                  <span style={{ fontSize: '32px' }}>{item.icon}</span>
+                  <div>
+                    <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--brown)' }}>
+                      {item.count}
+                    </div>
+                    <div style={{ fontSize: '13px', color: 'var(--brown-light)' }}>
+                      {item.label}
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
 
-          {/* Área de upload rápido via drag & drop */}
-          <div 
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            onClick={() => document.getElementById('doc-file-input')?.click()}
-            style={{
-              position: 'relative',
-              marginTop: '24px',
-              padding: '32px',
-              border: `2px dashed ${dragOver ? 'var(--blush)' : 'var(--stone)'}`,
-              borderRadius: '16px',
-              background: dragOver ? 'rgba(195, 186, 175, 0.1)' : 'transparent',
+          <div className="card">
+            <div className="flex items-center justify-between" style={{ marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
+                Biblioteca do Projeto
+              </h3>
+              <div className="flex gap-sm">
+                <button className="btn btn-secondary" style={{ padding: '8px 14px' }}>
+                  Importar da Biblioteca Global
+                </button>
+                <button className="btn btn-primary" style={{ padding: '8px 14px' }}>
+                  <Plus size={16} style={{ marginRight: '8px' }} />
+                  Adicionar Item
+                </button>
+              </div>
+            </div>
+
+            {/* Tabs de categorias */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+              {['Todos', 'Materiais', 'Objetos 3D', 'Texturas'].map((cat, idx) => (
+                <button
+                  key={idx}
+                  style={{
+                    padding: '8px 16px',
+                    background: idx === 0 ? 'var(--brown)' : 'transparent',
+                    color: idx === 0 ? 'white' : 'var(--brown-light)',
+                    border: idx === 0 ? 'none' : '1px solid var(--stone)',
+                    borderRadius: '20px',
+                    fontSize: '12px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+
+            <div style={{
+              padding: '48px',
+              background: 'var(--cream)',
+              borderRadius: '12px',
               textAlign: 'center',
-              transition: 'all 0.2s ease',
-              cursor: 'pointer'
-            }}
-          >
-            <Upload size={32} style={{ color: 'var(--brown-light)', marginBottom: '12px' }} />
-            <div style={{ fontSize: '14px', color: 'var(--brown)', marginBottom: '4px' }}>
-              Arraste um PDF aqui para adicionar
+              color: 'var(--brown-light)'
+            }}>
+              <Library size={48} style={{ opacity: 0.3, marginBottom: '16px' }} />
+              <h4 style={{ color: 'var(--brown)', marginBottom: '8px' }}>Biblioteca Vazia</h4>
+              <p>Adicione materiais, objetos 3D e texturas específicos deste projeto.</p>
             </div>
-            <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>
-              ou clique para selecionar ficheiro
-            </div>
-            <input
-              id="doc-file-input"
-              type="file"
-              accept=".pdf,application/pdf"
-              onChange={handleFileSelect}
-              style={{ display: 'none' }}
-            />
           </div>
         </div>
       )}
+
+      {/* Tab Decision Log */}
+      {activeTab === 'decisions' && (
+        <DecisionLog projeto={project} />
+      )}
+
+      {/* Tab Gestão de Projeto - Apenas Admin/PM */}
+      {activeTab === 'gestao' && isAdmin() && (
+        <div className="card">
+          <div className="flex items-center gap-md" style={{ marginBottom: '24px' }}>
+            <div style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: '12px',
+              background: 'var(--brown)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white'
+            }}>
+              <Settings size={24} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)', margin: 0 }}>
+                Gestão de Projeto
+              </h3>
+              <p style={{ fontSize: '13px', color: 'var(--brown-light)', margin: 0 }}>
+                Acesso restrito a administradores e gestores de projeto
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-2" style={{ gap: '16px' }}>
+            <button
+              onClick={() => navigate(`/gestao/projeto/${project.id}`)}
+              style={{
+                padding: '24px',
+                background: 'var(--cream)',
+                border: '1px solid var(--stone)',
+                borderRadius: '12px',
+                textAlign: 'left',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              <h4 style={{ color: 'var(--brown)', marginBottom: '8px', fontSize: '14px', fontWeight: 600 }}>
+                Dashboard de Gestão
+              </h4>
+              <p style={{ color: 'var(--brown-light)', fontSize: '12px', margin: 0 }}>
+                Visão geral financeira, contratos e documentação administrativa
+              </p>
+            </button>
+
+            <button
+              onClick={() => navigate(`/financeiro?projeto=${project.id}`)}
+              style={{
+                padding: '24px',
+                background: 'var(--cream)',
+                border: '1px solid var(--stone)',
+                borderRadius: '12px',
+                textAlign: 'left',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              <h4 style={{ color: 'var(--brown)', marginBottom: '8px', fontSize: '14px', fontWeight: 600 }}>
+                Gestão Financeira
+              </h4>
+              <p style={{ color: 'var(--brown-light)', fontSize: '12px', margin: 0 }}>
+                Orçamentos, compras e controlo de execução
+              </p>
+            </button>
+
+            <button
+              onClick={() => navigate(`/clientes/${project.cliente?.id}`)}
+              style={{
+                padding: '24px',
+                background: 'var(--cream)',
+                border: '1px solid var(--stone)',
+                borderRadius: '12px',
+                textAlign: 'left',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              <h4 style={{ color: 'var(--brown)', marginBottom: '8px', fontSize: '14px', fontWeight: 600 }}>
+                Ficha de Cliente
+              </h4>
+              <p style={{ color: 'var(--brown-light)', fontSize: '12px', margin: 0 }}>
+                Dados do cliente, histórico e comunicações
+              </p>
+            </button>
+
+            <button
+              style={{
+                padding: '24px',
+                background: 'var(--cream)',
+                border: '1px solid var(--stone)',
+                borderRadius: '12px',
+                textAlign: 'left',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              <h4 style={{ color: 'var(--brown)', marginBottom: '8px', fontSize: '14px', fontWeight: 600 }}>
+                Contratos & Documentos
+              </h4>
+              <p style={{ color: 'var(--brown-light)', fontSize: '12px', margin: 0 }}>
+                Propostas, contratos e documentação legal
+              </p>
+            </button>
+          </div>
+        </div>
+      )}
+
 
       {/* Modal de Upload */}
       {showUploadModal && (
@@ -2204,6 +3770,275 @@ export default function ProjetoDetalhe() {
                 }}
               >
                 Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Adicionar/Editar Render */}
+      {showRenderModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+          onClick={() => setShowRenderModal(false)}
+        >
+          <div
+            style={{
+              background: 'var(--white)',
+              borderRadius: '16px',
+              width: '100%',
+              maxWidth: '500px',
+              maxHeight: '90vh',
+              overflow: 'auto',
+              margin: '20px'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '20px 24px',
+              borderBottom: '1px solid var(--stone)'
+            }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--brown)' }}>
+                {editingRender ? 'Editar Render' : 'Adicionar Render'}
+              </h2>
+              <button
+                onClick={() => setShowRenderModal(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--brown-light)' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Form */}
+            <div style={{ padding: '24px' }}>
+              {/* Compartimento */}
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '8px', color: 'var(--brown)' }}>
+                  Compartimento *
+                </label>
+                <input
+                  type="text"
+                  list="compartimentos-list"
+                  value={renderForm.compartimento}
+                  onChange={(e) => handleRenderCompartimentoChange(e.target.value)}
+                  placeholder="Selecionar ou escrever nome..."
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid var(--stone)',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    background: 'var(--white)',
+                    color: 'var(--brown)'
+                  }}
+                />
+                <datalist id="compartimentos-list">
+                  {COMPARTIMENTOS.map(comp => (
+                    <option key={comp} value={comp} />
+                  ))}
+                </datalist>
+                <p style={{ fontSize: '11px', color: 'var(--brown-light)', marginTop: '6px' }}>
+                  Selecione da lista ou escreva um nome personalizado
+                </p>
+              </div>
+
+              {/* Versão (auto) */}
+              {renderForm.compartimento && (
+                <div style={{
+                  marginBottom: '20px',
+                  padding: '12px 16px',
+                  background: 'var(--cream)',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}>
+                  <span style={{ fontSize: '13px', color: 'var(--brown-light)' }}>
+                    Versão automática
+                  </span>
+                  <span style={{
+                    fontSize: '16px',
+                    fontWeight: 700,
+                    color: 'var(--brown)',
+                    background: 'var(--white)',
+                    padding: '4px 12px',
+                    borderRadius: '6px'
+                  }}>
+                    v{editingRender ? renderForm.versao : getNextVersion(renderForm.compartimento)}
+                  </span>
+                </div>
+              )}
+
+              {/* Imagem Upload com Drag & Drop */}
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '8px', color: 'var(--brown)' }}>
+                  Imagem do Render
+                </label>
+                <div
+                  style={{
+                    position: 'relative',
+                    aspectRatio: '16/10',
+                    background: renderForm.imagem_url ? `url(${renderForm.imagem_url}) center/cover` : 'var(--cream)',
+                    borderRadius: '12px',
+                    border: isDragging ? '3px dashed var(--info)' : '2px dashed var(--stone)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    overflow: 'hidden',
+                    transition: 'all 0.2s',
+                    transform: isDragging ? 'scale(1.02)' : 'scale(1)'
+                  }}
+                  onClick={() => document.getElementById('render-image-input').click()}
+                  onDragOver={handleRenderDragOver}
+                  onDragLeave={handleRenderDragLeave}
+                  onDrop={handleRenderDrop}
+                >
+                  {!renderForm.imagem_url && (
+                    <>
+                      <Upload size={32} style={{ color: isDragging ? 'var(--info)' : 'var(--brown-light)', opacity: isDragging ? 1 : 0.5, marginBottom: '8px' }} />
+                      <span style={{ fontSize: '13px', color: isDragging ? 'var(--info)' : 'var(--brown-light)', fontWeight: isDragging ? 600 : 400 }}>
+                        {isDragging ? 'Largue a imagem aqui' : 'Arraste ou clique para fazer upload'}
+                      </span>
+                    </>
+                  )}
+                  {renderForm.imagem_url && (
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '8px',
+                      right: '8px',
+                      padding: '6px 12px',
+                      background: 'rgba(0,0,0,0.7)',
+                      color: 'white',
+                      borderRadius: '6px',
+                      fontSize: '11px'
+                    }}>
+                      Arraste ou clique para alterar
+                    </div>
+                  )}
+                </div>
+                <input
+                  id="render-image-input"
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={handleRenderImageUpload}
+                />
+              </div>
+
+              {/* Data de Carregamento */}
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '8px', color: 'var(--brown)' }}>
+                  Data de Carregamento
+                </label>
+                <input
+                  type="date"
+                  value={renderForm.data_upload}
+                  onChange={(e) => setRenderForm(prev => ({ ...prev, data_upload: e.target.value }))}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid var(--stone)',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    background: 'var(--white)',
+                    color: 'var(--brown)'
+                  }}
+                />
+                <p style={{ fontSize: '11px', color: 'var(--brown-light)', marginTop: '6px' }}>
+                  Altere a data para registar histórico de imagens anteriores
+                </p>
+              </div>
+
+              {/* Descrição */}
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '8px', color: 'var(--brown)' }}>
+                  Descrição (opcional)
+                </label>
+                <textarea
+                  value={renderForm.descricao}
+                  onChange={(e) => setRenderForm(prev => ({ ...prev, descricao: e.target.value }))}
+                  placeholder="Notas sobre este render..."
+                  rows={3}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid var(--stone)',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    resize: 'vertical',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              {/* Marcar como Final */}
+              <div style={{
+                marginBottom: '20px',
+                padding: '16px',
+                background: renderForm.is_final ? 'rgba(var(--success-rgb), 0.1)' : 'var(--cream)',
+                borderRadius: '12px',
+                border: renderForm.is_final ? '2px solid var(--success)' : '1px solid var(--stone)'
+              }}>
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  cursor: 'pointer'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={renderForm.is_final}
+                    onChange={(e) => setRenderForm(prev => ({ ...prev, is_final: e.target.checked }))}
+                    style={{
+                      width: '20px',
+                      height: '20px',
+                      accentColor: 'var(--success)'
+                    }}
+                  />
+                  <div>
+                    <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--brown)', display: 'block' }}>
+                      Marcar como Imagem Final
+                    </span>
+                    <span style={{ fontSize: '12px', color: 'var(--brown-light)' }}>
+                      Esta imagem aparecerá nas entregas ao cliente
+                    </span>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div style={{
+              display: 'flex',
+              gap: '12px',
+              justifyContent: 'flex-end',
+              padding: '16px 24px',
+              borderTop: '1px solid var(--stone)',
+              background: 'var(--cream)'
+            }}>
+              <button onClick={() => setShowRenderModal(false)} className="btn btn-outline">
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveRender}
+                className="btn btn-primary"
+                disabled={!renderForm.compartimento}
+              >
+                {editingRender ? 'Guardar Alterações' : 'Adicionar Render'}
               </button>
             </div>
           </div>
@@ -2799,6 +4634,187 @@ export default function ProjetoDetalhe() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Modal de confirmação de eliminação */}
+      {showDeleteConfirm && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '16px',
+            padding: '24px',
+            maxWidth: '400px',
+            width: '90%'
+          }}>
+            <h3 style={{ margin: '0 0 16px', color: 'var(--brown)' }}>Eliminar Projeto</h3>
+            <p style={{ margin: '0 0 24px', color: 'var(--brown-light)', fontSize: '14px' }}>
+              Tem a certeza que deseja eliminar o projeto <strong>{project?.nome}</strong>? Esta ação não pode ser revertida.
+            </p>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                style={{
+                  padding: '10px 20px',
+                  background: 'var(--stone)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  color: 'var(--brown)'
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmDelete}
+                style={{
+                  padding: '10px 20px',
+                  background: 'var(--error)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  cursor: 'pointer'
+                }}
+              >
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox para visualizar imagens em grande */}
+      {lightboxImage && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.95)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+            cursor: 'zoom-out'
+          }}
+          onClick={() => setLightboxImage(null)}
+        >
+          {/* Header */}
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            padding: '16px 24px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            background: 'linear-gradient(rgba(0,0,0,0.8), transparent)'
+          }}>
+            <div style={{ color: 'white' }}>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>{lightboxImage.compartimento}</h3>
+              <span style={{ fontSize: '12px', opacity: 0.7 }}>
+                v{lightboxImage.versao} • {lightboxImage.data_upload ? new Date(lightboxImage.data_upload).toLocaleDateString('pt-PT') : ''}
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={(e) => { e.stopPropagation(); openEditRenderModal(lightboxImage); setLightboxImage(null) }}
+                style={{
+                  padding: '8px 16px',
+                  background: 'rgba(255,255,255,0.2)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <Edit size={14} /> Editar
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); setLightboxImage(null) }}
+                style={{
+                  padding: '8px',
+                  background: 'rgba(255,255,255,0.2)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer'
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+          </div>
+
+          {/* Imagem */}
+          <img
+            src={lightboxImage.imagem_url}
+            alt={lightboxImage.compartimento}
+            style={{
+              maxWidth: '95vw',
+              maxHeight: '85vh',
+              objectFit: 'contain',
+              borderRadius: '8px'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          />
+
+          {/* Descrição (se existir) */}
+          {lightboxImage.descricao && (
+            <div style={{
+              position: 'absolute',
+              bottom: '24px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              padding: '12px 24px',
+              background: 'rgba(0,0,0,0.7)',
+              color: 'white',
+              borderRadius: '8px',
+              maxWidth: '80vw',
+              textAlign: 'center',
+              fontSize: '13px'
+            }}>
+              {lightboxImage.descricao}
+            </div>
+          )}
+
+          {/* Badge Final */}
+          {lightboxImage.is_final && (
+            <div style={{
+              position: 'absolute',
+              bottom: '24px',
+              right: '24px',
+              padding: '8px 16px',
+              background: 'var(--success)',
+              color: 'white',
+              borderRadius: '8px',
+              fontSize: '12px',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              <CheckCircle size={14} /> Imagem Final
+            </div>
+          )}
         </div>
       )}
     </div>
