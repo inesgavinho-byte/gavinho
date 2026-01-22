@@ -525,8 +525,8 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
         <div className="archviz-title">
           <Image size={24} />
           <div>
-            <h2>Visualizacoes 3D &amp; Renders</h2>
-            <p>{totalRenders} renders · {totalFinais} imagens finais</p>
+            <h2>Visualizações 3D &amp; Renders</h2>
+            <p>{totalRenders} renders · {totalFinais} {totalFinais === 1 ? 'imagem final' : 'imagens finais'}</p>
           </div>
         </div>
         <div className="archviz-actions">
@@ -551,7 +551,7 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
       {Object.keys(renders).length === 0 ? (
         <div className="archviz-empty">
           <Image size={48} />
-          <h3>Sem visualizacoes</h3>
+          <h3>Sem visualizações</h3>
           <p>Adicione o primeiro render do projeto</p>
           <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
             <Plus size={16} /> Adicionar Render
@@ -569,7 +569,7 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
               <div className="archviz-section-header">
                 <h3>{compartimento}</h3>
                 <span className="archviz-count">
-                  {items.length} {items.length === 1 ? 'render' : 'renders'}
+                  ({items.length} {items.length === 1 ? 'versão' : 'versões'})
                 </span>
               </div>
 
@@ -724,7 +724,7 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
                   }}
                 >
                   <Plus size={32} />
-                  <span>Adicionar Versao</span>
+                  <span>Adicionar Versão</span>
                 </div>
               </div>
 
@@ -993,7 +993,7 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
 
               {/* Image info */}
               <div className="archviz-lightbox-info">
-                <span className="archviz-lightbox-version">Versao {lightboxImage.versao}</span>
+                <span className="archviz-lightbox-version">Versão {lightboxImage.versao}</span>
                 <span className="archviz-lightbox-date">
                   {new Date(lightboxImage.created_at).toLocaleDateString('pt-PT')}
                 </span>
