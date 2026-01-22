@@ -53,7 +53,11 @@ import {
   Bold,
   Italic,
   Underline,
-  List
+  List,
+  Sparkles,
+  Loader2,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -757,6 +761,11 @@ export default function ProjetoDetalhe() {
   const [savingEscopo, setSavingEscopo] = useState(false)
   const escopoEditorRef = useRef(null)
 
+  // Sugestões IA do Escopo
+  const [analisandoEscopo, setAnalisandoEscopo] = useState(false)
+  const [sugestoesEscopo, setSugestoesEscopo] = useState(null)
+  const [showSugestoesPanel, setShowSugestoesPanel] = useState(false)
+
   // Sub-tabs para Fases & Entregas
   const [activeFaseSection, setActiveFaseSection] = useState(urlSubtab || 'entregaveis')
 
@@ -1259,6 +1268,65 @@ export default function ProjetoDetalhe() {
   const formatEscopo = (command, value = null) => {
     document.execCommand(command, false, value)
     escopoEditorRef.current?.focus()
+  }
+
+  // Analisar escopo com IA
+  const handleAnalisarEscopo = async () => {
+    if (!escopoTrabalho || analisandoEscopo) return
+    setAnalisandoEscopo(true)
+    setSugestoesEscopo(null)
+
+    try {
+      // Extrair texto puro do HTML
+      const tempDiv = document.createElement('div')
+      tempDiv.innerHTML = escopoTrabalho
+      const textoPlano = tempDiv.textContent || tempDiv.innerText || ''
+
+      const { data, error } = await supabase.functions.invoke('analisar-escopo', {
+        body: {
+          escopo_texto: textoPlano,
+          projeto_nome: project?.nome || project?.codigo
+        }
+      })
+
+      if (error) throw error
+
+      if (data?.success && data?.sugestoes) {
+        setSugestoesEscopo(data.sugestoes)
+        setShowSugestoesPanel(true)
+      } else {
+        throw new Error(data?.error || 'Erro ao analisar escopo')
+      }
+    } catch (err) {
+      console.error('Erro ao analisar escopo:', err)
+      alert('Erro ao analisar escopo: ' + err.message)
+    } finally {
+      setAnalisandoEscopo(false)
+    }
+  }
+
+  // Adicionar fase sugerida
+  const handleAddSuggestedFase = async (fase) => {
+    try {
+      const { error } = await supabase
+        .from('projeto_fases_contratuais')
+        .insert({
+          projeto_id: project.id,
+          numero: fase.numero?.toString() || (fasesContratuais.length + 1).toString(),
+          nome: fase.nome,
+          estado: fase.estado_sugerido || 'nao_iniciado'
+        })
+      if (error) throw error
+      fetchFasesContratuais(project.id)
+      // Remover da lista de sugestões
+      setSugestoesEscopo(prev => ({
+        ...prev,
+        fases: prev.fases.filter(f => f.nome !== fase.nome)
+      }))
+    } catch (err) {
+      console.error('Erro ao adicionar fase:', err)
+      alert('Erro ao adicionar fase: ' + err.message)
+    }
   }
 
   // Carregar renders do projeto
@@ -3391,6 +3459,183 @@ export default function ProjetoDetalhe() {
                       >
                         Adicionar Escopo
                       </button>
+                    </div>
+                  )}
+
+                  {/* Botão Analisar com IA */}
+                  {escopoTrabalho && !editingEscopo && (
+                    <div style={{ marginTop: '16px', display: 'flex', gap: '12px', alignItems: 'center' }}>
+                      <button
+                        className="btn btn-secondary"
+                        style={{
+                          padding: '10px 16px',
+                          fontSize: '13px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px'
+                        }}
+                        onClick={handleAnalisarEscopo}
+                        disabled={analisandoEscopo}
+                      >
+                        {analisandoEscopo ? (
+                          <>
+                            <Loader2 size={16} className="animate-spin" style={{ animation: 'spin 1s linear infinite' }} />
+                            A analisar...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles size={16} />
+                            Analisar com IA
+                          </>
+                        )}
+                      </button>
+                      {sugestoesEscopo && (
+                        <button
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--brown)',
+                            cursor: 'pointer',
+                            fontSize: '13px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                          onClick={() => setShowSugestoesPanel(!showSugestoesPanel)}
+                        >
+                          {showSugestoesPanel ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                          {showSugestoesPanel ? 'Ocultar sugestões' : 'Ver sugestões'}
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Painel de Sugestões IA */}
+                  {showSugestoesPanel && sugestoesEscopo && (
+                    <div style={{
+                      marginTop: '20px',
+                      padding: '20px',
+                      background: 'linear-gradient(135deg, #f8f6f3 0%, #f0ede8 100%)',
+                      borderRadius: '12px',
+                      border: '1px solid var(--stone)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                        <Sparkles size={18} style={{ color: 'var(--gold)' }} />
+                        <h5 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: 'var(--brown)' }}>
+                          Sugestões da IA
+                        </h5>
+                      </div>
+
+                      {/* Fases Sugeridas */}
+                      {sugestoesEscopo.fases?.length > 0 && (
+                        <div style={{ marginBottom: '20px' }}>
+                          <h6 style={{ fontSize: '12px', fontWeight: 600, color: 'var(--brown)', marginBottom: '10px', textTransform: 'uppercase' }}>
+                            Fases Contratuais ({sugestoesEscopo.fases.length})
+                          </h6>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {sugestoesEscopo.fases.map((fase, idx) => (
+                              <div
+                                key={idx}
+                                style={{
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center',
+                                  padding: '12px',
+                                  background: 'var(--white)',
+                                  borderRadius: '8px',
+                                  border: '1px solid var(--stone)'
+                                }}
+                              >
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ fontWeight: 500, fontSize: '13px', color: 'var(--brown)' }}>
+                                    {fase.numero}ª Fase – {fase.nome}
+                                  </div>
+                                  {fase.descricao && (
+                                    <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginTop: '4px' }}>
+                                      {fase.descricao}
+                                    </div>
+                                  )}
+                                  <div style={{ display: 'flex', gap: '12px', marginTop: '6px' }}>
+                                    {fase.duracao_estimada && (
+                                      <span style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
+                                        ⏱ {fase.duracao_estimada}
+                                      </span>
+                                    )}
+                                    {fase.estado_sugerido && (
+                                      <span style={{
+                                        fontSize: '11px',
+                                        padding: '2px 8px',
+                                        borderRadius: '10px',
+                                        background: fase.estado_sugerido === 'concluido' ? '#dcfce7' :
+                                                    fase.estado_sugerido === 'em_curso' ? '#fef9c3' : '#f3f4f6',
+                                        color: fase.estado_sugerido === 'concluido' ? '#166534' :
+                                               fase.estado_sugerido === 'em_curso' ? '#854d0e' : '#6b7280'
+                                      }}>
+                                        {fase.estado_sugerido === 'concluido' ? 'Concluído' :
+                                         fase.estado_sugerido === 'em_curso' ? 'Em curso' : 'Não iniciado'}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <button
+                                  className="btn btn-primary"
+                                  style={{ padding: '6px 12px', fontSize: '11px' }}
+                                  onClick={() => handleAddSuggestedFase(fase)}
+                                >
+                                  <Plus size={14} style={{ marginRight: '4px' }} />
+                                  Adicionar
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Entregáveis Sugeridos */}
+                      {sugestoesEscopo.entregaveis?.length > 0 && (
+                        <div style={{ marginBottom: '20px' }}>
+                          <h6 style={{ fontSize: '12px', fontWeight: 600, color: 'var(--brown)', marginBottom: '10px', textTransform: 'uppercase' }}>
+                            Entregáveis ({sugestoesEscopo.entregaveis.length})
+                          </h6>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                            {sugestoesEscopo.entregaveis.map((entregavel, idx) => (
+                              <div
+                                key={idx}
+                                style={{
+                                  padding: '8px 12px',
+                                  background: 'var(--white)',
+                                  borderRadius: '8px',
+                                  border: '1px solid var(--stone)',
+                                  fontSize: '12px'
+                                }}
+                              >
+                                <div style={{ fontWeight: 500, color: 'var(--brown)' }}>
+                                  {entregavel.descricao}
+                                </div>
+                                {entregavel.fase && (
+                                  <div style={{ fontSize: '11px', color: 'var(--brown-light)', marginTop: '2px' }}>
+                                    Fase: {entregavel.fase}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Notas */}
+                      {sugestoesEscopo.notas?.length > 0 && (
+                        <div>
+                          <h6 style={{ fontSize: '12px', fontWeight: 600, color: 'var(--brown)', marginBottom: '10px', textTransform: 'uppercase' }}>
+                            Notas
+                          </h6>
+                          <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '12px', color: 'var(--brown-light)' }}>
+                            {sugestoesEscopo.notas.map((nota, idx) => (
+                              <li key={idx} style={{ marginBottom: '4px' }}>{nota}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
