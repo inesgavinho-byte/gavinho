@@ -178,25 +178,37 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
       setLoading(true)
       setLoadError(null)
 
-      const { data, error } = await supabase
+      // Query renders
+      const { data: rendersData, error: rendersError } = await supabase
         .from('projeto_renders')
-        .select(`
-          id,
-          compartimento,
-          vista,
-          created_at,
-          versoes:projeto_render_versoes(id, versao, url, is_final, created_at)
-        `)
+        .select('id, compartimento, vista, created_at')
         .eq('projeto_id', projeto.id)
         .order('compartimento')
         .order('vista')
 
-      if (error) throw error
+      if (rendersError) throw rendersError
 
-      // Sort versions by versao number descending for each render
-      const sortedData = (data || []).map(render => ({
+      // Query versions separately
+      const renderIds = (rendersData || []).map(r => r.id)
+      let versoesData = []
+
+      if (renderIds.length > 0) {
+        const { data: versoes, error: versoesError } = await supabase
+          .from('projeto_render_versoes')
+          .select('id, render_id, versao, url, is_final, created_at')
+          .in('render_id', renderIds)
+          .order('versao', { ascending: false })
+
+        if (versoesError) throw versoesError
+        versoesData = versoes || []
+      }
+
+      // Join renders with versions in JavaScript
+      const sortedData = (rendersData || []).map(render => ({
         ...render,
-        versoes: (render.versoes || []).sort((a, b) => b.versao - a.versao)
+        versoes: versoesData
+          .filter(v => v.render_id === render.id)
+          .sort((a, b) => b.versao - a.versao)
       }))
 
       // Group by compartimento
