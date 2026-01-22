@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { 
-  Users, 
+import {
+  Users,
   User,
-  Plus, 
+  Plus,
   Search,
   Filter,
   Calendar,
@@ -34,8 +34,10 @@ import {
   UserCheck,
   Send,
   Shield,
-  Lock
+  Lock,
+  BarChart3
 } from 'lucide-react';
+import TeamWorkloadGantt from '../components/TeamWorkloadGantt';
 
 export default function Equipa() {
   const { profile, isAdmin } = useAuth();
@@ -917,17 +919,36 @@ export default function Equipa() {
             <CalendarDays size={16} />
             Gestão RH
             {(pedidosAusenciaPendentes.length + recibosPendentes.length) > 0 && (
-              <span style={{ 
-                background: '#dc2626', 
-                color: 'white', 
-                padding: '2px 8px', 
-                borderRadius: '10px', 
-                fontSize: '11px', 
-                fontWeight: 600 
+              <span style={{
+                background: '#dc2626',
+                color: 'white',
+                padding: '2px 8px',
+                borderRadius: '10px',
+                fontSize: '11px',
+                fontWeight: 600
               }}>
                 {pedidosAusenciaPendentes.length + recibosPendentes.length}
               </span>
             )}
+          </button>
+          <button
+            onClick={() => setMainView('cronograma')}
+            style={{
+              padding: '10px 20px',
+              borderRadius: '8px',
+              border: 'none',
+              background: mainView === 'cronograma' ? 'white' : 'transparent',
+              boxShadow: mainView === 'cronograma' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+              color: mainView === 'cronograma' ? '#44403c' : '#78716c',
+              fontWeight: mainView === 'cronograma' ? 600 : 500,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+          >
+            <BarChart3 size={16} />
+            Cronograma
           </button>
         </div>
 
@@ -1033,6 +1054,11 @@ export default function Equipa() {
               </div>
             )}
           </div>
+        )}
+
+        {/* Vista de Cronograma da Equipa */}
+        {mainView === 'cronograma' && (
+          <TeamWorkloadGantt />
         )}
 
         {/* Vista de Gestão RH */}
