@@ -26,7 +26,8 @@ import {
   Wallet,
   Library,
   Database,
-  Shield
+  Shield,
+  FileSearch
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -62,6 +63,7 @@ const navigation = [
     items: [
       { name: 'Dashboard Gestão', href: '/gestao', icon: LayoutDashboard },
       { name: 'Clientes', href: '/clientes', icon: Users },
+      { name: 'Viabilidade', href: '/viabilidade', icon: FileSearch },
       {
         name: 'Gestão Financeira',
         href: '/financeiro',

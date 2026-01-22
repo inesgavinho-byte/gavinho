@@ -34,6 +34,7 @@ import ChatObras from './pages/ChatObras'
 import AdminSeed from './pages/AdminSeed'
 import DiarioObra from './pages/DiarioObra'
 import ObraComunicacoes from './pages/ObraComunicacoes'
+import Viabilidade from './pages/Viabilidade'
 
 function App() {
   return (
@@ -80,6 +81,7 @@ function App() {
             <Route path="orcamentos" element={<Orcamentos />} />
             <Route path="orcamentos/:id" element={<OrcamentoDetalhe />} />
             <Route path="financeiro" element={<Finance />} />
+            <Route path="viabilidade" element={<Viabilidade />} />
             <Route path="fornecedores" element={<Fornecedores />} />
             <Route path="fornecedores/:id" element={<FornecedorDetalhe />} />
             <Route path="perfil" element={<Perfil />} />
