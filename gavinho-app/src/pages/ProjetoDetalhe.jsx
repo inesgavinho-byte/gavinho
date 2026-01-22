@@ -747,6 +747,11 @@ export default function ProjetoDetalhe() {
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
+  // Escopo de Trabalho
+  const [escopoTrabalho, setEscopoTrabalho] = useState('')
+  const [editingEscopo, setEditingEscopo] = useState(false)
+  const [savingEscopo, setSavingEscopo] = useState(false)
+
   // Sub-tabs para Fases & Entregas
   const [activeFaseSection, setActiveFaseSection] = useState(urlSubtab || 'entregaveis')
 
@@ -1220,6 +1225,26 @@ export default function ProjetoDetalhe() {
       fetchFasesContratuais(project.id)
     } catch (err) {
       console.error('Erro ao remover fase:', err)
+    }
+  }
+
+  // Guardar escopo de trabalho
+  const handleSaveEscopo = async () => {
+    if (!project?.id) return
+    setSavingEscopo(true)
+    try {
+      const { error } = await supabase
+        .from('projetos')
+        .update({ escopo_trabalho: escopoTrabalho })
+        .eq('id', project.id)
+      if (error) throw error
+      setProject(prev => ({ ...prev, escopo_trabalho: escopoTrabalho }))
+      setEditingEscopo(false)
+    } catch (err) {
+      console.error('Erro ao guardar escopo:', err)
+      alert('Erro ao guardar escopo: ' + err.message)
+    } finally {
+      setSavingEscopo(false)
     }
   }
 
@@ -1704,6 +1729,7 @@ export default function ProjetoDetalhe() {
         }
         
         setProject(fullProject)
+        setEscopoTrabalho(projetoData.escopo_trabalho || '')
 
         // Carregar equipa, intervenientes, fases e renders
         fetchEquipaProjeto(projetoData.id)
@@ -3159,6 +3185,93 @@ export default function ProjetoDetalhe() {
                     </table>
                   </div>
                 )}
+
+                {/* Escopo de Trabalho */}
+                <div style={{ marginTop: '32px' }}>
+                  <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <h4 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--brown)' }}>Escopo de Trabalho</h4>
+                    {!editingEscopo ? (
+                      <button
+                        className="btn btn-secondary"
+                        style={{ padding: '6px 12px', fontSize: '12px' }}
+                        onClick={() => setEditingEscopo(true)}
+                      >
+                        <Edit size={14} style={{ marginRight: '4px' }} /> Editar
+                      </button>
+                    ) : (
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          className="btn btn-secondary"
+                          style={{ padding: '6px 12px', fontSize: '12px' }}
+                          onClick={() => {
+                            setEditingEscopo(false)
+                            setEscopoTrabalho(project?.escopo_trabalho || '')
+                          }}
+                          disabled={savingEscopo}
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          className="btn btn-primary"
+                          style={{ padding: '6px 12px', fontSize: '12px' }}
+                          onClick={handleSaveEscopo}
+                          disabled={savingEscopo}
+                        >
+                          {savingEscopo ? 'A guardar...' : 'Guardar'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {editingEscopo ? (
+                    <textarea
+                      value={escopoTrabalho}
+                      onChange={(e) => setEscopoTrabalho(e.target.value)}
+                      placeholder="Descreva o escopo de trabalho do projeto..."
+                      style={{
+                        width: '100%',
+                        minHeight: '400px',
+                        padding: '16px',
+                        border: '1px solid var(--stone)',
+                        borderRadius: '12px',
+                        fontSize: '13px',
+                        lineHeight: '1.6',
+                        fontFamily: 'inherit',
+                        resize: 'vertical'
+                      }}
+                    />
+                  ) : escopoTrabalho ? (
+                    <div style={{
+                      padding: '20px',
+                      background: 'var(--cream)',
+                      borderRadius: '12px',
+                      fontSize: '13px',
+                      lineHeight: '1.8',
+                      color: 'var(--brown)',
+                      whiteSpace: 'pre-wrap'
+                    }}>
+                      {escopoTrabalho}
+                    </div>
+                  ) : (
+                    <div style={{
+                      padding: '32px',
+                      background: 'var(--cream)',
+                      borderRadius: '12px',
+                      textAlign: 'center',
+                      color: 'var(--brown-light)'
+                    }}>
+                      <FileText size={32} style={{ opacity: 0.3, marginBottom: '12px' }} />
+                      <p>Nenhum escopo de trabalho definido.</p>
+                      <button
+                        className="btn btn-primary"
+                        style={{ marginTop: '12px', padding: '8px 16px', fontSize: '12px' }}
+                        onClick={() => setEditingEscopo(true)}
+                      >
+                        Adicionar Escopo
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
