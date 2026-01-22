@@ -47,7 +47,8 @@ import {
   Palette,
   ImagePlus,
   FolderOpen,
-  UserCircle
+  UserCircle,
+  Inbox
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -58,6 +59,7 @@ import CentralEntregas from '../components/CentralEntregas'
 import DiarioBordo from '../components/DiarioBordo'
 import DecisionLog from '../components/DecisionLog'
 import DesignReview from '../components/DesignReview'
+import RecebidosEspecialidades from '../components/RecebidosEspecialidades'
 
 // Dados de exemplo baseados nos JSONs fornecidos
 const sampleProjectData = {
@@ -2074,6 +2076,7 @@ export default function ProjetoDetalhe() {
   const faseSections = [
     { id: 'prazo', label: 'Prazo Contratual & Escopo', icon: Calendar },
     { id: 'entregaveis', label: 'Entregáveis', icon: ListChecks },
+    { id: 'recebidos', label: 'Recebidos', icon: Inbox },
     { id: 'entregas', label: 'Central Entregas', icon: Package },
     { id: 'design-review', label: 'Design Review', icon: Eye },
     { id: 'atas', label: 'Atas', icon: FileText }
@@ -3159,6 +3162,11 @@ export default function ProjetoDetalhe() {
             {/* Entregáveis */}
             {activeFaseSection === 'entregaveis' && (
               <ProjetoEntregaveis projeto={project} />
+            )}
+
+            {/* Recebidos - Desenhos de Especialidades */}
+            {activeFaseSection === 'recebidos' && (
+              <RecebidosEspecialidades projeto={project} />
             )}
 
             {/* Central de Entregas */}
