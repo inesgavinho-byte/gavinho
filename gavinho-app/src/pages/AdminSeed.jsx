@@ -15,9 +15,47 @@ import {
   Package,
   HardHat,
   FileText,
-  Send
+  Send,
+  ClipboardPaste,
+  Table,
+  X,
+  Eye,
+  Upload,
+  Trash2
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+
+// Tabelas disponíveis para importação em massa
+const IMPORT_TABLES = {
+  utilizadores: {
+    label: 'Colaboradores',
+    icon: Users,
+    fields: ['nome', 'email', 'cargo', 'departamento', 'telefone', 'data_entrada', 'tipo_contrato', 'regime'],
+    required: ['nome', 'email'],
+    example: 'nome,email,cargo,departamento,data_entrada\nJoão Silva,joao@gavinho.pt,Arquiteto,Projetos,2025-01-15\nMaria Costa,maria@gavinho.pt,Designer,Design,2025-02-01'
+  },
+  projetos: {
+    label: 'Projetos',
+    icon: Building2,
+    fields: ['codigo', 'nome', 'tipologia', 'fase', 'cidade', 'cliente_nome', 'data_inicio', 'data_prevista'],
+    required: ['codigo', 'nome'],
+    example: 'codigo,nome,tipologia,fase,cidade,cliente_nome\nGA00500,Casa Nova,Residencial,Projeto Base,Lisboa,João Silva\nGA00501,Edifício Central,Comercial,Construção,Porto,Empresa ABC'
+  },
+  projeto_entregaveis: {
+    label: 'Entregáveis',
+    icon: FileText,
+    fields: ['projeto_id', 'codigo', 'nome', 'fase', 'categoria', 'status', 'responsavel_id'],
+    required: ['projeto_id', 'codigo', 'nome'],
+    example: 'codigo,nome,fase,categoria,status\nARQ.01,Planta Piso 0,Projeto Base,Arquitetura,pendente\nARQ.02,Cortes,Projeto Base,Arquitetura,em_progresso'
+  },
+  tarefas: {
+    label: 'Tarefas',
+    icon: ListChecks,
+    fields: ['projeto_id', 'titulo', 'descricao', 'status', 'prioridade', 'responsavel_id', 'data_inicio', 'data_fim'],
+    required: ['titulo'],
+    example: 'titulo,descricao,status,prioridade\nRever plantas,Verificar cotas e dimensões,pendente,alta\nAprovação cliente,Reunião de apresentação,pendente,media'
+  }
+}
 
 export default function AdminSeed() {
   const navigate = useNavigate()
@@ -25,8 +63,150 @@ export default function AdminSeed() {
   const [logs, setLogs] = useState([])
   const [result, setResult] = useState(null)
 
+  // Estados para importação em massa
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [importTable, setImportTable] = useState('utilizadores')
+  const [importText, setImportText] = useState('')
+  const [parsedData, setParsedData] = useState([])
+  const [importFormat, setImportFormat] = useState('csv') // 'csv', 'json', 'lines'
+  const [importing, setImporting] = useState(false)
+  const [linkedProjectId, setLinkedProjectId] = useState('') // Para entregáveis e tarefas
+
   const addLog = (message, type = 'info') => {
     setLogs(prev => [...prev, { message, type, timestamp: new Date().toLocaleTimeString() }])
+  }
+
+  // Funções de importação em massa
+  const parseCSV = (text) => {
+    const lines = text.trim().split('\n')
+    if (lines.length < 2) return []
+
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase())
+    const data = []
+
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].split(',').map(v => v.trim())
+      if (values.length === headers.length) {
+        const row = {}
+        headers.forEach((header, idx) => {
+          row[header] = values[idx] || null
+        })
+        data.push(row)
+      }
+    }
+    return data
+  }
+
+  const parseJSON = (text) => {
+    try {
+      const parsed = JSON.parse(text)
+      return Array.isArray(parsed) ? parsed : [parsed]
+    } catch {
+      return []
+    }
+  }
+
+  const parseLines = (text) => {
+    // Formato simples: uma linha por item, campos separados por |
+    // Ex: João Silva | joao@email.com | Arquiteto
+    const tableConfig = IMPORT_TABLES[importTable]
+    const lines = text.trim().split('\n').filter(l => l.trim())
+
+    return lines.map(line => {
+      const values = line.split('|').map(v => v.trim())
+      const row = {}
+      tableConfig.fields.forEach((field, idx) => {
+        if (values[idx]) row[field] = values[idx]
+      })
+      return row
+    })
+  }
+
+  const handleParseText = () => {
+    let data = []
+
+    switch (importFormat) {
+      case 'csv':
+        data = parseCSV(importText)
+        break
+      case 'json':
+        data = parseJSON(importText)
+        break
+      case 'lines':
+        data = parseLines(importText)
+        break
+    }
+
+    // Adicionar projeto_id se necessário
+    if ((importTable === 'projeto_entregaveis' || importTable === 'tarefas') && linkedProjectId) {
+      data = data.map(row => ({ ...row, projeto_id: linkedProjectId }))
+    }
+
+    setParsedData(data)
+  }
+
+  const handleBulkImport = async () => {
+    if (parsedData.length === 0) {
+      alert('Nenhum dado para importar. Parse os dados primeiro.')
+      return
+    }
+
+    setImporting(true)
+    setLogs([])
+    setResult(null)
+
+    addLog(`🚀 Iniciando importação de ${parsedData.length} registos para ${IMPORT_TABLES[importTable].label}...`, 'info')
+
+    let successCount = 0
+    let errorCount = 0
+
+    for (const row of parsedData) {
+      try {
+        // Validar campos obrigatórios
+        const tableConfig = IMPORT_TABLES[importTable]
+        const missingFields = tableConfig.required.filter(f => !row[f])
+
+        if (missingFields.length > 0) {
+          addLog(`⚠️ Campos obrigatórios em falta: ${missingFields.join(', ')} - ${JSON.stringify(row).substring(0, 50)}...`, 'warning')
+          errorCount++
+          continue
+        }
+
+        // Preparar dados para inserção
+        const insertData = { ...row }
+
+        // Tratamentos especiais por tabela
+        if (importTable === 'utilizadores') {
+          insertData.ativo = true
+          insertData.role = insertData.role || 'user'
+        }
+
+        const { error } = await supabase
+          .from(importTable)
+          .insert([insertData])
+
+        if (error) {
+          addLog(`❌ Erro: ${error.message} - ${row.nome || row.codigo || row.titulo || JSON.stringify(row).substring(0, 30)}`, 'error')
+          errorCount++
+        } else {
+          addLog(`✅ ${row.nome || row.codigo || row.titulo || 'Registo'} inserido`, 'success')
+          successCount++
+        }
+      } catch (err) {
+        addLog(`💥 Erro inesperado: ${err.message}`, 'error')
+        errorCount++
+      }
+    }
+
+    addLog(`📊 Importação concluída: ${successCount} sucesso, ${errorCount} erros`, 'info')
+    setResult({ success: errorCount === 0, error: errorCount > 0 ? `${errorCount} erros` : null })
+    setImporting(false)
+  }
+
+  const loadExampleData = () => {
+    const tableConfig = IMPORT_TABLES[importTable]
+    setImportText(tableConfig.example)
+    setImportFormat('csv')
   }
 
   const seedMariaResidences = async () => {
@@ -1261,6 +1441,246 @@ export default function AdminSeed() {
               <>
                 <Play size={18} style={{ marginRight: '8px' }} />
                 Atualizar Datas de Entrada
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Importação em Massa Card */}
+        <div className="card" style={{ padding: '24px', gridColumn: 'span 2' }}>
+          <div className="flex items-center gap-md" style={{ marginBottom: '20px' }}>
+            <div style={{
+              width: '56px',
+              height: '56px',
+              borderRadius: '12px',
+              background: 'linear-gradient(135deg, #10b981, #059669)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white'
+            }}>
+              <ClipboardPaste size={28} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--brown)' }}>
+                Importação em Massa
+              </h3>
+              <p style={{ fontSize: '13px', color: 'var(--brown-light)' }}>
+                Cole texto CSV, JSON ou linhas separadas para inserir múltiplos registos
+              </p>
+            </div>
+          </div>
+
+          {/* Seleção de tabela e formato */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, marginBottom: '6px', color: 'var(--brown-light)' }}>
+                Tabela de Destino
+              </label>
+              <select
+                value={importTable}
+                onChange={(e) => { setImportTable(e.target.value); setParsedData([]) }}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  border: '1px solid var(--stone)',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  background: 'white'
+                }}
+              >
+                {Object.entries(IMPORT_TABLES).map(([key, config]) => (
+                  <option key={key} value={key}>{config.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, marginBottom: '6px', color: 'var(--brown-light)' }}>
+                Formato dos Dados
+              </label>
+              <select
+                value={importFormat}
+                onChange={(e) => setImportFormat(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  border: '1px solid var(--stone)',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  background: 'white'
+                }}
+              >
+                <option value="csv">CSV (vírgulas)</option>
+                <option value="json">JSON</option>
+                <option value="lines">Linhas (separador |)</option>
+              </select>
+            </div>
+
+            {(importTable === 'projeto_entregaveis' || importTable === 'tarefas') && (
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, marginBottom: '6px', color: 'var(--brown-light)' }}>
+                  ID do Projeto (UUID)
+                </label>
+                <input
+                  type="text"
+                  value={linkedProjectId}
+                  onChange={(e) => setLinkedProjectId(e.target.value)}
+                  placeholder="Cole o UUID do projeto"
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid var(--stone)',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Campos disponíveis */}
+          <div style={{ marginBottom: '16px', padding: '12px', background: 'var(--cream)', borderRadius: '8px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--brown)', marginBottom: '8px' }}>
+              Campos disponíveis para {IMPORT_TABLES[importTable].label}:
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+              {IMPORT_TABLES[importTable].fields.map(field => (
+                <span
+                  key={field}
+                  style={{
+                    padding: '4px 10px',
+                    background: IMPORT_TABLES[importTable].required.includes(field) ? 'var(--warning)' : 'white',
+                    color: IMPORT_TABLES[importTable].required.includes(field) ? 'white' : 'var(--brown-light)',
+                    borderRadius: '12px',
+                    fontSize: '11px',
+                    border: '1px solid var(--stone)'
+                  }}
+                >
+                  {field}{IMPORT_TABLES[importTable].required.includes(field) ? ' *' : ''}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Área de texto para colar dados */}
+          <div style={{ marginBottom: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <label style={{ fontSize: '12px', fontWeight: 500, color: 'var(--brown-light)' }}>
+                Cole os dados aqui:
+              </label>
+              <button
+                onClick={loadExampleData}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--info)',
+                  fontSize: '12px',
+                  textDecoration: 'underline'
+                }}
+              >
+                Carregar exemplo
+              </button>
+            </div>
+            <textarea
+              value={importText}
+              onChange={(e) => setImportText(e.target.value)}
+              placeholder={`Cole aqui os dados em formato ${importFormat.toUpperCase()}...\n\nExemplo CSV:\nnome,email,cargo\nJoão Silva,joao@email.com,Arquiteto`}
+              style={{
+                width: '100%',
+                minHeight: '150px',
+                padding: '12px',
+                border: '1px solid var(--stone)',
+                borderRadius: '8px',
+                fontSize: '13px',
+                fontFamily: 'monospace',
+                resize: 'vertical',
+                boxSizing: 'border-box'
+              }}
+            />
+          </div>
+
+          {/* Botões de ação */}
+          <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
+            <button
+              onClick={handleParseText}
+              disabled={!importText.trim()}
+              className="btn btn-outline"
+              style={{ flex: 1, padding: '12px' }}
+            >
+              <Eye size={16} style={{ marginRight: '8px' }} />
+              Pré-visualizar Dados
+            </button>
+            <button
+              onClick={() => { setImportText(''); setParsedData([]) }}
+              className="btn btn-ghost"
+              style={{ padding: '12px' }}
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
+
+          {/* Preview dos dados parseados */}
+          {parsedData.length > 0 && (
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--brown)', marginBottom: '8px' }}>
+                Pré-visualização ({parsedData.length} registos):
+              </div>
+              <div style={{
+                maxHeight: '200px',
+                overflow: 'auto',
+                border: '1px solid var(--stone)',
+                borderRadius: '8px'
+              }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                  <thead>
+                    <tr style={{ background: 'var(--cream)' }}>
+                      {Object.keys(parsedData[0]).map(key => (
+                        <th key={key} style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid var(--stone)', fontWeight: 600 }}>
+                          {key}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {parsedData.slice(0, 10).map((row, idx) => (
+                      <tr key={idx} style={{ background: idx % 2 === 0 ? 'white' : 'var(--cream)' }}>
+                        {Object.values(row).map((val, vIdx) => (
+                          <td key={vIdx} style={{ padding: '8px 12px', borderBottom: '1px solid var(--stone)' }}>
+                            {val || '-'}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {parsedData.length > 10 && (
+                  <div style={{ padding: '8px 12px', background: 'var(--cream)', fontSize: '11px', color: 'var(--brown-light)', textAlign: 'center' }}>
+                    ... e mais {parsedData.length - 10} registos
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Botão de importar */}
+          <button
+            onClick={handleBulkImport}
+            disabled={importing || parsedData.length === 0}
+            className="btn btn-primary"
+            style={{ width: '100%', padding: '14px' }}
+          >
+            {importing ? (
+              <>
+                <Loader size={18} style={{ marginRight: '8px', animation: 'spin 1s linear infinite' }} />
+                A importar {parsedData.length} registos...
+              </>
+            ) : (
+              <>
+                <Upload size={18} style={{ marginRight: '8px' }} />
+                Importar {parsedData.length > 0 ? `${parsedData.length} Registos` : 'Dados'}
               </>
             )}
           </button>
