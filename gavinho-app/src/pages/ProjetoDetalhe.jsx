@@ -48,7 +48,8 @@ import {
   ImagePlus,
   FolderOpen,
   UserCircle,
-  Inbox
+  Inbox,
+  FileSearch
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -60,6 +61,7 @@ import DiarioBordo from '../components/DiarioBordo'
 import DecisionLog from '../components/DecisionLog'
 import DesignReview from '../components/DesignReview'
 import RecebidosEspecialidades from '../components/RecebidosEspecialidades'
+import ViabilidadeModule from '../components/viabilidade/ViabilidadeModule'
 
 // Dados de exemplo baseados nos JSONs fornecidos
 const sampleProjectData = {
@@ -2067,6 +2069,7 @@ export default function ProjetoDetalhe() {
     { id: 'briefing', label: 'Briefing & Conceito', icon: Lightbulb },
     { id: 'fases', label: 'Fases & Entregas', icon: Target, hasSubtabs: true },
     { id: 'decisions', label: 'Decision Log', icon: ClipboardList },
+    { id: 'viabilidade', label: 'Viabilidade', icon: FileSearch },
     { id: 'archviz', label: 'Archviz', icon: Image, hasSubtabs: true },
     { id: 'biblioteca', label: 'Biblioteca', icon: Library },
     { id: 'gestao', label: 'Gestão de Projeto', icon: Settings, hasSubtabs: true }
@@ -3637,6 +3640,11 @@ export default function ProjetoDetalhe() {
       {/* Tab Decision Log */}
       {activeTab === 'decisions' && (
         <DecisionLog projeto={project} />
+      )}
+
+      {/* Tab Viabilidade Urbanística */}
+      {activeTab === 'viabilidade' && (
+        <ViabilidadeModule projetoId={project?.id} projeto={project} />
       )}
 
       {/* Tab Gestão de Projeto com subtabs */}
