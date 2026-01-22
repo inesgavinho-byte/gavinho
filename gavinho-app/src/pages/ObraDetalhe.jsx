@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { 
+import {
   ArrowLeft, MapPin, Calendar, Users, HardHat, BookOpen, Grid3X3, Camera, AlertTriangle,
   Plus, Sun, Cloud, CloudRain, Wind, Thermometer, Clock, CheckCircle2, Edit, X, Building2,
   ChevronRight, Trash2, UserPlus, Phone, Mail, Briefcase, ClipboardList, Receipt,
-  Upload, Image, FileText, Download, Loader2, Calculator, Euro
+  Upload, Image, FileText, Download, Loader2, Calculator, Euro, NotebookPen
 } from 'lucide-react'
 import ObraTracking from '../components/ObraTracking'
 import ObraAutos from '../components/ObraAutos'
 import ObraOrcamentacao from '../components/ObraOrcamentacao'
+import DiarioObraProjeto from '../components/DiarioObraProjeto'
 
 const tabs = [
   { id: 'tracking', label: 'Tracking', icon: ClipboardList },
@@ -17,6 +18,7 @@ const tabs = [
   { id: 'componentes', label: 'Contratos', icon: Building2 },
   { id: 'autos', label: 'Autos de Medição', icon: Receipt },
   { id: 'diario', label: 'Diário de Obra', icon: BookOpen },
+  { id: 'diario-projeto', label: 'Diário de Projeto', icon: NotebookPen },
   { id: 'zonas', label: 'Zonas', icon: Grid3X3 },
   { id: 'equipa', label: 'Equipa em Obra', icon: Users },
   { id: 'ocorrencias', label: 'Ocorrências', icon: AlertTriangle },
@@ -891,6 +893,11 @@ export default function ObraDetalhe() {
             </div>
           )}
         </div>
+      )}
+
+      {/* TAB: Diário de Projeto */}
+      {activeTab === 'diario-projeto' && (
+        <DiarioObraProjeto obraId={obra.id} obraCodigo={obra.codigo} />
       )}
 
       {/* TAB: Zonas */}
