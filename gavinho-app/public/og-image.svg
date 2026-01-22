@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">
+  <!-- Background -->
+  <rect fill="#FAF8F5" width="1200" height="630"/>
+
+  <!-- Left accent bar -->
+  <rect fill="#C9B896" x="0" y="0" width="8" height="630"/>
+
+  <!-- Logo circle -->
+  <circle cx="200" cy="315" r="80" fill="#2C2C2C"/>
+  <text x="200" y="340" font-family="Georgia, serif" font-size="72" font-weight="600" fill="#C9B896" text-anchor="middle">G</text>
+
+  <!-- Text content -->
+  <text x="320" y="280" font-family="system-ui, -apple-system, sans-serif" font-size="64" font-weight="700" fill="#2C2C2C">GAVINHO</text>
+  <text x="320" y="350" font-family="system-ui, -apple-system, sans-serif" font-size="32" fill="#6B6B6B">Plataforma de Gestão</text>
+  <text x="320" y="400" font-family="system-ui, -apple-system, sans-serif" font-size="24" fill="#8B8B8B">Projetos de Design &amp; Build</text>
+
+  <!-- Bottom accent -->
+  <rect fill="#C9B896" x="320" y="440" width="120" height="4" rx="2"/>
+
+  <!-- Decorative elements -->
+  <rect fill="#F5F0E8" x="900" y="150" width="200" height="330" rx="12"/>
+  <rect fill="#E8E0D0" x="920" y="170" width="160" height="24" rx="4"/>
+  <rect fill="#E8E0D0" x="920" y="210" width="120" height="16" rx="4"/>
+  <rect fill="#E8E0D0" x="920" y="240" width="140" height="16" rx="4"/>
+  <rect fill="#C9B896" x="920" y="280" width="80" height="8" rx="4"/>
+  <rect fill="#E8E0D0" x="920" y="320" width="160" height="120" rx="8"/>
+</svg>
