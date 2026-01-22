@@ -20,6 +20,7 @@ import {
   Briefcase
 } from 'lucide-react'
 import { ClassificacaoBadge, EstadoBadge } from './ViabilidadeModule'
+import ChatViabilidade from './ChatViabilidade'
 
 // Categorias de solo
 const CATEGORIAS_URBANO = [
@@ -582,13 +583,13 @@ export default function AnaliseDetalhe({ analiseId, onBack }) {
         )}
 
         {activeTab === 'chat' && (
-          <div style={{ background: 'white', borderRadius: '12px', padding: '40px', textAlign: 'center' }}>
-            <MessageSquare size={48} style={{ color: '#d6d3d1', marginBottom: '16px' }} />
-            <h3 style={{ margin: '0 0 8px', fontSize: '16px', fontWeight: 600 }}>Assistente IA</h3>
-            <p style={{ color: '#78716c', fontSize: '14px' }}>
-              O chat conversacional com IA será implementado na próxima fase.
-            </p>
-          </div>
+          <ChatViabilidade
+            analiseId={analiseId}
+            analise={analise}
+            onAnaliseComplete={(resultado) => {
+              setAnalise(prev => ({ ...prev, resultado, classificacao: resultado.classificacao }))
+            }}
+          />
         )}
 
         {activeTab === 'resultado' && (
