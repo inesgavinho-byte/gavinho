@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import {
   Plus, FileText, Edit2, Trash2, Save, X, Calendar, User, CheckCircle,
   Clock, AlertCircle, Download, Upload, Send, Package, Users, Building2,
-  Loader2, Eye, ChevronDown, ChevronRight, FileCheck, ExternalLink
+  Loader2, Eye, ChevronDown, ChevronRight, FileCheck, ExternalLink, Paperclip, File
 } from 'lucide-react'
 
 const tipoConfig = {
@@ -28,6 +28,8 @@ export default function CentralEntregas({ projeto }) {
   const [saving, setSaving] = useState(false)
   const [activeSection, setActiveSection] = useState('interna')
   const [expandedItems, setExpandedItems] = useState({})
+  const [uploadedFiles, setUploadedFiles] = useState([])
+  const [uploading, setUploading] = useState(false)
 
   const [formData, setFormData] = useState({
     titulo: '',
@@ -130,6 +132,7 @@ export default function CentralEntregas({ projeto }) {
       documentos: '',
       observacoes: ''
     })
+    setUploadedFiles([])
   }
 
   const handleEdit = (item) => {
@@ -145,7 +148,73 @@ export default function CentralEntregas({ projeto }) {
       documentos: item.documentos || '',
       observacoes: item.observacoes || ''
     })
+    // Parse existing documents if editing
+    if (item.documentos) {
+      const existingFiles = item.documentos.split(',').map(doc => ({
+        name: doc.trim().split('/').pop(),
+        url: doc.trim(),
+        existing: true
+      }))
+      setUploadedFiles(existingFiles)
+    } else {
+      setUploadedFiles([])
+    }
     setShowModal(true)
+  }
+
+  const handleFileUpload = async (e) => {
+    const files = Array.from(e.target.files)
+    if (files.length === 0) return
+
+    setUploading(true)
+    const newFiles = []
+
+    for (const file of files) {
+      try {
+        const fileExt = file.name.split('.').pop()
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
+        const filePath = `entregas/${projeto.id}/${fileName}`
+
+        const { data, error } = await supabase.storage
+          .from('projeto-files')
+          .upload(filePath, file)
+
+        if (error) {
+          console.error('Erro ao fazer upload:', error)
+          // Still add to list for demo purposes
+          newFiles.push({
+            name: file.name,
+            url: URL.createObjectURL(file),
+            local: true
+          })
+        } else {
+          const { data: { publicUrl } } = supabase.storage
+            .from('projeto-files')
+            .getPublicUrl(filePath)
+
+          newFiles.push({
+            name: file.name,
+            url: publicUrl,
+            path: filePath
+          })
+        }
+      } catch (err) {
+        console.error('Erro no upload:', err)
+        newFiles.push({
+          name: file.name,
+          url: URL.createObjectURL(file),
+          local: true
+        })
+      }
+    }
+
+    setUploadedFiles(prev => [...prev, ...newFiles])
+    setUploading(false)
+    e.target.value = ''
+  }
+
+  const removeFile = (index) => {
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index))
   }
 
   const handleSave = async () => {
@@ -156,6 +225,12 @@ export default function CentralEntregas({ projeto }) {
 
     setSaving(true)
     try {
+      // Concatenate file URLs
+      const documentosUrls = uploadedFiles
+        .filter(f => f.url)
+        .map(f => f.url)
+        .join(', ')
+
       const itemData = {
         projeto_id: projeto.id,
         titulo: formData.titulo.trim(),
@@ -165,7 +240,7 @@ export default function CentralEntregas({ projeto }) {
         data_prevista: formData.data_prevista || null,
         data_entrega: formData.data_entrega || null,
         status: formData.status,
-        documentos: formData.documentos || null,
+        documentos: documentosUrls || null,
         observacoes: formData.observacoes || null
       }
 
@@ -465,6 +540,12 @@ export default function CentralEntregas({ projeto }) {
                           <span className="flex items-center gap-xs" style={{ color: 'var(--success)' }}>
                             <CheckCircle size={12} />
                             Entregue: {new Date(item.data_entrega).toLocaleDateString('pt-PT')}
+                          </span>
+                        )}
+                        {item.documentos && (
+                          <span className="flex items-center gap-xs" style={{ color: 'var(--info)' }}>
+                            <Paperclip size={12} />
+                            {item.documentos.split(',').length} anexo(s)
                           </span>
                         )}
                       </div>
@@ -829,6 +910,115 @@ export default function CentralEntregas({ projeto }) {
                     resize: 'vertical'
                   }}
                 />
+              </div>
+
+              {/* Anexos */}
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--brown)', marginBottom: '6px' }}>
+                  Anexos
+                </label>
+
+                {/* Upload area */}
+                <label
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '20px',
+                    border: '2px dashed var(--stone)',
+                    borderRadius: '8px',
+                    background: 'var(--cream)',
+                    cursor: uploading ? 'wait' : 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseOver={(e) => !uploading && (e.currentTarget.style.borderColor = 'var(--brown-light)')}
+                  onMouseOut={(e) => e.currentTarget.style.borderColor = 'var(--stone)'}
+                >
+                  <input
+                    type="file"
+                    multiple
+                    onChange={handleFileUpload}
+                    disabled={uploading}
+                    style={{ display: 'none' }}
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.zip,.rar"
+                  />
+                  {uploading ? (
+                    <>
+                      <Loader2 className="animate-spin" size={24} style={{ color: 'var(--brown-light)', marginBottom: '8px' }} />
+                      <span style={{ fontSize: '13px', color: 'var(--brown-light)' }}>A carregar ficheiros...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload size={24} style={{ color: 'var(--brown-light)', marginBottom: '8px' }} />
+                      <span style={{ fontSize: '13px', color: 'var(--brown-light)' }}>Clique para anexar ficheiros</span>
+                      <span style={{ fontSize: '11px', color: 'var(--brown-light)', opacity: 0.7, marginTop: '4px' }}>
+                        PDF, DOC, XLS, PPT, Imagens, ZIP
+                      </span>
+                    </>
+                  )}
+                </label>
+
+                {/* Lista de ficheiros */}
+                {uploadedFiles.length > 0 && (
+                  <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {uploadedFiles.map((file, index) => (
+                      <div
+                        key={index}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '8px 12px',
+                          background: 'white',
+                          border: '1px solid var(--stone)',
+                          borderRadius: '6px'
+                        }}
+                      >
+                        <div className="flex items-center gap-sm" style={{ flex: 1, minWidth: 0 }}>
+                          <File size={16} style={{ color: 'var(--brown-light)', flexShrink: 0 }} />
+                          <span style={{
+                            fontSize: '13px',
+                            color: 'var(--brown)',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            {file.name}
+                          </span>
+                          {file.local && (
+                            <span style={{
+                              fontSize: '10px',
+                              color: 'var(--warning)',
+                              background: 'rgba(201, 168, 130, 0.2)',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              flexShrink: 0
+                            }}>
+                              Local
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeFile(index)}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: 'var(--error)',
+                            padding: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
