@@ -678,7 +678,7 @@ const projectsMap = {
 export default function ProjetoDetalhe() {
   const { id, tab: urlTab } = useParams()
   const navigate = useNavigate()
-  const { isAdmin } = useAuth()
+  const { isAdmin, profile } = useAuth()
   const [activeTab, setActiveTab] = useState(urlTab || 'geral')
   const [showActions, setShowActions] = useState(false)
   const [showUploadModal, setShowUploadModal] = useState(false)
