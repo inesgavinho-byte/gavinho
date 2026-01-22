@@ -12,6 +12,7 @@ import {
   FileText,
   Upload,
   Download,
+  Loader,
   Check,
   X,
   ChevronRight,
@@ -116,6 +117,8 @@ export default function Equipa() {
     valor_bruto: '',
     notas: ''
   });
+  const [reciboPdf, setReciboPdf] = useState(null);
+  const [uploadingRecibo, setUploadingRecibo] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -578,10 +581,32 @@ export default function Equipa() {
       return;
     }
 
+    setUploadingRecibo(true);
     const mesAtual = new Date().getMonth() + 1;
     const anoAtual = new Date().getFullYear();
 
     try {
+      let pdfUrl = null;
+
+      // Upload do PDF se existir
+      if (reciboPdf) {
+        const fileExt = reciboPdf.name.split('.').pop();
+        const fileName = `${selectedUser.id}/${anoAtual}-${String(mesAtual).padStart(2, '0')}_recibo.${fileExt}`;
+
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('recibos-prestadores')
+          .upload(fileName, reciboPdf, { upsert: true });
+
+        if (uploadError) {
+          console.error('Erro upload:', uploadError);
+        } else {
+          const { data: urlData } = supabase.storage
+            .from('recibos-prestadores')
+            .getPublicUrl(fileName);
+          pdfUrl = urlData?.publicUrl;
+        }
+      }
+
       const { data: existing } = await supabase
         .from('recibos_prestadores')
         .select('id')
@@ -590,16 +615,19 @@ export default function Equipa() {
         .eq('ano', anoAtual)
         .single();
 
+      const reciboData = {
+        valor_bruto: parseFloat(reciboForm.valor_bruto),
+        valor_liquido: parseFloat(reciboForm.valor_bruto),
+        status: 'submetido',
+        recibo_data_submissao: new Date().toISOString(),
+        notas: reciboForm.notas || null,
+        ...(pdfUrl && { pdf_url: pdfUrl })
+      };
+
       if (existing) {
         const { error } = await supabase
           .from('recibos_prestadores')
-          .update({
-            valor_bruto: parseFloat(reciboForm.valor_bruto),
-            valor_liquido: parseFloat(reciboForm.valor_bruto),
-            status: 'submetido',
-            recibo_data_submissao: new Date().toISOString(),
-            notas: reciboForm.notas || null
-          })
+          .update(reciboData)
           .eq('id', existing.id);
 
         if (error) throw error;
@@ -610,11 +638,7 @@ export default function Equipa() {
             utilizador_id: selectedUser.id,
             mes: mesAtual,
             ano: anoAtual,
-            valor_bruto: parseFloat(reciboForm.valor_bruto),
-            valor_liquido: parseFloat(reciboForm.valor_bruto),
-            status: 'submetido',
-            recibo_data_submissao: new Date().toISOString(),
-            notas: reciboForm.notas || null
+            ...reciboData
           });
 
         if (error) throw error;
@@ -622,10 +646,13 @@ export default function Equipa() {
 
       setShowModal(null);
       setReciboForm({ valor_bruto: '', notas: '' });
+      setReciboPdf(null);
       loadUserDetails(selectedUser);
     } catch (error) {
       console.error('Erro ao submeter recibo:', error);
       alert('Erro ao submeter recibo');
+    } finally {
+      setUploadingRecibo(false);
     }
   };
 
@@ -2082,17 +2109,78 @@ export default function Equipa() {
                   placeholder="Notas ou observações..."
                 />
               </div>
-              <div style={{ background: '#fef3c7', borderRadius: '8px', padding: '12px', fontSize: '12px', color: '#b45309' }}>
-                <strong>Nota:</strong> Por favor anexe o PDF do recibo/fatura via email para financeiro@gavinho.pt
+
+              {/* Upload do Recibo PDF */}
+              <div style={styles.formGroup}>
+                <label style={styles.formLabel}>Anexar Recibo (PDF)</label>
+                <div
+                  style={{
+                    border: reciboPdf ? '2px solid #16a34a' : '2px dashed #d6d3d1',
+                    borderRadius: '8px',
+                    padding: '16px',
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    background: reciboPdf ? '#f0fdf4' : '#fafaf9',
+                    transition: 'all 0.2s'
+                  }}
+                  onClick={() => document.getElementById('recibo-pdf-input').click()}
+                >
+                  <input
+                    id="recibo-pdf-input"
+                    type="file"
+                    accept=".pdf"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) setReciboPdf(file);
+                    }}
+                    style={{ display: 'none' }}
+                  />
+                  {reciboPdf ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                      <FileText size={20} style={{ color: '#16a34a' }} />
+                      <span style={{ color: '#16a34a', fontWeight: 500 }}>{reciboPdf.name}</span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setReciboPdf(null); }}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', padding: '4px' }}
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <Upload size={24} style={{ color: '#a8a29e', marginBottom: '8px' }} />
+                      <p style={{ margin: 0, fontSize: '13px', color: '#78716c' }}>
+                        Clique para selecionar o PDF do recibo
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ background: '#dbeafe', borderRadius: '8px', padding: '12px', fontSize: '12px', color: '#1e40af' }}>
+                <strong>Nota:</strong> Ao anexar o recibo será enviada uma cópia automática para <strong>contabilidade@gavinhogroup.com</strong>
               </div>
             </div>
             <div style={styles.modalFooter}>
-              <button onClick={() => setShowModal(null)} style={{ padding: '10px 16px', background: 'transparent', border: 'none', color: '#78716c', cursor: 'pointer' }}>
+              <button
+                onClick={() => { setShowModal(null); setReciboPdf(null); }}
+                style={{ padding: '10px 16px', background: 'transparent', border: 'none', color: '#78716c', cursor: 'pointer' }}
+                disabled={uploadingRecibo}
+              >
                 Cancelar
               </button>
-              <button onClick={handleSubmitRecibo} style={styles.btnPrimary}>
-                <Send size={16} />
-                Submeter
+              <button onClick={handleSubmitRecibo} style={styles.btnPrimary} disabled={uploadingRecibo}>
+                {uploadingRecibo ? (
+                  <>
+                    <Loader size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                    A submeter...
+                  </>
+                ) : (
+                  <>
+                    <Send size={16} />
+                    Submeter
+                  </>
+                )}
               </button>
             </div>
           </div>
