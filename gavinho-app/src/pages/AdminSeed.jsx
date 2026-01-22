@@ -905,6 +905,113 @@ export default function AdminSeed() {
     }
   }
 
+  // Seed feriados de Portugal + Lisboa
+  const seedFeriadosPortugal = async () => {
+    setLoading(true)
+    setLogs([])
+    setResult(null)
+
+    addLog('🇵🇹 A adicionar feriados de Portugal...', 'info')
+
+    // Feriados nacionais + municipais Lisboa para 2025, 2026, 2027
+    const feriadosBase = [
+      // Feriados fixos
+      { mes: 1, dia: 1, nome: 'Ano Novo', tipo: 'nacional' },
+      { mes: 4, dia: 25, nome: 'Dia da Liberdade', tipo: 'nacional' },
+      { mes: 5, dia: 1, nome: 'Dia do Trabalhador', tipo: 'nacional' },
+      { mes: 6, dia: 10, nome: 'Dia de Portugal', tipo: 'nacional' },
+      { mes: 6, dia: 13, nome: 'Santo António (Lisboa)', tipo: 'municipal_lisboa' },
+      { mes: 8, dia: 15, nome: 'Assunção de Nossa Senhora', tipo: 'nacional' },
+      { mes: 10, dia: 5, nome: 'Implantação da República', tipo: 'nacional' },
+      { mes: 11, dia: 1, nome: 'Todos os Santos', tipo: 'nacional' },
+      { mes: 12, dia: 1, nome: 'Restauração da Independência', tipo: 'nacional' },
+      { mes: 12, dia: 8, nome: 'Imaculada Conceição', tipo: 'nacional' },
+      { mes: 12, dia: 25, nome: 'Natal', tipo: 'nacional' }
+    ]
+
+    // Feriados móveis (Páscoa e derivados)
+    const feriadosMoveis = {
+      2025: [
+        { data: '2025-04-18', nome: 'Sexta-feira Santa', tipo: 'nacional' },
+        { data: '2025-04-20', nome: 'Páscoa', tipo: 'nacional' },
+        { data: '2025-06-19', nome: 'Corpo de Deus', tipo: 'nacional' }
+      ],
+      2026: [
+        { data: '2026-04-03', nome: 'Sexta-feira Santa', tipo: 'nacional' },
+        { data: '2026-04-05', nome: 'Páscoa', tipo: 'nacional' },
+        { data: '2026-06-04', nome: 'Corpo de Deus', tipo: 'nacional' }
+      ],
+      2027: [
+        { data: '2027-03-26', nome: 'Sexta-feira Santa', tipo: 'nacional' },
+        { data: '2027-03-28', nome: 'Páscoa', tipo: 'nacional' },
+        { data: '2027-05-27', nome: 'Corpo de Deus', tipo: 'nacional' }
+      ]
+    }
+
+    try {
+      let total = 0
+      const anos = [2025, 2026, 2027]
+
+      for (const ano of anos) {
+        addLog(`📅 Processando ${ano}...`, 'info')
+
+        // Limpar feriados existentes do ano
+        await supabase
+          .from('feriados_portugal')
+          .delete()
+          .eq('ano', ano)
+
+        const feriadosAno = []
+
+        // Adicionar feriados fixos
+        for (const fer of feriadosBase) {
+          const data = `${ano}-${String(fer.mes).padStart(2, '0')}-${String(fer.dia).padStart(2, '0')}`
+          feriadosAno.push({
+            ano,
+            data,
+            nome: fer.nome,
+            tipo: fer.tipo
+          })
+        }
+
+        // Adicionar feriados móveis
+        if (feriadosMoveis[ano]) {
+          for (const fer of feriadosMoveis[ano]) {
+            feriadosAno.push({
+              ano,
+              data: fer.data,
+              nome: fer.nome,
+              tipo: fer.tipo
+            })
+          }
+        }
+
+        // Ordenar por data
+        feriadosAno.sort((a, b) => a.data.localeCompare(b.data))
+
+        // Inserir todos
+        const { error } = await supabase
+          .from('feriados_portugal')
+          .insert(feriadosAno)
+
+        if (error) {
+          addLog(`❌ Erro em ${ano}: ${error.message}`, 'error')
+        } else {
+          addLog(`✅ ${ano}: ${feriadosAno.length} feriados adicionados`, 'success')
+          total += feriadosAno.length
+        }
+      }
+
+      addLog(`📊 Total: ${total} feriados adicionados (2025-2027)`, 'info')
+      setResult({ success: true })
+    } catch (err) {
+      addLog(`💥 Erro: ${err.message}`, 'error')
+      setResult({ success: false, error: err.message })
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const seedEntregasMYRYAD = async () => {
     setLoading(true)
     setLogs([])
@@ -1468,6 +1575,80 @@ export default function AdminSeed() {
               <>
                 <Play size={18} style={{ marginRight: '8px' }} />
                 Atualizar Datas de Entrada
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Feriados Portugal Card */}
+        <div className="card" style={{ padding: '24px' }}>
+          <div className="flex items-center gap-md" style={{ marginBottom: '20px' }}>
+            <div style={{
+              width: '56px',
+              height: '56px',
+              borderRadius: '12px',
+              background: 'linear-gradient(135deg, #dc2626, #16a34a)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white',
+              fontSize: '24px'
+            }}>
+              🇵🇹
+            </div>
+            <div>
+              <h3 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--brown)' }}>
+                Feriados Portugal
+              </h3>
+              <p style={{ fontSize: '13px', color: 'var(--brown-light)' }}>
+                Feriados nacionais + Santo António (Lisboa)
+              </p>
+            </div>
+          </div>
+
+          {/* Lista de feriados */}
+          <div style={{
+            background: 'var(--cream)',
+            borderRadius: '12px',
+            padding: '16px',
+            marginBottom: '20px'
+          }}>
+            <h4 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--brown)', marginBottom: '12px' }}>
+              O que será adicionado (2025-2027):
+            </h4>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', fontSize: '12px', color: 'var(--brown-light)' }}>
+              <div>🎆 Ano Novo (1 Jan)</div>
+              <div>✝️ Sexta-feira Santa</div>
+              <div>🐣 Páscoa</div>
+              <div>🌷 Dia da Liberdade (25 Abr)</div>
+              <div>👷 Dia do Trabalhador (1 Mai)</div>
+              <div>⛪ Corpo de Deus</div>
+              <div>🇵🇹 Dia de Portugal (10 Jun)</div>
+              <div>🔥 Santo António - Lisboa (13 Jun)</div>
+              <div>⛪ Assunção N. Senhora (15 Ago)</div>
+              <div>🏛️ Implantação República (5 Out)</div>
+              <div>👼 Todos os Santos (1 Nov)</div>
+              <div>🏰 Restauração Independência (1 Dez)</div>
+              <div>👸 Imaculada Conceição (8 Dez)</div>
+              <div>🎄 Natal (25 Dez)</div>
+            </div>
+          </div>
+
+          <button
+            onClick={seedFeriadosPortugal}
+            disabled={loading}
+            className="btn btn-primary"
+            style={{ width: '100%', padding: '14px' }}
+          >
+            {loading ? (
+              <>
+                <Loader size={18} style={{ marginRight: '8px', animation: 'spin 1s linear infinite' }} />
+                A processar...
+              </>
+            ) : (
+              <>
+                <Play size={18} style={{ marginRight: '8px' }} />
+                Adicionar Feriados 2025-2027
               </>
             )}
           </button>
