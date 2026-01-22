@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -49,7 +49,11 @@ import {
   FolderOpen,
   UserCircle,
   Inbox,
-  FileSearch
+  FileSearch,
+  Bold,
+  Italic,
+  Underline,
+  List
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -751,6 +755,7 @@ export default function ProjetoDetalhe() {
   const [escopoTrabalho, setEscopoTrabalho] = useState('')
   const [editingEscopo, setEditingEscopo] = useState(false)
   const [savingEscopo, setSavingEscopo] = useState(false)
+  const escopoEditorRef = useRef(null)
 
   // Sub-tabs para Fases & Entregas
   const [activeFaseSection, setActiveFaseSection] = useState(urlSubtab || 'entregaveis')
@@ -1233,12 +1238,14 @@ export default function ProjetoDetalhe() {
     if (!project?.id) return
     setSavingEscopo(true)
     try {
+      const content = escopoEditorRef.current?.innerHTML || escopoTrabalho
       const { error } = await supabase
         .from('projetos')
-        .update({ escopo_trabalho: escopoTrabalho })
+        .update({ escopo_trabalho: content })
         .eq('id', project.id)
       if (error) throw error
-      setProject(prev => ({ ...prev, escopo_trabalho: escopoTrabalho }))
+      setEscopoTrabalho(content)
+      setProject(prev => ({ ...prev, escopo_trabalho: content }))
       setEditingEscopo(false)
     } catch (err) {
       console.error('Erro ao guardar escopo:', err)
@@ -1246,6 +1253,12 @@ export default function ProjetoDetalhe() {
     } finally {
       setSavingEscopo(false)
     }
+  }
+
+  // Funções de formatação do editor de escopo
+  const formatEscopo = (command, value = null) => {
+    document.execCommand(command, false, value)
+    escopoEditorRef.current?.focus()
   }
 
   // Carregar renders do projeto
@@ -3224,34 +3237,143 @@ export default function ProjetoDetalhe() {
                   </div>
 
                   {editingEscopo ? (
-                    <textarea
-                      value={escopoTrabalho}
-                      onChange={(e) => setEscopoTrabalho(e.target.value)}
-                      placeholder="Descreva o escopo de trabalho do projeto..."
+                    <div style={{ border: '1px solid var(--stone)', borderRadius: '12px', overflow: 'hidden' }}>
+                      {/* Toolbar de formatação */}
+                      <div style={{
+                        display: 'flex',
+                        gap: '4px',
+                        padding: '8px 12px',
+                        background: 'var(--cream)',
+                        borderBottom: '1px solid var(--stone)'
+                      }}>
+                        <button
+                          type="button"
+                          onClick={() => formatEscopo('bold')}
+                          title="Negrito (Ctrl+B)"
+                          style={{
+                            width: '32px',
+                            height: '32px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            border: '1px solid var(--stone)',
+                            borderRadius: '6px',
+                            background: 'var(--white)',
+                            cursor: 'pointer',
+                            color: 'var(--brown)'
+                          }}
+                        >
+                          <Bold size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => formatEscopo('italic')}
+                          title="Itálico (Ctrl+I)"
+                          style={{
+                            width: '32px',
+                            height: '32px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            border: '1px solid var(--stone)',
+                            borderRadius: '6px',
+                            background: 'var(--white)',
+                            cursor: 'pointer',
+                            color: 'var(--brown)'
+                          }}
+                        >
+                          <Italic size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => formatEscopo('underline')}
+                          title="Sublinhado (Ctrl+U)"
+                          style={{
+                            width: '32px',
+                            height: '32px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            border: '1px solid var(--stone)',
+                            borderRadius: '6px',
+                            background: 'var(--white)',
+                            cursor: 'pointer',
+                            color: 'var(--brown)'
+                          }}
+                        >
+                          <Underline size={16} />
+                        </button>
+                        <div style={{ width: '1px', background: 'var(--stone)', margin: '0 4px' }} />
+                        <button
+                          type="button"
+                          onClick={() => formatEscopo('insertUnorderedList')}
+                          title="Lista com marcadores"
+                          style={{
+                            width: '32px',
+                            height: '32px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            border: '1px solid var(--stone)',
+                            borderRadius: '6px',
+                            background: 'var(--white)',
+                            cursor: 'pointer',
+                            color: 'var(--brown)'
+                          }}
+                        >
+                          <List size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => formatEscopo('insertOrderedList')}
+                          title="Lista numerada"
+                          style={{
+                            width: '32px',
+                            height: '32px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            border: '1px solid var(--stone)',
+                            borderRadius: '6px',
+                            background: 'var(--white)',
+                            cursor: 'pointer',
+                            color: 'var(--brown)',
+                            fontSize: '12px',
+                            fontWeight: 600
+                          }}
+                        >
+                          1.
+                        </button>
+                      </div>
+                      {/* Editor contentEditable */}
+                      <div
+                        ref={escopoEditorRef}
+                        contentEditable
+                        suppressContentEditableWarning
+                        dangerouslySetInnerHTML={{ __html: escopoTrabalho }}
+                        style={{
+                          minHeight: '400px',
+                          padding: '16px',
+                          fontSize: '13px',
+                          lineHeight: '1.8',
+                          outline: 'none',
+                          color: 'var(--brown)',
+                          background: 'var(--white)'
+                        }}
+                      />
+                    </div>
+                  ) : escopoTrabalho ? (
+                    <div
                       style={{
-                        width: '100%',
-                        minHeight: '400px',
-                        padding: '16px',
-                        border: '1px solid var(--stone)',
+                        padding: '20px',
+                        background: 'var(--cream)',
                         borderRadius: '12px',
                         fontSize: '13px',
-                        lineHeight: '1.6',
-                        fontFamily: 'inherit',
-                        resize: 'vertical'
+                        lineHeight: '1.8',
+                        color: 'var(--brown)'
                       }}
+                      dangerouslySetInnerHTML={{ __html: escopoTrabalho }}
                     />
-                  ) : escopoTrabalho ? (
-                    <div style={{
-                      padding: '20px',
-                      background: 'var(--cream)',
-                      borderRadius: '12px',
-                      fontSize: '13px',
-                      lineHeight: '1.8',
-                      color: 'var(--brown)',
-                      whiteSpace: 'pre-wrap'
-                    }}>
-                      {escopoTrabalho}
-                    </div>
                   ) : (
                     <div style={{
                       padding: '32px',
