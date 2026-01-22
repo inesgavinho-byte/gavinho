@@ -1118,23 +1118,27 @@ export default function Equipa() {
               {/* Feriados Portugal */}
               <div style={{ background: 'white', borderRadius: '12px', padding: '20px', border: '1px solid #e7e5e4' }}>
                 <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 600 }}>🇵🇹 Feriados Portugal {anoGestao}</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '300px', overflowY: 'auto' }}>
-                  {feriados.length > 0 ? feriados.map(fer => (
-                    <div key={fer.id} style={{ 
-                      display: 'flex', justifyContent: 'space-between',
-                      padding: '8px 12px', background: '#f5f5f4', borderRadius: '6px', fontSize: '13px'
-                    }}>
-                      <span>{fer.nome}</span>
-                      <span style={{ color: '#78716c' }}>
-                        {new Date(fer.data).toLocaleDateString('pt-PT', { weekday: 'short', day: 'numeric', month: 'short' })}
-                      </span>
-                    </div>
-                  )) : (
-                    <p style={{ color: '#78716c', textAlign: 'center', padding: '20px' }}>
-                      Feriados não carregados. Execute o SQL para adicionar.
-                    </p>
-                  )}
-                </div>
+                {feriados.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {feriados.map(fer => (
+                      <div key={fer.id} style={{
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        padding: '10px 12px',
+                        background: fer.tipo === 'municipal_lisboa' ? '#dbeafe' : '#f5f5f4',
+                        borderRadius: '6px', fontSize: '13px'
+                      }}>
+                        <span style={{ fontWeight: 500 }}>{fer.nome}</span>
+                        <span style={{ color: '#78716c' }}>
+                          {new Date(fer.data).toLocaleDateString('pt-PT', { weekday: 'short', day: 'numeric', month: 'short' })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p style={{ color: '#78716c', textAlign: 'center', padding: '20px' }}>
+                    Feriados não carregados. Execute o SQL para adicionar.
+                  </p>
+                )}
               </div>
             </div>
 
