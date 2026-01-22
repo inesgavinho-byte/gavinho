@@ -1055,10 +1055,26 @@ export default function DesignReview({ projeto }) {
     )
   }
 
+  // Auto-fit scale when PDF loads
+  const fitToWidth = useCallback(() => {
+    if (containerRef.current && pdfDimensions.width > 0) {
+      const containerWidth = containerRef.current.clientWidth - 48 // padding
+      const newScale = Math.min(containerWidth / pdfDimensions.width, 2)
+      setScale(Math.max(0.5, newScale))
+    }
+  }, [pdfDimensions.width])
+
+  // Auto-fit on first load
+  useEffect(() => {
+    if (pdfDimensions.width > 0 && scale === 1) {
+      fitToWidth()
+    }
+  }, [pdfDimensions.width])
+
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh - 380px)', minHeight: '500px', maxHeight: '800px' }}>
+    <div style={{ display: 'flex', height: 'calc(100vh - 280px)', minHeight: '600px' }}>
       {/* Main PDF Viewer Area */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#F5F5F0' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#F5F5F0', minWidth: 0 }}>
         {/* Toolbar */}
         <div style={{
           display: 'flex',
@@ -1206,7 +1222,7 @@ export default function DesignReview({ projeto }) {
           {/* Zoom Controls */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <button
-              onClick={() => setScale(s => Math.max(0.5, s - 0.25))}
+              onClick={() => setScale(s => Math.max(0.25, s - 0.25))}
               style={{
                 width: '32px',
                 height: '32px',
@@ -1239,6 +1255,22 @@ export default function DesignReview({ projeto }) {
               }}
             >
               <Plus size={16} />
+            </button>
+            <button
+              onClick={fitToWidth}
+              title="Ajustar à largura"
+              style={{
+                padding: '6px 10px',
+                borderRadius: '6px',
+                border: '1px solid var(--stone)',
+                background: 'var(--white)',
+                cursor: 'pointer',
+                fontSize: '11px',
+                fontWeight: 500,
+                color: 'var(--brown)'
+              }}
+            >
+              Ajustar
             </button>
           </div>
 
