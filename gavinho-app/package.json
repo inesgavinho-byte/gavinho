@@ -17,6 +17,7 @@
     "jspdf": "^4.0.0",
     "lucide-react": "^0.561.0",
     "pdfjs-dist": "^5.4.449",
+    "perfect-freehand": "^1.2.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-pdf": "^9.2.1",

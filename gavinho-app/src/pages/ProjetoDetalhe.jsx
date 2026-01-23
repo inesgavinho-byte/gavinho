@@ -57,7 +57,8 @@ import {
   Sparkles,
   Loader2,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Pencil
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -70,6 +71,7 @@ import DecisionLog from '../components/DecisionLog'
 import DesignReview from '../components/DesignReview'
 import RecebidosEspecialidades from '../components/RecebidosEspecialidades'
 import ViabilidadeModule from '../components/viabilidade/ViabilidadeModule'
+import Moleskine from '../components/Moleskine'
 
 // Dados de exemplo baseados nos JSONs fornecidos
 const sampleProjectData = {
@@ -780,6 +782,7 @@ export default function ProjetoDetalhe() {
   const [showRenderModal, setShowRenderModal] = useState(false)
   const [editingRender, setEditingRender] = useState(null)
   const [lightboxImage, setLightboxImage] = useState(null) // Para lightbox
+  const [moleskineRender, setMoleskineRender] = useState(null) // Para Moleskine (anotação de renders)
   const [isDragging, setIsDragging] = useState(false) // Para drag & drop
   const [renderForm, setRenderForm] = useState({
     compartimento: '',
@@ -3885,6 +3888,26 @@ export default function ProjetoDetalhe() {
                           </button>
                           <div style={{ display: 'flex', gap: '4px' }}>
                             <button
+                              onClick={(e) => { e.stopPropagation(); setMoleskineRender(render) }}
+                              style={{
+                                padding: '4px 8px',
+                                background: '#8B8670',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontSize: '10px',
+                                fontWeight: 500
+                              }}
+                              title="Moleskine - Anotar render"
+                            >
+                              <Pencil size={12} />
+                              Moleskine
+                            </button>
+                            <button
                               onClick={(e) => { e.stopPropagation(); openEditRenderModal(render) }}
                               style={{
                                 padding: '4px',
@@ -5315,6 +5338,23 @@ export default function ProjetoDetalhe() {
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
               <button
+                onClick={(e) => { e.stopPropagation(); setMoleskineRender(lightboxImage); setLightboxImage(null) }}
+                style={{
+                  padding: '8px 16px',
+                  background: '#8B8670',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <Pencil size={14} /> Moleskine
+              </button>
+              <button
                 onClick={(e) => { e.stopPropagation(); openEditRenderModal(lightboxImage); setLightboxImage(null) }}
                 style={{
                   padding: '8px 16px',
@@ -5399,6 +5439,21 @@ export default function ProjetoDetalhe() {
             </div>
           )}
         </div>
+      )}
+
+      {/* Moleskine - Ferramenta de anotação de renders */}
+      {moleskineRender && (
+        <Moleskine
+          projectId={projeto?.id}
+          renderId={moleskineRender.id}
+          renderImageUrl={moleskineRender.imagem_url}
+          renderName={`${moleskineRender.compartimento} v${moleskineRender.versao}`}
+          onClose={() => setMoleskineRender(null)}
+          onSave={() => {
+            // Recarregar renders após guardar anotações
+            console.log('Anotações guardadas com sucesso')
+          }}
+        />
       )}
     </div>
   )
