@@ -2775,3 +2775,12 @@ tbody tr:last-child td {
   background: var(--error) !important;
   color: white !important;
 }
+
+/* Moleskine hover effect */
+.moleskine-hover-overlay {
+  opacity: 0 !important;
+}
+
+*:hover > .moleskine-hover-overlay {
+  opacity: 1 !important;
+}

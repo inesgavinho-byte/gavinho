@@ -783,6 +783,7 @@ export default function ProjetoDetalhe() {
   const [editingRender, setEditingRender] = useState(null)
   const [lightboxImage, setLightboxImage] = useState(null) // Para lightbox
   const [moleskineRender, setMoleskineRender] = useState(null) // Para Moleskine (anotação de renders)
+  const [renderAnnotations, setRenderAnnotations] = useState({}) // Mapa de render_id -> annotation count
   const [isDragging, setIsDragging] = useState(false) // Para drag & drop
   const [renderForm, setRenderForm] = useState({
     compartimento: '',
@@ -1343,6 +1344,20 @@ export default function ProjetoDetalhe() {
         .order('versao', { ascending: false })
       if (error) throw error
       setRenders(data || [])
+
+      // Carregar anotações existentes
+      const { data: annotationsData } = await supabase
+        .from('render_annotations')
+        .select('render_id, annotations')
+        .eq('projeto_id', projetoId)
+
+      if (annotationsData) {
+        const annotationsMap = {}
+        annotationsData.forEach(a => {
+          annotationsMap[a.render_id] = a.annotations?.length || 0
+        })
+        setRenderAnnotations(annotationsMap)
+      }
     } catch (err) {
       console.error('Erro ao carregar renders:', err)
     }
@@ -2199,7 +2214,8 @@ export default function ProjetoDetalhe() {
   const archvizSections = [
     { id: 'inspiracoes', label: 'Inspirações & Referências', icon: Palette },
     { id: 'processo', label: 'Imagens Processo', icon: ImagePlus },
-    { id: 'finais', label: 'Imagens Finais', icon: CheckCircle }
+    { id: 'finais', label: 'Imagens Finais', icon: CheckCircle },
+    { id: 'moleskine', label: 'Moleskine', icon: Pencil }
   ]
 
   // Secções dentro de Gestão de Projeto
@@ -4060,6 +4076,163 @@ export default function ProjetoDetalhe() {
           )}
             </div>
           )}
+
+          {/* Sub-tab Moleskine */}
+          {activeArchvizSection === 'moleskine' && (
+            <div className="card">
+              <div className="flex items-center justify-between" style={{ marginBottom: '24px' }}>
+                <div>
+                  <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
+                    Moleskine - Anotações em Renders
+                  </h3>
+                  <p style={{ fontSize: '13px', color: 'var(--brown-light)', marginTop: '4px' }}>
+                    Selecione um render para adicionar anotações, correções e feedback visual
+                  </p>
+                </div>
+                <span style={{
+                  padding: '8px 16px',
+                  background: 'var(--olive-gray)',
+                  color: 'white',
+                  borderRadius: '20px',
+                  fontSize: '13px',
+                  fontWeight: 600
+                }}>
+                  {Object.keys(renderAnnotations).length} com anotações
+                </span>
+              </div>
+
+              {renders.length > 0 ? (
+                <div className="grid grid-3" style={{ gap: '16px' }}>
+                  {renders.map((render) => (
+                    <div
+                      key={render.id}
+                      onClick={() => setMoleskineRender(render)}
+                      style={{
+                        position: 'relative',
+                        aspectRatio: '16/10',
+                        background: render.imagem_url ? `url(${render.imagem_url}) center/cover` : 'var(--cream)',
+                        borderRadius: '12px',
+                        overflow: 'hidden',
+                        border: renderAnnotations[render.id] ? '3px solid var(--olive-gray)' : '1px solid var(--stone)',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      {!render.imagem_url && (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                          <Image size={32} style={{ color: 'var(--brown-light)', opacity: 0.4 }} />
+                        </div>
+                      )}
+
+                      {/* Badge de anotações */}
+                      {renderAnnotations[render.id] > 0 && (
+                        <div style={{
+                          position: 'absolute',
+                          top: '8px',
+                          right: '8px',
+                          padding: '4px 10px',
+                          background: 'var(--olive-gray)',
+                          color: 'white',
+                          borderRadius: '12px',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}>
+                          <Pencil size={12} />
+                          {renderAnnotations[render.id]}
+                        </div>
+                      )}
+
+                      {/* Versão */}
+                      <div style={{
+                        position: 'absolute',
+                        top: '8px',
+                        left: '8px',
+                        padding: '4px 8px',
+                        background: 'rgba(0,0,0,0.6)',
+                        color: 'white',
+                        borderRadius: '6px',
+                        fontSize: '10px',
+                        fontWeight: 500
+                      }}>
+                        v{render.versao}
+                      </div>
+
+                      {/* Info overlay */}
+                      <div style={{
+                        position: 'absolute',
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        padding: '12px',
+                        background: 'linear-gradient(transparent, rgba(0,0,0,0.8))',
+                        color: 'white'
+                      }}>
+                        <div style={{ fontSize: '13px', fontWeight: 600 }}>{render.compartimento}</div>
+                        <div style={{ fontSize: '11px', opacity: 0.8, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span>{render.data_upload ? new Date(render.data_upload).toLocaleDateString('pt-PT') : ''}</span>
+                          {!renderAnnotations[render.id] && (
+                            <span style={{
+                              padding: '2px 6px',
+                              background: 'rgba(255,255,255,0.2)',
+                              borderRadius: '4px',
+                              fontSize: '10px'
+                            }}>
+                              Sem anotações
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Hover overlay */}
+                      <div style={{
+                        position: 'absolute',
+                        inset: 0,
+                        background: 'rgba(139, 134, 112, 0.3)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        opacity: 0,
+                        transition: 'opacity 0.2s'
+                      }}
+                      className="moleskine-hover-overlay"
+                      >
+                        <div style={{
+                          padding: '12px 20px',
+                          background: 'var(--olive-gray)',
+                          color: 'white',
+                          borderRadius: '8px',
+                          fontSize: '13px',
+                          fontWeight: 600,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px'
+                        }}>
+                          <Pencil size={16} />
+                          Abrir Moleskine
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{
+                  padding: '48px',
+                  background: 'var(--cream)',
+                  borderRadius: '12px',
+                  textAlign: 'center'
+                }}>
+                  <Pencil size={48} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '16px' }} />
+                  <h4 style={{ color: 'var(--brown)', marginBottom: '8px' }}>Nenhum Render Disponível</h4>
+                  <p style={{ color: 'var(--brown-light)', fontSize: '13px' }}>
+                    Adicione renders em "Imagens Processo" para poder criar anotações no Moleskine.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -5449,9 +5622,21 @@ export default function ProjetoDetalhe() {
           renderImageUrl={moleskineRender.imagem_url}
           renderName={`${moleskineRender.compartimento} v${moleskineRender.versao}`}
           onClose={() => setMoleskineRender(null)}
-          onSave={() => {
-            // Recarregar renders após guardar anotações
-            console.log('Anotações guardadas com sucesso')
+          onSave={async () => {
+            // Atualizar contagem de anotações
+            if (project?.id) {
+              const { data: annotationsData } = await supabase
+                .from('render_annotations')
+                .select('render_id, annotations')
+                .eq('projeto_id', project.id)
+              if (annotationsData) {
+                const annotationsMap = {}
+                annotationsData.forEach(a => {
+                  annotationsMap[a.render_id] = a.annotations?.length || 0
+                })
+                setRenderAnnotations(annotationsMap)
+              }
+            }
           }}
         />
       )}
