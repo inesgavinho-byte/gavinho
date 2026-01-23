@@ -25,6 +25,7 @@ export default function Projetos() {
   const [editingProject, setEditingProject] = useState(null)
   const [activeMenu, setActiveMenu] = useState(null)
   const [formData, setFormData] = useState({
+    codigo: '',
     nome: '',
     tipologia: 'Residencial',
     localizacao: '',
@@ -91,7 +92,7 @@ export default function Projetos() {
   const handleNewProject = () => {
     setEditingProject(null)
     setFormData({
-      nome: '', tipologia: 'Residencial', localizacao: '', morada: '', cidade: '',
+      codigo: '', nome: '', tipologia: 'Residencial', localizacao: '', morada: '', cidade: '',
       cliente_id: '', cliente_nome: '', fase: 'Conceito', status: 'on_track',
       progresso: 0, descricao: '', data_inicio: new Date().toISOString().split('T')[0],
       data_prevista_conclusao: '', orcamento_atual: ''
@@ -103,6 +104,7 @@ export default function Projetos() {
   const handleEditProject = (project) => {
     setEditingProject(project)
     setFormData({
+      codigo: project.codigo || '',
       nome: project.nome || '',
       tipologia: project.tipologia || 'Residencial',
       localizacao: project.localizacao || '',
@@ -153,6 +155,11 @@ export default function Projetos() {
         data_prevista_conclusao: formData.data_prevista_conclusao || null,
         orcamento_atual: formData.orcamento_atual ? parseFloat(formData.orcamento_atual) : null,
         updated_at: new Date().toISOString()
+      }
+
+      // Incluir código quando estiver a editar
+      if (editingProject && formData.codigo) {
+        projectData.codigo = formData.codigo
       }
 
       console.log('A guardar projeto:', projectData)
@@ -569,11 +576,17 @@ export default function Projetos() {
               <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--brown-light)' }}><X size={20} /></button>
             </div>
             <div style={{ padding: '24px' }}>
+              {editingProject && (
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '6px', color: 'var(--brown)' }}>Código do Projeto</label>
+                  <input type="text" value={formData.codigo} onChange={(e) => setFormData({...formData, codigo: e.target.value})} placeholder="Ex: GA00123" style={{ width: '100%', padding: '12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box', fontFamily: 'monospace' }} />
+                </div>
+              )}
               <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '6px', color: 'var(--brown)' }}>Nome do Projeto *</label>
                 <input type="text" value={formData.nome} onChange={(e) => setFormData({...formData, nome: e.target.value})} placeholder="Ex: Casa Silva" style={{ width: '100%', padding: '12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }} />
               </div>
-              
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '6px', color: 'var(--brown)' }}>Tipologia</label>
