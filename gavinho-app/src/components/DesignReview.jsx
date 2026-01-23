@@ -1344,8 +1344,9 @@ export default function DesignReview({ projeto }) {
           onWheel={(e) => {
             if (e.ctrlKey || e.metaKey) {
               e.preventDefault()
-              const delta = e.deltaY > 0 ? -0.1 : 0.1
-              setScale(prev => Math.min(3, Math.max(0.25, prev + delta)))
+              // Zoom suave - proporcional à escala atual
+              const zoomFactor = 1 - (e.deltaY * 0.001)
+              setScale(prev => Math.min(3, Math.max(0.25, prev * zoomFactor)))
             }
           }}
           style={{
