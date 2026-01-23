@@ -29,7 +29,8 @@ import {
   Circle,
   Eraser,
   Undo2,
-  Redo2
+  Redo2,
+  History
 } from 'lucide-react'
 
 // Configure PDF.js worker
@@ -962,7 +963,7 @@ export default function DesignReview({ projeto }) {
 
       // Create new version
       const newVersionNum = (versions[0]?.numero_versao || 0) + 1
-      const { error: versionError } = await supabase
+      const { data: newVersion, error: versionError } = await supabase
         .from('design_review_versions')
         .insert({
           review_id: selectedReview.id,
@@ -973,8 +974,38 @@ export default function DesignReview({ projeto }) {
           uploaded_by: profile?.id,
           uploaded_by_nome: profile?.nome || user?.email
         })
+        .select()
+        .single()
 
       if (versionError) throw versionError
+
+      // Copy unresolved annotations from current version to new version
+      if (selectedVersion && newVersion) {
+        const { data: unresolvedAnnotations } = await supabase
+          .from('design_review_annotations')
+          .select('*')
+          .eq('version_id', selectedVersion.id)
+          .neq('status', 'resolvido')
+
+        if (unresolvedAnnotations && unresolvedAnnotations.length > 0) {
+          const annotationsToCopy = unresolvedAnnotations.map(ann => ({
+            version_id: newVersion.id,
+            pagina: ann.pagina,
+            pos_x: ann.pos_x,
+            pos_y: ann.pos_y,
+            comentario: ann.comentario,
+            categoria: ann.categoria,
+            status: ann.status,
+            autor_id: ann.autor_id,
+            autor_nome: ann.autor_nome,
+            herdado_de: ann.herdado_de || ann.id // Referência ao comentário original
+          }))
+
+          await supabase
+            .from('design_review_annotations')
+            .insert(annotationsToCopy)
+        }
+      }
 
       await loadVersions()
       setShowUploadModal(false)
@@ -1932,6 +1963,25 @@ export default function DesignReview({ projeto }) {
                             }}>
                               {CATEGORIAS.find(c => c.id === annotation.categoria)?.label}
                             </span>
+                            {/* Inherited comment indicator */}
+                            {annotation.herdado_de && (
+                              <span
+                                title="Comentário herdado de versão anterior"
+                                style={{
+                                  fontSize: '10px',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  background: '#7C3AED20',
+                                  color: '#7C3AED',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '3px'
+                                }}
+                              >
+                                <History size={10} />
+                                Herdado
+                              </span>
+                            )}
                           </div>
                           {/* Edit/Delete buttons */}
                           <div style={{ display: 'flex', gap: '4px' }}>
