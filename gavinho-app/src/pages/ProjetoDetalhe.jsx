@@ -5444,7 +5444,7 @@ export default function ProjetoDetalhe() {
       {/* Moleskine - Ferramenta de anotação de renders */}
       {moleskineRender && (
         <Moleskine
-          projectId={projeto?.id}
+          projectId={project?.id}
           renderId={moleskineRender.id}
           renderImageUrl={moleskineRender.imagem_url}
           renderName={`${moleskineRender.compartimento} v${moleskineRender.versao}`}
