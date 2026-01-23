@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 import {
   Plus, FileText, Edit2, Trash2, Save, X, Calendar, User, CheckCircle,
   Clock, AlertCircle, Download, Upload, Send, Package, Users, Building2,
-  Loader2, Eye, ChevronDown, ChevronRight, FileCheck, ExternalLink, Paperclip, File
+  Loader2, Eye, ChevronDown, ChevronRight, FileCheck, ExternalLink, Paperclip, File,
+  FileSearch, ArrowRight
 } from 'lucide-react'
 
 const tipoConfig = {
@@ -20,7 +22,8 @@ const statusConfig = {
   'rejeitado': { label: 'Rejeitado', color: 'var(--error)', bg: 'rgba(180, 100, 100, 0.15)' }
 }
 
-export default function CentralEntregas({ projeto }) {
+export default function CentralEntregas({ projeto, onNavigateToDesignReview }) {
+  const { user, profile } = useAuth()
   const [entregas, setEntregas] = useState([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
@@ -30,6 +33,12 @@ export default function CentralEntregas({ projeto }) {
   const [expandedItems, setExpandedItems] = useState({})
   const [uploadedFiles, setUploadedFiles] = useState([])
   const [uploading, setUploading] = useState(false)
+  const [convertingToReview, setConvertingToReview] = useState(false)
+  const [showConvertModal, setShowConvertModal] = useState(false)
+  const [convertFile, setConvertFile] = useState(null)
+  const [convertEntrega, setConvertEntrega] = useState(null)
+  const [convertName, setConvertName] = useState('')
+  const [convertCodigo, setConvertCodigo] = useState('')
 
   const [formData, setFormData] = useState({
     titulo: '',
@@ -317,6 +326,91 @@ export default function CentralEntregas({ projeto }) {
     }
   }
 
+  // Helper to check if file is PDF
+  const isPdfFile = (url) => {
+    if (!url) return false
+    const lowered = url.toLowerCase()
+    return lowered.endsWith('.pdf') || lowered.includes('.pdf')
+  }
+
+  // Get PDF files from entrega documents
+  const getPdfFilesFromEntrega = (item) => {
+    if (!item.documentos) return []
+    return item.documentos.split(',').map(doc => doc.trim()).filter(doc => isPdfFile(doc))
+  }
+
+  // Open convert to design review modal
+  const openConvertModal = (item, fileUrl) => {
+    setConvertEntrega(item)
+    setConvertFile(fileUrl)
+    setConvertName(item.titulo || '')
+    setConvertCodigo('')
+    setShowConvertModal(true)
+  }
+
+  // Convert PDF to Design Review
+  const handleConvertToDesignReview = async () => {
+    if (!convertFile || !convertName.trim()) return
+
+    setConvertingToReview(true)
+    try {
+      // Create design review
+      const { data: reviewData, error: reviewError } = await supabase
+        .from('design_reviews')
+        .insert({
+          projeto_id: projeto.id,
+          nome: convertName.trim(),
+          codigo_documento: convertCodigo.trim() || null,
+          criado_por: profile?.id || null,
+          criado_por_nome: profile?.nome || user?.email || 'Utilizador',
+          origem_entrega_id: convertEntrega?.id || null
+        })
+        .select()
+        .single()
+
+      if (reviewError) {
+        console.error('Review error:', reviewError)
+        throw new Error(`Erro ao criar review: ${reviewError.message}`)
+      }
+
+      // Create first version using existing file URL
+      const fileName = convertFile.split('/').pop() || 'documento.pdf'
+      const { error: versionError } = await supabase
+        .from('design_review_versions')
+        .insert({
+          review_id: reviewData.id,
+          numero_versao: 1,
+          file_url: convertFile,
+          file_name: fileName,
+          uploaded_by: profile?.id || null,
+          uploaded_by_nome: profile?.nome || user?.email || 'Utilizador'
+        })
+
+      if (versionError) {
+        console.error('Version error:', versionError)
+        throw new Error(`Erro ao criar versão: ${versionError.message}`)
+      }
+
+      setShowConvertModal(false)
+      setConvertFile(null)
+      setConvertEntrega(null)
+      setConvertName('')
+      setConvertCodigo('')
+
+      // Navigate to design review if callback provided
+      if (onNavigateToDesignReview) {
+        onNavigateToDesignReview(reviewData.id)
+      } else {
+        alert('Design Review criado com sucesso!')
+      }
+    } catch (err) {
+      console.error('Erro ao converter para Design Review:', err)
+      alert('Erro: ' + err.message)
+    } finally {
+      setConvertingToReview(false)
+    }
+  }
+
   const filteredEntregas = entregas.filter(e => e.tipo === activeSection)
 
   const stats = {
@@ -543,10 +637,24 @@ export default function CentralEntregas({ projeto }) {
                           </span>
                         )}
                         {item.documentos && (
-                          <span className="flex items-center gap-xs" style={{ color: 'var(--info)' }}>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setExpandedItems(prev => ({ ...prev, [item.id]: !prev[item.id] }))
+                            }}
+                            className="flex items-center gap-xs"
+                            style={{
+                              color: 'var(--info)',
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              padding: 0
+                            }}
+                          >
                             <Paperclip size={12} />
                             {item.documentos.split(',').length} anexo(s)
-                          </span>
+                            {expandedItems[item.id] ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                          </button>
                         )}
                       </div>
                     </div>
@@ -662,6 +770,111 @@ export default function CentralEntregas({ projeto }) {
                     </div>
                   </div>
                 </div>
+
+                {/* Expanded documents section */}
+                {expandedItems[item.id] && item.documentos && (
+                  <div style={{
+                    marginTop: '12px',
+                    paddingTop: '12px',
+                    borderTop: '1px solid var(--stone)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px'
+                  }}>
+                    <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--brown-light)' }}>
+                      Documentos anexados:
+                    </span>
+                    {item.documentos.split(',').map((doc, idx) => {
+                      const docUrl = doc.trim()
+                      const docName = docUrl.split('/').pop() || `Documento ${idx + 1}`
+                      const isPdf = isPdfFile(docUrl)
+                      return (
+                        <div
+                          key={idx}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '8px 12px',
+                            background: 'white',
+                            border: '1px solid var(--stone)',
+                            borderRadius: '8px'
+                          }}
+                        >
+                          <div className="flex items-center gap-sm" style={{ flex: 1, minWidth: 0 }}>
+                            <File size={16} style={{ color: isPdf ? '#EF4444' : 'var(--brown-light)', flexShrink: 0 }} />
+                            <span style={{
+                              fontSize: '13px',
+                              color: 'var(--brown)',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap'
+                            }}>
+                              {docName}
+                            </span>
+                            {isPdf && (
+                              <span style={{
+                                fontSize: '10px',
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                background: 'rgba(239, 68, 68, 0.1)',
+                                color: '#EF4444',
+                                flexShrink: 0
+                              }}>
+                                PDF
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-xs">
+                            <a
+                              href={docUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Ver documento"
+                              style={{
+                                padding: '6px',
+                                background: 'transparent',
+                                border: 'none',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                color: 'var(--brown-light)',
+                                display: 'flex',
+                                alignItems: 'center'
+                              }}
+                            >
+                              <ExternalLink size={14} />
+                            </a>
+                            {isPdf && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  openConvertModal(item, docUrl)
+                                }}
+                                title="Converter para Design Review"
+                                style={{
+                                  padding: '6px 10px',
+                                  background: 'var(--brown)',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  color: 'white',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  fontSize: '11px',
+                                  fontWeight: 500
+                                }}
+                              >
+                                <FileSearch size={14} />
+                                Design Review
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -1046,6 +1259,166 @@ export default function CentralEntregas({ projeto }) {
               >
                 {saving ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
                 {editingItem ? 'Guardar' : 'Criar Entrega'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Converter para Design Review */}
+      {showConvertModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '16px',
+            width: '450px',
+            maxHeight: '90vh',
+            overflow: 'auto'
+          }}>
+            <div style={{
+              padding: '20px 24px',
+              borderBottom: '1px solid var(--stone)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
+                Converter para Design Review
+              </h3>
+              <button
+                onClick={() => {
+                  setShowConvertModal(false)
+                  setConvertFile(null)
+                  setConvertEntrega(null)
+                }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--brown-light)'
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {/* Info about source */}
+              <div style={{
+                padding: '12px',
+                background: 'var(--cream)',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px'
+              }}>
+                <FileSearch size={24} style={{ color: 'var(--brown)', flexShrink: 0 }} />
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--brown)' }}>
+                    {convertFile?.split('/').pop() || 'Documento PDF'}
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
+                    Da entrega: {convertEntrega?.titulo}
+                  </div>
+                </div>
+              </div>
+
+              {/* Nome */}
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--brown)', marginBottom: '6px' }}>
+                  Nome do Documento *
+                </label>
+                <input
+                  type="text"
+                  value={convertName}
+                  onChange={(e) => setConvertName(e.target.value)}
+                  placeholder="Ex: Planta Piso 0"
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid var(--stone)',
+                    borderRadius: '8px',
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
+
+              {/* Código */}
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--brown)', marginBottom: '6px' }}>
+                  Código do Documento
+                </label>
+                <input
+                  type="text"
+                  value={convertCodigo}
+                  onChange={(e) => setConvertCodigo(e.target.value)}
+                  placeholder="Ex: 01.01.01"
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid var(--stone)',
+                    borderRadius: '8px',
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
+
+              {/* Info */}
+              <div style={{
+                padding: '12px',
+                background: 'rgba(138, 158, 184, 0.15)',
+                borderRadius: '8px',
+                fontSize: '12px',
+                color: 'var(--brown-light)'
+              }}>
+                <strong>O que acontece:</strong>
+                <ul style={{ margin: '8px 0 0 16px', paddingLeft: 0 }}>
+                  <li>Será criado um novo Design Review</li>
+                  <li>O PDF será a versão 1 do review</li>
+                  <li>Poderá adicionar anotações e comentários</li>
+                </ul>
+              </div>
+            </div>
+
+            <div style={{
+              padding: '16px 24px',
+              borderTop: '1px solid var(--stone)',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '12px'
+            }}>
+              <button
+                onClick={() => {
+                  setShowConvertModal(false)
+                  setConvertFile(null)
+                  setConvertEntrega(null)
+                }}
+                className="btn btn-secondary"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConvertToDesignReview}
+                disabled={convertingToReview || !convertName.trim()}
+                className="btn btn-primary flex items-center gap-sm"
+              >
+                {convertingToReview ? (
+                  <Loader2 className="animate-spin" size={16} />
+                ) : (
+                  <ArrowRight size={16} />
+                )}
+                Criar Design Review
               </button>
             </div>
           </div>

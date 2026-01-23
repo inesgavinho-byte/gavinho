@@ -30,7 +30,10 @@ import {
   Eraser,
   Undo2,
   Redo2,
-  History
+  History,
+  FolderOpen,
+  PlusCircle,
+  Columns
 } from 'lucide-react'
 
 // Configure PDF.js worker
@@ -73,7 +76,7 @@ const getStatusColor = (status) => {
   }
 }
 
-export default function DesignReview({ projeto }) {
+export default function DesignReview({ projeto, initialReviewId }) {
   const { user, profile } = useAuth()
   const containerRef = useRef(null)
   const pdfContainerRef = useRef(null)
@@ -83,6 +86,11 @@ export default function DesignReview({ projeto }) {
   const [selectedReview, setSelectedReview] = useState(null)
   const [versions, setVersions] = useState([])
   const [selectedVersion, setSelectedVersion] = useState(null)
+
+  // Multiple tabs support
+  const [openTabs, setOpenTabs] = useState([]) // Array of { reviewId, reviewName, reviewCodigo }
+  const [activeTabId, setActiveTabId] = useState(null)
+  const [showReviewSelector, setShowReviewSelector] = useState(false)
 
   // PDF State
   const [numPages, setNumPages] = useState(null)
@@ -138,6 +146,60 @@ export default function DesignReview({ projeto }) {
     }
   }, [projeto?.id])
 
+  // Handle initial review ID (from navigation)
+  useEffect(() => {
+    if (initialReviewId && reviews.length > 0) {
+      const review = reviews.find(r => r.id === initialReviewId)
+      if (review) {
+        addTab(review)
+      }
+    }
+  }, [initialReviewId, reviews])
+
+  // Tab management functions
+  const addTab = (review) => {
+    // Check if already open
+    if (openTabs.some(t => t.reviewId === review.id)) {
+      setActiveTabId(review.id)
+      setSelectedReview(review)
+      return
+    }
+
+    const newTab = {
+      reviewId: review.id,
+      reviewName: review.nome,
+      reviewCodigo: review.codigo_documento
+    }
+    setOpenTabs(prev => [...prev, newTab])
+    setActiveTabId(review.id)
+    setSelectedReview(review)
+  }
+
+  const closeTab = (reviewId, e) => {
+    if (e) e.stopPropagation()
+    const newTabs = openTabs.filter(t => t.reviewId !== reviewId)
+    setOpenTabs(newTabs)
+
+    // If closing active tab, switch to another
+    if (activeTabId === reviewId) {
+      if (newTabs.length > 0) {
+        const nextTab = newTabs[newTabs.length - 1]
+        setActiveTabId(nextTab.reviewId)
+        const review = reviews.find(r => r.id === nextTab.reviewId)
+        setSelectedReview(review)
+      } else {
+        setActiveTabId(null)
+        setSelectedReview(null)
+      }
+    }
+  }
+
+  const switchTab = (reviewId) => {
+    setActiveTabId(reviewId)
+    const review = reviews.find(r => r.id === reviewId)
+    setSelectedReview(review)
+  }
+
   // Load versions when review selected
   useEffect(() => {
     if (selectedReview) {
@@ -183,8 +245,9 @@ export default function DesignReview({ projeto }) {
       if (error) throw error
       setReviews(data || [])
 
-      if (data && data.length > 0) {
-        setSelectedReview(data[0])
+      // Auto-open first review if no tabs open and not waiting for initialReviewId
+      if (data && data.length > 0 && openTabs.length === 0 && !initialReviewId) {
+        addTab(data[0])
       }
     } catch (err) {
       console.error('Error loading reviews:', err)
@@ -931,7 +994,10 @@ export default function DesignReview({ projeto }) {
         throw new Error(`Erro ao criar versao: ${versionError.message}`)
       }
 
-      // Reload
+      // Add new review as tab
+      addTab(reviewData)
+
+      // Reload reviews list
       await loadReviews()
       setShowNewReviewModal(false)
       setNewReviewName('')
@@ -1052,23 +1118,30 @@ export default function DesignReview({ projeto }) {
   // No reviews yet
   if (reviews.length === 0) {
     return (
-      <div style={{
-        padding: '48px',
-        background: 'var(--cream)',
-        borderRadius: '12px',
-        textAlign: 'center',
-        color: 'var(--brown-light)'
-      }}>
-        <Eye size={48} style={{ opacity: 0.3, marginBottom: '16px' }} />
-        <h4 style={{ color: 'var(--brown)', marginBottom: '8px' }}>Design Review</h4>
-        <p style={{ marginBottom: '24px' }}>Sistema de revisao de desenhos tecnicos com comentarios e aprovacoes.</p>
-        <button
-          className="btn btn-primary"
-          onClick={() => setShowNewReviewModal(true)}
-        >
-          <Plus size={16} style={{ marginRight: '8px' }} />
-          Iniciar Design Review
-        </button>
+      <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 280px)', minHeight: '600px' }}>
+        <div style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '48px',
+          background: 'var(--cream)',
+          borderRadius: '12px',
+          textAlign: 'center',
+          color: 'var(--brown-light)'
+        }}>
+          <Eye size={48} style={{ opacity: 0.3, marginBottom: '16px' }} />
+          <h4 style={{ color: 'var(--brown)', marginBottom: '8px' }}>Design Review</h4>
+          <p style={{ marginBottom: '24px' }}>Sistema de revisao de desenhos tecnicos com comentarios e aprovacoes.</p>
+          <button
+            className="btn btn-primary"
+            onClick={() => setShowNewReviewModal(true)}
+          >
+            <Plus size={16} style={{ marginRight: '8px' }} />
+            Iniciar Design Review
+          </button>
+        </div>
 
         {/* New Review Modal */}
         {showNewReviewModal && (
@@ -1102,7 +1175,224 @@ export default function DesignReview({ projeto }) {
   }
 
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh - 280px)', minHeight: '600px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 280px)', minHeight: '600px' }}>
+      {/* Tabs Bar */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '4px',
+        padding: '8px 12px',
+        borderBottom: '1px solid var(--stone)',
+        background: 'var(--cream)',
+        minHeight: '48px'
+      }}>
+        {/* Open Tabs */}
+        {openTabs.map((tab) => (
+          <div
+            key={tab.reviewId}
+            onClick={() => switchTab(tab.reviewId)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '8px 12px',
+              borderRadius: '8px 8px 0 0',
+              background: activeTabId === tab.reviewId ? 'var(--white)' : 'transparent',
+              border: activeTabId === tab.reviewId ? '1px solid var(--stone)' : '1px solid transparent',
+              borderBottom: activeTabId === tab.reviewId ? '1px solid var(--white)' : '1px solid transparent',
+              marginBottom: activeTabId === tab.reviewId ? '-1px' : '0',
+              cursor: 'pointer',
+              maxWidth: '200px',
+              transition: 'all 0.15s'
+            }}
+          >
+            <FolderOpen size={14} style={{ color: 'var(--brown)', flexShrink: 0 }} />
+            <span style={{
+              fontSize: '12px',
+              fontWeight: activeTabId === tab.reviewId ? 600 : 400,
+              color: 'var(--brown)',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }}>
+              {tab.reviewCodigo ? `${tab.reviewCodigo} - ` : ''}{tab.reviewName}
+            </span>
+            <button
+              onClick={(e) => closeTab(tab.reviewId, e)}
+              style={{
+                padding: '2px',
+                background: 'transparent',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                color: 'var(--brown-light)',
+                display: 'flex',
+                alignItems: 'center'
+              }}
+              onMouseOver={(e) => e.currentTarget.style.color = 'var(--error)'}
+              onMouseOut={(e) => e.currentTarget.style.color = 'var(--brown-light)'}
+            >
+              <X size={14} />
+            </button>
+          </div>
+        ))}
+
+        {/* Add Tab Button */}
+        <div style={{ position: 'relative' }}>
+          <button
+            onClick={() => setShowReviewSelector(prev => !prev)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '8px 12px',
+              borderRadius: '8px',
+              background: 'transparent',
+              border: '1px dashed var(--stone)',
+              cursor: 'pointer',
+              color: 'var(--brown-light)',
+              fontSize: '12px'
+            }}
+          >
+            <PlusCircle size={14} />
+            Adicionar
+          </button>
+
+          {/* Review Selector Dropdown */}
+          {showReviewSelector && (
+            <div style={{
+              position: 'absolute',
+              top: '100%',
+              left: 0,
+              marginTop: '4px',
+              background: 'var(--white)',
+              borderRadius: '12px',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+              border: '1px solid var(--stone)',
+              minWidth: '280px',
+              maxHeight: '300px',
+              overflow: 'auto',
+              zIndex: 100
+            }}>
+              <div style={{ padding: '12px', borderBottom: '1px solid var(--stone)' }}>
+                <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--brown)' }}>
+                  Selecionar Pacote de Desenhos
+                </span>
+              </div>
+              {reviews.filter(r => !openTabs.some(t => t.reviewId === r.id)).length === 0 ? (
+                <div style={{ padding: '16px', textAlign: 'center', color: 'var(--brown-light)', fontSize: '12px' }}>
+                  Todos os pacotes já estão abertos
+                </div>
+              ) : (
+                reviews.filter(r => !openTabs.some(t => t.reviewId === r.id)).map((review) => (
+                  <div
+                    key={review.id}
+                    onClick={() => {
+                      addTab(review)
+                      setShowReviewSelector(false)
+                    }}
+                    style={{
+                      padding: '10px 12px',
+                      cursor: 'pointer',
+                      borderBottom: '1px solid var(--cream)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px'
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.background = 'var(--cream)'}
+                    onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <FolderOpen size={16} style={{ color: 'var(--brown-light)' }} />
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--brown)' }}>
+                        {review.nome}
+                      </div>
+                      {review.codigo_documento && (
+                        <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
+                          {review.codigo_documento}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+              <div
+                onClick={() => {
+                  setShowReviewSelector(false)
+                  setShowNewReviewModal(true)
+                }}
+                style={{
+                  padding: '10px 12px',
+                  cursor: 'pointer',
+                  borderTop: '1px solid var(--stone)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  color: 'var(--brown)'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.background = 'var(--cream)'}
+                onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+              >
+                <Plus size={16} />
+                <span style={{ fontSize: '13px', fontWeight: 500 }}>Criar Novo Pacote</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Spacer */}
+        <div style={{ flex: 1 }} />
+
+        {/* Open tabs count */}
+        {openTabs.length > 1 && (
+          <span style={{ fontSize: '11px', color: 'var(--brown-light)', marginRight: '8px' }}>
+            <Columns size={12} style={{ marginRight: '4px', verticalAlign: 'middle' }} />
+            {openTabs.length} pacotes abertos
+          </span>
+        )}
+      </div>
+
+      {/* Main Content */}
+      <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+      {/* Show message when no tabs open */}
+      {openTabs.length === 0 ? (
+        <div style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: '#F5F5F0',
+          padding: '48px'
+        }}>
+          <FolderOpen size={64} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '24px' }} />
+          <h3 style={{ color: 'var(--brown)', marginBottom: '8px', fontSize: '18px' }}>
+            Nenhum pacote de desenhos aberto
+          </h3>
+          <p style={{ color: 'var(--brown-light)', marginBottom: '24px', textAlign: 'center', maxWidth: '400px' }}>
+            Selecione um pacote de desenhos existente ou crie um novo para iniciar a revisão.
+          </p>
+          <div style={{ display: 'flex', gap: '12px' }}>
+            {reviews.length > 0 && (
+              <button
+                onClick={() => setShowReviewSelector(true)}
+                className="btn btn-secondary"
+              >
+                <FolderOpen size={16} style={{ marginRight: '8px' }} />
+                Abrir Existente
+              </button>
+            )}
+            <button
+              onClick={() => setShowNewReviewModal(true)}
+              className="btn btn-primary"
+            >
+              <Plus size={16} style={{ marginRight: '8px' }} />
+              Novo Pacote
+            </button>
+          </div>
+        </div>
+      ) : (
+      <>
       {/* Main PDF Viewer Area */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#F5F5F0', minWidth: 0 }}>
         {/* Toolbar */}
@@ -2234,6 +2524,8 @@ export default function DesignReview({ projeto }) {
           </div>
         </div>
       </div>
+      </>
+      )}
 
       {/* Upload New Version Modal */}
       {showUploadModal && (
@@ -2309,6 +2601,19 @@ export default function DesignReview({ projeto }) {
           error={createError}
         />
       )}
+
+      {/* Click outside to close review selector */}
+      {showReviewSelector && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 99
+          }}
+          onClick={() => setShowReviewSelector(false)}
+        />
+      )}
+      </div>
     </div>
   )
 }
