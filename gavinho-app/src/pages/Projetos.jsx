@@ -62,22 +62,6 @@ export default function Projetos() {
     loadData()
   }, [])
 
-  // Gerar código do projeto
-  const generateProjectCode = async () => {
-    const { data } = await supabase
-      .from('projetos')
-      .select('codigo')
-      .order('codigo', { ascending: false })
-      .limit(1)
-
-    let nextNum = 1
-    if (data && data.length > 0 && data[0].codigo) {
-      const match = data[0].codigo.match(/GA(\d+)/)
-      if (match) nextNum = parseInt(match[1]) + 1
-    }
-    return `GA${String(nextNum).padStart(5, '0')}`
-  }
-
   // Filtrar projetos
   const filteredProjects = projects.filter(p => {
     const matchesSearch = 
@@ -126,6 +110,10 @@ export default function Projetos() {
 
   // Guardar projeto (criar ou atualizar)
   const handleSaveProject = async () => {
+    if (!formData.codigo.trim()) {
+      alert('O código do projeto é obrigatório')
+      return
+    }
     if (!formData.nome.trim()) {
       alert('O nome do projeto é obrigatório')
       return
@@ -179,12 +167,9 @@ export default function Projetos() {
         console.log('Projeto atualizado:', data)
       } else {
         // Criar novo
-        const codigo = await generateProjectCode()
-        console.log('Código gerado:', codigo)
-        
         const { data, error } = await supabase
           .from('projetos')
-          .insert([{ ...projectData, codigo }])
+          .insert([{ ...projectData, codigo: formData.codigo.trim() }])
           .select()
 
         if (error) {
@@ -576,12 +561,10 @@ export default function Projetos() {
               <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--brown-light)' }}><X size={20} /></button>
             </div>
             <div style={{ padding: '24px' }}>
-              {editingProject && (
-                <div style={{ marginBottom: '16px' }}>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '6px', color: 'var(--brown)' }}>Código do Projeto</label>
-                  <input type="text" value={formData.codigo} onChange={(e) => setFormData({...formData, codigo: e.target.value})} placeholder="Ex: GA00123" style={{ width: '100%', padding: '12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box', fontFamily: 'monospace' }} />
-                </div>
-              )}
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '6px', color: 'var(--brown)' }}>Código do Projeto *</label>
+                <input type="text" value={formData.codigo} onChange={(e) => setFormData({...formData, codigo: e.target.value})} placeholder="Ex: GA00123" style={{ width: '100%', padding: '12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box', fontFamily: 'monospace' }} />
+              </div>
               <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '6px', color: 'var(--brown)' }}>Nome do Projeto *</label>
                 <input type="text" value={formData.nome} onChange={(e) => setFormData({...formData, nome: e.target.value})} placeholder="Ex: Casa Silva" style={{ width: '100%', padding: '12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }} />
@@ -659,7 +642,7 @@ export default function Projetos() {
             </div>
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', padding: '16px 24px', borderTop: '1px solid var(--stone)', background: 'var(--cream)' }}>
               <button onClick={() => setShowModal(false)} className="btn btn-outline">Cancelar</button>
-              <button onClick={handleSaveProject} className="btn btn-primary" disabled={!formData.nome.trim()}>{editingProject ? 'Guardar Alterações' : 'Criar Projeto'}</button>
+              <button onClick={handleSaveProject} className="btn btn-primary" disabled={!formData.codigo.trim() || !formData.nome.trim()}>{editingProject ? 'Guardar Alterações' : 'Criar Projeto'}</button>
             </div>
           </div>
         </div>
