@@ -1338,31 +1338,12 @@ export default function DesignReview({ projeto }) {
           </a>
         </div>
 
-        {/* PDF Content */}
-        <div
-          ref={containerRef}
-          onWheel={(e) => {
-            if (e.ctrlKey || e.metaKey) {
-              e.preventDefault()
-              // Zoom suave - proporcional à escala atual
-              const zoomFactor = 1 - (e.deltaY * 0.001)
-              setScale(prev => Math.min(3, Math.max(0.25, prev * zoomFactor)))
-            }
-          }}
-          style={{
-            flex: 1,
-            overflow: 'auto',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'flex-start',
-            padding: '24px',
-            position: 'relative'
-          }}
-        >
-          {/* Floating Toolbar for Drawing Tools */}
+        {/* PDF Content Area - Container fixo */}
+        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+          {/* Floating Toolbar - Posicionada absolutamente */}
           {selectedVersion?.file_url && (
             <div style={{
-              position: 'sticky',
+              position: 'absolute',
               top: '12px',
               left: '12px',
               zIndex: 100,
@@ -1372,9 +1353,7 @@ export default function DesignReview({ projeto }) {
               padding: '8px',
               background: 'var(--white)',
               borderRadius: '12px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-              marginRight: '12px',
-              alignSelf: 'flex-start'
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
             }}>
               {[
                 { id: 'select', icon: Eye, label: 'Selecionar' },
@@ -1433,6 +1412,28 @@ export default function DesignReview({ projeto }) {
               )}
             </div>
           )}
+
+          {/* Scrollable PDF Area */}
+          <div
+            ref={containerRef}
+            onWheel={(e) => {
+              if (e.ctrlKey || e.metaKey) {
+                e.preventDefault()
+                const zoomFactor = 1 - (e.deltaY * 0.001)
+                setScale(prev => Math.min(3, Math.max(0.25, prev * zoomFactor)))
+              }
+            }}
+            style={{
+              width: '100%',
+              height: '100%',
+              overflow: 'auto',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'flex-start',
+              padding: '24px',
+              paddingLeft: '80px' // Espaço para a toolbar flutuante
+            }}
+          >
           {selectedVersion?.file_url ? (
             <div
               ref={pdfContainerRef}
@@ -1654,6 +1655,7 @@ export default function DesignReview({ projeto }) {
               <p>Nenhuma versao disponivel</p>
             </div>
           )}
+          </div>
         </div>
 
         {/* Page Navigation */}
