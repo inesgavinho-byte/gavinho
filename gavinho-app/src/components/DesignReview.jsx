@@ -1070,24 +1070,6 @@ export default function DesignReview({ projeto }) {
     }
   }
 
-  // Handle mouse wheel zoom
-  const handleWheel = useCallback((e) => {
-    if (e.ctrlKey || e.metaKey) {
-      e.preventDefault()
-      const delta = e.deltaY > 0 ? -0.1 : 0.1
-      setScale(prev => Math.min(3, Math.max(0.25, prev + delta)))
-    }
-  }, [])
-
-  // Add wheel event listener
-  useEffect(() => {
-    const container = containerRef.current
-    if (container) {
-      container.addEventListener('wheel', handleWheel, { passive: false })
-      return () => container.removeEventListener('wheel', handleWheel)
-    }
-  }, [handleWheel])
-
   return (
     <div style={{ display: 'flex', height: 'calc(100vh - 280px)', minHeight: '600px' }}>
       {/* Main PDF Viewer Area */}
@@ -1359,6 +1341,13 @@ export default function DesignReview({ projeto }) {
         {/* PDF Content */}
         <div
           ref={containerRef}
+          onWheel={(e) => {
+            if (e.ctrlKey || e.metaKey) {
+              e.preventDefault()
+              const delta = e.deltaY > 0 ? -0.1 : 0.1
+              setScale(prev => Math.min(3, Math.max(0.25, prev + delta)))
+            }
+          }}
           style={{
             flex: 1,
             overflow: 'auto',
