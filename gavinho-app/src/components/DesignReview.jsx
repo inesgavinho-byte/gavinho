@@ -55,7 +55,8 @@ const CATEGORIAS = [
   { id: 'cota_falta', label: 'Cota em falta', color: '#8B5CF6' },
   { id: 'material', label: 'Material', color: '#10B981' },
   { id: 'dimensao', label: 'Dimensao', color: '#EC4899' },
-  { id: 'alinhamento', label: 'Alinhamento', color: '#06B6D4' }
+  { id: 'alinhamento', label: 'Alinhamento', color: '#06B6D4' },
+  { id: 'especialidades', label: 'Especialidades', color: '#7C3AED' }
 ]
 
 const getCategoriaColor = (cat) => {
@@ -688,16 +689,18 @@ export default function DesignReview({ projeto }) {
 
     // Only save if drawing has meaningful size
     let shouldSave = false
+    let drawingToSave = { ...currentDrawing }
+
     switch (currentDrawing.tipo) {
       case 'pencil':
         shouldSave = currentDrawing.data.points.length > 2
         break
       case 'rectangle':
         shouldSave = currentDrawing.data.width > 1 && currentDrawing.data.height > 1
-        // Clean up startX, startY before saving
+        // Clean up startX, startY before saving (create new object, don't mutate)
         if (shouldSave) {
           const { startX, startY, ...cleanData } = currentDrawing.data
-          currentDrawing.data = cleanData
+          drawingToSave = { ...currentDrawing, data: cleanData }
         }
         break
       case 'arrow':
@@ -708,16 +711,16 @@ export default function DesignReview({ projeto }) {
         break
       case 'circle':
         shouldSave = currentDrawing.data.radius > 1
-        // Clean up startX, startY before saving
+        // Clean up startX, startY before saving (create new object, don't mutate)
         if (shouldSave) {
           const { startX, startY, ...cleanData } = currentDrawing.data
-          currentDrawing.data = cleanData
+          drawingToSave = { ...currentDrawing, data: cleanData }
         }
         break
     }
 
     if (shouldSave) {
-      saveDrawing(currentDrawing)
+      saveDrawing(drawingToSave)
     }
 
     setCurrentDrawing(null)
@@ -1067,6 +1070,24 @@ export default function DesignReview({ projeto }) {
     }
   }
 
+  // Handle mouse wheel zoom
+  const handleWheel = useCallback((e) => {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault()
+      const delta = e.deltaY > 0 ? -0.1 : 0.1
+      setScale(prev => Math.min(3, Math.max(0.25, prev + delta)))
+    }
+  }, [])
+
+  // Add wheel event listener
+  useEffect(() => {
+    const container = containerRef.current
+    if (container) {
+      container.addEventListener('wheel', handleWheel, { passive: false })
+      return () => container.removeEventListener('wheel', handleWheel)
+    }
+  }, [handleWheel])
+
   return (
     <div style={{ display: 'flex', height: 'calc(100vh - 280px)', minHeight: '600px' }}>
       {/* Main PDF Viewer Area */}
@@ -1344,9 +1365,84 @@ export default function DesignReview({ projeto }) {
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'flex-start',
-            padding: '24px'
+            padding: '24px',
+            position: 'relative'
           }}
         >
+          {/* Floating Toolbar for Drawing Tools */}
+          {selectedVersion?.file_url && (
+            <div style={{
+              position: 'sticky',
+              top: '12px',
+              left: '12px',
+              zIndex: 100,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+              padding: '8px',
+              background: 'var(--white)',
+              borderRadius: '12px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              marginRight: '12px',
+              alignSelf: 'flex-start'
+            }}>
+              {[
+                { id: 'select', icon: Eye, label: 'Selecionar' },
+                { id: 'comment', icon: MessageCircle, label: 'Comentário' },
+                { id: 'pencil', icon: Pencil, label: 'Desenho livre' },
+                { id: 'rectangle', icon: Square, label: 'Retângulo' },
+                { id: 'arrow', icon: ArrowUpRight, label: 'Seta' },
+                { id: 'circle', icon: Circle, label: 'Círculo' },
+                { id: 'line', icon: Minus, label: 'Linha' },
+                { id: 'eraser', icon: Eraser, label: 'Borracha' }
+              ].map(tool => (
+                <button
+                  key={tool.id}
+                  onClick={() => setActiveTool(tool.id)}
+                  title={tool.label}
+                  style={{
+                    width: '40px',
+                    height: '40px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: activeTool === tool.id ? 'var(--brown)' : 'transparent',
+                    color: activeTool === tool.id ? 'var(--white)' : 'var(--brown)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <tool.icon size={20} />
+                </button>
+              ))}
+
+              {/* Divider */}
+              <div style={{ height: '1px', background: 'var(--stone)', margin: '4px 0' }} />
+
+              {/* Color Picker when drawing tool selected */}
+              {['pencil', 'rectangle', 'arrow', 'circle', 'line'].includes(activeTool) && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {DRAWING_COLORS.map(color => (
+                    <button
+                      key={color}
+                      onClick={() => setDrawingColor(color)}
+                      style={{
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '50%',
+                        border: drawingColor === color ? '2px solid var(--brown)' : '2px solid transparent',
+                        background: color,
+                        cursor: 'pointer',
+                        padding: 0,
+                        margin: '0 auto'
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           {selectedVersion?.file_url ? (
             <div
               ref={pdfContainerRef}
@@ -1451,28 +1547,104 @@ export default function DesignReview({ projeto }) {
                 </div>
               ))}
 
-              {/* New Comment Marker */}
+              {/* New Comment Marker + Floating Input */}
               {isAddingComment && newCommentPos && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    left: `${newCommentPos.x}%`,
-                    top: `${newCommentPos.y}%`,
-                    transform: 'translate(-50%, -50%)',
-                    width: '28px',
-                    height: '28px',
-                    borderRadius: '50%',
-                    background: getCategoriaColor(newCommentCategoria),
-                    color: 'white',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: '0 0 0 3px rgba(0,0,0,0.3)',
-                    zIndex: 20
-                  }}
-                >
-                  <Plus size={14} />
-                </div>
+                <>
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: `${newCommentPos.x}%`,
+                      top: `${newCommentPos.y}%`,
+                      transform: 'translate(-50%, -50%)',
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '50%',
+                      background: getCategoriaColor(newCommentCategoria),
+                      color: 'white',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 0 0 3px rgba(0,0,0,0.3)',
+                      zIndex: 20
+                    }}
+                  >
+                    <Plus size={14} />
+                  </div>
+                  {/* Floating Comment Input Box */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: `${Math.min(newCommentPos.x + 3, 70)}%`,
+                      top: `${newCommentPos.y}%`,
+                      transform: 'translateY(-50%)',
+                      width: '280px',
+                      padding: '12px',
+                      background: 'var(--white)',
+                      borderRadius: '12px',
+                      boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+                      zIndex: 25
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <textarea
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
+                      placeholder="Escreva o seu comentário..."
+                      autoFocus
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        borderRadius: '8px',
+                        border: '1px solid var(--stone)',
+                        fontSize: '13px',
+                        resize: 'none',
+                        minHeight: '70px',
+                        marginBottom: '8px'
+                      }}
+                    />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <select
+                        value={newCommentCategoria}
+                        onChange={(e) => setNewCommentCategoria(e.target.value)}
+                        style={{
+                          flex: 1,
+                          padding: '8px',
+                          borderRadius: '6px',
+                          border: '1px solid var(--stone)',
+                          fontSize: '12px',
+                          background: 'var(--white)'
+                        }}
+                      >
+                        {CATEGORIAS.map(cat => (
+                          <option key={cat.id} value={cat.id}>{cat.label}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => {
+                          setIsAddingComment(false)
+                          setNewCommentPos(null)
+                        }}
+                        style={{
+                          padding: '8px',
+                          borderRadius: '6px',
+                          border: '1px solid var(--stone)',
+                          background: 'var(--white)',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <X size={16} />
+                      </button>
+                      <button
+                        onClick={handleAddAnnotation}
+                        disabled={!newComment.trim()}
+                        className="btn btn-primary"
+                        style={{ padding: '8px 12px', fontSize: '12px' }}
+                      >
+                        <Send size={14} />
+                      </button>
+                    </div>
+                  </div>
+                </>
               )}
 
               {pdfError && (
