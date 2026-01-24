@@ -13,6 +13,9 @@ import ObraAutos from '../components/ObraAutos'
 import ObraOrcamentacao from '../components/ObraOrcamentacao'
 import ObraProjetoExecucao from '../components/ObraProjetoExecucao'
 import DiarioObraProjeto from '../components/DiarioObraProjeto'
+import ObraFotografias from '../components/ObraFotografias'
+import ObraRelatorios from '../components/ObraRelatorios'
+import ObraNaoConformidades from '../components/ObraNaoConformidades'
 import { exportDiarioToPDF } from '../utils/exportDiarioToPDF'
 
 // Tab Groups
@@ -1063,31 +1066,19 @@ export default function ObraDetalhe() {
         <DiarioObraProjeto obra={obra} />
       )}
 
-      {/* TAB: Fotografias (placeholder) */}
+      {/* TAB: Fotografias */}
       {activeTab === 'fotografias' && (
-        <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
-          <Camera size={48} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '16px' }} />
-          <h3 style={{ margin: '0 0 8px', color: 'var(--brown)' }}>Fotografias</h3>
-          <p style={{ color: 'var(--brown-light)', margin: 0 }}>Galeria de fotografias da obra em desenvolvimento</p>
-        </div>
+        <ObraFotografias obra={obra} />
       )}
 
-      {/* TAB: Relatórios Obra (placeholder) */}
+      {/* TAB: Relatórios Obra */}
       {activeTab === 'relatorios' && (
-        <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
-          <FileText size={48} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '16px' }} />
-          <h3 style={{ margin: '0 0 8px', color: 'var(--brown)' }}>Relatórios Obra</h3>
-          <p style={{ color: 'var(--brown-light)', margin: 0 }}>Módulo de relatórios de obra em desenvolvimento</p>
-        </div>
+        <ObraRelatorios obra={obra} />
       )}
 
-      {/* TAB: Não Conformidades (placeholder) */}
+      {/* TAB: Não Conformidades */}
       {activeTab === 'nao-conformidades' && (
-        <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
-          <AlertTriangle size={48} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '16px' }} />
-          <h3 style={{ margin: '0 0 8px', color: 'var(--brown)' }}>Não Conformidades</h3>
-          <p style={{ color: 'var(--brown-light)', margin: 0 }}>Módulo de não conformidades em desenvolvimento</p>
-        </div>
+        <ObraNaoConformidades obra={obra} />
       )}
 
       {/* TAB: HSO (placeholder) */}
