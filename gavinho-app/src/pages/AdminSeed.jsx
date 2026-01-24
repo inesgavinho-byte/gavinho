@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { seedGA00413Diario } from '../scripts/seedGA00413Diario'
 import {
   Database,
   Play,
@@ -1120,6 +1121,28 @@ export default function AdminSeed() {
     }
   }
 
+  // Wrapper para seed do Diário GA00413
+  const runSeedGA00413Diario = async () => {
+    setLoading(true)
+    setLogs([])
+    setResult(null)
+
+    const addLogWrapper = (message, type = 'info') => {
+      const timestamp = new Date().toLocaleTimeString('pt-PT')
+      setLogs(prev => [...prev, { message, type, timestamp }])
+    }
+
+    try {
+      const result = await seedGA00413Diario(supabase, addLogWrapper)
+      setResult({ success: result.errors === 0 })
+    } catch (err) {
+      addLogWrapper(`💥 Erro: ${err.message}`, 'error')
+      setResult({ success: false, error: err.message })
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const seedEntregasMYRYAD = async () => {
     setLoading(true)
     setLogs([])
@@ -1820,6 +1843,81 @@ export default function AdminSeed() {
               <>
                 <Play size={18} style={{ marginRight: '8px' }} />
                 Registar Férias
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* GA00413 Diário de Bordo Card */}
+        <div className="card" style={{ padding: '24px' }}>
+          <div className="flex items-center gap-md" style={{ marginBottom: '20px' }}>
+            <div style={{
+              width: '56px',
+              height: '56px',
+              borderRadius: '12px',
+              background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white'
+            }}>
+              <FileText size={28} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--brown)' }}>
+                Diário GA00413 - Oeiras House
+              </h3>
+              <p style={{ fontSize: '13px', color: 'var(--brown-light)' }}>
+                Importar entradas de reuniões de coordenação de obra
+              </p>
+            </div>
+          </div>
+
+          {/* Resumo do que será importado */}
+          <div style={{
+            background: 'var(--cream)',
+            borderRadius: '12px',
+            padding: '16px',
+            marginBottom: '20px'
+          }}>
+            <h4 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--brown)', marginBottom: '12px' }}>
+              O que será importado:
+            </h4>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px', color: 'var(--brown-light)' }}>
+              <div>📋 118 entradas de diário</div>
+              <div>🏗️ Estruturas (38 entradas)</div>
+              <div>🏠 Arquitetura (14 entradas)</div>
+              <div>❄️ AVAC (10 entradas)</div>
+              <div>🌳 Paisagismo (18 entradas)</div>
+              <div>💧 Hidráulica (14 entradas)</div>
+              <div>🔌 Infraestrutura (8 entradas)</div>
+              <div>+ 7 outras especialidades</div>
+            </div>
+            <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--stone)' }}>
+              <div style={{ display: 'flex', gap: '16px', fontSize: '11px', color: 'var(--brown-light)' }}>
+                <span>🔴 Bloqueios: 13</span>
+                <span>🟢 Decisões: 41</span>
+                <span>🟡 Pendentes: 33</span>
+                <span>🔵 Info: 24</span>
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={runSeedGA00413Diario}
+            disabled={loading}
+            className="btn btn-primary"
+            style={{ width: '100%', padding: '14px' }}
+          >
+            {loading ? (
+              <>
+                <Loader size={18} style={{ marginRight: '8px', animation: 'spin 1s linear infinite' }} />
+                A processar...
+              </>
+            ) : (
+              <>
+                <Play size={18} style={{ marginRight: '8px' }} />
+                Importar Diário de Obra
               </>
             )}
           </button>
