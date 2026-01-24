@@ -355,6 +355,19 @@ ALTER TABLE obra_diario_projeto ENABLE ROW LEVEL SECURITY;
 ALTER TABLE obra_diario_projeto_tags ENABLE ROW LEVEL SECURITY;
 
 -- Políticas permissivas para utilizadores autenticados
+DROP POLICY IF EXISTS "Allow all for authenticated users" ON obra_zonas;
+DROP POLICY IF EXISTS "Allow all for authenticated users" ON especialidades;
+DROP POLICY IF EXISTS "Allow all for authenticated users" ON obra_fotografias;
+DROP POLICY IF EXISTS "Allow all for authenticated users" ON obra_relatorios;
+DROP POLICY IF EXISTS "Allow all for authenticated users" ON obra_relatorio_fotos;
+DROP POLICY IF EXISTS "Allow all for authenticated users" ON nao_conformidades;
+DROP POLICY IF EXISTS "Allow all for authenticated users" ON nc_fotografias;
+DROP POLICY IF EXISTS "Allow all for authenticated users" ON nc_historico;
+DROP POLICY IF EXISTS "Allow all for authenticated users" ON obra_diario_categorias;
+DROP POLICY IF EXISTS "Allow all for authenticated users" ON obra_diario_tags;
+DROP POLICY IF EXISTS "Allow all for authenticated users" ON obra_diario_projeto;
+DROP POLICY IF EXISTS "Allow all for authenticated users" ON obra_diario_projeto_tags;
+
 CREATE POLICY "Allow all for authenticated users" ON obra_zonas FOR ALL USING (true);
 CREATE POLICY "Allow all for authenticated users" ON especialidades FOR ALL USING (true);
 CREATE POLICY "Allow all for authenticated users" ON obra_fotografias FOR ALL USING (true);
@@ -378,6 +391,12 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_obra_zonas_updated_at ON obra_zonas;
+DROP TRIGGER IF EXISTS trigger_obra_fotografias_updated_at ON obra_fotografias;
+DROP TRIGGER IF EXISTS trigger_obra_relatorios_updated_at ON obra_relatorios;
+DROP TRIGGER IF EXISTS trigger_nao_conformidades_updated_at ON nao_conformidades;
+DROP TRIGGER IF EXISTS trigger_obra_diario_projeto_updated_at ON obra_diario_projeto;
 
 CREATE TRIGGER trigger_obra_zonas_updated_at
   BEFORE UPDATE ON obra_zonas
