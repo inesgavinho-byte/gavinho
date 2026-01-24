@@ -4,6 +4,27 @@
 -- =====================================================
 
 -- =====================================================
+-- ZONAS DE OBRA (necessária para outras tabelas)
+-- =====================================================
+CREATE TABLE IF NOT EXISTS obra_zonas (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    obra_id UUID NOT NULL REFERENCES obras(id) ON DELETE CASCADE,
+    codigo VARCHAR(20),
+    nome VARCHAR(100) NOT NULL,
+    piso VARCHAR(50),
+    tipo VARCHAR(50) DEFAULT 'Divisão',
+    area_m2 DECIMAL(10,2),
+    progresso INT DEFAULT 0,
+    notas TEXT,
+    ordem INT DEFAULT 0,
+    ativo BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_obra_zonas_obra ON obra_zonas(obra_id);
+
+-- =====================================================
 -- ESPECIALIDADES (tabela base partilhada)
 -- =====================================================
 CREATE TABLE IF NOT EXISTS especialidades (
@@ -320,6 +341,7 @@ CREATE INDEX IF NOT EXISTS idx_obra_diario_projeto_data ON obra_diario_projeto(d
 -- =====================================================
 -- RLS POLICIES
 -- =====================================================
+ALTER TABLE obra_zonas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE especialidades ENABLE ROW LEVEL SECURITY;
 ALTER TABLE obra_fotografias ENABLE ROW LEVEL SECURITY;
 ALTER TABLE obra_relatorios ENABLE ROW LEVEL SECURITY;
@@ -333,6 +355,7 @@ ALTER TABLE obra_diario_projeto ENABLE ROW LEVEL SECURITY;
 ALTER TABLE obra_diario_projeto_tags ENABLE ROW LEVEL SECURITY;
 
 -- Políticas permissivas para utilizadores autenticados
+CREATE POLICY "Allow all for authenticated users" ON obra_zonas FOR ALL USING (true);
 CREATE POLICY "Allow all for authenticated users" ON especialidades FOR ALL USING (true);
 CREATE POLICY "Allow all for authenticated users" ON obra_fotografias FOR ALL USING (true);
 CREATE POLICY "Allow all for authenticated users" ON obra_relatorios FOR ALL USING (true);
@@ -355,6 +378,11 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_obra_zonas_updated_at
+  BEFORE UPDATE ON obra_zonas
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at();
 
 CREATE TRIGGER trigger_obra_fotografias_updated_at
   BEFORE UPDATE ON obra_fotografias
