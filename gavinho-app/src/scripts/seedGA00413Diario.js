@@ -1,4 +1,4 @@
-// Script para inserir entradas do Diário de Bordo - GA00413 (Oeiras House S+K)
+// Script para inserir entradas do Diário de Bordo - GA00413+414 (Oeiras House S+K)
 // Execute este script através da página AdminSeed
 // Dados extraídos das reuniões de coordenação de obra
 
@@ -247,20 +247,20 @@ async function ensureEstadoTags(supabase, addLog) {
 
 // Função principal para inserir as entradas do diário
 export async function seedGA00413Diario(supabase, addLog = console.log) {
-  addLog('🚀 Iniciando importação do Diário de Bordo GA00413...', 'info')
+  addLog('🚀 Iniciando importação do Diário de Bordo GA00413+414...', 'info')
 
-  // 1. Encontrar o projeto GA00413
-  addLog('🔍 Procurando projeto GA00413...', 'info')
+  // 1. Encontrar o projeto GA00413+414
+  addLog('🔍 Procurando projeto GA00413+414...', 'info')
 
   const { data: projeto, error: projetoError } = await supabase
     .from('projetos')
     .select('id, codigo, nome')
-    .eq('codigo', 'GA00413')
+    .eq('codigo', 'GA00413+414')
     .single()
 
   if (projetoError || !projeto) {
-    addLog('❌ Projeto GA00413 não encontrado!', 'error')
-    throw new Error('Projeto GA00413 não encontrado')
+    addLog('❌ Projeto GA00413+414 não encontrado!', 'error')
+    throw new Error('Projeto GA00413+414 não encontrado')
   }
 
   addLog(`✅ Projeto encontrado: ${projeto.nome} (ID: ${projeto.id})`, 'success')
