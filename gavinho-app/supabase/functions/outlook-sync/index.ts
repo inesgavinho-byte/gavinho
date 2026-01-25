@@ -192,11 +192,18 @@ serve(async (req) => {
       let obraId: string | null = null
 
       if (projectCode) {
-        // Primeiro tentar obras, depois projetos
-        obraId = obraMap.get(projectCode) || projetoMap.get(projectCode) || null
+        // IMPORTANTE: obra_id tem FK para tabela obras, então só podemos usar códigos OB
+        // Códigos GA são projetos e não podem ser inseridos em obra_id
+        if (projectCode.startsWith('OB')) {
+          obraId = obraMap.get(projectCode) || null
+        }
+        // Note: GA codes são guardados em codigo_obra_detectado para referência
+        // mas não podem ser usados em obra_id devido à FK constraint
 
-        if (!obraId) {
-          console.log(`Email "${email.subject}" has code ${projectCode} but project not found in database - will import without association`)
+        if (!obraId && projectCode.startsWith('OB')) {
+          console.log(`Email "${email.subject}" has obra code ${projectCode} but not found in database`)
+        } else if (projectCode.startsWith('GA')) {
+          console.log(`Email "${email.subject}" has projeto code ${projectCode} - storing in codigo_obra_detectado only`)
         }
       } else {
         console.log(`Email "${email.subject}" - no project code detected, importing anyway`)
