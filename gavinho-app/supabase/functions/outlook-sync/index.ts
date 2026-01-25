@@ -57,12 +57,12 @@ async function getAccessToken(): Promise<string> {
 }
 
 // Buscar emails recentes
-async function fetchRecentEmails(accessToken: string, since?: string): Promise<Email[]> {
+async function fetchRecentEmails(accessToken: string, since?: string, limit: number = 50): Promise<Email[]> {
   const filter = since
     ? `&$filter=receivedDateTime ge ${since}`
     : ''
 
-  const url = `https://graph.microsoft.com/v1.0/users/${OUTLOOK_EMAIL}/messages?$top=50&$orderby=receivedDateTime desc&$select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,sentDateTime,bodyPreview,body,hasAttachments,importance,isRead${filter}`
+  const url = `https://graph.microsoft.com/v1.0/users/${OUTLOOK_EMAIL}/messages?$top=${limit}&$orderby=receivedDateTime desc&$select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,sentDateTime,bodyPreview,body,hasAttachments,importance,isRead${filter}`
 
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${accessToken}` },
@@ -120,23 +120,44 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
-    // Obter última sincronização da tabela obra_emails
-    const { data: lastSync } = await supabase
-      .from('obra_emails')
-      .select('data_recebido')
-      .order('data_recebido', { ascending: false })
-      .limit(1)
-      .single()
+    // Parâmetros opcionais do request
+    let daysBack = 30 // Default: últimos 30 dias
+    let forceFullSync = false
 
-    const sinceDate = lastSync?.data_recebido
-      ? new Date(lastSync.data_recebido).toISOString()
-      : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString() // Últimos 7 dias
+    try {
+      const body = await req.json()
+      if (body.days_back) daysBack = parseInt(body.days_back)
+      if (body.full_sync) forceFullSync = true
+    } catch {
+      // Request sem body, usar defaults
+    }
 
-    console.log(`Fetching emails since: ${sinceDate}`)
+    // Calcular data de início
+    let sinceDate: string
+
+    if (forceFullSync) {
+      // Sync completo: últimos 90 dias
+      sinceDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
+    } else {
+      // Obter última sincronização ou usar days_back
+      const { data: lastSync } = await supabase
+        .from('obra_emails')
+        .select('data_recebido')
+        .order('data_recebido', { ascending: false })
+        .limit(1)
+        .single()
+
+      sinceDate = lastSync?.data_recebido
+        ? new Date(lastSync.data_recebido).toISOString()
+        : new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000).toISOString()
+    }
+
+    console.log(`Fetching emails since: ${sinceDate} (full_sync: ${forceFullSync}, days_back: ${daysBack})`)
 
     // Obter token e emails
     const accessToken = await getAccessToken()
-    const emails = await fetchRecentEmails(accessToken, sinceDate)
+    const emailLimit = forceFullSync ? 200 : 50
+    const emails = await fetchRecentEmails(accessToken, sinceDate, emailLimit)
 
     console.log(`Found ${emails.length} emails from Outlook`)
 
