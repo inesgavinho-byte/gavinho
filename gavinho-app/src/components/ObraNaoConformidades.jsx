@@ -4,7 +4,7 @@ import {
   AlertTriangle, Plus, X, Calendar, MapPin, Edit2, Trash2,
   ChevronDown, ChevronRight, Clock, User, Camera, CheckCircle,
   ArrowRight, Loader2, Upload, AlertCircle, Search, Filter,
-  FileText, Check
+  FileText, Check, Image, Euro, Building2, Wrench, Zap, Hammer, Layers
 } from 'lucide-react'
 
 const TIPOS_NC = [
@@ -23,9 +23,24 @@ const GRAVIDADES = {
 const ESTADOS = {
   aberta: { label: 'Aberta', cor: '#EF4444', icon: AlertCircle },
   em_resolucao: { label: 'Em Resolução', cor: '#F59E0B', icon: Clock },
-  resolvida: { label: 'Resolvida', cor: '#3B82F6', icon: Check },
+  resolvida: { label: 'Resolvida', cor: '#10B981', icon: Check },
   verificada: { label: 'Verificada', cor: '#10B981', icon: CheckCircle },
   encerrada: { label: 'Encerrada', cor: '#6B7280', icon: FileText }
+}
+
+// Ícones por especialidade
+const ESPECIALIDADE_ICONS = {
+  'estrutura': Layers,
+  'avac': Wrench,
+  'eletrico': Zap,
+  'carpintaria': Hammer,
+  'default': Building2
+}
+
+const getEspecialidadeIcon = (nome) => {
+  if (!nome) return ESPECIALIDADE_ICONS.default
+  const key = nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  return ESPECIALIDADE_ICONS[key] || ESPECIALIDADE_ICONS.default
 }
 
 export default function ObraNaoConformidades({ obra }) {
@@ -57,7 +72,12 @@ export default function ObraNaoConformidades({ obra }) {
     data_limite_resolucao: '',
     responsavel_resolucao: '',
     acao_corretiva: '',
-    acao_preventiva: ''
+    acao_preventiva: '',
+    artigo: '',
+    valor_estimado: '',
+    ref_proposta: '',
+    especificacao_contratual: '',
+    comunicado_por: ''
   })
 
   useEffect(() => {
@@ -124,7 +144,12 @@ export default function ObraNaoConformidades({ obra }) {
       data_limite_resolucao: '',
       responsavel_resolucao: '',
       acao_corretiva: '',
-      acao_preventiva: ''
+      acao_preventiva: '',
+      artigo: '',
+      valor_estimado: '',
+      ref_proposta: '',
+      especificacao_contratual: '',
+      comunicado_por: ''
     })
     setEditingNC(null)
   }
@@ -151,7 +176,12 @@ export default function ObraNaoConformidades({ obra }) {
           data_identificacao: formData.data_identificacao,
           data_limite_resolucao: formData.data_limite_resolucao || null,
           responsavel_resolucao: formData.responsavel_resolucao || null,
-          estado: 'aberta'
+          estado: 'aberta',
+          artigo: formData.artigo || null,
+          valor_estimado: formData.valor_estimado ? parseFloat(formData.valor_estimado) : null,
+          ref_proposta: formData.ref_proposta || null,
+          especificacao_contratual: formData.especificacao_contratual || null,
+          comunicado_por: formData.comunicado_por || null
         })
         .select()
         .single()
@@ -194,7 +224,12 @@ export default function ObraNaoConformidades({ obra }) {
           data_limite_resolucao: formData.data_limite_resolucao || null,
           responsavel_resolucao: formData.responsavel_resolucao || null,
           acao_corretiva: formData.acao_corretiva || null,
-          acao_preventiva: formData.acao_preventiva || null
+          acao_preventiva: formData.acao_preventiva || null,
+          artigo: formData.artigo || null,
+          valor_estimado: formData.valor_estimado ? parseFloat(formData.valor_estimado) : null,
+          ref_proposta: formData.ref_proposta || null,
+          especificacao_contratual: formData.especificacao_contratual || null,
+          comunicado_por: formData.comunicado_por || null
         })
         .eq('id', editingNC.id)
 
@@ -281,7 +316,12 @@ export default function ObraNaoConformidades({ obra }) {
       data_limite_resolucao: nc.data_limite_resolucao || '',
       responsavel_resolucao: nc.responsavel_resolucao || '',
       acao_corretiva: nc.acao_corretiva || '',
-      acao_preventiva: nc.acao_preventiva || ''
+      acao_preventiva: nc.acao_preventiva || '',
+      artigo: nc.artigo || '',
+      valor_estimado: nc.valor_estimado || '',
+      ref_proposta: nc.ref_proposta || '',
+      especificacao_contratual: nc.especificacao_contratual || '',
+      comunicado_por: nc.comunicado_por || ''
     })
     setShowModal(true)
   }
@@ -324,8 +364,19 @@ export default function ObraNaoConformidades({ obra }) {
     total: ncs.length,
     abertas: ncs.filter(nc => nc.estado === 'aberta').length,
     emResolucao: ncs.filter(nc => nc.estado === 'em_resolucao').length,
-    resolvidas: ncs.filter(nc => ['resolvida', 'verificada', 'encerrada'].includes(nc.estado)).length,
+    resolvidas: ncs.filter(nc => nc.estado === 'resolvida').length,
+    verificadas: ncs.filter(nc => nc.estado === 'verificada').length,
     criticas: ncs.filter(nc => nc.gravidade === 'critica' && nc.estado === 'aberta').length
+  }
+
+  // Contar NCs por estado por especialidade
+  const getEspecialidadeStats = (espId) => {
+    const ncsEsp = ncs.filter(nc => nc.especialidade_id === espId)
+    return {
+      abertas: ncsEsp.filter(nc => nc.estado === 'aberta').length,
+      emResolucao: ncsEsp.filter(nc => nc.estado === 'em_resolucao').length,
+      resolvidas: ncsEsp.filter(nc => ['resolvida', 'verificada'].includes(nc.estado)).length
+    }
   }
 
   const formatDate = (dateStr) => {
@@ -346,38 +397,51 @@ export default function ObraNaoConformidades({ obra }) {
     <div style={{ display: 'flex', gap: '16px', height: 'calc(100vh - 300px)', minHeight: '500px' }}>
       {/* Painel esquerdo - Lista */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <div>
-            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--brown)' }}>
-              Não Conformidades
-            </h3>
-            <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--brown-light)' }}>
-              {stats.total} total • {stats.abertas} abertas • {stats.criticas > 0 && <span style={{ color: '#EF4444' }}>{stats.criticas} críticas</span>}
-            </p>
-          </div>
-          <button onClick={() => { resetForm(); setShowModal(true) }} className="btn btn-primary">
-            <Plus size={16} /> Nova NC
-          </button>
-        </div>
-
-        {/* KPIs */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '16px' }}>
-          <div style={{ padding: '12px', background: '#FEE2E2', borderRadius: '8px', textAlign: 'center' }}>
-            <div style={{ fontSize: '20px', fontWeight: 700, color: '#EF4444' }}>{stats.abertas}</div>
-            <div style={{ fontSize: '11px', color: '#B91C1C' }}>Abertas</div>
-          </div>
-          <div style={{ padding: '12px', background: '#FEF3C7', borderRadius: '8px', textAlign: 'center' }}>
-            <div style={{ fontSize: '20px', fontWeight: 700, color: '#F59E0B' }}>{stats.emResolucao}</div>
-            <div style={{ fontSize: '11px', color: '#B45309' }}>Em Resolução</div>
-          </div>
-          <div style={{ padding: '12px', background: '#D1FAE5', borderRadius: '8px', textAlign: 'center' }}>
-            <div style={{ fontSize: '20px', fontWeight: 700, color: '#10B981' }}>{stats.resolvidas}</div>
-            <div style={{ fontSize: '11px', color: '#047857' }}>Resolvidas</div>
-          </div>
-          <div style={{ padding: '12px', background: 'var(--stone)', borderRadius: '8px', textAlign: 'center' }}>
-            <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--brown)' }}>{stats.total}</div>
-            <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>Total</div>
+        {/* Header com título e contadores */}
+        <div className="card" style={{ padding: '20px', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--brown)' }}>
+                Não Conformidades
+              </h3>
+              {/* Status counters com dots coloridos */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '8px', fontSize: '13px' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#EF4444' }} />
+                  Abertas: {stats.abertas}
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#F59E0B' }} />
+                  Em Resolução: {stats.emResolucao}
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10B981' }} />
+                  Resolvidas: {stats.resolvidas}
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10B981' }} />
+                  Verificadas: {stats.verificadas}
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={() => { resetForm(); setShowModal(true) }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '10px 16px',
+                background: '#10B981',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}
+            >
+              <Plus size={16} /> Registar NC
+            </button>
           </div>
         </div>
 
@@ -427,7 +491,11 @@ export default function ObraNaoConformidades({ obra }) {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {Object.entries(ncsPorEspecialidade).map(([espId, { especialidade, ncs: ncsEsp }]) => (
+              {Object.entries(ncsPorEspecialidade).map(([espId, { especialidade, ncs: ncsEsp }]) => {
+                const EspIcon = getEspecialidadeIcon(especialidade.nome)
+                const espStats = getEspecialidadeStats(espId)
+
+                return (
                 <div key={espId} className="card" style={{ padding: 0, overflow: 'hidden' }}>
                   {/* Header da especialidade */}
                   <button
@@ -435,33 +503,64 @@ export default function ObraNaoConformidades({ obra }) {
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '8px',
+                      gap: '12px',
                       width: '100%',
-                      padding: '12px 16px',
-                      background: 'var(--cream)',
+                      padding: '14px 16px',
+                      background: 'white',
                       border: 'none',
                       cursor: 'pointer',
-                      textAlign: 'left'
+                      textAlign: 'left',
+                      borderLeft: `4px solid ${especialidade.cor || '#8B8670'}`
                     }}
                   >
-                    {expandedEspecialidades.includes(espId) ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                    <span style={{
-                      width: '12px',
-                      height: '12px',
-                      borderRadius: '3px',
-                      background: especialidade.cor
-                    }} />
-                    <span style={{ flex: 1, fontWeight: 600, fontSize: '13px' }}>{especialidade.nome}</span>
-                    <span style={{
-                      padding: '2px 8px',
-                      borderRadius: '10px',
-                      fontSize: '11px',
-                      fontWeight: 600,
-                      background: 'var(--stone)',
-                      color: 'var(--brown)'
+                    {/* Ícone da especialidade */}
+                    <div style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '8px',
+                      background: `${especialidade.cor || '#8B8670'}15`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: especialidade.cor || '#8B8670'
                     }}>
-                      {ncsEsp.length}
-                    </span>
+                      <EspIcon size={18} />
+                    </div>
+
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--brown)' }}>{especialidade.nome}</div>
+                      <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>{ncsEsp.length} não conformidades</div>
+                    </div>
+
+                    {/* Badges de contagem por estado */}
+                    <div style={{ display: 'flex', gap: '6px', marginRight: '8px' }}>
+                      {espStats.abertas > 0 && (
+                        <span style={{
+                          width: '24px', height: '24px', borderRadius: '50%',
+                          background: '#FEE2E2', color: '#EF4444',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: '11px', fontWeight: 600
+                        }}>{espStats.abertas}</span>
+                      )}
+                      {espStats.emResolucao > 0 && (
+                        <span style={{
+                          width: '24px', height: '24px', borderRadius: '50%',
+                          background: '#FEF3C7', color: '#D97706',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: '11px', fontWeight: 600
+                        }}>{espStats.emResolucao}</span>
+                      )}
+                      {espStats.resolvidas > 0 && (
+                        <span style={{
+                          width: '24px', height: '24px', borderRadius: '50%',
+                          background: '#D1FAE5', color: '#10B981',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: '11px', fontWeight: 600
+                        }}>{espStats.resolvidas}</span>
+                      )}
+                    </div>
+
+                    {expandedEspecialidades.includes(espId) ? <ChevronDown size={18} color="var(--brown-light)" /> : <ChevronRight size={18} color="var(--brown-light)" />}
                   </button>
 
                   {/* Lista de NCs */}
@@ -480,7 +579,8 @@ export default function ObraNaoConformidades({ obra }) {
                     </div>
                   )}
                 </div>
-              ))}
+              )})}
+
 
               {/* NCs sem especialidade */}
               {ncsSemEspecialidade.length > 0 && (
@@ -667,6 +767,75 @@ export default function ObraNaoConformidades({ obra }) {
                 />
               </div>
 
+              {/* Campos adicionais de informação */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 500, marginBottom: '4px', display: 'block' }}>
+                    Artigo (Caderno Encargos)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.artigo}
+                    onChange={e => setFormData({ ...formData, artigo: e.target.value })}
+                    placeholder="Ex: 1.4 - Peças lancil"
+                    style={{ width: '100%' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 500, marginBottom: '4px', display: 'block' }}>
+                    Valor Estimado (€)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.valor_estimado}
+                    onChange={e => setFormData({ ...formData, valor_estimado: e.target.value })}
+                    placeholder="0.00"
+                    style={{ width: '100%' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 500, marginBottom: '4px', display: 'block' }}>
+                    Ref. Proposta
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.ref_proposta}
+                    onChange={e => setFormData({ ...formData, ref_proposta: e.target.value })}
+                    placeholder="Ex: POP.003.2025 - Extras 08"
+                    style={{ width: '100%' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 500, marginBottom: '4px', display: 'block' }}>
+                    Comunicado por
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.comunicado_por}
+                    onChange={e => setFormData({ ...formData, comunicado_por: e.target.value })}
+                    placeholder="Nome da empresa/entidade"
+                    style={{ width: '100%' }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 500, marginBottom: '4px', display: 'block' }}>
+                  Especificação Contratual
+                </label>
+                <textarea
+                  value={formData.especificacao_contratual}
+                  onChange={e => setFormData({ ...formData, especificacao_contratual: e.target.value })}
+                  placeholder="Texto do caderno de encargos relevante..."
+                  rows={3}
+                  style={{ width: '100%', resize: 'vertical' }}
+                />
+              </div>
+
               {editingNC && (
                 <>
                   <div>
@@ -719,9 +888,17 @@ export default function ObraNaoConformidades({ obra }) {
 
 // Componente para item da lista
 function NCListItem({ nc, isSelected, onSelect, onEdit, onDelete }) {
-  const gravidade = GRAVIDADES[nc.gravidade] || GRAVIDADES.maior
   const estado = ESTADOS[nc.estado] || ESTADOS.aberta
-  const EstadoIcon = estado.icon
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return ''
+    return new Date(dateStr).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  }
+
+  const formatCurrency = (value) => {
+    if (!value) return null
+    return new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(value)
+  }
 
   return (
     <div
@@ -730,66 +907,70 @@ function NCListItem({ nc, isSelected, onSelect, onEdit, onDelete }) {
         display: 'flex',
         alignItems: 'center',
         gap: '12px',
-        padding: '12px 16px',
+        padding: '14px 16px',
         borderBottom: '1px solid var(--border)',
         cursor: 'pointer',
         background: isSelected ? 'var(--cream)' : 'white',
         transition: 'background 0.15s'
       }}
     >
-      {/* Indicador de gravidade */}
+      {/* Indicador de estado (dot) */}
       <div style={{
-        width: '4px',
-        height: '40px',
-        borderRadius: '2px',
-        background: gravidade.cor
+        width: '10px',
+        height: '10px',
+        borderRadius: '50%',
+        background: estado.cor,
+        flexShrink: 0
       }} />
 
-      {/* Conteúdo */}
+      {/* Conteúdo principal */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-          <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--brown-light)', fontFamily: 'monospace' }}>
-            {nc.codigo}
-          </span>
-          <span style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '3px',
-            padding: '2px 6px',
-            borderRadius: '4px',
-            fontSize: '10px',
-            fontWeight: 500,
-            background: `${estado.cor}20`,
-            color: estado.cor
-          }}>
-            <EstadoIcon size={10} />
-            {estado.label}
-          </span>
-        </div>
         <div style={{
-          fontSize: '13px',
+          fontSize: '14px',
           fontWeight: 500,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap'
+          color: 'var(--brown)',
+          marginBottom: '4px'
         }}>
           {nc.titulo}
         </div>
-        {nc.zona && (
-          <div style={{ fontSize: '11px', color: 'var(--brown-light)', marginTop: '2px' }}>
-            {nc.zona.nome}
-          </div>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--brown-light)' }}>
+          <span style={{ fontFamily: 'monospace', fontWeight: 500 }}>{nc.codigo}</span>
+          {nc.zona && (
+            <>
+              <span>·</span>
+              <span>{nc.zona.nome}</span>
+            </>
+          )}
+          {nc.artigo && (
+            <>
+              <span>·</span>
+              <span>Art. {nc.artigo}</span>
+            </>
+          )}
+        </div>
       </div>
 
-      {/* Ações */}
-      <div style={{ display: 'flex', gap: '2px' }} onClick={e => e.stopPropagation()}>
-        <button className="btn btn-ghost btn-icon" onClick={onEdit} style={{ padding: '4px' }}>
-          <Edit2 size={14} />
-        </button>
-        <button className="btn btn-ghost btn-icon" onClick={onDelete} style={{ padding: '4px', color: 'var(--error)' }}>
-          <Trash2 size={14} />
-        </button>
+      {/* Valor estimado */}
+      {nc.valor_estimado && (
+        <div style={{
+          fontSize: '13px',
+          fontWeight: 600,
+          color: 'var(--brown)',
+          textAlign: 'right',
+          minWidth: '80px'
+        }}>
+          {formatCurrency(nc.valor_estimado)}
+        </div>
+      )}
+
+      {/* Data */}
+      <div style={{
+        fontSize: '12px',
+        color: 'var(--brown-light)',
+        textAlign: 'right',
+        minWidth: '80px'
+      }}>
+        {formatDate(nc.data_identificacao)}
       </div>
     </div>
   )
@@ -797,9 +978,12 @@ function NCListItem({ nc, isSelected, onSelect, onEdit, onDelete }) {
 
 // Componente para painel de detalhes
 function NCDetailPanel({ nc, onClose, onEdit, onEstadoChange, formatDate }) {
-  const gravidade = GRAVIDADES[nc.gravidade] || GRAVIDADES.maior
   const estado = ESTADOS[nc.estado] || ESTADOS.aberta
-  const EstadoIcon = estado.icon
+
+  const formatCurrency = (value) => {
+    if (!value) return null
+    return new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(value)
+  }
 
   // Determinar próximos estados possíveis
   const getProximosEstados = () => {
@@ -814,151 +998,250 @@ function NCDetailPanel({ nc, onClose, onEdit, onEstadoChange, formatDate }) {
 
   const proximosEstados = getProximosEstados()
 
+  // Determinar texto do botão principal
+  const getMainAction = () => {
+    if (nc.estado === 'aberta' || nc.estado === 'em_resolucao') return 'resolvida'
+    if (nc.estado === 'resolvida') return 'verificada'
+    return null
+  }
+
+  const mainAction = getMainAction()
+
   return (
     <div className="card" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       {/* Header */}
-      <div style={{ padding: '16px', borderBottom: '1px solid var(--border)', background: 'var(--cream)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-          <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--brown-light)', fontFamily: 'monospace' }}>
+      <div style={{ padding: '20px', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+          <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--brown-light)' }}>
             {nc.codigo}
           </span>
-          <button onClick={onClose} className="btn btn-ghost btn-icon" style={{ padding: '4px' }}>
-            <X size={16} />
-          </button>
-        </div>
-        <h4 style={{ margin: '0 0 8px', fontSize: '15px', fontWeight: 600 }}>{nc.titulo}</h4>
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
           <span style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '4px',
-            padding: '4px 10px',
-            borderRadius: '4px',
-            fontSize: '11px',
-            fontWeight: 600,
-            background: `${estado.cor}20`,
-            color: estado.cor
+            gap: '6px',
+            padding: '4px 12px',
+            borderRadius: '16px',
+            fontSize: '12px',
+            fontWeight: 500,
+            background: `${estado.cor}15`,
+            color: estado.cor,
+            border: `1px solid ${estado.cor}30`
           }}>
-            <EstadoIcon size={12} />
+            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: estado.cor }} />
             {estado.label}
           </span>
-          <span style={{
-            padding: '4px 10px',
-            borderRadius: '4px',
-            fontSize: '11px',
-            fontWeight: 600,
-            background: `${gravidade.cor}20`,
-            color: gravidade.cor
-          }}>
-            {gravidade.label}
-          </span>
-          {nc.especialidade && (
-            <span style={{
-              padding: '4px 10px',
-              borderRadius: '4px',
-              fontSize: '11px',
-              fontWeight: 500,
-              background: `${nc.especialidade.cor}20`,
-              color: nc.especialidade.cor
-            }}>
-              {nc.especialidade.nome}
-            </span>
-          )}
         </div>
+        <h4 style={{ margin: '0 0 8px', fontSize: '16px', fontWeight: 600, color: 'var(--brown)', lineHeight: 1.4 }}>{nc.titulo}</h4>
+        {nc.zona && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--brown-light)' }}>
+            <MapPin size={14} />
+            {nc.zona.nome}
+          </div>
+        )}
       </div>
 
-      {/* Conteúdo */}
-      <div style={{ flex: 1, overflow: 'auto', padding: '16px' }}>
-        {/* Descrição */}
-        <div style={{ marginBottom: '16px' }}>
-          <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--brown-light)', textTransform: 'uppercase', marginBottom: '4px', display: 'block' }}>
-            Descrição
-          </label>
-          <p style={{ fontSize: '13px', margin: 0, lineHeight: 1.5 }}>{nc.descricao}</p>
-        </div>
-
-        {/* Datas */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
-          <div>
-            <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--brown-light)', textTransform: 'uppercase', marginBottom: '2px', display: 'block' }}>
-              Identificada
-            </label>
-            <span style={{ fontSize: '13px' }}>{formatDate(nc.data_identificacao)}</span>
-          </div>
-          {nc.data_limite_resolucao && (
+      {/* Conteúdo scrollável */}
+      <div style={{ flex: 1, overflow: 'auto' }}>
+        {/* Secção: Informação */}
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
+          <h5 style={{ margin: '0 0 12px', fontSize: '11px', fontWeight: 600, color: 'var(--brown-light)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            Informação
+          </h5>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--brown-light)', textTransform: 'uppercase', marginBottom: '2px', display: 'block' }}>
-                Prazo
-              </label>
-              <span style={{ fontSize: '13px' }}>{formatDate(nc.data_limite_resolucao)}</span>
+              <div style={{ fontSize: '11px', color: 'var(--brown-light)', marginBottom: '2px' }}>Data</div>
+              <div style={{ fontSize: '13px', fontWeight: 500 }}>{formatDate(nc.data_identificacao)}</div>
             </div>
-          )}
+            {nc.artigo && (
+              <div>
+                <div style={{ fontSize: '11px', color: 'var(--brown-light)', marginBottom: '2px' }}>Artigo</div>
+                <div style={{ fontSize: '13px', fontWeight: 500 }}>{nc.artigo}</div>
+              </div>
+            )}
+            {nc.ref_proposta && (
+              <div>
+                <div style={{ fontSize: '11px', color: 'var(--brown-light)', marginBottom: '2px' }}>Ref. Proposta</div>
+                <div style={{ fontSize: '13px', fontWeight: 500 }}>{nc.ref_proposta}</div>
+              </div>
+            )}
+            {nc.valor_estimado && (
+              <div>
+                <div style={{ fontSize: '11px', color: 'var(--brown-light)', marginBottom: '2px' }}>Valor Estimado</div>
+                <div style={{ fontSize: '13px', fontWeight: 600 }}>{formatCurrency(nc.valor_estimado)}</div>
+              </div>
+            )}
+            {nc.comunicado_por && (
+              <div style={{ gridColumn: '1 / -1' }}>
+                <div style={{ fontSize: '11px', color: 'var(--brown-light)', marginBottom: '2px' }}>Comunicado por</div>
+                <div style={{ fontSize: '13px', fontWeight: 500 }}>{nc.comunicado_por}</div>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Responsável */}
-        {nc.responsavel_resolucao && (
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--brown-light)', textTransform: 'uppercase', marginBottom: '2px', display: 'block' }}>
-              Responsável
-            </label>
-            <span style={{ fontSize: '13px' }}>{nc.responsavel_resolucao}</span>
+        {/* Secção: Descrição do Problema */}
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
+          <h5 style={{ margin: '0 0 12px', fontSize: '11px', fontWeight: 600, color: 'var(--brown-light)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            Descrição do Problema
+          </h5>
+          <p style={{ fontSize: '13px', margin: 0, lineHeight: 1.6, color: 'var(--brown)' }}>{nc.descricao}</p>
+        </div>
+
+        {/* Secção: Especificação Contratual */}
+        {nc.especificacao_contratual && (
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
+            <h5 style={{ margin: '0 0 12px', fontSize: '11px', fontWeight: 600, color: 'var(--brown-light)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Especificação Contratual
+            </h5>
+            <div style={{
+              padding: '16px',
+              background: '#F0EDE5',
+              borderRadius: '8px',
+              borderLeft: '3px solid #8B8670',
+              fontSize: '13px',
+              fontStyle: 'italic',
+              lineHeight: 1.6,
+              color: 'var(--brown)'
+            }}>
+              "{nc.especificacao_contratual}"
+            </div>
           </div>
         )}
 
-        {/* Zona */}
-        {nc.zona && (
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--brown-light)', textTransform: 'uppercase', marginBottom: '2px', display: 'block' }}>
-              Zona
-            </label>
-            <span style={{ fontSize: '13px' }}>{nc.zona.nome}</span>
+        {/* Secção: Registo Fotográfico */}
+        {nc.fotos && nc.fotos.length > 0 && (
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
+            <h5 style={{ margin: '0 0 12px', fontSize: '11px', fontWeight: 600, color: 'var(--brown-light)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Registo Fotográfico
+            </h5>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+              {nc.fotos.map((foto, idx) => (
+                <div key={idx} style={{
+                  aspectRatio: '4/3',
+                  borderRadius: '8px',
+                  overflow: 'hidden',
+                  background: 'var(--stone)',
+                  position: 'relative'
+                }}>
+                  <img
+                    src={foto.url}
+                    alt={foto.descricao || `Foto ${idx + 1}`}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                  {foto.descricao && (
+                    <div style={{
+                      position: 'absolute',
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      padding: '8px',
+                      background: 'linear-gradient(transparent, rgba(0,0,0,0.7))',
+                      color: 'white',
+                      fontSize: '11px'
+                    }}>
+                      {foto.descricao}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
-        {/* Ação Corretiva */}
+        {/* Placeholder para fotos quando não existem */}
+        {(!nc.fotos || nc.fotos.length === 0) && (
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
+            <h5 style={{ margin: '0 0 12px', fontSize: '11px', fontWeight: 600, color: 'var(--brown-light)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Registo Fotográfico
+            </h5>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+              {[1, 2].map(idx => (
+                <div key={idx} style={{
+                  aspectRatio: '4/3',
+                  borderRadius: '8px',
+                  background: 'var(--stone)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--brown-light)'
+                }}>
+                  <Image size={24} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Secção: Pedido de Esclarecimentos */}
+        {nc.esclarecimentos && nc.esclarecimentos.length > 0 && (
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
+            <h5 style={{ margin: '0 0 12px', fontSize: '11px', fontWeight: 600, color: 'var(--brown-light)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Pedido de Esclarecimentos
+            </h5>
+            <ol style={{ margin: 0, paddingLeft: '20px', fontSize: '13px', lineHeight: 1.8, color: 'var(--brown)' }}>
+              {nc.esclarecimentos.map((item, idx) => (
+                <li key={idx}>{item}</li>
+              ))}
+            </ol>
+          </div>
+        )}
+
+        {/* Secção: Ação Corretiva */}
         {nc.acao_corretiva && (
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--brown-light)', textTransform: 'uppercase', marginBottom: '4px', display: 'block' }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
+            <h5 style={{ margin: '0 0 12px', fontSize: '11px', fontWeight: 600, color: 'var(--brown-light)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
               Ação Corretiva
-            </label>
-            <p style={{ fontSize: '13px', margin: 0, lineHeight: 1.5, padding: '8px', background: 'var(--cream)', borderRadius: '6px' }}>
-              {nc.acao_corretiva}
-            </p>
-          </div>
-        )}
-
-        {/* Ação Preventiva */}
-        {nc.acao_preventiva && (
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--brown-light)', textTransform: 'uppercase', marginBottom: '4px', display: 'block' }}>
-              Ação Preventiva
-            </label>
-            <p style={{ fontSize: '13px', margin: 0, lineHeight: 1.5, padding: '8px', background: 'var(--cream)', borderRadius: '6px' }}>
-              {nc.acao_preventiva}
-            </p>
+            </h5>
+            <p style={{ fontSize: '13px', margin: 0, lineHeight: 1.6, color: 'var(--brown)' }}>{nc.acao_corretiva}</p>
           </div>
         )}
       </div>
 
       {/* Footer com ações */}
-      <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)', background: 'var(--cream)' }}>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <button onClick={onEdit} className="btn btn-outline" style={{ flex: 1 }}>
-            <Edit2 size={14} /> Editar
+      <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border)', background: 'white' }}>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button
+            onClick={onEdit}
+            style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              padding: '12px 16px',
+              background: 'white',
+              border: '1px solid var(--border)',
+              borderRadius: '8px',
+              fontSize: '13px',
+              fontWeight: 500,
+              color: 'var(--brown)',
+              cursor: 'pointer'
+            }}
+          >
+            <Edit2 size={16} /> Editar
           </button>
-          {proximosEstados.map(novoEstado => {
-            const novoEstadoConfig = ESTADOS[novoEstado]
-            return (
-              <button
-                key={novoEstado}
-                onClick={() => onEstadoChange(novoEstado)}
-                className="btn btn-primary"
-                style={{ flex: 1, background: novoEstadoConfig.cor }}
-              >
-                <ArrowRight size={14} /> {novoEstadoConfig.label}
-              </button>
-            )
-          })}
+          {mainAction && (
+            <button
+              onClick={() => onEstadoChange(mainAction)}
+              style={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                padding: '12px 16px',
+                background: '#10B981',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '13px',
+                fontWeight: 600,
+                color: 'white',
+                cursor: 'pointer'
+              }}
+            >
+              <CheckCircle size={16} /> Marcar {ESTADOS[mainAction].label}
+            </button>
+          )}
         </div>
       </div>
     </div>
