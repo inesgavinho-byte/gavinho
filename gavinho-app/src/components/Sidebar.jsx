@@ -27,7 +27,8 @@ import {
   Library,
   Database,
   Shield,
-  FileSearch
+  FileSearch,
+  Mail
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -62,6 +63,7 @@ const navigation = [
     section: 'Gestão Projetos',
     items: [
       { name: 'Dashboard Gestão', href: '/gestao', icon: LayoutDashboard },
+      { name: 'Emails', href: '/emails', icon: Mail },
       { name: 'Clientes', href: '/clientes', icon: Users },
       { name: 'Viabilidade', href: '/viabilidade', icon: FileSearch },
       {

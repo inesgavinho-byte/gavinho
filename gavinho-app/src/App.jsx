@@ -35,6 +35,7 @@ import AdminSeed from './pages/AdminSeed'
 import DiarioObra from './pages/DiarioObra'
 import ObraComunicacoes from './pages/ObraComunicacoes'
 import Viabilidade from './pages/Viabilidade'
+import Emails from './pages/Emails'
 
 function App() {
   return (
@@ -82,6 +83,7 @@ function App() {
             <Route path="orcamentos/:id" element={<OrcamentoDetalhe />} />
             <Route path="financeiro" element={<Finance />} />
             <Route path="viabilidade" element={<Viabilidade />} />
+            <Route path="emails" element={<Emails />} />
             <Route path="fornecedores" element={<Fornecedores />} />
             <Route path="fornecedores/:id" element={<FornecedorDetalhe />} />
             <Route path="perfil" element={<Perfil />} />
