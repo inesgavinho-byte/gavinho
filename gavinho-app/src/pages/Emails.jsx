@@ -68,6 +68,9 @@ export default function Emails() {
   const [detectando, setDetectando] = useState(false)
   const [detectResult, setDetectResult] = useState(null)
 
+  // Seed de dados de teste
+  const [seeding, setSeeding] = useState(false)
+
   // Stats
   const [stats, setStats] = useState({ total: 0, naoLidos: 0, urgentes: 0 })
 
@@ -451,6 +454,122 @@ export default function Emails() {
       alert('❌ Erro ao analisar email. Verifica a consola.')
     } finally {
       setDetectando(false)
+    }
+  }
+
+  // Seed de emails de teste
+  const seedTestEmails = async () => {
+    setSeeding(true)
+    try {
+      // Obter um projeto ou obra para associar
+      const { data: projetos } = await supabase
+        .from('projetos')
+        .select('id, codigo, nome')
+        .eq('arquivado', false)
+        .limit(1)
+
+      const projetoId = projetos?.[0]?.id || null
+
+      // Emails de teste com decisões
+      const testEmails = [
+        {
+          obra_id: projetoId,
+          de_email: 'joao.silva@cliente.com',
+          de_nome: 'João Silva',
+          para_emails: [{ email: 'ines@gavinhogroup.com', nome: 'Inês Gavinho' }],
+          assunto: 'RE: Confirmação materiais WC Suite - Maria Residences',
+          corpo_texto: `Olá Inês,
+
+Após a reunião de ontem, venho confirmar as seguintes decisões:
+
+1. BANCADA WC SUITE
+Confirmamos que queremos avançar com o mármore Calacatta Gold para a bancada do WC Suite principal.
+
+2. TORNEIRA WC
+Aprovamos a torneira Fantini série Lamè em dourado escovado. Por favor encomendem 2 unidades.
+
+3. ORÇAMENTO ADICIONAL
+O orçamento adicional de €3.200 para os acabamentos premium está aprovado.
+
+Por favor confirmem a recepção deste email.
+
+Cumprimentos,
+João Silva`,
+          tipo: 'recebido',
+          data_envio: new Date().toISOString(),
+          data_recebido: new Date().toISOString(),
+          lido: false,
+          importante: true,
+          urgencia: 'alta'
+        },
+        {
+          obra_id: projetoId,
+          de_email: 'fornecedor@pedras.pt',
+          de_nome: 'Pedro Marques - PedrasLux',
+          para_emails: [{ email: 'ines@gavinhogroup.com', nome: 'Inês Gavinho' }],
+          assunto: 'Orçamento Pedras Naturais - GA00402',
+          corpo_texto: `Boa tarde Inês,
+
+Conforme solicitado, envio o orçamento para as pedras naturais:
+
+- Mármore Calacatta Gold (bancada 2.5m²): €1.850
+- Mármore Nero Marquina (pavimento entrada): €2.400
+- Granito preto Zimbabwe (cozinha): €1.200
+
+Total: €5.450 + IVA
+
+Prazo de entrega: 3 semanas após confirmação.
+
+Aguardo feedback.
+
+Cumprimentos,
+Pedro Marques`,
+          tipo: 'recebido',
+          data_envio: new Date(Date.now() - 86400000).toISOString(),
+          data_recebido: new Date(Date.now() - 86400000).toISOString(),
+          lido: true,
+          importante: false,
+          urgencia: 'normal'
+        },
+        {
+          obra_id: projetoId,
+          de_email: 'ines@gavinhogroup.com',
+          de_nome: 'Inês Gavinho',
+          para_emails: [{ email: 'joao.silva@cliente.com', nome: 'João Silva' }],
+          assunto: 'RE: Reunião de acompanhamento - Maria Residences',
+          corpo_texto: `Caro João,
+
+Confirmo a reunião para amanhã às 15h no escritório.
+
+Temas a abordar:
+- Escolha de acabamentos
+- Cronograma atualizado
+- Orçamento extras
+
+Até amanhã,
+Inês Gavinho`,
+          tipo: 'enviado',
+          data_envio: new Date(Date.now() - 172800000).toISOString(),
+          data_recebido: new Date(Date.now() - 172800000).toISOString(),
+          lido: true,
+          importante: false,
+          urgencia: 'normal'
+        }
+      ]
+
+      const { error } = await supabase
+        .from('obra_emails')
+        .insert(testEmails)
+
+      if (error) throw error
+
+      alert('✅ 3 emails de teste inseridos com sucesso!')
+      loadEmails()
+    } catch (err) {
+      console.error('Erro ao inserir emails de teste:', err)
+      alert('❌ Erro: ' + err.message)
+    } finally {
+      setSeeding(false)
     }
   }
 
@@ -1038,6 +1157,25 @@ export default function Emails() {
               <div style={styles.emptyState}>
                 <Mail size={48} style={{ opacity: 0.3, marginBottom: '16px' }} />
                 <p>Nenhum email encontrado</p>
+                <p style={{ fontSize: '13px', color: 'var(--brown-light)', marginBottom: '16px' }}>
+                  Clica em "Sincronizar" para importar do Outlook ou insere dados de teste.
+                </p>
+                <button
+                  onClick={seedTestEmails}
+                  disabled={seeding}
+                  style={{
+                    padding: '10px 20px',
+                    background: '#8B8670',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: seeding ? 'wait' : 'pointer',
+                    fontSize: '13px',
+                    fontWeight: 500
+                  }}
+                >
+                  {seeding ? 'A inserir...' : '+ Inserir Emails de Teste'}
+                </button>
               </div>
             ) : (
               emails.map(email => (
