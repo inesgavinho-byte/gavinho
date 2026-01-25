@@ -69,6 +69,7 @@ import ProjetoDocumentos from '../components/ProjetoDocumentos'
 import CentralEntregas from '../components/CentralEntregas'
 import DiarioBordo from '../components/DiarioBordo'
 import DecisionLog from '../components/DecisionLog'
+import ProjetoDecisoes from '../components/decisoes/ProjetoDecisoes'
 import DesignReview from '../components/DesignReview'
 import RecebidosEspecialidades from '../components/RecebidosEspecialidades'
 import ViabilidadeModule from '../components/viabilidade/ViabilidadeModule'
@@ -2195,7 +2196,7 @@ export default function ProjetoDetalhe() {
     { id: 'dashboard', label: 'Dashboard', icon: Layers },
     { id: 'briefing', label: 'Briefing & Conceito', icon: Lightbulb },
     { id: 'fases', label: 'Fases & Entregas', icon: Target, hasSubtabs: true },
-    { id: 'decisions', label: 'Decision Log', icon: ClipboardList },
+    { id: 'decisoes', label: 'Decisões', icon: ClipboardList },
     { id: 'viabilidade', label: 'Viabilidade', icon: FileSearch },
     { id: 'chat-ia', label: 'Chat IA', icon: MessageSquare },
     { id: 'archviz', label: 'Archviz', icon: Image, hasSubtabs: true },
@@ -4316,9 +4317,9 @@ export default function ProjetoDetalhe() {
         </div>
       )}
 
-      {/* Tab Decision Log */}
-      {activeTab === 'decisions' && (
-        <DecisionLog projeto={project} />
+      {/* Tab Decisões */}
+      {activeTab === 'decisoes' && (
+        <ProjetoDecisoes projetoId={project?.id} />
       )}
 
       {/* Tab Viabilidade Urbanística */}
