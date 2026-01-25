@@ -190,20 +190,23 @@ serve(async (req) => {
       // Extrair código do projeto/obra
       const projectCode = extractProjectCode(email.subject, email.bodyPreview)
       let obraId: string | null = null
+      let projetoId: string | null = null
 
       if (projectCode) {
-        // IMPORTANTE: obra_id tem FK para tabela obras, então só podemos usar códigos OB
-        // Códigos GA são projetos e não podem ser inseridos em obra_id
+        // Códigos OB -> obra_id (FK para obras)
+        // Códigos GA -> projeto_id (FK para projetos)
         if (projectCode.startsWith('OB')) {
           obraId = obraMap.get(projectCode) || null
-        }
-        // Note: GA codes são guardados em codigo_obra_detectado para referência
-        // mas não podem ser usados em obra_id devido à FK constraint
-
-        if (!obraId && projectCode.startsWith('OB')) {
-          console.log(`Email "${email.subject}" has obra code ${projectCode} but not found in database`)
+          if (!obraId) {
+            console.log(`Email "${email.subject}" has obra code ${projectCode} but not found in database`)
+          }
         } else if (projectCode.startsWith('GA')) {
-          console.log(`Email "${email.subject}" has projeto code ${projectCode} - storing in codigo_obra_detectado only`)
+          projetoId = projetoMap.get(projectCode) || null
+          if (projetoId) {
+            console.log(`Email "${email.subject}" linked to projeto ${projectCode}`)
+          } else {
+            console.log(`Email "${email.subject}" has projeto code ${projectCode} but not found in database`)
+          }
         }
       } else {
         console.log(`Email "${email.subject}" - no project code detected, importing anyway`)
@@ -223,9 +226,11 @@ serve(async (req) => {
         nome: r.emailAddress.name || null
       })) || []
 
-      // Inserir na tabela obra_emails (obra_id pode ser null se projeto não existir)
+      // Inserir na tabela obra_emails
+      // obra_id para códigos OB (obras), projeto_id para códigos GA (projetos)
       const { error } = await supabase.from('obra_emails').insert({
-        obra_id: obraId, // null se projeto não encontrado
+        obra_id: obraId,
+        projeto_id: projetoId,
         de_email: email.from.emailAddress.address,
         de_nome: email.from.emailAddress.name || null,
         para_emails: paraEmails,
@@ -249,7 +254,7 @@ serve(async (req) => {
         console.error(`Error inserting email "${email.subject}": ${error.message}`)
       } else {
         imported++
-        if (!obraId) noProject++
+        if (!obraId && !projetoId) noProject++
       }
     }
 

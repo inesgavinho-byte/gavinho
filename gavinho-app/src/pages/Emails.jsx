@@ -109,7 +109,8 @@ export default function Emails() {
         .from('obra_emails')
         .select(`
           *,
-          obras:obra_id (id, codigo, nome)
+          obras:obra_id (id, codigo, nome),
+          projetos:projeto_id (id, codigo, nome)
         `)
         .order('data_recebido', { ascending: false })
         .limit(100)
