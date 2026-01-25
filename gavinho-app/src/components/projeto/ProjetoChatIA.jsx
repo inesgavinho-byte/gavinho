@@ -42,7 +42,11 @@ export default function ProjetoChatIA({ projetoId, projeto }) {
       .select('*')
       .eq('projeto_id', projetoId)
       .order('fixado', { ascending: false })
-      .order('last_message_at', { ascending: false, nullsFirst: false })
+      .order('updated_at', { ascending: false })
+
+    if (error) {
+      console.error('Erro ao carregar chats:', error)
+    }
 
     if (!error && data) {
       setChats(data)
