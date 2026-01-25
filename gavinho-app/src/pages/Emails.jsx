@@ -168,16 +168,36 @@ export default function Emails() {
 
   const loadObras = async () => {
     try {
-      const { data, error } = await supabase
-        .from('obras')
-        .select('id, codigo, codigo_canonico, nome')
-        .eq('estado', 'em_curso')
-        .order('codigo', { ascending: false })
+      // Carregar tanto projetos como obras
+      const [projetosRes, obrasRes] = await Promise.all([
+        supabase
+          .from('projetos')
+          .select('id, codigo, nome')
+          .eq('arquivado', false)
+          .order('codigo', { ascending: false }),
+        supabase
+          .from('obras')
+          .select('id, codigo, codigo_canonico, nome')
+          .in('estado', ['em_curso', 'planeamento'])
+          .order('codigo', { ascending: false })
+      ])
 
-      if (error) throw error
-      setObras(data || [])
+      // Combinar projetos e obras numa lista
+      const projetos = (projetosRes.data || []).map(p => ({
+        ...p,
+        tipo: 'projeto',
+        label: `${p.codigo} - ${p.nome}`
+      }))
+
+      const obras = (obrasRes.data || []).map(o => ({
+        ...o,
+        tipo: 'obra',
+        label: `${o.codigo_canonico || o.codigo} - ${o.nome}`
+      }))
+
+      setObras([...projetos, ...obras])
     } catch (err) {
-      console.error('Erro ao carregar obras:', err)
+      console.error('Erro ao carregar projetos/obras:', err)
     }
   }
 
@@ -972,12 +992,21 @@ export default function Emails() {
               onChange={(e) => setFiltroObra(e.target.value)}
               style={styles.filterSelect}
             >
-              <option value="todos">Todas as Obras</option>
-              {obras.map(obra => (
-                <option key={obra.id} value={obra.id}>
-                  {obra.codigo_canonico || obra.codigo} - {obra.nome}
-                </option>
-              ))}
+              <option value="todos">Todos Projetos/Obras</option>
+              {obras.filter(o => o.tipo === 'projeto').length > 0 && (
+                <optgroup label="Projetos">
+                  {obras.filter(o => o.tipo === 'projeto').map(p => (
+                    <option key={p.id} value={p.id}>{p.label}</option>
+                  ))}
+                </optgroup>
+              )}
+              {obras.filter(o => o.tipo === 'obra').length > 0 && (
+                <optgroup label="Obras">
+                  {obras.filter(o => o.tipo === 'obra').map(o => (
+                    <option key={o.id} value={o.id}>{o.label}</option>
+                  ))}
+                </optgroup>
+              )}
             </select>
 
             <select
@@ -1333,18 +1362,27 @@ export default function Emails() {
               </div>
 
               <div style={styles.fieldRow}>
-                <span style={styles.fieldLabel}>Obra:</span>
+                <span style={styles.fieldLabel}>Projeto/Obra:</span>
                 <select
                   value={composeObraId}
                   onChange={(e) => setComposeObraId(e.target.value)}
                   style={{ ...styles.fieldInput, cursor: 'pointer' }}
                 >
-                  <option value="">Nenhuma (não adicionar código)</option>
-                  {obras.map(obra => (
-                    <option key={obra.id} value={obra.id}>
-                      {obra.codigo_canonico || obra.codigo} - {obra.nome}
-                    </option>
-                  ))}
+                  <option value="">Nenhum (não adicionar código)</option>
+                  {obras.filter(o => o.tipo === 'projeto').length > 0 && (
+                    <optgroup label="Projetos">
+                      {obras.filter(o => o.tipo === 'projeto').map(p => (
+                        <option key={p.id} value={p.id}>{p.label}</option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {obras.filter(o => o.tipo === 'obra').length > 0 && (
+                    <optgroup label="Obras">
+                      {obras.filter(o => o.tipo === 'obra').map(o => (
+                        <option key={o.id} value={o.id}>{o.label}</option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
               </div>
             </div>
