@@ -226,6 +226,30 @@ serve(async (req) => {
         nome: r.emailAddress.name || null
       })) || []
 
+      // Extrair corpo do email (completo, não o preview truncado)
+      let corpoTexto = email.bodyPreview // fallback
+      let corpoHtml: string | null = null
+
+      if (email.body?.content) {
+        if (email.body.contentType === 'html') {
+          corpoHtml = email.body.content
+          // Extrair texto do HTML removendo tags
+          corpoTexto = email.body.content
+            .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '') // Remove CSS
+            .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '') // Remove scripts
+            .replace(/<[^>]+>/g, ' ') // Remove HTML tags
+            .replace(/&nbsp;/g, ' ')
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&quot;/g, '"')
+            .replace(/\s+/g, ' ') // Normalizar espaços
+            .trim()
+        } else {
+          corpoTexto = email.body.content
+        }
+      }
+
       // Inserir na tabela obra_emails
       // obra_id para códigos OB (obras), projeto_id para códigos GA (projetos)
       const { error } = await supabase.from('obra_emails').insert({
@@ -236,8 +260,8 @@ serve(async (req) => {
         para_emails: paraEmails,
         cc_emails: ccEmails.length > 0 ? ccEmails : null,
         assunto: email.subject,
-        corpo_texto: email.bodyPreview,
-        corpo_html: email.body?.contentType === 'html' ? email.body.content : null,
+        corpo_texto: corpoTexto,
+        corpo_html: corpoHtml,
         tipo: 'recebido',
         data_envio: email.sentDateTime || email.receivedDateTime,
         data_recebido: email.receivedDateTime,
