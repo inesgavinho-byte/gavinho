@@ -64,6 +64,10 @@ export default function Emails() {
   const [suggestion, setSuggestion] = useState(null)
   const [loadingSuggestion, setLoadingSuggestion] = useState(false)
 
+  // Detectar Decisões
+  const [detectando, setDetectando] = useState(false)
+  const [detectResult, setDetectResult] = useState(null)
+
   // Stats
   const [stats, setStats] = useState({ total: 0, naoLidos: 0, urgentes: 0 })
 
@@ -375,6 +379,58 @@ export default function Emails() {
         setComposeBody(suggestion.resposta + composeBody)
       }, 100)
       setShowSuggestion(false)
+    }
+  }
+
+  // Detectar Decisões com IA
+  const handleDetectarDecisoes = async (email) => {
+    if (!email) return
+
+    setDetectando(true)
+    setDetectResult(null)
+
+    try {
+      // Construir texto para análise (assunto + corpo)
+      const conteudo = `Assunto: ${email.assunto || ''}\n\nConteúdo:\n${email.corpo_texto || email.corpo_html?.replace(/<[^>]*>/g, '') || ''}`
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/decisoes-detectar`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+          },
+          body: JSON.stringify({
+            conteudo,
+            projeto_id: email.projeto_id || email.obra_id,
+            fonte: 'email',
+            metadata: {
+              email_id: email.id,
+              de: email.de_email,
+              de_nome: email.de_nome,
+              assunto: email.assunto,
+              data: email.data_envio || email.created_at
+            }
+          })
+        }
+      )
+
+      const result = await response.json()
+      setDetectResult(result)
+
+      if (result.success && result.decisoes_criadas > 0) {
+        alert(`✅ Detectadas ${result.decisoes_criadas} decisão(ões)!\n\nVai a Decisões > Validar para aprovar.`)
+      } else if (result.success) {
+        alert('ℹ️ Nenhuma decisão detectada neste email.')
+      } else {
+        alert(`❌ Erro: ${result.error}`)
+      }
+    } catch (error) {
+      console.error('Erro ao detectar decisões:', error)
+      alert('❌ Erro ao analisar email. Verifica a consola.')
+    } finally {
+      setDetectando(false)
     }
   }
 
@@ -1146,6 +1202,30 @@ export default function Emails() {
                     Sugerir Resposta
                   </button>
                 )}
+
+                {/* Detectar Decisões */}
+                <button
+                  onClick={() => handleDetectarDecisoes(selectedEmail)}
+                  disabled={detectando}
+                  style={{
+                    ...styles.button,
+                    background: detectando ? '#E5E5E5' : '#8B8670',
+                    color: detectando ? '#9CA3AF' : 'var(--white)',
+                    cursor: detectando ? 'wait' : 'pointer'
+                  }}
+                >
+                  {detectando ? (
+                    <>
+                      <Loader2 size={16} className="spin" />
+                      A analisar...
+                    </>
+                  ) : (
+                    <>
+                      <Search size={16} />
+                      Detectar Decisões
+                    </>
+                  )}
+                </button>
 
                 <button
                   onClick={() => handleArchive(selectedEmail)}
