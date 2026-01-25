@@ -109,7 +109,7 @@ export default function Emails() {
         .from('obra_emails')
         .select(`
           *,
-          obras:obra_id (id, codigo, codigo_canonico, nome)
+          obras:obra_id (id, codigo, nome)
         `)
         .order('data_recebido', { ascending: false })
         .limit(100)
@@ -180,7 +180,7 @@ export default function Emails() {
           .order('codigo', { ascending: false }),
         supabase
           .from('obras')
-          .select('id, codigo, codigo_canonico, nome')
+          .select('id, codigo, nome')
           .in('estado', ['em_curso', 'planeamento'])
           .order('codigo', { ascending: false })
       ])
@@ -195,7 +195,7 @@ export default function Emails() {
       const obras = (obrasRes.data || []).map(o => ({
         ...o,
         tipo: 'obra',
-        label: `${o.codigo_canonico || o.codigo} - ${o.nome}`
+        label: `${o.codigo} - ${o.nome}`
       }))
 
       setObras([...projetos, ...obras])
