@@ -73,10 +73,23 @@ Responde APENAS com JSON válido: { "tem_decisoes": boolean, "decisoes": [...], 
     let decisoesCriadas = 0
     if (resultado.tem_decisoes && resultado.decisoes?.length > 0) {
       for (const dec of resultado.decisoes) {
-        await supabase.from('decisoes').insert({
+        // Mapear tipo para categoria
+        const categoriaMap: Record<string, string> = {
+          'design': 'tecnica',
+          'material': 'tecnica',
+          'tecnico': 'tecnica',
+          'financeiro': 'financeira',
+          'prazo': 'prazo',
+          'fornecedor': 'fornecedor',
+          'alteracao': 'cliente'
+        }
+        const categoria = categoriaMap[dec.tipo] || 'cliente'
+
+        const { error: insertError } = await supabase.from('decisoes').insert({
           projeto_id,
           titulo: dec.titulo,
           descricao: dec.descricao,
+          categoria,
           tipo: dec.tipo || 'design',
           impacto: dec.impacto || 'medio',
           decidido_por: dec.decidido_por || 'Não identificado',
@@ -91,7 +104,12 @@ Responde APENAS com JSON válido: { "tem_decisoes": boolean, "decisoes": [...], 
           fonte_referencia: evento_id,
           estado: 'sugerida'
         })
-        decisoesCriadas++
+
+        if (insertError) {
+          console.error('Erro ao inserir decisão:', insertError.message)
+        } else {
+          decisoesCriadas++
+        }
       }
     }
 
