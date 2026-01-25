@@ -628,218 +628,497 @@ export default function ObraNaoConformidades({ obra }) {
 
       {/* Modal de Criação/Edição */}
       {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px', maxHeight: '90vh', overflow: 'auto' }}>
-            <div className="modal-header">
-              <h3>{editingNC ? 'Editar Não Conformidade' : 'Nova Não Conformidade'}</h3>
-              <button onClick={() => setShowModal(false)} className="modal-close">
+        <div
+          onClick={() => setShowModal(false)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '20px'
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: 'white',
+              borderRadius: '16px',
+              width: '100%',
+              maxWidth: '640px',
+              maxHeight: '90vh',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)'
+            }}
+          >
+            {/* Header do Modal */}
+            <div style={{
+              padding: '24px 28px 20px',
+              borderBottom: '1px solid #E5E2D9',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '10px',
+                  background: '#FEF3C7',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <AlertTriangle size={20} color="#D97706" />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: '#4A4637' }}>
+                    {editingNC ? 'Editar Não Conformidade' : 'Nova Não Conformidade'}
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '13px', color: '#8B8670' }}>
+                    Registe os detalhes da não conformidade identificada
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowModal(false)}
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '8px',
+                  border: '1px solid #E5E2D9',
+                  background: 'white',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#8B8670'
+                }}
+              >
                 <X size={18} />
               </button>
             </div>
 
-            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: 500, marginBottom: '4px', display: 'block' }}>
-                  Título *
-                </label>
-                <input
-                  type="text"
-                  value={formData.titulo}
-                  onChange={e => setFormData({ ...formData, titulo: e.target.value })}
-                  placeholder="Descrição breve do problema..."
-                  style={{ width: '100%' }}
-                />
-              </div>
+            {/* Corpo do Modal - Scrollable */}
+            <div style={{
+              flex: 1,
+              overflow: 'auto',
+              padding: '24px 28px'
+            }}>
+              {/* Secção: Identificação */}
+              <div style={{ marginBottom: '24px' }}>
+                <h4 style={{
+                  margin: '0 0 16px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#8B8670',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  Identificação
+                </h4>
 
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: 500, marginBottom: '4px', display: 'block' }}>
-                  Descrição *
-                </label>
-                <textarea
-                  value={formData.descricao}
-                  onChange={e => setFormData({ ...formData, descricao: e.target.value })}
-                  placeholder="Descreva o desvio identificado com detalhes..."
-                  rows={4}
-                  style={{ width: '100%', resize: 'vertical' }}
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={{ fontSize: '12px', fontWeight: 500, marginBottom: '4px', display: 'block' }}>
-                    Especialidade
-                  </label>
-                  <select
-                    value={formData.especialidade_id}
-                    onChange={e => setFormData({ ...formData, especialidade_id: e.target.value })}
-                    style={{ width: '100%' }}
-                  >
-                    <option value="">Selecionar...</option>
-                    {especialidades.map(esp => (
-                      <option key={esp.id} value={esp.id}>{esp.nome}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label style={{ fontSize: '12px', fontWeight: 500, marginBottom: '4px', display: 'block' }}>
-                    Zona
-                  </label>
-                  <select
-                    value={formData.zona_id}
-                    onChange={e => setFormData({ ...formData, zona_id: e.target.value })}
-                    style={{ width: '100%' }}
-                  >
-                    <option value="">Selecionar...</option>
-                    {zonas.map(zona => (
-                      <option key={zona.id} value={zona.id}>{zona.nome}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={{ fontSize: '12px', fontWeight: 500, marginBottom: '4px', display: 'block' }}>
-                    Tipo
-                  </label>
-                  <select
-                    value={formData.tipo}
-                    onChange={e => setFormData({ ...formData, tipo: e.target.value })}
-                    style={{ width: '100%' }}
-                  >
-                    {TIPOS_NC.map(tipo => (
-                      <option key={tipo.id} value={tipo.id}>{tipo.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label style={{ fontSize: '12px', fontWeight: 500, marginBottom: '4px', display: 'block' }}>
-                    Gravidade
-                  </label>
-                  <select
-                    value={formData.gravidade}
-                    onChange={e => setFormData({ ...formData, gravidade: e.target.value })}
-                    style={{ width: '100%' }}
-                  >
-                    {Object.entries(GRAVIDADES).map(([key, { label }]) => (
-                      <option key={key} value={key}>{label}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={{ fontSize: '12px', fontWeight: 500, marginBottom: '4px', display: 'block' }}>
-                    Data Identificação
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.data_identificacao}
-                    onChange={e => setFormData({ ...formData, data_identificacao: e.target.value })}
-                    style={{ width: '100%' }}
-                    disabled={editingNC}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: '12px', fontWeight: 500, marginBottom: '4px', display: 'block' }}>
-                    Data Limite Resolução
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.data_limite_resolucao}
-                    onChange={e => setFormData({ ...formData, data_limite_resolucao: e.target.value })}
-                    style={{ width: '100%' }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: 500, marginBottom: '4px', display: 'block' }}>
-                  Responsável pela Resolução
-                </label>
-                <input
-                  type="text"
-                  value={formData.responsavel_resolucao}
-                  onChange={e => setFormData({ ...formData, responsavel_resolucao: e.target.value })}
-                  placeholder="Nome ou empresa responsável..."
-                  style={{ width: '100%' }}
-                />
-              </div>
-
-              {/* Campos adicionais de informação */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={{ fontSize: '12px', fontWeight: 500, marginBottom: '4px', display: 'block' }}>
-                    Artigo (Caderno Encargos)
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    marginBottom: '6px',
+                    display: 'block',
+                    color: '#4A4637'
+                  }}>
+                    Título <span style={{ color: '#EF4444' }}>*</span>
                   </label>
                   <input
                     type="text"
-                    value={formData.artigo}
-                    onChange={e => setFormData({ ...formData, artigo: e.target.value })}
-                    placeholder="Ex: 1.4 - Peças lancil"
-                    style={{ width: '100%' }}
+                    value={formData.titulo}
+                    onChange={e => setFormData({ ...formData, titulo: e.target.value })}
+                    placeholder="Descrição breve do problema..."
+                    style={{
+                      width: '100%',
+                      padding: '12px 14px',
+                      border: '1px solid #E5E2D9',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      outline: 'none',
+                      transition: 'border-color 0.2s',
+                      boxSizing: 'border-box'
+                    }}
                   />
                 </div>
+
                 <div>
-                  <label style={{ fontSize: '12px', fontWeight: 500, marginBottom: '4px', display: 'block' }}>
-                    Valor Estimado (€)
+                  <label style={{
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    marginBottom: '6px',
+                    display: 'block',
+                    color: '#4A4637'
+                  }}>
+                    Descrição <span style={{ color: '#EF4444' }}>*</span>
                   </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.valor_estimado}
-                    onChange={e => setFormData({ ...formData, valor_estimado: e.target.value })}
-                    placeholder="0.00"
-                    style={{ width: '100%' }}
+                  <textarea
+                    value={formData.descricao}
+                    onChange={e => setFormData({ ...formData, descricao: e.target.value })}
+                    placeholder="Descreva o desvio identificado com detalhes..."
+                    rows={3}
+                    style={{
+                      width: '100%',
+                      padding: '12px 14px',
+                      border: '1px solid #E5E2D9',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      resize: 'vertical',
+                      outline: 'none',
+                      fontFamily: 'inherit',
+                      boxSizing: 'border-box'
+                    }}
                   />
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={{ fontSize: '12px', fontWeight: 500, marginBottom: '4px', display: 'block' }}>
-                    Ref. Proposta
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.ref_proposta}
-                    onChange={e => setFormData({ ...formData, ref_proposta: e.target.value })}
-                    placeholder="Ex: POP.003.2025 - Extras 08"
-                    style={{ width: '100%' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: '12px', fontWeight: 500, marginBottom: '4px', display: 'block' }}>
-                    Comunicado por
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.comunicado_por}
-                    onChange={e => setFormData({ ...formData, comunicado_por: e.target.value })}
-                    placeholder="Nome da empresa/entidade"
-                    style={{ width: '100%' }}
-                  />
-                </div>
-              </div>
+              {/* Secção: Classificação */}
+              <div style={{ marginBottom: '24px' }}>
+                <h4 style={{
+                  margin: '0 0 16px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#8B8670',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  Classificação
+                </h4>
 
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: 500, marginBottom: '4px', display: 'block' }}>
-                  Especificação Contratual
-                </label>
-                <textarea
-                  value={formData.especificacao_contratual}
-                  onChange={e => setFormData({ ...formData, especificacao_contratual: e.target.value })}
-                  placeholder="Texto do caderno de encargos relevante..."
-                  rows={3}
-                  style={{ width: '100%', resize: 'vertical' }}
-                />
-              </div>
-
-              {editingNC && (
-                <>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                   <div>
-                    <label style={{ fontSize: '12px', fontWeight: 500, marginBottom: '4px', display: 'block' }}>
+                    <label style={{ fontSize: '13px', fontWeight: 500, marginBottom: '6px', display: 'block', color: '#4A4637' }}>
+                      Especialidade
+                    </label>
+                    <select
+                      value={formData.especialidade_id}
+                      onChange={e => setFormData({ ...formData, especialidade_id: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '12px 14px',
+                        border: '1px solid #E5E2D9',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        background: 'white',
+                        cursor: 'pointer',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      <option value="">Selecionar...</option>
+                      {especialidades.map(esp => (
+                        <option key={esp.id} value={esp.id}>{esp.nome}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '13px', fontWeight: 500, marginBottom: '6px', display: 'block', color: '#4A4637' }}>
+                      Zona / Local
+                    </label>
+                    <select
+                      value={formData.zona_id}
+                      onChange={e => setFormData({ ...formData, zona_id: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '12px 14px',
+                        border: '1px solid #E5E2D9',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        background: 'white',
+                        cursor: 'pointer',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      <option value="">Selecionar...</option>
+                      {zonas.map(zona => (
+                        <option key={zona.id} value={zona.id}>{zona.nome}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div>
+                    <label style={{ fontSize: '13px', fontWeight: 500, marginBottom: '6px', display: 'block', color: '#4A4637' }}>
+                      Tipo
+                    </label>
+                    <select
+                      value={formData.tipo}
+                      onChange={e => setFormData({ ...formData, tipo: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '12px 14px',
+                        border: '1px solid #E5E2D9',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        background: 'white',
+                        cursor: 'pointer',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      {TIPOS_NC.map(tipo => (
+                        <option key={tipo.id} value={tipo.id}>{tipo.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '13px', fontWeight: 500, marginBottom: '6px', display: 'block', color: '#4A4637' }}>
+                      Gravidade
+                    </label>
+                    <select
+                      value={formData.gravidade}
+                      onChange={e => setFormData({ ...formData, gravidade: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '12px 14px',
+                        border: '1px solid #E5E2D9',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        background: 'white',
+                        cursor: 'pointer',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      {Object.entries(GRAVIDADES).map(([key, { label }]) => (
+                        <option key={key} value={key}>{label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Secção: Prazos e Responsabilidade */}
+              <div style={{ marginBottom: '24px' }}>
+                <h4 style={{
+                  margin: '0 0 16px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#8B8670',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  Prazos e Responsabilidade
+                </h4>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                  <div>
+                    <label style={{ fontSize: '13px', fontWeight: 500, marginBottom: '6px', display: 'block', color: '#4A4637' }}>
+                      Data Identificação
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.data_identificacao}
+                      onChange={e => setFormData({ ...formData, data_identificacao: e.target.value })}
+                      disabled={editingNC}
+                      style={{
+                        width: '100%',
+                        padding: '12px 14px',
+                        border: '1px solid #E5E2D9',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        outline: 'none',
+                        boxSizing: 'border-box',
+                        background: editingNC ? '#F5F5F3' : 'white'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '13px', fontWeight: 500, marginBottom: '6px', display: 'block', color: '#4A4637' }}>
+                      Data Limite Resolução
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.data_limite_resolucao}
+                      onChange={e => setFormData({ ...formData, data_limite_resolucao: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '12px 14px',
+                        border: '1px solid #E5E2D9',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: 500, marginBottom: '6px', display: 'block', color: '#4A4637' }}>
+                    Responsável pela Resolução
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.responsavel_resolucao}
+                    onChange={e => setFormData({ ...formData, responsavel_resolucao: e.target.value })}
+                    placeholder="Nome ou empresa responsável..."
+                    style={{
+                      width: '100%',
+                      padding: '12px 14px',
+                      border: '1px solid #E5E2D9',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      outline: 'none',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Secção: Informação Contratual */}
+              <div style={{ marginBottom: '24px' }}>
+                <h4 style={{
+                  margin: '0 0 16px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#8B8670',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  Informação Contratual
+                </h4>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                  <div>
+                    <label style={{ fontSize: '13px', fontWeight: 500, marginBottom: '6px', display: 'block', color: '#4A4637' }}>
+                      Artigo (Caderno Encargos)
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.artigo}
+                      onChange={e => setFormData({ ...formData, artigo: e.target.value })}
+                      placeholder="Ex: 1.4 - Peças lancil"
+                      style={{
+                        width: '100%',
+                        padding: '12px 14px',
+                        border: '1px solid #E5E2D9',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '13px', fontWeight: 500, marginBottom: '6px', display: 'block', color: '#4A4637' }}>
+                      Valor Estimado (€)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={formData.valor_estimado}
+                      onChange={e => setFormData({ ...formData, valor_estimado: e.target.value })}
+                      placeholder="0.00"
+                      style={{
+                        width: '100%',
+                        padding: '12px 14px',
+                        border: '1px solid #E5E2D9',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                  <div>
+                    <label style={{ fontSize: '13px', fontWeight: 500, marginBottom: '6px', display: 'block', color: '#4A4637' }}>
+                      Ref. Proposta
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.ref_proposta}
+                      onChange={e => setFormData({ ...formData, ref_proposta: e.target.value })}
+                      placeholder="Ex: POP.003.2025 - Extras 08"
+                      style={{
+                        width: '100%',
+                        padding: '12px 14px',
+                        border: '1px solid #E5E2D9',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '13px', fontWeight: 500, marginBottom: '6px', display: 'block', color: '#4A4637' }}>
+                      Comunicado por
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.comunicado_por}
+                      onChange={e => setFormData({ ...formData, comunicado_por: e.target.value })}
+                      placeholder="Nome da empresa/entidade"
+                      style={{
+                        width: '100%',
+                        padding: '12px 14px',
+                        border: '1px solid #E5E2D9',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: 500, marginBottom: '6px', display: 'block', color: '#4A4637' }}>
+                    Especificação Contratual
+                  </label>
+                  <textarea
+                    value={formData.especificacao_contratual}
+                    onChange={e => setFormData({ ...formData, especificacao_contratual: e.target.value })}
+                    placeholder="Texto do caderno de encargos relevante..."
+                    rows={3}
+                    style={{
+                      width: '100%',
+                      padding: '12px 14px',
+                      border: '1px solid #E5E2D9',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      resize: 'vertical',
+                      outline: 'none',
+                      fontFamily: 'inherit',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Secção: Ações (apenas em edição) */}
+              {editingNC && (
+                <div style={{ marginBottom: '24px' }}>
+                  <h4 style={{
+                    margin: '0 0 16px',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: '#8B8670',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    Ações de Resolução
+                  </h4>
+
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ fontSize: '13px', fontWeight: 500, marginBottom: '6px', display: 'block', color: '#4A4637' }}>
                       Ação Corretiva
                     </label>
                     <textarea
@@ -847,11 +1126,22 @@ export default function ObraNaoConformidades({ obra }) {
                       onChange={e => setFormData({ ...formData, acao_corretiva: e.target.value })}
                       placeholder="Descreva a ação corretiva a implementar..."
                       rows={3}
-                      style={{ width: '100%', resize: 'vertical' }}
+                      style={{
+                        width: '100%',
+                        padding: '12px 14px',
+                        border: '1px solid #E5E2D9',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        resize: 'vertical',
+                        outline: 'none',
+                        fontFamily: 'inherit',
+                        boxSizing: 'border-box'
+                      }}
                     />
                   </div>
+
                   <div>
-                    <label style={{ fontSize: '12px', fontWeight: 500, marginBottom: '4px', display: 'block' }}>
+                    <label style={{ fontSize: '13px', fontWeight: 500, marginBottom: '6px', display: 'block', color: '#4A4637' }}>
                       Ação Preventiva
                     </label>
                     <textarea
@@ -859,24 +1149,67 @@ export default function ObraNaoConformidades({ obra }) {
                       onChange={e => setFormData({ ...formData, acao_preventiva: e.target.value })}
                       placeholder="Medidas para evitar recorrência..."
                       rows={2}
-                      style={{ width: '100%', resize: 'vertical' }}
+                      style={{
+                        width: '100%',
+                        padding: '12px 14px',
+                        border: '1px solid #E5E2D9',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        resize: 'vertical',
+                        outline: 'none',
+                        fontFamily: 'inherit',
+                        boxSizing: 'border-box'
+                      }}
                     />
                   </div>
-                </>
+                </div>
               )}
             </div>
 
-            <div className="modal-footer">
-              <button onClick={() => setShowModal(false)} className="btn btn-outline">
+            {/* Footer do Modal */}
+            <div style={{
+              padding: '20px 28px',
+              borderTop: '1px solid #E5E2D9',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '12px',
+              background: '#FAFAF8'
+            }}>
+              <button
+                onClick={() => setShowModal(false)}
+                style={{
+                  padding: '12px 24px',
+                  border: '1px solid #E5E2D9',
+                  borderRadius: '8px',
+                  background: 'white',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  color: '#4A4637',
+                  cursor: 'pointer'
+                }}
+              >
                 Cancelar
               </button>
               <button
                 onClick={editingNC ? handleUpdate : handleCreate}
-                className="btn btn-primary"
                 disabled={saving}
+                style={{
+                  padding: '12px 24px',
+                  border: 'none',
+                  borderRadius: '8px',
+                  background: '#10B981',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  color: 'white',
+                  cursor: saving ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  opacity: saving ? 0.7 : 1
+                }}
               >
-                {saving ? <Loader2 className="spin" size={14} /> : null}
-                {editingNC ? 'Guardar' : 'Criar NC'}
+                {saving && <Loader2 className="spin" size={16} />}
+                {editingNC ? 'Guardar Alterações' : 'Criar NC'}
               </button>
             </div>
           </div>
