@@ -58,7 +58,8 @@ import {
   Loader2,
   ChevronDown,
   ChevronUp,
-  Pencil
+  Pencil,
+  MessageSquare
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -72,6 +73,7 @@ import DesignReview from '../components/DesignReview'
 import RecebidosEspecialidades from '../components/RecebidosEspecialidades'
 import ViabilidadeModule from '../components/viabilidade/ViabilidadeModule'
 import Moleskine from '../components/Moleskine'
+import ProjetoChatIA from '../components/projeto/ProjetoChatIA'
 
 // Dados de exemplo baseados nos JSONs fornecidos
 const sampleProjectData = {
@@ -2195,6 +2197,7 @@ export default function ProjetoDetalhe() {
     { id: 'fases', label: 'Fases & Entregas', icon: Target, hasSubtabs: true },
     { id: 'decisions', label: 'Decision Log', icon: ClipboardList },
     { id: 'viabilidade', label: 'Viabilidade', icon: FileSearch },
+    { id: 'chat-ia', label: 'Chat IA', icon: MessageSquare },
     { id: 'archviz', label: 'Archviz', icon: Image, hasSubtabs: true },
     { id: 'biblioteca', label: 'Biblioteca', icon: Library },
     { id: 'gestao', label: 'Gestão de Projeto', icon: Settings, hasSubtabs: true }
@@ -4321,6 +4324,11 @@ export default function ProjetoDetalhe() {
       {/* Tab Viabilidade Urbanística */}
       {activeTab === 'viabilidade' && (
         <ViabilidadeModule projetoId={project?.id} projeto={project} />
+      )}
+
+      {/* Tab Chat IA */}
+      {activeTab === 'chat-ia' && (
+        <ProjetoChatIA projetoId={project?.id} projeto={project} />
       )}
 
       {/* Tab Gestão de Projeto com subtabs */}
