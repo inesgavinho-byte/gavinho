@@ -510,7 +510,28 @@ export default function Emails() {
         .eq('arquivado', false)
         .limit(1)
 
-      const projetoId = projetos?.[0]?.id || null
+      let projetoId = projetos?.[0]?.id || null
+      let projetoNome = projetos?.[0]?.nome || ''
+
+      // Se não houver projetos, tentar obras
+      if (!projetoId) {
+        const { data: obrasData } = await supabase
+          .from('obras')
+          .select('id, codigo, nome')
+          .in('estado', ['em_curso', 'planeamento'])
+          .limit(1)
+
+        projetoId = obrasData?.[0]?.id || null
+        projetoNome = obrasData?.[0]?.nome || ''
+      }
+
+      if (!projetoId) {
+        alert('⚠️ Não foi encontrado nenhum projeto ou obra ativo.\n\nCria primeiro um projeto ou obra para poder associar os emails de teste.')
+        setSeeding(false)
+        return
+      }
+
+      console.log('Seed: Usando projeto/obra:', projetoId, projetoNome)
 
       // Emails de teste com decisões
       const testEmails = [
@@ -599,13 +620,46 @@ Inês Gavinho`,
         }
       ]
 
+      // Primeiro, atualizar emails órfãos (sem obra_id) com este projeto
+      const { data: orphanEmails } = await supabase
+        .from('obra_emails')
+        .select('id')
+        .is('obra_id', null)
+
+      if (orphanEmails && orphanEmails.length > 0) {
+        const { error: updateError } = await supabase
+          .from('obra_emails')
+          .update({ obra_id: projetoId })
+          .is('obra_id', null)
+
+        if (updateError) {
+          console.error('Erro ao atualizar emails órfãos:', updateError)
+        } else {
+          console.log(`Atualizados ${orphanEmails.length} emails órfãos com projeto ${projetoNome}`)
+        }
+      }
+
+      // Verificar se já existem emails de teste
+      const { data: existingTest } = await supabase
+        .from('obra_emails')
+        .select('id')
+        .ilike('assunto', '%Confirmação materiais WC Suite%')
+        .limit(1)
+
+      if (existingTest && existingTest.length > 0) {
+        alert(`✅ Os emails existentes foram associados ao projeto "${projetoNome}".\n\nAgora podes usar "Detectar Decisões".`)
+        loadEmails()
+        setSeeding(false)
+        return
+      }
+
       const { error } = await supabase
         .from('obra_emails')
         .insert(testEmails)
 
       if (error) throw error
 
-      alert('✅ 3 emails de teste inseridos com sucesso!')
+      alert(`✅ 3 emails de teste inseridos e associados ao projeto "${projetoNome}"!`)
       loadEmails()
     } catch (err) {
       console.error('Erro ao inserir emails de teste:', err)
