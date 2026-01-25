@@ -18,7 +18,7 @@ const IMPACTO_CONFIG = {
   baixo: { label: 'Baixo', bg: '#9CA3AF', color: '#FFF' }
 }
 
-export default function DecisoesList({ projetoId, onSelectDecisao, onNovaDecisao }) {
+export default function DecisoesList({ projetoId, onSelectDecisao, onNovaDecisao, onOpenValidacao }) {
   const [decisoes, setDecisoes] = useState([])
   const [pendentes, setPendentes] = useState([])
   const [stats, setStats] = useState(null)
@@ -145,7 +145,7 @@ export default function DecisoesList({ projetoId, onSelectDecisao, onNovaDecisao
           <div style={{ flex: 1 }}>
             <strong style={{ color: '#92400E' }}>{pendentes.length} decisões aguardam validação</strong>
           </div>
-          <button onClick={() => setFilters({ ...filters, estado: 'sugerida' })} style={{ padding: '8px 14px', backgroundColor: '#D97706', color: '#FFF', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>Validar →</button>
+          <button onClick={onOpenValidacao} style={{ padding: '8px 14px', backgroundColor: '#D97706', color: '#FFF', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>Validar →</button>
         </div>
       )}
 
