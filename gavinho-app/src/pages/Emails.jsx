@@ -409,12 +409,25 @@ export default function Emails() {
   const handleDetectarDecisoes = async (email) => {
     if (!email) return
 
+    // Verificar se tem projeto/obra associado
+    const projetoId = email.projeto_id || email.obra_id
+    if (!projetoId) {
+      alert('⚠️ Este email não está associado a nenhum projeto ou obra.\n\nPara detectar decisões, o email precisa estar associado a um projeto.')
+      return
+    }
+
     setDetectando(true)
     setDetectResult(null)
 
     try {
       // Construir texto para análise (assunto + corpo)
       const conteudo = `Assunto: ${email.assunto || ''}\n\nConteúdo:\n${email.corpo_texto || email.corpo_html?.replace(/<[^>]*>/g, '') || ''}`
+
+      console.log('Detectar Decisões - Enviando request:', {
+        conteudo: conteudo.substring(0, 200) + '...',
+        projeto_id: projetoId,
+        fonte: 'email'
+      })
 
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/decisoes-detectar`,
@@ -426,7 +439,7 @@ export default function Emails() {
           },
           body: JSON.stringify({
             conteudo,
-            projeto_id: email.projeto_id || email.obra_id,
+            projeto_id: projetoId,
             fonte: 'email',
             metadata: {
               email_id: email.id,
@@ -439,19 +452,48 @@ export default function Emails() {
         }
       )
 
-      const result = await response.json()
+      console.log('Detectar Decisões - Response status:', response.status)
+
+      // Tentar ler a resposta como texto primeiro para debug
+      const responseText = await response.text()
+      console.log('Detectar Decisões - Response body:', responseText)
+
+      let result
+      try {
+        result = JSON.parse(responseText)
+      } catch (parseError) {
+        console.error('Erro ao fazer parse da resposta:', parseError)
+        alert(`❌ Erro: Resposta inválida do servidor.\n\n${responseText.substring(0, 200)}`)
+        return
+      }
+
       setDetectResult(result)
 
       if (result.success && result.decisoes_criadas > 0) {
         alert(`✅ Detectadas ${result.decisoes_criadas} decisão(ões)!\n\nVai a Decisões > Validar para aprovar.`)
       } else if (result.success) {
-        alert('ℹ️ Nenhuma decisão detectada neste email.')
+        alert(`ℹ️ Nenhuma decisão detectada neste email.\n\n${result.motivo || ''}`)
       } else {
-        alert(`❌ Erro: ${result.error}`)
+        // Mostrar erro detalhado
+        const errorMsg = result.error || 'Erro desconhecido'
+        console.error('Erro da Edge Function:', result)
+
+        if (errorMsg.includes('ANTHROPIC_API_KEY') || errorMsg.includes('api_key')) {
+          alert('❌ Erro de configuração:\n\nA chave da API Anthropic não está configurada no Supabase.\n\nConfigura em: Dashboard > Edge Functions > Secrets')
+        } else if (response.status === 404) {
+          alert('❌ Função não encontrada.\n\nA Edge Function "decisoes-detectar" precisa ser deployada.\n\nExecuta: supabase functions deploy decisoes-detectar')
+        } else {
+          alert(`❌ Erro: ${errorMsg}`)
+        }
       }
     } catch (error) {
       console.error('Erro ao detectar decisões:', error)
-      alert('❌ Erro ao analisar email. Verifica a consola.')
+
+      if (error.message?.includes('Failed to fetch')) {
+        alert('❌ Erro de rede ao chamar a Edge Function.\n\nVerifica:\n1. Se a função está deployada\n2. Se tens conexão à internet\n3. Se o URL do Supabase está correto')
+      } else {
+        alert(`❌ Erro: ${error.message}\n\nVerifica a consola para mais detalhes.`)
+      }
     } finally {
       setDetectando(false)
     }
