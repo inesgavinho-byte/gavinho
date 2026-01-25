@@ -1,166 +1,112 @@
-// Supabase Edge Function para pesquisa semântica de decisões
-// Deploy: supabase functions deploy decisoes-search
-
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import OpenAI from 'https://esm.sh/openai@4'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-interface SearchRequest {
-  query: string
-  projeto_id?: string
-  tipo?: string
-  impacto?: string
-  estado?: string
-  mode?: 'semantic' | 'fulltext' | 'hybrid'
-  limit?: number
-}
-
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  )
+
+  const openai = new OpenAI({ apiKey: Deno.env.get('OPENAI_API_KEY')! })
 
   try {
-    const { query, projeto_id, tipo, impacto, estado, mode = 'hybrid', limit = 20 }: SearchRequest = await req.json()
+    const { query, projeto_id, filters = {}, modo = 'hibrido', max_results = 10 } = await req.json()
 
-    if (!query || query.trim().length < 2) {
-      throw new Error('Query deve ter pelo menos 2 caracteres')
+    if (!query?.trim()) {
+      return new Response(JSON.stringify({ success: false, error: 'query é obrigatório' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    const startTime = Date.now()
+    let results = []
 
-    let results: any[] = []
-
-    // Full-text search
-    if (mode === 'fulltext' || mode === 'hybrid') {
-      const { data: fulltextResults, error: ftError } = await supabase.rpc('search_decisoes_fulltext', {
-        search_query: query,
-        filter_projeto_id: projeto_id || null,
-        filter_estado: estado || 'validada',
-        filter_tipo: tipo || null,
-        filter_impacto: impacto || null,
-        max_results: limit
+    if (modo === 'semantico' || modo === 'hibrido') {
+      const embeddingResponse = await openai.embeddings.create({
+        model: 'text-embedding-3-small',
+        input: query
       })
+      const queryEmbedding = embeddingResponse.data[0].embedding
 
-      if (!ftError && fulltextResults) {
-        results = fulltextResults.map((r: any) => ({
-          ...r,
-          search_type: 'fulltext',
-          score: r.rank
-        }))
-      }
-    }
+      if (modo === 'semantico') {
+        const { data } = await supabase.rpc('search_decisoes', {
+          query_embedding: queryEmbedding,
+          filter_projeto_id: projeto_id,
+          filter_estado: filters.estado || 'validada',
+          match_count: max_results,
+          match_threshold: 0.4
+        })
+        results = data || []
+      } else {
+        const { data: semanticResults } = await supabase.rpc('search_decisoes', {
+          query_embedding: queryEmbedding,
+          filter_projeto_id: projeto_id,
+          filter_estado: filters.estado || 'validada',
+          match_count: max_results,
+          match_threshold: 0.3
+        })
 
-    // Semantic search (requires embedding)
-    if ((mode === 'semantic' || mode === 'hybrid') && results.length < limit) {
-      const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY')
+        const { data: fulltextResults } = await supabase.rpc('search_decisoes_fulltext', {
+          search_query: query,
+          filter_projeto_id: projeto_id,
+          filter_estado: filters.estado || 'validada',
+          filter_tipo: filters.tipo,
+          filter_impacto: filters.impacto,
+          max_results: max_results
+        })
 
-      if (anthropicApiKey) {
-        // Generate embedding for query using Anthropic (via proxy to OpenAI-compatible endpoint)
-        // Note: For production, use a proper embedding service
-        try {
-          const voyageApiKey = Deno.env.get('VOYAGE_API_KEY')
-          const openaiApiKey = Deno.env.get('OPENAI_API_KEY')
+        const combined = new Map()
+        const semanticWeight = 0.6
+        const fulltextWeight = 0.4
 
-          let embedding: number[] | null = null
-
-          // Try Voyage AI first (recommended for Portuguese)
-          if (voyageApiKey) {
-            const voyageResponse = await fetch('https://api.voyageai.com/v1/embeddings', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${voyageApiKey}`
-              },
-              body: JSON.stringify({
-                model: 'voyage-multilingual-2',
-                input: query
-              })
-            })
-
-            if (voyageResponse.ok) {
-              const voyageData = await voyageResponse.json()
-              embedding = voyageData.data?.[0]?.embedding
-            }
-          }
-
-          // Fallback to OpenAI
-          if (!embedding && openaiApiKey) {
-            const openaiResponse = await fetch('https://api.openai.com/v1/embeddings', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${openaiApiKey}`
-              },
-              body: JSON.stringify({
-                model: 'text-embedding-3-small',
-                input: query
-              })
-            })
-
-            if (openaiResponse.ok) {
-              const openaiData = await openaiResponse.json()
-              embedding = openaiData.data?.[0]?.embedding
-            }
-          }
-
-          if (embedding) {
-            const { data: semanticResults, error: semError } = await supabase.rpc('search_decisoes', {
-              query_embedding: embedding,
-              filter_projeto_id: projeto_id || null,
-              filter_estado: estado || 'validada',
-              match_count: limit,
-              match_threshold: 0.5
-            })
-
-            if (!semError && semanticResults) {
-              // Merge and dedupe results
-              const existingIds = new Set(results.map(r => r.id))
-              const newResults = semanticResults
-                .filter((r: any) => !existingIds.has(r.id))
-                .map((r: any) => ({
-                  ...r,
-                  search_type: 'semantic',
-                  score: r.similarity
-                }))
-
-              results = [...results, ...newResults]
-            }
-          }
-        } catch (embeddingError) {
-          console.error('Erro ao gerar embedding:', embeddingError)
-          // Continue with fulltext results only
+        for (const r of (semanticResults || [])) {
+          combined.set(r.id, { ...r, score: (r.similarity || 0) * semanticWeight })
         }
+        for (const r of (fulltextResults || [])) {
+          if (combined.has(r.id)) {
+            const existing = combined.get(r.id)
+            existing.score += (r.rank || 0) * fulltextWeight
+          } else {
+            combined.set(r.id, { ...r, score: (r.rank || 0) * fulltextWeight })
+          }
+        }
+
+        results = Array.from(combined.values()).sort((a, b) => b.score - a.score).slice(0, max_results)
       }
+    } else {
+      const { data } = await supabase.rpc('search_decisoes_fulltext', {
+        search_query: query,
+        filter_projeto_id: projeto_id,
+        filter_estado: filters.estado || 'validada',
+        filter_tipo: filters.tipo,
+        filter_impacto: filters.impacto,
+        max_results: max_results
+      })
+      results = data || []
     }
 
-    // Sort by score and limit
-    results = results
-      .sort((a, b) => (b.score || 0) - (a.score || 0))
-      .slice(0, limit)
+    if (results.length === 0) {
+      let fallbackQuery = supabase.from('decisoes').select('*').eq('projeto_id', projeto_id).eq('estado', filters.estado || 'validada').ilike('texto_pesquisa', `%${query}%`).limit(max_results)
+      const { data } = await fallbackQuery
+      results = data || []
+    }
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        query,
-        mode,
-        count: results.length,
-        results
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    return new Response(JSON.stringify({
+      success: true,
+      results,
+      total: results.length,
+      query,
+      modo,
+      tempo_ms: Date.now() - startTime
+    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
   } catch (error) {
-    console.error('Erro:', error)
-    return new Response(
-      JSON.stringify({ success: false, error: error.message }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    return new Response(JSON.stringify({ success: false, error: error.message }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 })
   }
 })
