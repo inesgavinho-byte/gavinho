@@ -20,7 +20,7 @@ const ESPECIALIDADES_DEFAULT = [
   'Pinturas', 'Vidros', 'Equipamentos', 'Limpezas', 'Outros'
 ]
 
-export default function ObraTracking({ obra }) {
+export default function ObraTracking({ obra, onStatsUpdate }) {
   const [propostas, setPropostas] = useState([])
   const [especialidades, setEspecialidades] = useState([])
   const [zonas, setZonas] = useState([])
@@ -209,7 +209,7 @@ export default function ObraTracking({ obra }) {
     // Função para parse de valor
     const parseValor = (str) => {
       if (!str) return 0
-      let valorStr = String(str).replace(/[€\s]/g, '').trim()
+      let valorStr = String(str).replace(/[â‚¬\s]/g, '').trim()
       if (!valorStr) return 0
       
       const hasComma = valorStr.includes(',')
@@ -243,11 +243,11 @@ export default function ObraTracking({ obra }) {
     }
     
     // Padrões para identificar items
-    // Formato típico: "1.1 Descrição do item vg 1 1.500,00 € 1.500,00 €"
-    const itemPattern = /^(\d+(?:\.\d+)?)\s+(.+?)\s+(un|vg|m2|m3|ml|kg|h|cj|conj|pç|pc)?\s*(\d+(?:[.,]\d+)?)\s*(?:€?\s*(\d+(?:[.,]\d+)*(?:[.,]\d{2})?)\s*€?)?\s*(?:€?\s*(\d+(?:[.,]\d+)*(?:[.,]\d{2})?)\s*€?)?$/i
+    // Formato típico: "1.1 Descrição do item vg 1 1.500,00 â‚¬ 1.500,00 â‚¬"
+    const itemPattern = /^(\d+(?:\.\d+)?)\s+(.+?)\s+(un|vg|m2|m3|ml|kg|h|cj|conj|pç|pc)?\s*(\d+(?:[.,]\d+)?)\s*(?:â‚¬?\s*(\d+(?:[.,]\d+)*(?:[.,]\d{2})?)\s*â‚¬?)?\s*(?:â‚¬?\s*(\d+(?:[.,]\d+)*(?:[.,]\d{2})?)\s*â‚¬?)?$/i
     
     // Padrão para categorias (números inteiros como 1, 2, 3 seguidos de texto em maiúsculas)
-    const categoryPattern = /^(\d+)\s+([A-ZÁÉÍÓÚÂÊÔÃÕÇ][A-ZÁÉÍÓÚÂÊÔÃÕÇ\s]+)$/
+    const categoryPattern = /^(\d+)\s+([A-ZÀÀ‰ÀÀ“ÀšÀ‚ÀŠÀ”ÀƒÀ•À‡][A-ZÀÀ‰ÀÀ“ÀšÀ‚ÀŠÀ”ÀƒÀ•À‡\s]+)$/
     
     lines.forEach(line => {
       const trimmed = line.trim()
@@ -288,7 +288,7 @@ export default function ObraTracking({ obra }) {
       }
       
       // Tentar padrão mais simples: "código descrição valor"
-      const simpleMatch = trimmed.match(/^(\d+\.\d+)\s+(.+?)\s+(\d+(?:[.,]\d+)*(?:[.,]\d{2})?)\s*€?$/)
+      const simpleMatch = trimmed.match(/^(\d+\.\d+)\s+(.+?)\s+(\d+(?:[.,]\d+)*(?:[.,]\d{2})?)\s*â‚¬?$/)
       if (simpleMatch) {
         const codigo = simpleMatch[1]
         const descricao = simpleMatch[2].trim()
@@ -364,7 +364,7 @@ export default function ObraTracking({ obra }) {
       // Linhas sem ponto no código são headers de categoria (1, 2, 3...)
       // Linhas com ponto são items (1.1, 1.2, 2.1...)
       if (itemCode && !itemCode.includes('.') && tipo) {
-        // É header de especialidade
+        // À‰ header de especialidade
         currentEspecialidade = tipo
         continue
       }
@@ -389,7 +389,7 @@ export default function ObraTracking({ obra }) {
       // Função para parse de valor (suporta formato americano e europeu)
       const parseValor = (str) => {
         if (!str) return 0
-        let valorStr = String(str).replace(/[€\s]/g, '').trim()
+        let valorStr = String(str).replace(/[â‚¬\s]/g, '').trim()
         if (!valorStr) return 0
         
         // Detectar formato baseado na estrutura
@@ -398,8 +398,8 @@ export default function ObraTracking({ obra }) {
         
         // Caso 1: Tem vírgula e ponto - determinar qual é separador de milhares
         if (hasComma && hasDot) {
-          // Se vírgula vem antes do ponto (ex: 23,750.00) → formato americano
-          // Se ponto vem antes da vírgula (ex: 23.750,00) → formato europeu
+          // Se vírgula vem antes do ponto (ex: 23,750.00) â†’ formato americano
+          // Se ponto vem antes da vírgula (ex: 23.750,00) â†’ formato europeu
           if (valorStr.lastIndexOf(',') < valorStr.lastIndexOf('.')) {
             // Americano: remover vírgulas
             valorStr = valorStr.replace(/,/g, '')
@@ -415,7 +415,7 @@ export default function ObraTracking({ obra }) {
           const parts = valorStr.split('.')
           const lastPart = parts[parts.length - 1]
           if (parts.length === 2 && lastPart.length <= 2) {
-            // É decimal, manter como está (ex: 55.00, 1500.00)
+            // À‰ decimal, manter como está (ex: 55.00, 1500.00)
           } else if (lastPart.length === 3 && parts.length > 1) {
             // Pode ser milhares europeu (ex: 1.500), remover pontos
             valorStr = valorStr.replace(/\./g, '')
@@ -748,13 +748,13 @@ export default function ObraTracking({ obra }) {
     setDeleting(true)
     
     try {
-      // Primeiro eliminar items associados à proposta
+      // Primeiro eliminar items associados À  proposta
       await supabase
         .from('obra_items')
         .delete()
         .eq('proposta_id', propostaToDelete.id)
       
-      // Eliminar especialidades associadas à proposta
+      // Eliminar especialidades associadas À  proposta
       await supabase
         .from('obra_especialidades')
         .delete()
@@ -840,10 +840,35 @@ export default function ObraTracking({ obra }) {
   const totalItems = items.length
   const itemsConcluidos = items.filter(i => i.estado === 'concluido').length
   const itemsEmCurso = items.filter(i => i.estado === 'em_curso').length
-  const progressoGeral = totalItems > 0 
-    ? Math.round(items.reduce((sum, i) => sum + (i.percentagem || 0), 0) / totalItems) 
-    : 0
+  
+  // Valor total contratado
   const valorTotal = items.reduce((sum, i) => sum + (i.valor_total || 0), 0)
+  
+  // Valor executado (baseado na percentagem de cada item)
+  const valorExecutado = items.reduce((sum, i) => {
+    const valorItem = i.valor_total || 0
+    const percentagem = i.percentagem || 0
+    return sum + (valorItem * percentagem / 100)
+  }, 0)
+  
+  // Progresso = itens concluídos / total itens
+  const progressoGeral = totalItems > 0 
+    ? Math.round((itemsConcluidos / totalItems) * 100)
+    : 0
+
+  // Notificar componente pai sobre alterações nos stats
+  useEffect(() => {
+    if (onStatsUpdate && !loading) {
+      onStatsUpdate({
+        totalItems,
+        itemsConcluidos,
+        itemsEmCurso,
+        progressoGeral,
+        valorTotal,
+        valorExecutado
+      })
+    }
+  }, [totalItems, itemsConcluidos, itemsEmCurso, progressoGeral, valorTotal, valorExecutado, loading])
 
   const formatCurrency = (value) => {
     if (!value) return '-'
@@ -888,8 +913,9 @@ export default function ObraTracking({ obra }) {
           <div style={{ fontSize: '24px', fontWeight: 700 }}>{progressoGeral}%</div>
         </div>
         <div style={{ background: 'var(--white)', padding: '16px', borderRadius: '12px', border: '1px solid var(--stone)' }}>
-          <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginBottom: '4px' }}>Valor Total</div>
-          <div style={{ fontSize: '20px', fontWeight: 700 }}>{formatCurrency(valorTotal)}</div>
+          <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginBottom: '4px' }}>Valor Executado</div>
+          <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--success)' }}>{formatCurrency(valorExecutado)}</div>
+          <div style={{ fontSize: '11px', color: 'var(--brown-light)', marginTop: '2px' }}>de {formatCurrency(valorTotal)}</div>
         </div>
       </div>
 
@@ -1029,7 +1055,7 @@ export default function ObraTracking({ obra }) {
                   <div>
                     <div style={{ fontWeight: 600 }}>{p.nome}</div>
                     <div style={{ fontSize: '11px', color: 'var(--brown-light)', marginTop: '2px' }}>
-                      {itemCount} items • {p.valor_total ? formatCurrency(p.valor_total) : '-'}
+                      {itemCount} items  –  {p.valor_total ? formatCurrency(p.valor_total) : '-'}
                     </div>
                   </div>
                   <button
@@ -1442,7 +1468,7 @@ export default function ObraTracking({ obra }) {
                   </select>
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '6px' }}>Valor Unitário (€)</label>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '6px' }}>Valor Unitário (â‚¬)</label>
                   <input type="number" step="0.01" value={itemForm.valor_unitario} onChange={e => setItemForm({...itemForm, valor_unitario: e.target.value})} placeholder="0.00" style={{ width: '100%', padding: '12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }} />
                 </div>
                 <div>

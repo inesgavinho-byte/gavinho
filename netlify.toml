@@ -1,0 +1,8 @@
+[build]
+  command = "cd gavinho-app && npm install && npm run build"
+  publish = "gavinho-app/dist"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

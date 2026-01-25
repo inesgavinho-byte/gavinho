@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { 
+import {
   ChevronLeft, ChevronRight, Plus, Clock, MapPin, X, Edit, Trash2,
-  Flag, Building2
+  Flag, Building2, RefreshCw, Link2, Palmtree
 } from 'lucide-react'
 
 const TIPOS_EVENTO = [
@@ -14,10 +14,24 @@ const TIPOS_EVENTO = [
   { id: 'entrega', label: 'Entrega', color: '#B88A8A' },
   { id: 'feriado', label: 'Feriado', color: '#dc2626' },
   { id: 'encerramento', label: 'Encerramento', color: '#7c3aed' },
+  { id: 'ferias', label: 'Férias', color: '#0891b2' },
   { id: 'outro', label: 'Outro', color: '#999999' }
 ]
 
 const DIAS_SEMANA = ['SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB', 'DOM']
+const DIAS_SEMANA_CURTO = ['SEG', 'TER', 'QUA', 'QUI', 'SEX']
+
+// Horas para vista semanal (8:00 - 20:00)
+const HORAS_DIA = Array.from({ length: 13 }, (_, i) => {
+  const hora = i + 8
+  return `${hora.toString().padStart(2, '0')}:00`
+})
+
+// Contas Outlook para sincronização
+const OUTLOOK_ACCOUNTS = [
+  { email: 'geral@gavinhogroup.com', label: 'Geral' },
+  { email: 'equipa@gavinhogroup.com', label: 'Equipa' }
+]
 
 // Calcular Páscoa (algoritmo de Gauss)
 const calcularPascoa = (ano) => {
@@ -70,6 +84,7 @@ export default function Calendario() {
   const [eventos, setEventos] = useState([])
   const [projetos, setProjetos] = useState([])
   const [encerramentos, setEncerramentos] = useState([])
+  const [ferias, setFerias] = useState([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingEvento, setEditingEvento] = useState(null)
@@ -77,6 +92,7 @@ export default function Calendario() {
   const [showEventDetail, setShowEventDetail] = useState(null)
   const [showFeriados, setShowFeriados] = useState(true)
   const [showEncerramentos, setShowEncerramentos] = useState(true)
+  const [showFerias, setShowFerias] = useState(true)
   
   const [form, setForm] = useState({
     titulo: '', tipo: 'reuniao_cliente', projeto_id: '', data: '',
@@ -89,15 +105,20 @@ export default function Calendario() {
 
   const fetchData = async () => {
     try {
-      const [eventosRes, projetosRes, encRes] = await Promise.all([
+      const [eventosRes, projetosRes, encRes, feriasRes] = await Promise.all([
         supabase.from('eventos').select('*').order('data', { ascending: true }),
         supabase.from('projetos').select('id, codigo, nome').eq('arquivado', false).order('codigo', { ascending: false }),
-        supabase.from('encerramentos_empresa').select('*').order('data')
+        supabase.from('encerramentos_empresa').select('*').order('data'),
+        supabase.from('ausencias').select(`
+          *,
+          utilizador:utilizadores(id, nome)
+        `).eq('tipo', 'ferias').order('data_inicio')
       ])
 
       setEventos(eventosRes.data || [])
       setProjetos(projetosRes.data || [])
       setEncerramentos(encRes.data || [])
+      setFerias(feriasRes.data || [])
     } catch (err) {
       console.error('Erro:', err)
     } finally {
@@ -128,6 +149,17 @@ export default function Calendario() {
     if (!showEncerramentos) return null
     const dateStr = date.toISOString().split('T')[0]
     return encerramentos.find(enc => enc.data === dateStr)
+  }
+
+  // Obter férias para uma data (pode haver múltiplas pessoas)
+  const getFeriasForDate = (date) => {
+    if (!showFerias) return []
+    const dateStr = date.toISOString().split('T')[0]
+    return ferias.filter(f => {
+      const inicio = f.data_inicio
+      const fim = f.data_fim || f.data_inicio
+      return dateStr >= inicio && dateStr <= fim
+    })
   }
 
   // Navegação
@@ -185,15 +217,16 @@ export default function Calendario() {
     return days
   }
 
-  // Gerar dias da semana
+  // Gerar dias da semana (apenas segunda a sexta)
   const generateWeekDays = () => {
     const days = []
     const startOfWeek = new Date(currentDate)
     const day = startOfWeek.getDay()
     const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1)
     startOfWeek.setDate(diff)
-    
-    for (let i = 0; i < 7; i++) {
+
+    // Apenas 5 dias (segunda a sexta)
+    for (let i = 0; i < 5; i++) {
       const date = new Date(startOfWeek)
       date.setDate(startOfWeek.getDate() + i)
       days.push({ date, isCurrentMonth: true })
@@ -201,10 +234,35 @@ export default function Calendario() {
     return days
   }
 
+  // Obter eventos para uma hora específica de um dia
+  const getEventsForHour = (date, hora) => {
+    const dateStr = date.toISOString().split('T')[0]
+    return eventos.filter(e => {
+      if (e.data !== dateStr) return false
+      if (!e.hora_inicio) return false
+      const eventHour = parseInt(e.hora_inicio.split(':')[0])
+      const slotHour = parseInt(hora.split(':')[0])
+      return eventHour === slotHour
+    })
+  }
+
+  // Calcular posição e altura do evento na grelha
+  const getEventPosition = (evento) => {
+    if (!evento.hora_inicio) return { top: 0, height: 60 }
+    const [startHour, startMin] = evento.hora_inicio.split(':').map(Number)
+    const [endHour, endMin] = (evento.hora_fim || evento.hora_inicio).split(':').map(Number)
+
+    const top = startMin // minutos dentro da hora
+    const durationMinutes = (endHour * 60 + endMin) - (startHour * 60 + startMin)
+    const height = Math.max(durationMinutes, 30) // mínimo 30 min
+
+    return { top: (top / 60) * 60, height: (height / 60) * 60 }
+  }
+
   const getEventsForDate = (date) => {
     const dateStr = date.toISOString().split('T')[0]
     const dayEvents = eventos.filter(e => e.data === dateStr)
-    
+
     // Adicionar feriado se existir
     const feriado = getFeriadoForDate(date)
     if (feriado) {
@@ -216,7 +274,7 @@ export default function Calendario() {
         isFeriado: true
       })
     }
-    
+
     // Adicionar encerramento se existir
     const encerramento = getEncerramentoForDate(date)
     if (encerramento) {
@@ -228,7 +286,21 @@ export default function Calendario() {
         isEncerramento: true
       })
     }
-    
+
+    // Adicionar férias da equipa
+    const feriasHoje = getFeriasForDate(date)
+    feriasHoje.forEach(f => {
+      const nomeUtilizador = f.utilizador?.nome || 'Colaborador'
+      dayEvents.push({
+        id: `ferias-${f.id}-${dateStr}`,
+        titulo: `Férias ${nomeUtilizador}`,
+        tipo: 'ferias',
+        data: dateStr,
+        isFerias: true,
+        utilizador: f.utilizador
+      })
+    })
+
     return dayEvents
   }
 
@@ -340,9 +412,58 @@ export default function Calendario() {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h1 className="page-title">Calendário</h1>
-        <button className="btn btn-primary" onClick={() => { resetForm(); setShowModal(true) }} style={{ fontSize: '13px', padding: '8px 14px' }}>
-          <Plus size={14} /> Novo Evento
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {/* Outlook Sync */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {OUTLOOK_ACCOUNTS.map(account => (
+              <button
+                key={account.email}
+                onClick={() => alert(`Sincronização com ${account.email} será configurada.\n\nPara sincronizar com Outlook:\n1. Configurar Microsoft Graph API\n2. Autenticar conta: ${account.email}\n3. Importar eventos automaticamente`)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '6px 10px',
+                  background: 'var(--white)',
+                  border: '1px solid var(--stone)',
+                  borderRadius: '6px',
+                  fontSize: '11px',
+                  fontWeight: 500,
+                  color: 'var(--brown-light)',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s'
+                }}
+                title={`Sincronizar com ${account.email}`}
+              >
+                <Link2 size={12} />
+                {account.label}
+              </button>
+            ))}
+            <button
+              onClick={() => alert('A sincronizar calendários...\n\nContas configuradas:\n• geral@gavinhogroup.com\n• equipa@gavinhogroup.com')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '6px 10px',
+                background: 'var(--accent-olive)',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '11px',
+                fontWeight: 500,
+                color: 'white',
+                cursor: 'pointer'
+              }}
+              title="Sincronizar agora"
+            >
+              <RefreshCw size={12} />
+              Sync
+            </button>
+          </div>
+          <button className="btn btn-primary" onClick={() => { resetForm(); setShowModal(true) }} style={{ fontSize: '13px', padding: '8px 14px' }}>
+            <Plus size={14} /> Novo Evento
+          </button>
+        </div>
       </div>
 
       {/* Controlos */}
@@ -384,6 +505,18 @@ export default function Calendario() {
             >
               <Building2 size={12} /> Encerramentos
             </button>
+            <button
+              onClick={() => setShowFerias(!showFerias)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '4px',
+                padding: '6px 10px', border: 'none', borderRadius: '6px',
+                fontSize: '11px', fontWeight: 500, cursor: 'pointer',
+                background: showFerias ? '#cffafe' : 'var(--stone)',
+                color: showFerias ? '#0891b2' : 'var(--brown-light)'
+              }}
+            >
+              <Palmtree size={12} /> Férias
+            </button>
           </div>
         </div>
 
@@ -415,114 +548,242 @@ export default function Calendario() {
       </div>
 
       {/* Calendário */}
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        {/* Header dias da semana */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: 'var(--cream)', borderBottom: '1px solid var(--stone)' }}>
-          {DIAS_SEMANA.map(dia => (
-            <div key={dia} style={{ padding: '12px', textAlign: 'center', fontSize: '11px', fontWeight: 600, color: 'var(--brown-light)' }}>
-              {dia}
-            </div>
-          ))}
-        </div>
+      {viewMode === 'mes' ? (
+        /* VISTA MENSAL */
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          {/* Header dias da semana */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: 'var(--cream)', borderBottom: '1px solid var(--stone)' }}>
+            {DIAS_SEMANA.map(dia => (
+              <div key={dia} style={{ padding: '12px', textAlign: 'center', fontSize: '11px', fontWeight: 600, color: 'var(--brown-light)' }}>
+                {dia}
+              </div>
+            ))}
+          </div>
 
-        {/* Grid de dias */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
-          {calendarDays.map((day, index) => {
-            const dayEvents = getEventsForDate(day.date)
-            const today = isToday(day.date)
-            const feriado = getFeriadoForDate(day.date)
-            const encerramento = getEncerramentoForDate(day.date)
-            
-            // Background especial para feriados/encerramentos
-            let bgColor = day.isCurrentMonth ? 'var(--white)' : 'var(--cream)'
-            if (today) bgColor = 'rgba(201, 168, 130, 0.08)'
-            if (feriado && showFeriados) bgColor = 'rgba(220, 38, 38, 0.06)'
-            if (encerramento && showEncerramentos) bgColor = 'rgba(124, 58, 237, 0.06)'
-            
-            return (
-              <div 
-                key={index}
-                onClick={() => handleAddEvent(day.date)}
-                style={{ 
-                  minHeight: viewMode === 'mes' ? '100px' : '300px',
-                  padding: '6px',
-                  borderRight: (index + 1) % 7 !== 0 ? '1px solid var(--stone)' : 'none',
-                  borderBottom: '1px solid var(--stone)',
-                  background: bgColor,
-                  cursor: 'pointer',
-                  transition: 'background 0.15s'
-                }}
-              >
-                {/* Número do dia */}
-                <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'flex-end',
-                  marginBottom: '4px'
-                }}>
-                  <span style={{ 
-                    width: '24px', 
-                    height: '24px', 
-                    display: 'flex', 
-                    alignItems: 'center', 
+          {/* Grid de dias */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
+            {calendarDays.map((day, index) => {
+              const dayEvents = getEventsForDate(day.date)
+              const today = isToday(day.date)
+              const feriado = getFeriadoForDate(day.date)
+              const encerramento = getEncerramentoForDate(day.date)
+              const feriasHoje = getFeriasForDate(day.date)
+
+              let bgColor = day.isCurrentMonth ? 'var(--white)' : 'var(--cream)'
+              if (today) bgColor = 'rgba(201, 168, 130, 0.08)'
+              if (feriado && showFeriados) bgColor = 'rgba(220, 38, 38, 0.06)'
+              if (encerramento && showEncerramentos) bgColor = 'rgba(124, 58, 237, 0.06)'
+              if (feriasHoje.length > 0 && showFerias) bgColor = 'rgba(8, 145, 178, 0.04)'
+
+              return (
+                <div
+                  key={index}
+                  onClick={() => handleAddEvent(day.date)}
+                  style={{
+                    minHeight: '100px',
+                    padding: '6px',
+                    borderRight: (index + 1) % 7 !== 0 ? '1px solid var(--stone)' : 'none',
+                    borderBottom: '1px solid var(--stone)',
+                    background: bgColor,
+                    cursor: 'pointer',
+                    transition: 'background 0.15s'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '4px' }}>
+                    <span style={{
+                      width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      borderRadius: '50%', fontSize: '12px', fontWeight: today ? 600 : 400,
+                      color: today ? 'white' : day.isCurrentMonth ? 'var(--brown)' : 'var(--brown-light)',
+                      background: today ? 'var(--brown)' : 'transparent'
+                    }}>
+                      {day.date.getDate()}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    {dayEvents.slice(0, 3).map(evento => {
+                      const tipoConfig = getTipoConfig(evento.tipo)
+                      const isSpecialEvent = evento.isFeriado || evento.isEncerramento || evento.isFerias
+                      return (
+                        <div
+                          key={evento.id}
+                          onClick={(e) => { e.stopPropagation(); if (!isSpecialEvent) setShowEventDetail(evento) }}
+                          style={{
+                            padding: '2px 4px', borderRadius: '3px', fontSize: '10px', fontWeight: 500,
+                            background: tipoConfig.color, color: 'white', overflow: 'hidden',
+                            textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                            cursor: isSpecialEvent ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: '3px'
+                          }}
+                        >
+                          {evento.isFeriado && <Flag size={10} />}
+                          {evento.isEncerramento && <Building2 size={10} />}
+                          {evento.isFerias && <Palmtree size={10} />}
+                          {evento.titulo}
+                        </div>
+                      )
+                    })}
+                    {dayEvents.length > 3 && (
+                      <div style={{ fontSize: '9px', color: 'var(--brown-light)', textAlign: 'center' }}>+{dayEvents.length - 3} mais</div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ) : (
+        /* VISTA SEMANAL COM HORAS (8:00 - 20:00) */
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          {/* Header com dias da semana (segunda a sexta) */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '60px repeat(5, 1fr)',
+            background: 'var(--cream)',
+            borderBottom: '1px solid var(--stone)'
+          }}>
+            {/* Canto vazio para coluna de horas */}
+            <div style={{ padding: '12px 8px', borderRight: '1px solid var(--stone)' }} />
+
+            {/* Dias da semana */}
+            {calendarDays.map((day, idx) => {
+              const today = isToday(day.date)
+              return (
+                <div
+                  key={idx}
+                  style={{
+                    padding: '12px 8px',
+                    textAlign: 'center',
+                    borderRight: idx < 4 ? '1px solid var(--stone)' : 'none'
+                  }}
+                >
+                  <div style={{
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    color: today ? 'var(--accent-olive-dark)' : 'var(--brown-light)',
+                    textTransform: 'uppercase',
+                    marginBottom: '4px'
+                  }}>
+                    {DIAS_SEMANA_CURTO[idx]}
+                  </div>
+                  <div style={{
+                    fontSize: '20px',
+                    fontWeight: today ? 700 : 500,
+                    width: today ? '32px' : 'auto',
+                    height: today ? '32px' : 'auto',
+                    display: 'inline-flex',
+                    alignItems: 'center',
                     justifyContent: 'center',
                     borderRadius: '50%',
-                    fontSize: '12px',
-                    fontWeight: today ? 600 : 400,
-                    color: today ? 'white' : day.isCurrentMonth ? 'var(--brown)' : 'var(--brown-light)',
-                    background: today ? 'var(--brown)' : 'transparent'
+                    background: today ? 'var(--accent-olive-dark)' : 'transparent',
+                    color: today ? 'white' : 'var(--brown)'
                   }}>
                     {day.date.getDate()}
-                  </span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Grid de horas */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '60px repeat(5, 1fr)',
+            maxHeight: 'calc(100vh - 280px)',
+            minHeight: '600px',
+            overflowY: 'auto'
+          }}>
+            {HORAS_DIA.map((hora, horaIdx) => (
+              <div key={hora} style={{ display: 'contents' }}>
+                {/* Coluna de hora */}
+                <div style={{
+                  padding: '8px 4px',
+                  fontSize: '11px',
+                  fontWeight: 500,
+                  color: 'var(--brown-light)',
+                  textAlign: 'right',
+                  paddingRight: '8px',
+                  borderRight: '1px solid var(--stone)',
+                  borderBottom: '1px solid var(--stone-dark)',
+                  background: 'var(--cream)',
+                  height: '60px',
+                  boxSizing: 'border-box'
+                }}>
+                  {hora}
                 </div>
 
-                {/* Eventos */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  {dayEvents.slice(0, viewMode === 'mes' ? 3 : 10).map(evento => {
-                    const tipoConfig = getTipoConfig(evento.tipo)
-                    const isSpecialEvent = evento.isFeriado || evento.isEncerramento
-                    return (
-                      <div 
-                        key={evento.id}
-                        onClick={(e) => { 
-                          e.stopPropagation()
-                          if (!isSpecialEvent) setShowEventDetail(evento) 
-                        }}
-                        style={{ 
-                          padding: viewMode === 'mes' ? '2px 4px' : '4px 6px',
-                          borderRadius: '3px',
-                          fontSize: viewMode === 'mes' ? '10px' : '11px',
-                          fontWeight: 500,
-                          background: tipoConfig.color,
-                          color: 'white',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          cursor: isSpecialEvent ? 'default' : 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '3px'
-                        }}
-                      >
-                        {evento.isFeriado && <Flag size={10} />}
-                        {evento.isEncerramento && <Building2 size={10} />}
-                        {viewMode === 'semana' && evento.hora_inicio && (
-                          <span style={{ opacity: 0.8 }}>{evento.hora_inicio} </span>
-                        )}
-                        {evento.titulo}
-                      </div>
-                    )
-                  })}
-                  {dayEvents.length > (viewMode === 'mes' ? 3 : 10) && (
-                    <div style={{ fontSize: '9px', color: 'var(--brown-light)', textAlign: 'center' }}>
-                      +{dayEvents.length - (viewMode === 'mes' ? 3 : 10)} mais
+                {/* Células para cada dia */}
+                {calendarDays.map((day, dayIdx) => {
+                  const eventsAtHour = getEventsForHour(day.date, hora)
+                  const today = isToday(day.date)
+
+                  return (
+                    <div
+                      key={`${hora}-${dayIdx}`}
+                      onClick={() => {
+                        const dateStr = day.date.toISOString().split('T')[0]
+                        resetForm()
+                        setForm(prev => ({ ...prev, data: dateStr, hora_inicio: hora, hora_fim: `${parseInt(hora) + 1}:00` }))
+                        setShowModal(true)
+                      }}
+                      style={{
+                        position: 'relative',
+                        borderRight: dayIdx < 4 ? '1px solid var(--stone)' : 'none',
+                        borderBottom: '1px solid var(--stone-dark)',
+                        background: today ? 'rgba(139, 154, 125, 0.04)' : 'var(--white)',
+                        height: '60px',
+                        cursor: 'pointer',
+                        transition: 'background 0.15s'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = today ? 'rgba(139, 154, 125, 0.08)' : 'var(--cream)'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = today ? 'rgba(139, 154, 125, 0.04)' : 'var(--white)'}
+                    >
+                      {/* Eventos nesta hora */}
+                      {eventsAtHour.map((evento, evtIdx) => {
+                        const tipoConfig = getTipoConfig(evento.tipo)
+                        const position = getEventPosition(evento)
+                        return (
+                          <div
+                            key={evento.id}
+                            onClick={(e) => { e.stopPropagation(); setShowEventDetail(evento) }}
+                            style={{
+                              position: 'absolute',
+                              top: `${position.top}px`,
+                              left: '2px',
+                              right: '2px',
+                              minHeight: `${Math.min(position.height, 58)}px`,
+                              padding: '4px 6px',
+                              borderRadius: '4px',
+                              background: tipoConfig.color,
+                              color: 'white',
+                              fontSize: '11px',
+                              fontWeight: 500,
+                              overflow: 'hidden',
+                              cursor: 'pointer',
+                              zIndex: evtIdx + 1,
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.12)'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <span style={{ opacity: 0.9, fontSize: '10px' }}>{evento.hora_inicio}</span>
+                              <span style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {evento.titulo}
+                              </span>
+                            </div>
+                            {position.height > 40 && evento.local && (
+                              <div style={{ fontSize: '9px', opacity: 0.8, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '2px' }}>
+                                <MapPin size={8} /> {evento.local}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
                     </div>
-                  )}
-                </div>
+                  )
+                })}
               </div>
-            )
-          })}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* MODAL: Detalhe do Evento */}
       {showEventDetail && (

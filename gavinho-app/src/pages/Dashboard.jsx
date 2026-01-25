@@ -181,7 +181,7 @@ export default function Dashboard() {
           <h1 className="page-title">Dashboard</h1>
           <p className="page-subtitle">Visão geral da GAVINHO Group</p>
         </div>
-        <button className="btn btn-gold" onClick={() => navigate('/projetos')}>
+        <button className="btn btn-primary" onClick={() => navigate('/projetos')}>
           Ver Projetos
         </button>
       </div>
@@ -333,7 +333,7 @@ export default function Dashboard() {
             <div style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}>
               <FolderKanban size={48} style={{ opacity: 0.3, marginBottom: '16px' }} />
               <p>Nenhum projeto encontrado</p>
-              <button className="btn btn-gold mt-md" onClick={() => navigate('/projetos')}>
+              <button className="btn btn-primary mt-md" onClick={() => navigate('/projetos')}>
                 Criar Projeto
               </button>
             </div>

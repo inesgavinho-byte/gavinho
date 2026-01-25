@@ -183,11 +183,24 @@ export default function Clientes() {
         </button>
       </div>
 
-      <div className="card mb-lg">
-        <div style={{ position: 'relative', maxWidth: '400px' }}>
-          <Search size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--brown-light)' }} />
-          <input type="text" placeholder="Pesquisar clientes..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-            style={{ width: '100%', padding: '12px 12px 12px 40px', border: '1px solid var(--stone)', borderRadius: '10px', fontSize: '14px' }} />
+      <div style={{ marginBottom: '24px' }}>
+        <div style={{ position: 'relative', maxWidth: '450px' }}>
+          <Search size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--brown-light)' }} />
+          <input
+            type="text"
+            placeholder="Procurar por nome, empresa ou email..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '14px 16px 14px 48px',
+              border: '1px solid var(--stone)',
+              borderRadius: '24px',
+              fontSize: '14px',
+              background: 'var(--white)',
+              color: 'var(--brown)'
+            }}
+          />
         </div>
       </div>
 

@@ -334,7 +334,7 @@ export default function ObraOrcamentacao({ obra, activeSubTab = 'custo' }) {
     }
   }
 
-  // ==================== IMPORTAÇÃO EXCEL ====================
+  // ==================== IMPORTAÀ‡ÀƒO EXCEL ====================
   
   const handleImportExcel = async (e) => {
     const file = e.target.files?.[0]
@@ -437,7 +437,7 @@ export default function ObraOrcamentacao({ obra, activeSubTab = 'custo' }) {
     }
   }
 
-  // ==================== EXPORTAÇÃO ====================
+  // ==================== EXPORTAÇÁO ====================
   
   const exportarPropostaExcel = (proposta) => {
     const propostaItems = items.filter(i => i.proposta_id === proposta.id && i.status === 'ativo')
@@ -484,7 +484,7 @@ export default function ObraOrcamentacao({ obra, activeSubTab = 'custo' }) {
     return true
   })
 
-  // ==================== CÁLCULOS ====================
+  // ==================== CÀLCULOS ====================
   
   const calcularTotais = (itemsList) => {
     const ativos = itemsList.filter(i => i.status === 'ativo')

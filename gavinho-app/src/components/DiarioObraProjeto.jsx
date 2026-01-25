@@ -1,559 +1,575 @@
-import React, { useState, useEffect, useRef } from 'react'
-import { supabase } from '../supabaseClient'
+import { useState, useEffect } from 'react'
+import { supabase } from '../lib/supabase'
 import {
-  Plus, Search, Filter, Calendar, X, Edit, Trash2,
-  FileText, Users, CheckCircle, AlertTriangle, MapPin,
-  Truck, User, RefreshCw, Upload, ChevronDown, Tag
+  Plus, Search, Filter, Calendar, User, Mail, CheckSquare, PenTool,
+  Box, Truck, Users, StickyNote, FileText, X, Edit2, Trash2, Tag,
+  ChevronDown, ChevronRight, Paperclip, Clock, MoreVertical,
+  HardHat, Wrench, AlertTriangle, Camera, ClipboardList
 } from 'lucide-react'
 
 const iconMap = {
-  FileText, Users, CheckCircle, AlertTriangle, MapPin, Truck, User, RefreshCw
+  CheckSquare, PenTool, Box, User, Truck, Mail, Users, StickyNote, FileText,
+  HardHat, Wrench, AlertTriangle, Camera, ClipboardList
 }
 
-export default function DiarioObraProjeto({ obraId, obraCodigo }) {
+export default function DiarioObraProjeto({ obra }) {
   const [entradas, setEntradas] = useState([])
   const [categorias, setCategorias] = useState([])
   const [tags, setTags] = useState([])
   const [loading, setLoading] = useState(true)
-
-  // Filters
-  const [searchTerm, setSearchTerm] = useState('')
-  const [selectedCategoria, setSelectedCategoria] = useState(null)
-  const [selectedTags, setSelectedTags] = useState([])
-  const [dateRange, setDateRange] = useState({ start: '', end: '' })
-  const [showFilters, setShowFilters] = useState(false)
-
-  // Modal
   const [showModal, setShowModal] = useState(false)
-  const [editingEntry, setEditingEntry] = useState(null)
-  const [form, setForm] = useState({
+  const [editingItem, setEditingItem] = useState(null)
+  const [utilizadores, setUtilizadores] = useState([])
+
+  // Filtros
+  const [filtroCategoria, setFiltroCategoria] = useState('')
+  const [filtroTag, setFiltroTag] = useState('')
+  const [filtroBusca, setFiltroBusca] = useState('')
+  const [filtroData, setFiltroData] = useState('')
+
+  // Form
+  const [formData, setFormData] = useState({
     titulo: '',
     descricao: '',
     categoria_id: '',
-    data_evento: new Date().toISOString().slice(0, 16),
-    tags: [],
-    anexos: []
+    data_evento: new Date().toISOString().split('T')[0],
+    tags: []
   })
-  const [uploading, setUploading] = useState(false)
-  const fileInputRef = useRef(null)
-
-  // Delete confirmation
-  const [deleteConfirm, setDeleteConfirm] = useState(null)
 
   useEffect(() => {
-    fetchData()
-  }, [obraId])
+    if (obra?.id) {
+      loadData()
+    }
+  }, [obra?.id])
 
-  const fetchData = async () => {
+  const loadData = async () => {
     setLoading(true)
-    await Promise.all([fetchEntradas(), fetchCategorias(), fetchTags()])
-    setLoading(false)
-  }
+    try {
+      // Load entries - using separate queries to avoid foreign key issues
+      const [entradasRes, categoriasRes, tagsRes, utilizadoresRes] = await Promise.all([
+        supabase
+          .from('obra_diario_projeto')
+          .select('*')
+          .eq('obra_id', obra.id)
+          .order('data_evento', { ascending: false }),
+        supabase.from('obra_diario_categorias').select('*').order('ordem'),
+        supabase.from('obra_diario_tags').select('*').order('nome'),
+        supabase.from('utilizadores').select('id, nome').eq('ativo', true).order('nome')
+      ])
 
-  const fetchEntradas = async () => {
-    const { data } = await supabase
-      .from('obra_diario_projeto')
-      .select(`
-        *,
-        categoria:obra_diario_categorias(*),
-        obra_diario_projeto_tags(tag_id)
-      `)
-      .eq('obra_id', obraId)
-      .order('data_evento', { ascending: false })
+      let entradasData = entradasRes.data || []
 
-    setEntradas(data || [])
-  }
+      // If we have entries, load their tags and categories separately
+      if (entradasData.length > 0) {
+        const entradaIds = entradasData.map(e => e.id)
 
-  const fetchCategorias = async () => {
-    const { data } = await supabase
-      .from('obra_diario_categorias')
-      .select('*')
-      .order('ordem')
-    setCategorias(data || [])
-  }
+        // Load tags for entries
+        const { data: entradaTags } = await supabase
+          .from('obra_diario_projeto_tags')
+          .select('diario_id, tag_id')
+          .in('diario_id', entradaIds)
 
-  const fetchTags = async () => {
-    const { data } = await supabase
-      .from('obra_diario_tags')
-      .select('*')
-    setTags(data || [])
-  }
-
-  const handleSave = async () => {
-    if (!form.titulo.trim()) return
-
-    const entryData = {
-      obra_id: obraId,
-      titulo: form.titulo,
-      descricao: form.descricao,
-      categoria_id: form.categoria_id || null,
-      data_evento: form.data_evento,
-      anexos: form.anexos,
-      updated_at: new Date().toISOString()
-    }
-
-    let entryId = editingEntry?.id
-
-    if (editingEntry) {
-      await supabase.from('obra_diario_projeto').update(entryData).eq('id', entryId)
-    } else {
-      const { data } = await supabase.from('obra_diario_projeto').insert([entryData]).select()
-      entryId = data?.[0]?.id
-    }
-
-    // Update tags
-    if (entryId) {
-      await supabase.from('obra_diario_projeto_tags').delete().eq('diario_id', entryId)
-      if (form.tags.length > 0) {
-        const tagInserts = form.tags.map(tagId => ({ diario_id: entryId, tag_id: tagId }))
-        await supabase.from('obra_diario_projeto_tags').insert(tagInserts)
+        // Map tags to entries
+        entradasData = entradasData.map(entrada => ({
+          ...entrada,
+          categoria: categoriasRes.data?.find(c => c.id === entrada.categoria_id),
+          obra_diario_projeto_tags: (entradaTags || []).filter(t => t.diario_id === entrada.id)
+        }))
       }
+
+      setEntradas(entradasData)
+      if (categoriasRes.data) setCategorias(categoriasRes.data)
+      if (tagsRes.data) setTags(tagsRes.data)
+      if (utilizadoresRes.data) setUtilizadores(utilizadoresRes.data)
+    } catch (err) {
+      console.error('Erro ao carregar diário de obra:', err)
+    } finally {
+      setLoading(false)
     }
-
-    setShowModal(false)
-    resetForm()
-    fetchEntradas()
-  }
-
-  const handleDelete = async (entry) => {
-    await supabase.from('obra_diario_projeto').delete().eq('id', entry.id)
-    setDeleteConfirm(null)
-    fetchEntradas()
-  }
-
-  const handleFileUpload = async (e) => {
-    const files = Array.from(e.target.files)
-    if (files.length === 0) return
-
-    setUploading(true)
-    const newAnexos = [...form.anexos]
-
-    for (const file of files) {
-      const fileName = `${obraCodigo}/diario-projeto/${Date.now()}_${file.name}`
-      const { error } = await supabase.storage.from('obras').upload(fileName, file)
-
-      if (!error) {
-        const { data: urlData } = supabase.storage.from('obras').getPublicUrl(fileName)
-        newAnexos.push({ url: urlData.publicUrl, nome: file.name, data: new Date().toISOString() })
-      }
-    }
-
-    setForm({ ...form, anexos: newAnexos })
-    setUploading(false)
-  }
-
-  const removeAnexo = (index) => {
-    const newAnexos = form.anexos.filter((_, i) => i !== index)
-    setForm({ ...form, anexos: newAnexos })
   }
 
   const resetForm = () => {
-    setForm({
+    setFormData({
       titulo: '',
       descricao: '',
-      categoria_id: '',
-      data_evento: new Date().toISOString().slice(0, 16),
-      tags: [],
-      anexos: []
+      categoria_id: categorias[0]?.id || '',
+      data_evento: new Date().toISOString().split('T')[0],
+      tags: []
     })
-    setEditingEntry(null)
+    setEditingItem(null)
   }
 
-  const openEditModal = (entry) => {
-    setEditingEntry(entry)
-    setForm({
-      titulo: entry.titulo,
-      descricao: entry.descricao || '',
-      categoria_id: entry.categoria_id || '',
-      data_evento: entry.data_evento ? entry.data_evento.slice(0, 16) : new Date().toISOString().slice(0, 16),
-      tags: entry.obra_diario_projeto_tags?.map(t => t.tag_id) || [],
-      anexos: entry.anexos || []
+  const handleSave = async () => {
+    if (!formData.titulo.trim()) {
+      alert('Título é obrigatório')
+      return
+    }
+
+    try {
+      const entradaData = {
+        obra_id: obra.id,
+        titulo: formData.titulo.trim(),
+        descricao: formData.descricao?.trim() || null,
+        categoria_id: formData.categoria_id || null,
+        data_evento: formData.data_evento || new Date().toISOString(),
+        tipo: 'manual',
+        fonte: 'manual'
+      }
+
+      let entradaId
+
+      if (editingItem) {
+        const { error } = await supabase
+          .from('obra_diario_projeto')
+          .update(entradaData)
+          .eq('id', editingItem.id)
+        if (error) throw error
+        entradaId = editingItem.id
+      } else {
+        const { data, error } = await supabase
+          .from('obra_diario_projeto')
+          .insert([entradaData])
+          .select()
+          .single()
+        if (error) throw error
+        entradaId = data.id
+      }
+
+      // Atualizar tags
+      await supabase.from('obra_diario_projeto_tags').delete().eq('diario_id', entradaId)
+      if (formData.tags.length > 0) {
+        await supabase.from('obra_diario_projeto_tags').insert(
+          formData.tags.map(tagId => ({ diario_id: entradaId, tag_id: tagId }))
+        )
+      }
+
+      setShowModal(false)
+      resetForm()
+      loadData()
+    } catch (err) {
+      console.error('Erro ao guardar:', err)
+      alert('Erro ao guardar: ' + err.message)
+    }
+  }
+
+  const handleDelete = async (entrada) => {
+    if (!confirm('Tem certeza que deseja apagar esta entrada?')) return
+
+    try {
+      await supabase.from('obra_diario_projeto').delete().eq('id', entrada.id)
+      loadData()
+    } catch (err) {
+      console.error('Erro ao apagar:', err)
+    }
+  }
+
+  const handleEdit = (entrada) => {
+    setFormData({
+      titulo: entrada.titulo,
+      descricao: entrada.descricao || '',
+      categoria_id: entrada.categoria_id || '',
+      data_evento: entrada.data_evento?.split('T')[0] || '',
+      tags: entrada.obra_diario_projeto_tags?.map(t => t.tag_id) || []
     })
+    setEditingItem(entrada)
     setShowModal(true)
   }
 
-  const toggleTag = (tagId) => {
-    if (form.tags.includes(tagId)) {
-      setForm({ ...form, tags: form.tags.filter(t => t !== tagId) })
-    } else {
-      setForm({ ...form, tags: [...form.tags, tagId] })
+  // Filtrar entradas
+  const entradasFiltradas = entradas.filter(e => {
+    if (filtroCategoria && e.categoria_id !== filtroCategoria) return false
+    if (filtroTag && !e.obra_diario_projeto_tags?.some(t => t.tag_id === filtroTag)) return false
+    if (filtroBusca) {
+      const busca = filtroBusca.toLowerCase()
+      if (!e.titulo.toLowerCase().includes(busca) &&
+          !(e.descricao || '').toLowerCase().includes(busca)) return false
     }
-  }
-
-  const toggleFilterTag = (tagId) => {
-    if (selectedTags.includes(tagId)) {
-      setSelectedTags(selectedTags.filter(t => t !== tagId))
-    } else {
-      setSelectedTags([...selectedTags, tagId])
-    }
-  }
-
-  const clearFilters = () => {
-    setSearchTerm('')
-    setSelectedCategoria(null)
-    setSelectedTags([])
-    setDateRange({ start: '', end: '' })
-  }
-
-  // Filter entries
-  const filteredEntradas = entradas.filter(entry => {
-    if (searchTerm && !entry.titulo.toLowerCase().includes(searchTerm.toLowerCase()) &&
-        !entry.descricao?.toLowerCase().includes(searchTerm.toLowerCase())) {
-      return false
-    }
-    if (selectedCategoria && entry.categoria_id !== selectedCategoria) {
-      return false
-    }
-    if (selectedTags.length > 0) {
-      const entryTagIds = entry.obra_diario_projeto_tags?.map(t => t.tag_id) || []
-      if (!selectedTags.some(t => entryTagIds.includes(t))) {
-        return false
-      }
-    }
-    if (dateRange.start && new Date(entry.data_evento) < new Date(dateRange.start)) {
-      return false
-    }
-    if (dateRange.end && new Date(entry.data_evento) > new Date(dateRange.end + 'T23:59:59')) {
-      return false
-    }
+    if (filtroData && !e.data_evento?.startsWith(filtroData)) return false
     return true
   })
 
-  const hasActiveFilters = searchTerm || selectedCategoria || selectedTags.length > 0 || dateRange.start || dateRange.end
+  // Agrupar por data
+  const entradasAgrupadas = entradasFiltradas.reduce((acc, entrada) => {
+    const data = entrada.data_evento?.split('T')[0] || 'Sem data'
+    if (!acc[data]) acc[data] = []
+    acc[data].push(entrada)
+    return acc
+  }, {})
 
   const formatDate = (dateStr) => {
+    if (!dateStr) return ''
     const date = new Date(dateStr)
-    return date.toLocaleDateString('pt-PT', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    const hoje = new Date()
+    const ontem = new Date(hoje)
+    ontem.setDate(ontem.getDate() - 1)
+
+    if (date.toDateString() === hoje.toDateString()) return 'Hoje'
+    if (date.toDateString() === ontem.toDateString()) return 'Ontem'
+
+    return date.toLocaleDateString('pt-PT', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: date.getFullYear() !== hoje.getFullYear() ? 'numeric' : undefined
+    })
   }
 
-  const getCategoriaIcon = (iconName) => {
-    const IconComponent = iconMap[iconName] || FileText
-    return IconComponent
+  const getIcon = (iconName) => {
+    const Icon = iconMap[iconName] || FileText
+    return Icon
   }
 
   if (loading) {
-    return <div style={{ padding: '40px', textAlign: 'center', color: 'var(--brown-light)' }}>A carregar...</div>
+    return (
+      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--brown-light)' }}>
+        A carregar diário de projeto...
+      </div>
+    )
   }
 
   return (
-    <div className="diario-projeto-container">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {/* Header */}
-      <div className="diario-header">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h2 style={{ fontSize: '20px', fontWeight: 600, margin: 0 }}>Diário de Projeto</h2>
-          <p style={{ fontSize: '13px', color: 'var(--brown-light)', margin: '4px 0 0' }}>
-            {filteredEntradas.length} {filteredEntradas.length === 1 ? 'entrada' : 'entradas'}
+          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
+            Diário de Projeto
+          </h3>
+          <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--brown-light)' }}>
+            {entradas.length} {entradas.length === 1 ? 'entrada' : 'entradas'}
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button
-            className={`btn btn-outline ${hasActiveFilters ? 'active' : ''}`}
-            onClick={() => setShowFilters(!showFilters)}
+            onClick={() => { resetForm(); setShowModal(true) }}
+            className="btn btn-primary"
+            style={{ fontSize: '12px', padding: '8px 16px' }}
           >
-            <Filter size={16} />
-            Filtros
-            {hasActiveFilters && <span className="filter-badge">{selectedTags.length + (selectedCategoria ? 1 : 0) + (dateRange.start ? 1 : 0)}</span>}
-          </button>
-          <button className="btn btn-primary" onClick={() => { resetForm(); setShowModal(true) }}>
-            <Plus size={16} />
-            Nova Entrada
+            <Plus size={14} /> Nova Entrada
           </button>
         </div>
       </div>
 
-      {/* Search & Filters */}
-      <div className="diario-search-bar">
-        <Search size={18} style={{ color: 'var(--brown-light)' }} />
+      {/* Filtros */}
+      <div className="card" style={{ padding: '12px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ position: 'relative', flex: '1', minWidth: '200px' }}>
+          <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--brown-light)' }} />
+          <input
+            type="text"
+            placeholder="Pesquisar..."
+            value={filtroBusca}
+            onChange={e => setFiltroBusca(e.target.value)}
+            style={{ width: '100%', paddingLeft: '32px', fontSize: '13px' }}
+          />
+        </div>
+
+        <select
+          value={filtroCategoria}
+          onChange={e => setFiltroCategoria(e.target.value)}
+          style={{ fontSize: '13px', minWidth: '140px' }}
+        >
+          <option value="">Todas categorias</option>
+          {categorias.map(cat => (
+            <option key={cat.id} value={cat.id}>{cat.nome}</option>
+          ))}
+        </select>
+
+        <select
+          value={filtroTag}
+          onChange={e => setFiltroTag(e.target.value)}
+          style={{ fontSize: '13px', minWidth: '140px' }}
+        >
+          <option value="">Todas tags</option>
+          {tags.map(tag => (
+            <option key={tag.id} value={tag.id}>{tag.nome}</option>
+          ))}
+        </select>
+
         <input
-          type="text"
-          placeholder="Pesquisar entradas..."
-          value={searchTerm}
-          onChange={e => setSearchTerm(e.target.value)}
+          type="date"
+          value={filtroData}
+          onChange={e => setFiltroData(e.target.value)}
+          style={{ fontSize: '13px' }}
         />
-        {searchTerm && (
-          <button onClick={() => setSearchTerm('')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}>
-            <X size={16} />
+
+        {(filtroCategoria || filtroTag || filtroBusca || filtroData) && (
+          <button
+            onClick={() => { setFiltroCategoria(''); setFiltroTag(''); setFiltroBusca(''); setFiltroData('') }}
+            style={{ fontSize: '12px', color: 'var(--brown-light)', background: 'none', border: 'none', cursor: 'pointer' }}
+          >
+            Limpar filtros
           </button>
         )}
       </div>
 
-      {/* Filter Panel */}
-      {showFilters && (
-        <div className="diario-filters-panel">
-          <div className="filter-section">
-            <label>Categoria</label>
-            <div className="filter-chips">
-              {categorias.map(cat => {
-                const Icon = getCategoriaIcon(cat.icone)
-                return (
-                  <button
-                    key={cat.id}
-                    className={`filter-chip ${selectedCategoria === cat.id ? 'active' : ''}`}
-                    onClick={() => setSelectedCategoria(selectedCategoria === cat.id ? null : cat.id)}
-                    style={{ '--chip-color': cat.cor }}
-                  >
-                    <Icon size={14} />
-                    {cat.nome}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          <div className="filter-section">
-            <label>Tags</label>
-            <div className="filter-chips">
-              {tags.map(tag => (
-                <button
-                  key={tag.id}
-                  className={`filter-chip ${selectedTags.includes(tag.id) ? 'active' : ''}`}
-                  onClick={() => toggleFilterTag(tag.id)}
-                  style={{ '--chip-color': tag.cor }}
-                >
-                  <Tag size={14} />
-                  {tag.nome}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="filter-section">
-            <label>Período</label>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <input
-                type="date"
-                value={dateRange.start}
-                onChange={e => setDateRange({ ...dateRange, start: e.target.value })}
-                className="date-input"
-              />
-              <span style={{ color: 'var(--brown-light)' }}>até</span>
-              <input
-                type="date"
-                value={dateRange.end}
-                onChange={e => setDateRange({ ...dateRange, end: e.target.value })}
-                className="date-input"
-              />
-            </div>
-          </div>
-
-          {hasActiveFilters && (
-            <button className="btn btn-ghost" onClick={clearFilters} style={{ marginTop: '8px' }}>
-              <X size={14} />
-              Limpar filtros
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Entries List */}
-      {filteredEntradas.length === 0 ? (
-        <div className="diario-empty">
-          <FileText size={48} strokeWidth={1} />
-          <p>{hasActiveFilters ? 'Nenhuma entrada encontrada com os filtros aplicados' : 'Ainda não há entradas no diário'}</p>
-          {!hasActiveFilters && (
-            <button className="btn btn-primary" onClick={() => { resetForm(); setShowModal(true) }}>
-              <Plus size={16} />
-              Criar primeira entrada
-            </button>
-          )}
+      {/* Lista de Entradas */}
+      {entradasFiltradas.length === 0 ? (
+        <div className="card" style={{ padding: '40px', textAlign: 'center', color: 'var(--brown-light)' }}>
+          <FileText size={40} style={{ marginBottom: '12px', opacity: 0.5 }} />
+          <p style={{ margin: 0 }}>Sem entradas no diário</p>
+          <p style={{ fontSize: '12px', margin: '8px 0 0' }}>Adicione a primeira entrada para começar</p>
         </div>
       ) : (
-        <div className="diario-entries">
-          {filteredEntradas.map(entry => {
-            const Icon = entry.categoria ? getCategoriaIcon(entry.categoria.icone) : FileText
-            const entryTags = entry.obra_diario_projeto_tags?.map(t => tags.find(tag => tag.id === t.tag_id)).filter(Boolean) || []
-
-            return (
-              <div key={entry.id} className="diario-entry">
-                <div className="entry-icon" style={{ background: entry.categoria?.cor || '#6b7280' }}>
-                  <Icon size={18} color="white" />
-                </div>
-                <div className="entry-content">
-                  <div className="entry-header">
-                    <h3>{entry.titulo}</h3>
-                    <div className="entry-actions">
-                      <button className="btn btn-ghost btn-icon" onClick={() => openEditModal(entry)}>
-                        <Edit size={14} />
-                      </button>
-                      <button className="btn btn-ghost btn-icon" onClick={() => setDeleteConfirm(entry)}>
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="entry-meta">
-                    <span className="entry-date">
-                      <Calendar size={12} />
-                      {formatDate(entry.data_evento)}
-                    </span>
-                    {entry.categoria && (
-                      <span className="entry-categoria" style={{ background: entry.categoria.cor + '20', color: entry.categoria.cor }}>
-                        {entry.categoria.nome}
-                      </span>
-                    )}
-                    {entryTags.map(tag => (
-                      <span key={tag.id} className="entry-tag" style={{ background: tag.cor + '20', color: tag.cor }}>
-                        {tag.nome}
-                      </span>
-                    ))}
-                  </div>
-
-                  {entry.descricao && (
-                    <p className="entry-description">{entry.descricao}</p>
-                  )}
-
-                  {entry.anexos && entry.anexos.length > 0 && (
-                    <div className="entry-anexos">
-                      {entry.anexos.slice(0, 4).map((anexo, idx) => (
-                        <a key={idx} href={anexo.url} target="_blank" rel="noopener noreferrer" className="anexo-link">
-                          <FileText size={12} />
-                          {anexo.nome}
-                        </a>
-                      ))}
-                      {entry.anexos.length > 4 && (
-                        <span className="anexos-more">+{entry.anexos.length - 4}</span>
-                      )}
-                    </div>
-                  )}
-                </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {Object.entries(entradasAgrupadas).map(([data, items]) => (
+            <div key={data}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: 'var(--brown-light)',
+                marginBottom: '8px',
+                textTransform: 'capitalize'
+              }}>
+                {formatDate(data)}
               </div>
-            )
-          })}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {items.map(entrada => {
+                  const Icon = entrada.categoria ? getIcon(entrada.categoria.icone) : FileText
+                  const entradaTags = tags.filter(t =>
+                    entrada.obra_diario_projeto_tags?.some(et => et.tag_id === t.id)
+                  )
+
+                  return (
+                    <div
+                      key={entrada.id}
+                      className="card"
+                      style={{
+                        padding: '12px 16px',
+                        display: 'flex',
+                        gap: '12px',
+                        alignItems: 'flex-start',
+                        transition: 'box-shadow 0.2s',
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => handleEdit(entrada)}
+                    >
+                      {/* Ícone da categoria */}
+                      <div style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '8px',
+                        background: entrada.categoria?.cor ? `${entrada.categoria.cor}20` : 'var(--stone)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0
+                      }}>
+                        <Icon size={16} style={{ color: entrada.categoria?.cor || 'var(--brown-light)' }} />
+                      </div>
+
+                      {/* Conteúdo */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                          <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--brown)' }}>
+                            {entrada.titulo}
+                          </span>
+                          {entrada.categoria && (
+                            <span style={{
+                              fontSize: '10px',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              background: `${entrada.categoria.cor}20`,
+                              color: entrada.categoria.cor
+                            }}>
+                              {entrada.categoria.nome}
+                            </span>
+                          )}
+                        </div>
+
+                        {entrada.descricao && (
+                          <p style={{
+                            fontSize: '12px',
+                            color: 'var(--brown-light)',
+                            margin: '0 0 6px',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical'
+                          }}>
+                            {entrada.descricao}
+                          </p>
+                        )}
+
+                        {/* Tags */}
+                        {entradaTags.length > 0 && (
+                          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                            {entradaTags.map(tag => (
+                              <span
+                                key={tag.id}
+                                style={{
+                                  fontSize: '10px',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  background: `${tag.cor}20`,
+                                  color: tag.cor
+                                }}
+                              >
+                                {tag.nome}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Meta info */}
+                        <div style={{
+                          display: 'flex',
+                          gap: '12px',
+                          marginTop: '6px',
+                          fontSize: '11px',
+                          color: 'var(--brown-light)'
+                        }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Clock size={10} />
+                            {new Date(entrada.data_evento).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Ações */}
+                      <div style={{ display: 'flex', gap: '4px' }} onClick={e => e.stopPropagation()}>
+                        <button
+                          onClick={() => handleEdit(entrada)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            padding: '4px',
+                            cursor: 'pointer',
+                            color: 'var(--brown-light)'
+                          }}
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(entrada)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            padding: '4px',
+                            cursor: 'pointer',
+                            color: 'var(--danger)'
+                          }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
-      {/* Modal */}
+      {/* Modal de Criar/Editar */}
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal-content diario-modal" onClick={e => e.stopPropagation()}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
             <div className="modal-header">
-              <h2>{editingEntry ? 'Editar Entrada' : 'Nova Entrada'}</h2>
-              <button onClick={() => setShowModal(false)} className="btn btn-ghost btn-icon">
-                <X size={20} />
+              <h3>{editingItem ? 'Editar Entrada' : 'Nova Entrada'}</h3>
+              <button onClick={() => setShowModal(false)} className="modal-close">
+                <X size={18} />
               </button>
             </div>
 
-            <div className="modal-body">
-              <div className="form-group">
-                <label>Título *</label>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 500, marginBottom: '4px', display: 'block' }}>
+                  Título *
+                </label>
                 <input
                   type="text"
-                  value={form.titulo}
-                  onChange={e => setForm({ ...form, titulo: e.target.value })}
-                  placeholder="Título da entrada..."
-                  className="form-input"
+                  value={formData.titulo}
+                  onChange={e => setFormData({ ...formData, titulo: e.target.value })}
+                  placeholder="Descreva brevemente a ação..."
+                  style={{ width: '100%' }}
                 />
               </div>
 
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Categoria</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 500, marginBottom: '4px', display: 'block' }}>
+                    Categoria
+                  </label>
                   <select
-                    value={form.categoria_id}
-                    onChange={e => setForm({ ...form, categoria_id: e.target.value })}
-                    className="form-input"
+                    value={formData.categoria_id}
+                    onChange={e => setFormData({ ...formData, categoria_id: e.target.value })}
+                    style={{ width: '100%' }}
                   >
-                    <option value="">Sem categoria</option>
+                    <option value="">Selecionar...</option>
                     {categorias.map(cat => (
                       <option key={cat.id} value={cat.id}>{cat.nome}</option>
                     ))}
                   </select>
                 </div>
-                <div className="form-group">
-                  <label>Data e Hora</label>
+
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 500, marginBottom: '4px', display: 'block' }}>
+                    Data
+                  </label>
                   <input
-                    type="datetime-local"
-                    value={form.data_evento}
-                    onChange={e => setForm({ ...form, data_evento: e.target.value })}
-                    className="form-input"
+                    type="date"
+                    value={formData.data_evento}
+                    onChange={e => setFormData({ ...formData, data_evento: e.target.value })}
+                    style={{ width: '100%' }}
                   />
                 </div>
               </div>
 
-              <div className="form-group">
-                <label>Tags</label>
-                <div className="tags-selector">
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 500, marginBottom: '4px', display: 'block' }}>
+                  Descrição
+                </label>
+                <textarea
+                  value={formData.descricao}
+                  onChange={e => setFormData({ ...formData, descricao: e.target.value })}
+                  placeholder="Adicione mais detalhes..."
+                  rows={4}
+                  style={{ width: '100%', resize: 'vertical' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 500, marginBottom: '8px', display: 'block' }}>
+                  Tags
+                </label>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                   {tags.map(tag => (
                     <button
                       key={tag.id}
                       type="button"
-                      className={`tag-btn ${form.tags.includes(tag.id) ? 'active' : ''}`}
-                      onClick={() => toggleTag(tag.id)}
-                      style={{ '--tag-color': tag.cor }}
+                      onClick={() => {
+                        const newTags = formData.tags.includes(tag.id)
+                          ? formData.tags.filter(t => t !== tag.id)
+                          : [...formData.tags, tag.id]
+                        setFormData({ ...formData, tags: newTags })
+                      }}
+                      style={{
+                        fontSize: '12px',
+                        padding: '4px 10px',
+                        borderRadius: '4px',
+                        border: '1px solid',
+                        borderColor: formData.tags.includes(tag.id) ? tag.cor : 'var(--border)',
+                        background: formData.tags.includes(tag.id) ? `${tag.cor}20` : 'white',
+                        color: formData.tags.includes(tag.id) ? tag.cor : 'var(--brown-light)',
+                        cursor: 'pointer'
+                      }}
                     >
                       {tag.nome}
                     </button>
                   ))}
                 </div>
               </div>
-
-              <div className="form-group">
-                <label>Descrição</label>
-                <textarea
-                  value={form.descricao}
-                  onChange={e => setForm({ ...form, descricao: e.target.value })}
-                  placeholder="Descrição detalhada..."
-                  rows={4}
-                  className="form-input"
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Anexos</label>
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileUpload}
-                  multiple
-                  style={{ display: 'none' }}
-                />
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading}
-                >
-                  <Upload size={16} />
-                  {uploading ? 'A carregar...' : 'Adicionar ficheiros'}
-                </button>
-
-                {form.anexos.length > 0 && (
-                  <div className="anexos-list">
-                    {form.anexos.map((anexo, idx) => (
-                      <div key={idx} className="anexo-item">
-                        <FileText size={14} />
-                        <span>{anexo.nome}</span>
-                        <button type="button" onClick={() => removeAnexo(idx)} className="btn btn-ghost btn-icon">
-                          <X size={14} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
             </div>
 
             <div className="modal-footer">
-              <button className="btn btn-outline" onClick={() => setShowModal(false)}>Cancelar</button>
-              <button className="btn btn-primary" onClick={handleSave} disabled={!form.titulo.trim()}>
-                {editingEntry ? 'Guardar' : 'Criar Entrada'}
+              <button onClick={() => setShowModal(false)} className="btn btn-outline">
+                Cancelar
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation */}
-      {deleteConfirm && (
-        <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
-          <div className="modal-content modal-small" onClick={e => e.stopPropagation()}>
-            <h3>Eliminar entrada?</h3>
-            <p style={{ color: 'var(--brown-light)', margin: '8px 0 20px' }}>
-              Esta ação não pode ser revertida.
-            </p>
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-              <button className="btn btn-outline" onClick={() => setDeleteConfirm(null)}>Cancelar</button>
-              <button className="btn btn-danger" onClick={() => handleDelete(deleteConfirm)}>Eliminar</button>
+              <button onClick={handleSave} className="btn btn-primary">
+                {editingItem ? 'Guardar' : 'Criar Entrada'}
+              </button>
             </div>
           </div>
         </div>
