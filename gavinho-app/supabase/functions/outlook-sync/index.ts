@@ -1,4 +1,4 @@
-// Supabase Edge Function para sincronizar emails do Outlook com o Diário de Bordo
+// Supabase Edge Function para sincronizar emails do Outlook
 // Deploy: supabase functions deploy outlook-sync
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -23,10 +23,15 @@ interface Email {
   id: string
   subject: string
   from: { emailAddress: { address: string; name: string } }
-  toRecipients: { emailAddress: { address: string } }[]
+  toRecipients: { emailAddress: { address: string; name?: string } }[]
+  ccRecipients?: { emailAddress: { address: string; name?: string } }[]
   receivedDateTime: string
+  sentDateTime?: string
   bodyPreview: string
-  body?: { content: string }
+  body?: { content: string; contentType: string }
+  hasAttachments?: boolean
+  importance?: string
+  isRead?: boolean
 }
 
 // Obter token de acesso do Microsoft Graph
@@ -57,7 +62,7 @@ async function fetchRecentEmails(accessToken: string, since?: string): Promise<E
     ? `&$filter=receivedDateTime ge ${since}`
     : ''
 
-  const url = `https://graph.microsoft.com/v1.0/users/${OUTLOOK_EMAIL}/messages?$top=50&$orderby=receivedDateTime desc&$select=id,subject,from,toRecipients,receivedDateTime,bodyPreview${filter}`
+  const url = `https://graph.microsoft.com/v1.0/users/${OUTLOOK_EMAIL}/messages?$top=50&$orderby=receivedDateTime desc&$select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,sentDateTime,bodyPreview,body,hasAttachments,importance,isRead${filter}`
 
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${accessToken}` },
@@ -71,23 +76,27 @@ async function fetchRecentEmails(accessToken: string, since?: string): Promise<E
   return data.value || []
 }
 
-// Extrair código de projeto do assunto do email
-function extractProjectCode(subject: string): string | null {
-  // Procura por padrões como GA00413, GA00489, etc.
-  const match = subject.match(/GA\d{5}/i)
+// Extrair código de projeto/obra do assunto ou corpo do email
+function extractProjectCode(subject: string, body?: string): string | null {
+  const text = `${subject} ${body || ''}`
+  // Procura por padrões como GA00413, GA00489, OB00123, etc.
+  const match = text.match(/(GA|OB)\d{5}/i)
   return match ? match[0].toUpperCase() : null
 }
 
-// Mapear categoria com base no conteúdo do email
-function detectCategory(subject: string, body: string): string {
+// Detectar urgência baseada no conteúdo
+function detectUrgency(subject: string, body: string, importance?: string): string {
   const text = `${subject} ${body}`.toLowerCase()
 
-  if (text.includes('render') || text.includes('3d') || text.includes('imagem')) return '3D / Renders'
-  if (text.includes('desenho') || text.includes('planta') || text.includes('corte') || text.includes('cad')) return 'Desenhos'
-  if (text.includes('reunião') || text.includes('meeting') || text.includes('agenda')) return 'Reunião'
-  if (text.includes('fornecedor') || text.includes('orçamento') || text.includes('proposta')) return 'Fornecedor'
+  // Microsoft importance
+  if (importance === 'high') return 'urgente'
 
-  return 'Email'
+  // Palavras-chave de urgência
+  if (text.includes('urgente') || text.includes('urgent') || text.includes('asap')) return 'urgente'
+  if (text.includes('importante') || text.includes('prioritário') || text.includes('priority')) return 'alta'
+  if (text.includes('quando possível') || text.includes('sem pressa')) return 'baixa'
+
+  return 'normal'
 }
 
 serve(async (req) => {
@@ -99,22 +108,28 @@ serve(async (req) => {
   try {
     // Verificar configuração
     if (!MICROSOFT_CLIENT_ID || !MICROSOFT_CLIENT_SECRET || !MICROSOFT_TENANT_ID) {
-      throw new Error('Microsoft credentials not configured. Check Supabase secrets.')
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Microsoft credentials not configured. Set MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET, and MICROSOFT_TENANT_ID in Supabase secrets.',
+          help: 'Go to Supabase Dashboard > Project Settings > Edge Functions > Secrets'
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      )
     }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
-    // Obter última sincronização
+    // Obter última sincronização da tabela obra_emails
     const { data: lastSync } = await supabase
-      .from('projeto_diario')
-      .select('created_at')
-      .eq('tipo', 'email')
-      .order('created_at', { ascending: false })
+      .from('obra_emails')
+      .select('data_recebido')
+      .order('data_recebido', { ascending: false })
       .limit(1)
       .single()
 
-    const sinceDate = lastSync?.created_at
-      ? new Date(lastSync.created_at).toISOString()
+    const sinceDate = lastSync?.data_recebido
+      ? new Date(lastSync.data_recebido).toISOString()
       : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString() // Últimos 7 dias
 
     console.log(`Fetching emails since: ${sinceDate}`)
@@ -123,31 +138,27 @@ serve(async (req) => {
     const accessToken = await getAccessToken()
     const emails = await fetchRecentEmails(accessToken, sinceDate)
 
-    console.log(`Found ${emails.length} emails`)
+    console.log(`Found ${emails.length} emails from Outlook`)
 
-    // Buscar projetos para mapear códigos
-    const { data: projetos } = await supabase
-      .from('projetos')
-      .select('id, codigo')
+    // Buscar projetos e obras para mapear códigos
+    const [projetosRes, obrasRes] = await Promise.all([
+      supabase.from('projetos').select('id, codigo'),
+      supabase.from('obras').select('id, codigo')
+    ])
 
-    const projetoMap = new Map(projetos?.map(p => [p.codigo, p.id]) || [])
-
-    // Buscar categorias
-    const { data: categorias } = await supabase
-      .from('diario_categorias')
-      .select('id, nome')
-
-    const categoriaMap = new Map(categorias?.map(c => [c.nome, c.id]) || [])
+    const projetoMap = new Map(projetosRes.data?.map(p => [p.codigo, p.id]) || [])
+    const obraMap = new Map(obrasRes.data?.map(o => [o.codigo, o.id]) || [])
 
     let imported = 0
     let skipped = 0
+    let noProject = 0
 
     for (const email of emails) {
-      // Verificar se já foi importado
+      // Verificar se já foi importado (por message_id do Outlook)
       const { data: existing } = await supabase
-        .from('projeto_diario')
+        .from('obra_emails')
         .select('id')
-        .eq('email_message_id', email.id)
+        .eq('outlook_message_id', email.id)
         .single()
 
       if (existing) {
@@ -155,33 +166,55 @@ serve(async (req) => {
         continue
       }
 
-      // Extrair código do projeto
-      const projectCode = extractProjectCode(email.subject)
-      const projetoId = projectCode ? projetoMap.get(projectCode) : null
+      // Extrair código do projeto/obra
+      const projectCode = extractProjectCode(email.subject, email.bodyPreview)
+      let obraId: string | null = null
 
-      if (!projetoId) {
-        console.log(`Skipping email "${email.subject}" - no project code found`)
-        skipped++
+      if (projectCode) {
+        // Primeiro tentar obras, depois projetos
+        obraId = obraMap.get(projectCode) || projetoMap.get(projectCode) || null
+      }
+
+      if (!obraId) {
+        console.log(`Skipping email "${email.subject}" - no project/obra code found`)
+        noProject++
         continue
       }
 
-      // Detectar categoria
-      const categoriaNome = detectCategory(email.subject, email.bodyPreview)
-      const categoriaId = categoriaMap.get(categoriaNome) || categoriaMap.get('Email')
+      // Detectar urgência
+      const urgencia = detectUrgency(email.subject, email.bodyPreview, email.importance)
 
-      // Inserir no diário
-      const { error } = await supabase.from('projeto_diario').insert({
-        projeto_id: projetoId,
-        categoria_id: categoriaId,
-        titulo: email.subject.substring(0, 500),
-        descricao: email.bodyPreview,
-        tipo: 'email',
-        fonte: 'outlook',
-        email_de: email.from.emailAddress.address,
-        email_para: email.toRecipients.map(r => r.emailAddress.address).join(', '),
-        email_assunto: email.subject,
-        email_message_id: email.id,
-        data_evento: email.receivedDateTime,
+      // Preparar destinatários
+      const paraEmails = email.toRecipients?.map(r => ({
+        email: r.emailAddress.address,
+        nome: r.emailAddress.name || null
+      })) || []
+
+      const ccEmails = email.ccRecipients?.map(r => ({
+        email: r.emailAddress.address,
+        nome: r.emailAddress.name || null
+      })) || []
+
+      // Inserir na tabela obra_emails
+      const { error } = await supabase.from('obra_emails').insert({
+        obra_id: obraId,
+        de_email: email.from.emailAddress.address,
+        de_nome: email.from.emailAddress.name || null,
+        para_emails: paraEmails,
+        cc_emails: ccEmails.length > 0 ? ccEmails : null,
+        assunto: email.subject,
+        corpo_texto: email.bodyPreview,
+        corpo_html: email.body?.contentType === 'html' ? email.body.content : null,
+        tipo: 'recebido',
+        data_envio: email.sentDateTime || email.receivedDateTime,
+        data_recebido: email.receivedDateTime,
+        lido: email.isRead || false,
+        importante: email.importance === 'high',
+        urgencia,
+        codigo_obra_detectado: projectCode,
+        outlook_message_id: email.id,
+        tem_anexos: email.hasAttachments || false,
+        fonte: 'outlook'
       })
 
       if (error) {
@@ -194,9 +227,10 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Sync complete: ${imported} imported, ${skipped} skipped`,
+        message: `Sync complete: ${imported} imported, ${skipped} already existed, ${noProject} without project code`,
         imported,
         skipped,
+        noProject,
         total: emails.length,
       }),
       {
