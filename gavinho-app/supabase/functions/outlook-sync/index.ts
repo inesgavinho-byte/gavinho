@@ -173,12 +173,12 @@ serve(async (req) => {
       if (projectCode) {
         // Primeiro tentar obras, depois projetos
         obraId = obraMap.get(projectCode) || projetoMap.get(projectCode) || null
-      }
 
-      if (!obraId) {
-        console.log(`Skipping email "${email.subject}" - no project/obra code found`)
-        noProject++
-        continue
+        if (!obraId) {
+          console.log(`Email "${email.subject}" has code ${projectCode} but project not found in database - will import without association`)
+        }
+      } else {
+        console.log(`Email "${email.subject}" - no project code detected, importing anyway`)
       }
 
       // Detectar urgência
@@ -195,9 +195,9 @@ serve(async (req) => {
         nome: r.emailAddress.name || null
       })) || []
 
-      // Inserir na tabela obra_emails
+      // Inserir na tabela obra_emails (obra_id pode ser null se projeto não existir)
       const { error } = await supabase.from('obra_emails').insert({
-        obra_id: obraId,
+        obra_id: obraId, // null se projeto não encontrado
         de_email: email.from.emailAddress.address,
         de_nome: email.from.emailAddress.name || null,
         para_emails: paraEmails,
@@ -218,19 +218,20 @@ serve(async (req) => {
       })
 
       if (error) {
-        console.error(`Error inserting email: ${error.message}`)
+        console.error(`Error inserting email "${email.subject}": ${error.message}`)
       } else {
         imported++
+        if (!obraId) noProject++
       }
     }
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Sync complete: ${imported} imported, ${skipped} already existed, ${noProject} without project code`,
+        message: `Sync complete: ${imported} imported (${noProject} without project), ${skipped} already existed`,
         imported,
         skipped,
-        noProject,
+        withoutProject: noProject,
         total: emails.length,
       }),
       {
