@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useParams } from 'react-router-dom'
 import {
   DecisoesList,
   DecisaoDetalhe,
@@ -6,7 +7,9 @@ import {
   ValidacaoDecisoes
 } from '../components/decisoes'
 
-export default function DecisoesPagina({ projetoId }) {
+export default function DecisoesPagina({ projetoId: propProjetoId }) {
+  const { id } = useParams()
+  const projetoId = propProjetoId || id
   // Estado da navegação
   const [view, setView] = useState('list') // 'list' | 'detail' | 'form' | 'validar'
   const [selectedDecisao, setSelectedDecisao] = useState(null)
