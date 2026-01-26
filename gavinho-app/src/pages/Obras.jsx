@@ -25,6 +25,7 @@ export default function Obras() {
   const [selectedTipo, setSelectedTipo] = useState('Todos')
 
   const [formData, setFormData] = useState({
+    codigo: '',
     nome: '',
     projeto_id: '',
     localizacao: '',
@@ -90,6 +91,7 @@ export default function Obras() {
   const handleEditObra = (obra) => {
     setEditingObra(obra)
     setFormData({
+      codigo: obra.codigo || '',
       nome: obra.nome || '',
       projeto_id: obra.projeto_id || '',
       localizacao: obra.localizacao || '',
@@ -127,6 +129,11 @@ export default function Obras() {
         encarregado: formData.encarregado || null,
         orcamento: formData.orcamento ? parseFloat(formData.orcamento) : null,
         notas: formData.notas || null
+      }
+
+      // Adicionar codigo apenas quando editando
+      if (editingObra && formData.codigo) {
+        obraData.codigo = formData.codigo.toUpperCase()
       }
 
       if (editingObra) {
@@ -568,6 +575,29 @@ export default function Obras() {
                   </div>
                   {editingObra && (
                     <>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '6px', color: 'var(--brown)' }}>Código da Obra</label>
+                        <input
+                          type="text"
+                          value={formData.codigo}
+                          onChange={(e) => setFormData({...formData, codigo: e.target.value.toUpperCase()})}
+                          placeholder="OB00XXX"
+                          style={{
+                            width: '100%',
+                            padding: '12px',
+                            border: '1px solid var(--stone)',
+                            borderRadius: '8px',
+                            fontSize: '14px',
+                            boxSizing: 'border-box',
+                            fontFamily: 'monospace',
+                            fontWeight: 600,
+                            letterSpacing: '0.5px'
+                          }}
+                        />
+                        <span style={{ fontSize: '11px', color: 'var(--brown-light)', marginTop: '4px', display: 'block' }}>
+                          Formato: OB00XXX (ex: OB00001)
+                        </span>
+                      </div>
                       <div>
                         <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '6px', color: 'var(--brown)' }}>Status</label>
                         <select value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})} style={{ width: '100%', padding: '12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '14px', background: 'var(--white)' }}>
