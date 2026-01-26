@@ -73,17 +73,17 @@ Responde APENAS com JSON válido: { "tem_decisoes": boolean, "decisoes": [...], 
     let decisoesCriadas = 0
     if (resultado.tem_decisoes && resultado.decisoes?.length > 0) {
       for (const dec of resultado.decisoes) {
-        // Mapear tipo para categoria
+        // Mapear tipo para categoria (valores permitidos: cliente, tecnica, financeira, planeamento)
         const categoriaMap: Record<string, string> = {
           'design': 'tecnica',
           'material': 'tecnica',
           'tecnico': 'tecnica',
           'financeiro': 'financeira',
-          'prazo': 'prazo',
-          'fornecedor': 'fornecedor',
+          'prazo': 'planeamento',
+          'fornecedor': 'tecnica',
           'alteracao': 'cliente'
         }
-        const categoria = categoriaMap[dec.tipo] || 'cliente'
+        const categoria = categoriaMap[dec.tipo] || 'tecnica'
 
         const { error: insertError } = await supabase.from('decisoes').insert({
           projeto_id,
