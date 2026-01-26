@@ -94,14 +94,11 @@ Responde APENAS com JSON válido: { "tem_decisoes": boolean, "decisoes": [...], 
           impacto: dec.impacto || 'medio',
           decidido_por: dec.decidido_por || 'Não identificado',
           decidido_por_tipo: dec.decidido_por_tipo || 'cliente',
-          impacto_orcamento: dec.impacto_orcamento,
           impacto_prazo_dias: dec.impacto_prazo_dias,
           divisao: dec.divisao,
           justificacao: dec.justificacao,
-          alternativas_consideradas: dec.alternativas?.length > 0 ? dec.alternativas : null,
           fonte: fonteInfo.tipo,
           fonte_excerto: dec.excerto,
-          fonte_referencia: evento_id,
           estado: 'sugerida'
         })
 
