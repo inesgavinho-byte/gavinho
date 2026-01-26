@@ -653,84 +653,337 @@ export default function ObraDetalhe() {
     )
   }
 
+  // Design tokens
+  const colors = {
+    primary: '#8B8670',
+    primaryLight: '#ADAA96',
+    background: '#F2F0E7',
+    white: '#FFFFFF',
+    text: '#3D3D3D',
+    textMuted: '#6B6B6B',
+    border: '#E5E5E5',
+    success: '#7A8B6E',
+    warning: '#C9A86C',
+    progressBg: '#E8E6DE'
+  }
+
   return (
-    <div className="fade-in">
+    <div style={{
+      fontFamily: "'Quattrocento Sans', -apple-system, sans-serif",
+      minHeight: '100%'
+    }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
-        <button className="btn btn-ghost btn-icon" onClick={() => navigate(-1)} title="Voltar">
+      <div style={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: '20px',
+        marginBottom: '28px',
+        padding: '24px',
+        background: colors.white,
+        borderRadius: '16px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+      }}>
+        <button
+          onClick={() => navigate(-1)}
+          title="Voltar"
+          style={{
+            padding: '10px',
+            background: colors.background,
+            border: 'none',
+            borderRadius: '10px',
+            cursor: 'pointer',
+            color: colors.text,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
           <ArrowLeft size={20} />
         </button>
         <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-            <span style={{ fontWeight: 700, color: 'var(--success)', fontSize: '12px', fontFamily: 'monospace' }}>{obra.codigo}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+            <span style={{
+              fontWeight: 700,
+              color: colors.success,
+              fontSize: '13px',
+              fontFamily: 'monospace',
+              background: '#EEF5EC',
+              padding: '4px 10px',
+              borderRadius: '6px'
+            }}>
+              {obra.codigo}
+            </span>
             {obra.projetos?.codigo && (
-              <button className="badge" style={{ cursor: 'pointer', background: 'var(--stone)' }} onClick={() => navigate(`/projetos/${obra.projetos.codigo}`)}>
+              <button
+                onClick={() => navigate(`/projetos/${obra.projetos.codigo}`)}
+                style={{
+                  cursor: 'pointer',
+                  background: colors.background,
+                  border: 'none',
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: colors.primary
+                }}
+              >
                 {obra.projetos.codigo}
               </button>
             )}
-            <span className={`badge badge-${getStatusColor(obra.status)}`}>
-              {obra.status === 'ativo' ? 'Em Curso' : obra.status === 'planeamento' ? 'Planeamento' : obra.status === 'pausado' ? 'Pausada' : obra.status === 'concluido' ? 'Concluída' : obra.status}
+            <span style={{
+              padding: '4px 12px',
+              borderRadius: '20px',
+              fontSize: '11px',
+              fontWeight: 600,
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+              background: obra.status === 'ativo' || obra.status === 'em_curso' ? '#E8F5E9' :
+                         obra.status === 'planeamento' ? '#FFF8E1' :
+                         obra.status === 'pausado' ? '#FFEBEE' : '#E3F2FD',
+              color: obra.status === 'ativo' || obra.status === 'em_curso' ? '#2E7D32' :
+                    obra.status === 'planeamento' ? '#F57F17' :
+                    obra.status === 'pausado' ? '#C62828' : '#1565C0'
+            }}>
+              {obra.status === 'ativo' || obra.status === 'em_curso' ? 'Em Curso' :
+               obra.status === 'planeamento' ? 'Planeamento' :
+               obra.status === 'pausado' ? 'Pausada' :
+               obra.status === 'concluido' ? 'Concluída' : obra.status}
             </span>
           </div>
-          <h1 className="page-title" style={{ marginBottom: 0 }}>{obra.nome}</h1>
-          {obra.projetos?.cliente_nome && <p style={{ color: 'var(--brown-light)', fontSize: '14px', margin: 0 }}>Cliente: {obra.projetos.cliente_nome}</p>}
+          <h1 style={{
+            fontSize: '28px',
+            fontWeight: 600,
+            color: colors.text,
+            margin: '0 0 4px 0',
+            fontFamily: "'Cormorant Garamond', serif"
+          }}>
+            {obra.nome}
+          </h1>
+          {obra.projetos?.cliente_nome && (
+            <p style={{
+              color: colors.textMuted,
+              fontSize: '14px',
+              margin: 0,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              <Users size={14} />
+              {obra.projetos.cliente_nome}
+            </p>
+          )}
         </div>
         <button
-          className="btn btn-outline"
           onClick={() => navigate(`/obras/${obra.id}/comunicacoes`)}
-          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '10px 20px',
+            background: colors.white,
+            border: `1px solid ${colors.border}`,
+            borderRadius: '10px',
+            fontSize: '14px',
+            fontWeight: 500,
+            color: colors.text,
+            cursor: 'pointer'
+          }}
         >
           <MessageSquare size={16} />
-          Comunicacoes
+          Comunicações
         </button>
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-4 mb-lg" style={{ gap: '16px' }}>
-        <div className="card" style={{ padding: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-            <MapPin size={14} style={{ color: 'var(--brown-light)' }} />
-            <span style={{ fontSize: '11px', color: 'var(--brown-light)', textTransform: 'uppercase' }}>Localização</span>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(4, 1fr)',
+        gap: '16px',
+        marginBottom: '28px'
+      }}>
+        {/* Localização */}
+        <div style={{
+          padding: '20px',
+          background: colors.white,
+          borderRadius: '14px',
+          border: `1px solid ${colors.border}`
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            marginBottom: '10px'
+          }}>
+            <div style={{
+              padding: '8px',
+              background: colors.background,
+              borderRadius: '8px'
+            }}>
+              <MapPin size={16} style={{ color: colors.primary }} />
+            </div>
+            <span style={{
+              fontSize: '12px',
+              color: colors.textMuted,
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+              fontWeight: 500
+            }}>
+              Localização
+            </span>
           </div>
-          <div style={{ fontSize: '13px', fontWeight: 500 }}>{obra.localizacao || 'Não definida'}</div>
-        </div>
-        <div className="card" style={{ padding: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-            <Calendar size={14} style={{ color: 'var(--brown-light)' }} />
-            <span style={{ fontSize: '11px', color: 'var(--brown-light)', textTransform: 'uppercase' }}>Prazo</span>
+          <div style={{
+            fontSize: '14px',
+            fontWeight: 600,
+            color: colors.text
+          }}>
+            {obra.localizacao || 'Não definida'}
           </div>
-          <div style={{ fontSize: '13px', fontWeight: 500 }}>{formatShortDate(obra.data_prevista)}</div>
         </div>
-        <div className="card" style={{ padding: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-            <Users size={14} style={{ color: 'var(--brown-light)' }} />
-            <span style={{ fontSize: '11px', color: 'var(--brown-light)', textTransform: 'uppercase' }}>Equipa</span>
+
+        {/* Prazo */}
+        <div style={{
+          padding: '20px',
+          background: colors.white,
+          borderRadius: '14px',
+          border: `1px solid ${colors.border}`
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            marginBottom: '10px'
+          }}>
+            <div style={{
+              padding: '8px',
+              background: colors.background,
+              borderRadius: '8px'
+            }}>
+              <Calendar size={16} style={{ color: colors.primary }} />
+            </div>
+            <span style={{
+              fontSize: '12px',
+              color: colors.textMuted,
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+              fontWeight: 500
+            }}>
+              Prazo
+            </span>
           </div>
-          <div style={{ fontSize: '13px', fontWeight: 500 }}>{equipaAtiva} membros ativos</div>
+          <div style={{
+            fontSize: '14px',
+            fontWeight: 600,
+            color: colors.text
+          }}>
+            {formatShortDate(obra.data_prevista) || '-'}
+          </div>
         </div>
-        <div className="card" style={{ padding: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-            <Building2 size={14} style={{ color: 'var(--brown-light)' }} />
-            <span style={{ fontSize: '11px', color: 'var(--brown-light)', textTransform: 'uppercase' }}>Progresso</span>
+
+        {/* Equipa */}
+        <div style={{
+          padding: '20px',
+          background: colors.white,
+          borderRadius: '14px',
+          border: `1px solid ${colors.border}`
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            marginBottom: '10px'
+          }}>
+            <div style={{
+              padding: '8px',
+              background: colors.background,
+              borderRadius: '8px'
+            }}>
+              <Users size={16} style={{ color: colors.primary }} />
+            </div>
+            <span style={{
+              fontSize: '12px',
+              color: colors.textMuted,
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+              fontWeight: 500
+            }}>
+              Equipa
+            </span>
+          </div>
+          <div style={{
+            fontSize: '14px',
+            fontWeight: 600,
+            color: colors.text
+          }}>
+            {equipaAtiva} membros ativos
+          </div>
+        </div>
+
+        {/* Progresso */}
+        <div style={{
+          padding: '20px',
+          background: colors.white,
+          borderRadius: '14px',
+          border: `1px solid ${colors.border}`
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            marginBottom: '10px'
+          }}>
+            <div style={{
+              padding: '8px',
+              background: colors.background,
+              borderRadius: '8px'
+            }}>
+              <Building2 size={16} style={{ color: colors.primary }} />
+            </div>
+            <span style={{
+              fontSize: '12px',
+              color: colors.textMuted,
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+              fontWeight: 500
+            }}>
+              Progresso
+            </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ flex: 1, height: '6px', background: 'var(--stone)', borderRadius: '3px', overflow: 'hidden' }}>
-              <div style={{ width: `${obra.progresso || 0}%`, height: '100%', background: 'var(--success)', borderRadius: '3px' }} />
+            <div style={{
+              flex: 1,
+              height: '8px',
+              background: colors.progressBg,
+              borderRadius: '4px',
+              overflow: 'hidden'
+            }}>
+              <div style={{
+                width: `${obra.progresso || 0}%`,
+                height: '100%',
+                background: `linear-gradient(90deg, ${colors.success} 0%, #9CB88F 100%)`,
+                borderRadius: '4px',
+                transition: 'width 0.3s ease'
+              }} />
             </div>
-            <span style={{ fontSize: '16px', fontWeight: 700 }}>{obra.progresso || 0}%</span>
+            <span style={{
+              fontSize: '18px',
+              fontWeight: 700,
+              color: colors.success
+            }}>
+              {obra.progresso || 0}%
+            </span>
           </div>
         </div>
       </div>
 
       {/* Grouped Tabs */}
-      <div className="obra-tab-groups" style={{ marginBottom: '24px' }}>
+      <div style={{ marginBottom: '28px' }}>
         {tabGroups.map((group) => {
           const GroupIcon = group.icon
           const isExpanded = expandedGroups.includes(group.id)
           const hasActiveTab = group.tabs.some(t => t.id === activeTab)
 
           return (
-            <div key={group.id} className="tab-group" style={{ marginBottom: '8px' }}>
+            <div key={group.id} style={{ marginBottom: '12px' }}>
               {/* Group Header */}
               <button
                 onClick={() => setExpandedGroups(prev =>
@@ -741,21 +994,30 @@ export default function ObraDetalhe() {
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px',
+                  gap: '10px',
                   width: '100%',
-                  padding: '10px 12px',
-                  background: hasActiveTab ? 'var(--cream)' : 'var(--stone)',
-                  border: 'none',
-                  borderRadius: '8px',
+                  padding: '14px 16px',
+                  background: hasActiveTab ? colors.white : colors.background,
+                  border: hasActiveTab ? `1px solid ${colors.border}` : 'none',
+                  borderRadius: '12px',
                   cursor: 'pointer',
                   fontWeight: 600,
-                  fontSize: '13px',
-                  color: hasActiveTab ? 'var(--brown)' : 'var(--brown-light)'
+                  fontSize: '14px',
+                  color: hasActiveTab ? colors.text : colors.textMuted,
+                  transition: 'all 0.2s'
                 }}
               >
-                {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                <GroupIcon size={16} />
-                {group.label}
+                {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                <GroupIcon size={18} />
+                <span style={{ flex: 1, textAlign: 'left' }}>{group.label}</span>
+                {hasActiveTab && (
+                  <span style={{
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    background: colors.success
+                  }} />
+                )}
               </button>
 
               {/* Group Tabs */}
@@ -763,12 +1025,13 @@ export default function ObraDetalhe() {
                 <div style={{
                   display: 'flex',
                   flexWrap: 'wrap',
-                  gap: '4px',
-                  marginTop: '8px',
-                  paddingLeft: '24px'
+                  gap: '8px',
+                  marginTop: '12px',
+                  paddingLeft: '28px'
                 }}>
                   {group.tabs.map((tab) => {
                     const Icon = tab.icon
+                    const isActive = activeTab === tab.id
                     const count = tab.id === 'zonas' ? zonas.length :
                                   tab.id === 'diario' ? diarios.length :
                                   tab.id === 'ocorrencias' ? ocorrenciasAbertas :
@@ -781,29 +1044,29 @@ export default function ObraDetalhe() {
                         style={{
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '6px',
-                          padding: '8px 12px',
-                          background: activeTab === tab.id ? 'var(--warning)' : 'white',
-                          border: '1px solid',
-                          borderColor: activeTab === tab.id ? 'var(--warning)' : 'var(--border)',
-                          borderRadius: '6px',
-                          color: activeTab === tab.id ? 'white' : 'var(--brown-light)',
-                          fontWeight: activeTab === tab.id ? 600 : 400,
-                          fontSize: '12px',
+                          gap: '8px',
+                          padding: '10px 16px',
+                          background: isActive ? colors.primary : colors.white,
+                          border: `1px solid ${isActive ? colors.primary : colors.border}`,
+                          borderRadius: '10px',
+                          color: isActive ? colors.white : colors.textMuted,
+                          fontWeight: isActive ? 600 : 500,
+                          fontSize: '13px',
                           cursor: 'pointer',
-                          transition: 'all 0.2s'
+                          transition: 'all 0.15s ease',
+                          boxShadow: isActive ? '0 2px 8px rgba(139,134,112,0.25)' : 'none'
                         }}
                       >
-                        <Icon size={14} />
+                        <Icon size={15} />
                         {tab.label}
                         {count > 0 && (
                           <span style={{
-                            background: activeTab === tab.id ? 'rgba(255,255,255,0.3)' : 'var(--stone)',
-                            color: activeTab === tab.id ? 'white' : 'var(--brown)',
-                            padding: '2px 6px',
-                            borderRadius: '10px',
-                            fontSize: '10px',
-                            fontWeight: 600
+                            background: isActive ? 'rgba(255,255,255,0.25)' : colors.background,
+                            color: isActive ? colors.white : colors.text,
+                            padding: '2px 8px',
+                            borderRadius: '12px',
+                            fontSize: '11px',
+                            fontWeight: 700
                           }}>
                             {count}
                           </span>
