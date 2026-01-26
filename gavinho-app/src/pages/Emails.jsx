@@ -3,7 +3,8 @@ import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import {
   Mail, Star, Search, RefreshCw, Paperclip, ChevronRight,
-  Reply, Forward, Trash2, Archive, Sparkles, Plus, Loader2
+  Reply, Forward, Trash2, Archive, Sparkles, Plus, Loader2,
+  ClipboardCheck, CheckCircle2, AlertCircle, FileText, ListTodo
 } from 'lucide-react'
 
 // ============================================
@@ -237,10 +238,11 @@ const EmailDetail = ({
   onReply,
   onForward,
   onArchive,
-  onDetectDecisions,
+  onProcessEmail,
   onSuggestReply,
-  detectando,
-  loadingSuggestion
+  processando,
+  loadingSuggestion,
+  processResult
 }) => {
   if (!email) {
     return (
@@ -437,26 +439,26 @@ const EmailDetail = ({
           Sugerir Resposta
         </button>
         <button
-          onClick={() => onDetectDecisions(email)}
-          disabled={detectando}
+          onClick={() => onProcessEmail(email)}
+          disabled={processando}
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: '6px',
             padding: '8px 16px',
-            backgroundColor: brand.white,
-            color: brand.brown,
-            border: `1px solid ${brand.borderSubtle}`,
+            backgroundColor: '#7C3AED',
+            color: brand.white,
+            border: 'none',
             borderRadius: '6px',
             fontSize: '13px',
             fontWeight: '500',
-            cursor: detectando ? 'wait' : 'pointer',
-            opacity: detectando ? 0.7 : 1,
+            cursor: processando ? 'wait' : 'pointer',
+            opacity: processando ? 0.7 : 1,
             fontFamily: "'Quattrocento Sans', sans-serif"
           }}
         >
-          {detectando ? <Loader2 size={16} className="spin" /> : <Search size={16} />}
-          Detectar Decisões
+          {processando ? <Loader2 size={16} className="spin" /> : <ClipboardCheck size={16} />}
+          Processar Email
         </button>
 
         {/* Icon actions */}
@@ -489,6 +491,126 @@ const EmailDetail = ({
           </button>
         </div>
       </div>
+
+      {/* Process Result Panel */}
+      {processResult && (
+        <div style={{
+          padding: '12px 24px',
+          backgroundColor: processResult.success ? '#F0FDF4' : '#FEF2F2',
+          borderBottom: `1px solid ${processResult.success ? '#BBF7D0' : '#FECACA'}`,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px'
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontSize: '13px',
+            fontWeight: '600',
+            color: processResult.success ? '#166534' : '#991B1B',
+            fontFamily: "'Quattrocento Sans', sans-serif"
+          }}>
+            {processResult.success ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+            {processResult.success ? 'Email processado com sucesso' : 'Erro ao processar'}
+          </div>
+
+          {processResult.success && (
+            <div style={{
+              display: 'flex',
+              gap: '16px',
+              flexWrap: 'wrap',
+              fontSize: '12px',
+              color: '#374151',
+              fontFamily: "'Quattrocento Sans', sans-serif"
+            }}>
+              {/* Classification */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '4px 8px',
+                backgroundColor: '#E0E7FF',
+                borderRadius: '4px'
+              }}>
+                <Mail size={12} />
+                <span style={{ fontWeight: '500' }}>
+                  {processResult.classificacao?.tipo?.replace(/_/g, ' ')}
+                </span>
+              </div>
+
+              {/* Diary entry */}
+              {processResult.diario?.criado && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '4px 8px',
+                  backgroundColor: '#DBEAFE',
+                  borderRadius: '4px'
+                }}>
+                  <FileText size={12} />
+                  <span>Registado no Diário</span>
+                </div>
+              )}
+
+              {/* Task created */}
+              {processResult.tarefa?.criada && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '4px 8px',
+                  backgroundColor: '#FEF3C7',
+                  borderRadius: '4px'
+                }}>
+                  <ListTodo size={12} />
+                  <span>Tarefa criada: {processResult.tarefa.titulo?.substring(0, 30)}...</span>
+                  <span style={{ color: '#92400E', fontWeight: '500' }}>
+                    (até {new Date(processResult.tarefa.data_limite).toLocaleDateString('pt-PT')})
+                  </span>
+                </div>
+              )}
+
+              {/* Decisions */}
+              {processResult.decisoes?.criadas > 0 && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '4px 8px',
+                  backgroundColor: '#D1FAE5',
+                  borderRadius: '4px'
+                }}>
+                  <CheckCircle2 size={12} />
+                  <span>{processResult.decisoes.criadas} decisão(ões) detectada(s)</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {processResult.classificacao?.resumo && (
+            <div style={{
+              fontSize: '12px',
+              color: '#6B7280',
+              fontStyle: 'italic',
+              fontFamily: "'Quattrocento Sans', sans-serif"
+            }}>
+              {processResult.classificacao.resumo}
+            </div>
+          )}
+
+          {!processResult.success && (
+            <div style={{
+              fontSize: '12px',
+              color: '#991B1B',
+              fontFamily: "'Quattrocento Sans', sans-serif"
+            }}>
+              {processResult.error}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Email body */}
       <div style={{
@@ -546,7 +668,8 @@ export default function Emails() {
   const [obras, setObras] = useState([])
 
   // AI states
-  const [detectando, setDetectando] = useState(false)
+  const [processando, setProcessando] = useState(false)
+  const [processResult, setProcessResult] = useState(null)
   const [loadingSuggestion, setLoadingSuggestion] = useState(false)
 
   // Stats
@@ -654,6 +777,7 @@ export default function Emails() {
 
   const handleSelectEmail = async (email) => {
     setSelectedEmail(email)
+    setProcessResult(null) // Clear previous process result
 
     // Mark as read
     if (!email.lido) {
@@ -717,22 +841,21 @@ export default function Emails() {
     }
   }
 
-  const handleDetectDecisions = async (email) => {
+  const handleProcessEmail = async (email) => {
     if (!email) return
 
     const projetoId = email.projeto_id || email.obra_id
     if (!projetoId) {
-      alert('Este email não está associado a nenhum projeto ou obra.\n\nPara detectar decisões, o email precisa estar associado a um projeto.')
+      alert('Este email não está associado a nenhum projeto ou obra.\n\nPara processar o email, precisa estar associado a um projeto.')
       return
     }
 
-    setDetectando(true)
+    setProcessando(true)
+    setProcessResult(null)
 
     try {
-      const conteudo = `Assunto: ${email.assunto || ''}\n\nConteúdo:\n${email.corpo_texto || email.corpo_html?.replace(/<[^>]*>/g, '') || ''}`
-
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/decisoes-detectar`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/email-processar`,
         {
           method: 'POST',
           headers: {
@@ -740,34 +863,29 @@ export default function Emails() {
             'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
           },
           body: JSON.stringify({
-            conteudo,
-            projeto_id: projetoId,
-            fonte: 'email',
-            metadata: {
-              email_id: email.id,
-              de: email.de_email,
-              de_nome: email.de_nome,
-              assunto: email.assunto,
-              data: email.data_envio || email.created_at
-            }
+            email_id: email.id
           })
         }
       )
 
       const result = await response.json()
+      setProcessResult(result)
 
-      if (result.success && result.decisoes_criadas > 0) {
-        alert(`Detectadas ${result.decisoes_criadas} decisão(ões)!\n\nVai a Decisões > Validar para aprovar.`)
-      } else if (result.success) {
-        alert(`Nenhuma decisão detectada neste email.\n\n${result.motivo || ''}`)
-      } else {
-        alert(`Erro: ${result.error}`)
+      // Marcar email como processado na lista local
+      if (result.success) {
+        setEmails(prev => prev.map(e =>
+          e.id === email.id ? { ...e, processado_ia: true, classificacao_ia: result.classificacao?.tipo } : e
+        ))
       }
+
     } catch (error) {
-      console.error('Erro ao detectar decisões:', error)
-      alert('Erro ao detectar decisões: ' + error.message)
+      console.error('Erro ao processar email:', error)
+      setProcessResult({
+        success: false,
+        error: error.message
+      })
     } finally {
-      setDetectando(false)
+      setProcessando(false)
     }
   }
 
@@ -1049,9 +1167,10 @@ export default function Emails() {
             onReply={handleReply}
             onForward={handleForward}
             onArchive={handleArchive}
-            onDetectDecisions={handleDetectDecisions}
+            onProcessEmail={handleProcessEmail}
             onSuggestReply={handleSuggestReply}
-            detectando={detectando}
+            processando={processando}
+            processResult={processResult}
             loadingSuggestion={loadingSuggestion}
           />
         )}
