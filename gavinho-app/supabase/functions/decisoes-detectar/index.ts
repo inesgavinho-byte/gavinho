@@ -106,7 +106,16 @@ Responde APENAS com JSON válido: { "tem_decisoes": boolean, "decisoes": [...], 
         })
 
         if (insertError) {
-          console.error('Erro ao inserir decisão:', insertError.message)
+          console.error('Erro ao inserir decisão:', insertError.message, insertError)
+          // Retornar erro para debug
+          return new Response(JSON.stringify({
+            success: false,
+            error: insertError.message,
+            errorDetails: insertError,
+            decisao: dec,
+            categoria,
+            tipo: dec.tipo
+          }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 })
         } else {
           decisoesCriadas++
         }
@@ -117,7 +126,7 @@ Responde APENAS com JSON válido: { "tem_decisoes": boolean, "decisoes": [...], 
       await supabase.from('ia_eventos').update({ processado: true, resultado: { decisoes_detectadas: decisoesCriadas } }).eq('id', evento_id)
     }
 
-    return new Response(JSON.stringify({ success: true, tem_decisoes: resultado.tem_decisoes, decisoes_criadas: decisoesCriadas, motivo: resultado.motivo }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    return new Response(JSON.stringify({ success: true, tem_decisoes: resultado.tem_decisoes, decisoes_criadas: decisoesCriadas, motivo: resultado.motivo, decisoes: resultado.decisoes }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
   } catch (error) {
     return new Response(JSON.stringify({ success: false, error: error.message }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 })
