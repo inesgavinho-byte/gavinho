@@ -28,7 +28,8 @@ import {
   Database,
   Shield,
   FileSearch,
-  Mail
+  Mail,
+  Table2
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -56,6 +57,7 @@ const navigation = [
     section: 'Módulo Obras',
     items: [
       { name: 'Dashboard Obras', href: '/obras', icon: HardHat },
+      { name: 'MQT - Quantidades', href: '/mqt', icon: Table2 },
       { name: 'Chat Obras', href: '/chat-obras', icon: MessageSquare },
     ]
   },

@@ -37,6 +37,7 @@ import ObraComunicacoes from './pages/ObraComunicacoes'
 import Viabilidade from './pages/Viabilidade'
 import Emails from './pages/Emails'
 import DecisoesPagina from './pages/DecisoesPagina'
+import MQT from './pages/MQT'
 
 function App() {
   return (
@@ -83,6 +84,7 @@ function App() {
             <Route path="calendario" element={<Calendario />} />
             <Route path="orcamentos" element={<Orcamentos />} />
             <Route path="orcamentos/:id" element={<OrcamentoDetalhe />} />
+            <Route path="mqt" element={<MQT />} />
             <Route path="financeiro" element={<Finance />} />
             <Route path="viabilidade" element={<Viabilidade />} />
             <Route path="emails" element={<Emails />} />
