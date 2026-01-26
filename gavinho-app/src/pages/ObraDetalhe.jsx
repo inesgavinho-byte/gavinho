@@ -18,64 +18,50 @@ import ObraRelatorios from '../components/ObraRelatorios'
 import ObraNaoConformidades from '../components/ObraNaoConformidades'
 import { exportDiarioToPDF } from '../utils/exportDiarioToPDF'
 
-// Tab Groups
-const tabGroups = [
-  {
-    id: 'financeira',
-    label: 'Gestão Financeira',
-    icon: Euro,
-    tabs: [
-      { id: 'tracking', label: 'MQT / Tracking', icon: ClipboardList },
-      { id: 'orcamentacao', label: 'Orçamentação', icon: Calculator },
-      { id: 'compras', label: 'Compras', icon: ShoppingCart },
-      { id: 'controle-executado', label: 'Controle Executado', icon: TrendingUp },
-      { id: 'componentes', label: 'Contratos', icon: Building2 },
-    ]
-  },
-  {
-    id: 'acompanhamento',
-    label: 'Acompanhamento Obra',
-    icon: HardHat,
-    tabs: [
-      { id: 'fotografias', label: 'Fotografias', icon: Camera },
-      { id: 'relatorios', label: 'Relatórios Obra', icon: FileText },
-      { id: 'nao-conformidades', label: 'Não Conformidades', icon: AlertTriangle },
-      { id: 'diario', label: 'Diário de Obra', icon: BookOpen },
-      { id: 'diario-projeto', label: 'Diário de Projeto', icon: FileText },
-    ]
-  },
-  {
-    id: 'fiscalizacao',
-    label: 'Fiscalização',
-    icon: Shield,
-    tabs: [
-      { id: 'autos', label: 'Autos Medição', icon: Receipt },
-      { id: 'hso', label: 'HSO', icon: Shield },
-      { id: 'ocorrencias', label: 'Ocorrências', icon: AlertTriangle },
-    ]
-  },
-  {
-    id: 'equipas',
-    label: 'Equipas e SubEmpreiteiros',
-    icon: Users,
-    tabs: [
-      { id: 'equipa', label: 'Equipa em Obra', icon: Users },
-      { id: 'subempreiteiros', label: 'SubEmpreiteiros', icon: Truck },
-      { id: 'zonas', label: 'Zonas', icon: Grid3X3 },
-    ]
-  },
-  {
-    id: 'projeto',
-    label: 'Projeto',
-    icon: FileText,
-    tabs: [
-      { id: 'projeto-execucao', label: 'Projeto em Execução', icon: FileText },
-    ]
-  }
+// Tabs principais (estilo ProjetoDetalhe)
+const mainTabs = [
+  { id: 'dashboard', label: 'Dashboard', icon: Building2 },
+  { id: 'tracking', label: 'MQT / Tracking', icon: ClipboardList },
+  { id: 'financeiro', label: 'Financeiro', icon: Euro, hasSubtabs: true },
+  { id: 'acompanhamento', label: 'Acompanhamento', icon: HardHat, hasSubtabs: true },
+  { id: 'fiscalizacao', label: 'Fiscalização', icon: Shield, hasSubtabs: true },
+  { id: 'equipas', label: 'Equipas', icon: Users, hasSubtabs: true },
+  { id: 'projeto', label: 'Projeto', icon: FileText },
 ]
 
-// Flatten tabs for easy access
-const allTabs = tabGroups.flatMap(group => group.tabs)
+// Subtabs de Financeiro
+const financeiroSubtabs = [
+  { id: 'orcamentacao', label: 'Orçamentação', icon: Calculator },
+  { id: 'compras', label: 'Compras', icon: ShoppingCart },
+  { id: 'controle-executado', label: 'Controle Executado', icon: TrendingUp },
+  { id: 'componentes', label: 'Contratos', icon: Building2 },
+]
+
+// Subtabs de Acompanhamento
+const acompanhamentoSubtabs = [
+  { id: 'fotografias', label: 'Fotografias', icon: Camera },
+  { id: 'relatorios', label: 'Relatórios Obra', icon: FileText },
+  { id: 'nao-conformidades', label: 'Não Conformidades', icon: AlertTriangle },
+  { id: 'diario', label: 'Diário de Obra', icon: BookOpen },
+  { id: 'diario-projeto', label: 'Diário de Projeto', icon: FileText },
+]
+
+// Subtabs de Fiscalização
+const fiscalizacaoSubtabs = [
+  { id: 'autos', label: 'Autos Medição', icon: Receipt },
+  { id: 'hso', label: 'HSO', icon: Shield },
+  { id: 'ocorrencias', label: 'Ocorrências', icon: AlertTriangle },
+]
+
+// Subtabs de Equipas
+const equipasSubtabs = [
+  { id: 'equipa', label: 'Equipa em Obra', icon: Users },
+  { id: 'subempreiteiros', label: 'SubEmpreiteiros', icon: Truck },
+  { id: 'zonas', label: 'Zonas', icon: Grid3X3 },
+]
+
+// All subtab IDs for routing
+const allSubtabs = [...financeiroSubtabs, ...acompanhamentoSubtabs, ...fiscalizacaoSubtabs, ...equipasSubtabs]
 
 // Tipos de componentes de obra
 const TIPOS_COMPONENTE = [
@@ -101,8 +87,11 @@ export default function ObraDetalhe() {
   const [componentes, setComponentes] = useState([])
   const [entidadesFaturacao, setEntidadesFaturacao] = useState([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState(urlTab || 'tracking')
-  const [expandedGroups, setExpandedGroups] = useState(['financeira', 'acompanhamento'])
+  const [activeTab, setActiveTab] = useState(urlTab || 'dashboard')
+  const [activeFinanceiroSubtab, setActiveFinanceiroSubtab] = useState('orcamentacao')
+  const [activeAcompanhamentoSubtab, setActiveAcompanhamentoSubtab] = useState('fotografias')
+  const [activeFiscalizacaoSubtab, setActiveFiscalizacaoSubtab] = useState('autos')
+  const [activeEquipasSubtab, setActiveEquipasSubtab] = useState('equipa')
 
   // Sincronizar tab da URL
   useEffect(() => {
@@ -667,131 +656,373 @@ export default function ObraDetalhe() {
     progressBg: '#E8E6DE'
   }
 
+  // Render functions for subtabs
+  const renderComponentesTab = () => (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <div>
+          <h2 style={{ fontSize: '20px', fontWeight: 600, margin: 0 }}>Contratos de Obra</h2>
+          <p style={{ fontSize: '13px', color: 'var(--brown-light)', margin: '4px 0 0' }}>
+            Componentes de faturação separados por entidade
+          </p>
+        </div>
+        <button className="btn btn-primary" onClick={() => {
+          setEditingComponente(null)
+          setComponenteForm({
+            tipo: 'construcao',
+            nome: 'Construção',
+            entidade_faturacao_id: '',
+            valor_contrato: '',
+            percentagem_adiantamento: 20,
+            percentagem_retencao: 5,
+            notas: ''
+          })
+          setShowComponenteModal(true)
+        }}>
+          <Plus size={16} /> Novo Contrato
+        </button>
+      </div>
+
+      {componentes.length === 0 ? (
+        <div className="card" style={{ textAlign: 'center', padding: '48px' }}>
+          <Building2 size={48} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '16px' }} />
+          <p style={{ color: 'var(--brown-light)', marginBottom: '16px' }}>Sem contratos definidos</p>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '20px' }}>
+          {componentes.map((comp) => (
+            <div key={comp.id} className="card" style={{ borderLeft: `4px solid ${comp.tipo === 'construcao' ? '#f59e0b' : '#8b5cf6'}` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                <div>
+                  <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 600, background: comp.tipo === 'construcao' ? '#fef3c7' : '#ede9fe', color: comp.tipo === 'construcao' ? '#92400e' : '#6d28d9', marginBottom: '8px' }}>
+                    {comp.tipo === 'construcao' ? 'CONSTRUÇÃO' : 'DESIGN INTERIORES'}
+                  </span>
+                  <h3 style={{ fontSize: '18px', fontWeight: 600, margin: '0 0 4px' }}>{comp.nome}</h3>
+                  <p style={{ fontSize: '13px', color: 'var(--brown-light)', margin: 0 }}>{comp.entidades_faturacao?.nome || 'Entidade não definida'}</p>
+                </div>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  <button className="btn btn-ghost btn-icon" onClick={() => handleEditComponente(comp)}><Edit size={14} /></button>
+                  <button className="btn btn-ghost btn-icon" style={{ color: '#dc2626' }} onClick={() => handleDeleteComponente(comp.id)}><Trash2 size={14} /></button>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+                <div><div style={{ fontSize: '11px', color: 'var(--brown-light)', marginBottom: '2px' }}>Valor Contrato</div><div style={{ fontSize: '18px', fontWeight: 600 }}>{comp.valor_contrato?.toLocaleString('pt-PT')} €</div></div>
+                <div><div style={{ fontSize: '11px', color: 'var(--brown-light)', marginBottom: '2px' }}>Adiantamento</div><div style={{ fontSize: '18px', fontWeight: 600 }}>{comp.percentagem_adiantamento}%</div></div>
+                <div><div style={{ fontSize: '11px', color: 'var(--brown-light)', marginBottom: '2px' }}>Retenção</div><div style={{ fontSize: '18px', fontWeight: 600 }}>{comp.percentagem_retencao}%</div></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+
+  const renderDiarioTab = () => (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <h2 style={{ fontSize: '20px', fontWeight: 600, margin: 0 }}>Diário de Obra</h2>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button className="btn btn-outline" onClick={() => navigate(`/obras/${obra.codigo}/relatorio-semanal`)}>
+            <FileText size={16} /> Relatório Semanal
+          </button>
+          <button className="btn btn-primary" onClick={() => navigate(`/obras/${obra.id}/diario`)}>
+            <Plus size={16} /> Abrir Diário
+          </button>
+        </div>
+      </div>
+      {diarios.length === 0 ? (
+        <div className="card" style={{ textAlign: 'center', padding: '48px' }}>
+          <BookOpen size={48} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '16px' }} />
+          <p style={{ color: 'var(--brown-light)' }}>Sem registos no diário</p>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gap: '12px' }}>
+          {diarios.map(diario => (
+            <div key={diario.id} className="card" style={{ padding: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontWeight: 600, marginBottom: '4px' }}>{formatShortDate(diario.data)}</div>
+                  <div style={{ fontSize: '13px', color: 'var(--brown-light)' }}>{diario.resumo?.substring(0, 100) || 'Sem resumo'}...</div>
+                </div>
+                <span style={{ padding: '4px 10px', background: 'var(--cream)', borderRadius: '6px', fontSize: '12px' }}>{diario.condicoes_meteo}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+
+  const renderOcorrenciasTab = () => (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <div>
+          <h2 style={{ fontSize: '20px', fontWeight: 600, margin: 0 }}>Ocorrências</h2>
+          <p style={{ fontSize: '13px', color: 'var(--brown-light)', margin: '4px 0 0' }}>{ocorrenciasAbertas} abertas</p>
+        </div>
+        <button className="btn btn-primary" onClick={() => { setEditingOcorrencia(null); setShowOcorrenciaModal(true) }}>
+          <Plus size={16} /> Nova Ocorrência
+        </button>
+      </div>
+      {ocorrencias.length === 0 ? (
+        <div className="card" style={{ textAlign: 'center', padding: '48px' }}>
+          <AlertTriangle size={48} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '16px' }} />
+          <p style={{ color: 'var(--brown-light)' }}>Sem ocorrências registadas</p>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gap: '12px' }}>
+          {ocorrencias.map(oc => (
+            <div key={oc.id} className="card" style={{ padding: '16px', borderLeft: `4px solid ${getGravidadeColor(oc.gravidade)}` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <div style={{ fontWeight: 600, marginBottom: '4px' }}>{oc.titulo}</div>
+                  <div style={{ fontSize: '13px', color: 'var(--brown-light)' }}>{oc.descricao?.substring(0, 80)}...</div>
+                </div>
+                <span style={{ padding: '4px 10px', background: oc.status === 'resolvida' ? '#E8F5E9' : '#FEF2F2', color: oc.status === 'resolvida' ? '#2E7D32' : '#DC2626', borderRadius: '6px', fontSize: '11px', fontWeight: 600 }}>
+                  {oc.status === 'resolvida' ? 'Resolvida' : 'Aberta'}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+
+  const renderEquipaTab = () => (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <div>
+          <h2 style={{ fontSize: '20px', fontWeight: 600, margin: 0 }}>Equipa em Obra</h2>
+          <p style={{ fontSize: '13px', color: 'var(--brown-light)', margin: '4px 0 0' }}>{equipaAtiva} membros ativos</p>
+        </div>
+        <button className="btn btn-primary" onClick={() => { setEditingMembro(null); setShowEquipaModal(true) }}>
+          <UserPlus size={16} /> Adicionar Membro
+        </button>
+      </div>
+      {equipa.filter(e => e.tipo === 'gavinho').length === 0 ? (
+        <div className="card" style={{ textAlign: 'center', padding: '48px' }}>
+          <Users size={48} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '16px' }} />
+          <p style={{ color: 'var(--brown-light)' }}>Sem membros de equipa</p>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gap: '12px' }}>
+          {equipa.filter(e => e.tipo === 'gavinho').map(membro => (
+            <div key={membro.id} className="card" style={{ padding: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ width: '40px', height: '40px', background: 'var(--cream)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600 }}>
+                    {membro.nome?.charAt(0)}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 600 }}>{membro.nome}</div>
+                    <div style={{ fontSize: '13px', color: 'var(--brown-light)' }}>{membro.funcao}</div>
+                  </div>
+                </div>
+                <span style={{ padding: '4px 10px', background: membro.ativo ? '#E8F5E9' : '#FEE2E2', color: membro.ativo ? '#2E7D32' : '#DC2626', borderRadius: '6px', fontSize: '11px', fontWeight: 600 }}>
+                  {membro.ativo ? 'Ativo' : 'Inativo'}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+
+  const renderSubempreiteirosTab = () => (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <h2 style={{ fontSize: '20px', fontWeight: 600, margin: 0 }}>SubEmpreiteiros</h2>
+        <button className="btn btn-primary" onClick={() => { setEditingMembro(null); setEquipaForm({...equipaForm, tipo: 'subempreiteiro'}); setShowEquipaModal(true) }}>
+          <Plus size={16} /> Adicionar SubEmpreiteiro
+        </button>
+      </div>
+      {equipa.filter(e => e.tipo === 'subempreiteiro').length === 0 ? (
+        <div className="card" style={{ textAlign: 'center', padding: '48px' }}>
+          <Truck size={48} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '16px' }} />
+          <p style={{ color: 'var(--brown-light)' }}>Sem subempreiteiros registados</p>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gap: '12px' }}>
+          {equipa.filter(e => e.tipo === 'subempreiteiro').map(sub => (
+            <div key={sub.id} className="card" style={{ padding: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontWeight: 600 }}>{sub.nome}</div>
+                  <div style={{ fontSize: '13px', color: 'var(--brown-light)' }}>{sub.empresa} • {sub.funcao}</div>
+                </div>
+                <span style={{ padding: '4px 10px', background: sub.ativo ? '#E8F5E9' : '#FEE2E2', color: sub.ativo ? '#2E7D32' : '#DC2626', borderRadius: '6px', fontSize: '11px', fontWeight: 600 }}>
+                  {sub.ativo ? 'Ativo' : 'Inativo'}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+
+  const renderZonasTab = () => (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <div>
+          <h2 style={{ fontSize: '20px', fontWeight: 600, margin: 0 }}>Zonas da Obra</h2>
+          <p style={{ fontSize: '13px', color: 'var(--brown-light)', margin: '4px 0 0' }}>{zonas.length} zonas • {progressoMedioZonas}% progresso médio</p>
+        </div>
+        <button className="btn btn-primary" onClick={() => { setEditingZona(null); setShowZonaModal(true) }}>
+          <Plus size={16} /> Nova Zona
+        </button>
+      </div>
+      {zonas.length === 0 ? (
+        <div className="card" style={{ textAlign: 'center', padding: '48px' }}>
+          <Grid3X3 size={48} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '16px' }} />
+          <p style={{ color: 'var(--brown-light)' }}>Sem zonas definidas</p>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+          {zonas.map(zona => (
+            <div key={zona.id} className="card" style={{ padding: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                <div>
+                  <div style={{ fontWeight: 600, marginBottom: '4px' }}>{zona.nome}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>{zona.piso} • {zona.tipo}</div>
+                </div>
+                <button className="btn btn-ghost btn-icon" onClick={() => handleEditZona(zona)}><Edit size={14} /></button>
+              </div>
+              <div style={{ height: '6px', background: 'var(--stone)', borderRadius: '3px', overflow: 'hidden' }}>
+                <div style={{ width: `${zona.progresso || 0}%`, height: '100%', background: 'var(--success)', borderRadius: '3px' }} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', fontSize: '12px' }}>
+                <span style={{ color: 'var(--brown-light)' }}>{zona.area_m2 ? `${zona.area_m2} m²` : '-'}</span>
+                <span style={{ fontWeight: 600 }}>{zona.progresso || 0}%</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+
   return (
-    <div style={{
-      fontFamily: "'Quattrocento Sans', -apple-system, sans-serif",
-      minHeight: '100%'
-    }}>
-      {/* Header */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: '20px',
-        marginBottom: '28px',
-        padding: '24px',
-        background: colors.white,
-        borderRadius: '16px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
-      }}>
+    <div className="fade-in">
+      {/* Header - Estilo ProjetoDetalhe */}
+      <div style={{ marginBottom: '24px' }}>
         <button
           onClick={() => navigate(-1)}
-          title="Voltar"
-          style={{
-            padding: '10px',
-            background: colors.background,
-            border: 'none',
-            borderRadius: '10px',
-            cursor: 'pointer',
-            color: colors.text,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}
-        >
-          <ArrowLeft size={20} />
-        </button>
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-            <span style={{
-              fontWeight: 700,
-              color: colors.success,
-              fontSize: '13px',
-              fontFamily: 'monospace',
-              background: '#EEF5EC',
-              padding: '4px 10px',
-              borderRadius: '6px'
-            }}>
-              {obra.codigo}
-            </span>
-            {obra.projetos?.codigo && (
-              <button
-                onClick={() => navigate(`/projetos/${obra.projetos.codigo}`)}
-                style={{
-                  cursor: 'pointer',
-                  background: colors.background,
-                  border: 'none',
-                  padding: '4px 10px',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  color: colors.primary
-                }}
-              >
-                {obra.projetos.codigo}
-              </button>
-            )}
-            <span style={{
-              padding: '4px 12px',
-              borderRadius: '20px',
-              fontSize: '11px',
-              fontWeight: 600,
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px',
-              background: obra.status === 'ativo' || obra.status === 'em_curso' ? '#E8F5E9' :
-                         obra.status === 'planeamento' ? '#FFF8E1' :
-                         obra.status === 'pausado' ? '#FFEBEE' : '#E3F2FD',
-              color: obra.status === 'ativo' || obra.status === 'em_curso' ? '#2E7D32' :
-                    obra.status === 'planeamento' ? '#F57F17' :
-                    obra.status === 'pausado' ? '#C62828' : '#1565C0'
-            }}>
-              {obra.status === 'ativo' || obra.status === 'em_curso' ? 'Em Curso' :
-               obra.status === 'planeamento' ? 'Planeamento' :
-               obra.status === 'pausado' ? 'Pausada' :
-               obra.status === 'concluido' ? 'Concluída' : obra.status}
-            </span>
-          </div>
-          <h1 style={{
-            fontSize: '28px',
-            fontWeight: 600,
-            color: colors.text,
-            margin: '0 0 4px 0',
-            fontFamily: "'Cormorant Garamond', serif"
-          }}>
-            {obra.nome}
-          </h1>
-          {obra.projetos?.cliente_nome && (
-            <p style={{
-              color: colors.textMuted,
-              fontSize: '14px',
-              margin: 0,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}>
-              <Users size={14} />
-              {obra.projetos.cliente_nome}
-            </p>
-          )}
-        </div>
-        <button
-          onClick={() => navigate(`/obras/${obra.id}/comunicacoes`)}
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            padding: '10px 20px',
-            background: colors.white,
-            border: `1px solid ${colors.border}`,
-            borderRadius: '10px',
-            fontSize: '14px',
-            fontWeight: 500,
-            color: colors.text,
-            cursor: 'pointer'
+            background: 'none',
+            border: 'none',
+            color: 'var(--brown-light)',
+            fontSize: '13px',
+            cursor: 'pointer',
+            marginBottom: '16px',
+            padding: 0
           }}
         >
-          <MessageSquare size={16} />
-          Comunicações
+          <ArrowLeft size={16} />
+          Voltar
         </button>
+
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-md mb-sm">
+              <span style={{
+                fontSize: '13px',
+                fontWeight: 700,
+                color: colors.success,
+                letterSpacing: '0.5px',
+                fontFamily: 'monospace',
+                background: '#EEF5EC',
+                padding: '4px 10px',
+                borderRadius: '6px'
+              }}>
+                {obra.codigo}
+              </span>
+              {obra.projetos?.codigo && (
+                <button
+                  onClick={() => navigate(`/projetos/${obra.projetos.codigo}`)}
+                  style={{
+                    cursor: 'pointer',
+                    background: 'var(--cream)',
+                    border: 'none',
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: 'var(--brown)'
+                  }}
+                >
+                  {obra.projetos.codigo}
+                </button>
+              )}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '4px 10px',
+                  borderRadius: '20px',
+                  background: obra.status === 'ativo' || obra.status === 'em_curso' ? '#E8F5E915' :
+                             obra.status === 'planeamento' ? '#F5A62315' :
+                             obra.status === 'pausado' ? '#EF444415' : '#3B82F615',
+                  color: obra.status === 'ativo' || obra.status === 'em_curso' ? '#2E7D32' :
+                        obra.status === 'planeamento' ? '#D97706' :
+                        obra.status === 'pausado' ? '#DC2626' : '#2563EB',
+                  fontSize: '12px',
+                  fontWeight: 600
+                }}
+              >
+                <div style={{
+                  width: '6px',
+                  height: '6px',
+                  borderRadius: '50%',
+                  background: obra.status === 'ativo' || obra.status === 'em_curso' ? '#2E7D32' :
+                             obra.status === 'planeamento' ? '#D97706' :
+                             obra.status === 'pausado' ? '#DC2626' : '#2563EB'
+                }} />
+                {obra.status === 'ativo' || obra.status === 'em_curso' ? 'Em Curso' :
+                 obra.status === 'planeamento' ? 'Planeamento' :
+                 obra.status === 'pausado' ? 'Pausada' :
+                 obra.status === 'concluido' ? 'Concluída' : obra.status}
+              </div>
+            </div>
+            <h1 className="page-title" style={{ marginBottom: '8px' }}>{obra.nome}</h1>
+            <div className="flex items-center gap-lg text-muted" style={{ fontSize: '13px' }}>
+              {obra.tipo && (
+                <span className="flex items-center gap-xs">
+                  <HardHat size={14} />
+                  {obra.tipo}
+                </span>
+              )}
+              {obra.localizacao && (
+                <span className="flex items-center gap-xs">
+                  <MapPin size={14} />
+                  {obra.localizacao}
+                </span>
+              )}
+              {obra.projetos?.cliente_nome && (
+                <span className="flex items-center gap-xs">
+                  <Users size={14} />
+                  {obra.projetos.cliente_nome}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-sm">
+            <button
+              className="btn btn-secondary"
+              onClick={() => navigate(`/obras/${obra.id}/comunicacoes`)}
+            >
+              <MessageSquare size={16} />
+              Comunicações
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* KPIs */}
@@ -975,270 +1206,338 @@ export default function ObraDetalhe() {
         </div>
       </div>
 
-      {/* Grouped Tabs */}
-      <div style={{ marginBottom: '28px' }}>
-        {tabGroups.map((group) => {
-          const GroupIcon = group.icon
-          const isExpanded = expandedGroups.includes(group.id)
-          const hasActiveTab = group.tabs.some(t => t.id === activeTab)
-
-          return (
-            <div key={group.id} style={{ marginBottom: '12px' }}>
-              {/* Group Header */}
-              <button
-                onClick={() => setExpandedGroups(prev =>
-                  prev.includes(group.id)
-                    ? prev.filter(g => g !== group.id)
-                    : [...prev, group.id]
-                )}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  width: '100%',
-                  padding: '14px 16px',
-                  background: hasActiveTab ? colors.white : colors.background,
-                  border: hasActiveTab ? `1px solid ${colors.border}` : 'none',
-                  borderRadius: '12px',
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                  fontSize: '14px',
-                  color: hasActiveTab ? colors.text : colors.textMuted,
-                  transition: 'all 0.2s'
-                }}
-              >
-                {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
-                <GroupIcon size={18} />
-                <span style={{ flex: 1, textAlign: 'left' }}>{group.label}</span>
-                {hasActiveTab && (
-                  <span style={{
-                    width: '8px',
-                    height: '8px',
-                    borderRadius: '50%',
-                    background: colors.success
-                  }} />
-                )}
-              </button>
-
-              {/* Group Tabs */}
-              {isExpanded && (
-                <div style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  gap: '8px',
-                  marginTop: '12px',
-                  paddingLeft: '28px'
-                }}>
-                  {group.tabs.map((tab) => {
-                    const Icon = tab.icon
-                    const isActive = activeTab === tab.id
-                    const count = tab.id === 'zonas' ? zonas.length :
-                                  tab.id === 'diario' ? diarios.length :
-                                  tab.id === 'ocorrencias' ? ocorrenciasAbertas :
-                                  tab.id === 'equipa' ? equipaAtiva : 0
-
-                    return (
-                      <button
-                        key={tab.id}
-                        onClick={() => handleTabChange(tab.id)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          padding: '10px 16px',
-                          background: isActive ? colors.primary : colors.white,
-                          border: `1px solid ${isActive ? colors.primary : colors.border}`,
-                          borderRadius: '10px',
-                          color: isActive ? colors.white : colors.textMuted,
-                          fontWeight: isActive ? 600 : 500,
-                          fontSize: '13px',
-                          cursor: 'pointer',
-                          transition: 'all 0.15s ease',
-                          boxShadow: isActive ? '0 2px 8px rgba(139,134,112,0.25)' : 'none'
-                        }}
-                      >
-                        <Icon size={15} />
-                        {tab.label}
-                        {count > 0 && (
-                          <span style={{
-                            background: isActive ? 'rgba(255,255,255,0.25)' : colors.background,
-                            color: isActive ? colors.white : colors.text,
-                            padding: '2px 8px',
-                            borderRadius: '12px',
-                            fontSize: '11px',
-                            fontWeight: 700
-                          }}>
-                            {count}
-                          </span>
-                        )}
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          )
-        })}
+      {/* Tabs Horizontais - Estilo ProjetoDetalhe */}
+      <div
+        style={{
+          display: 'flex',
+          gap: '4px',
+          marginBottom: '24px',
+          background: 'var(--cream)',
+          padding: '4px',
+          borderRadius: '12px',
+          width: 'fit-content',
+          flexWrap: 'wrap'
+        }}
+      >
+        {mainTabs.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => handleTabChange(tab.id)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 16px',
+              borderRadius: '8px',
+              border: 'none',
+              background: activeTab === tab.id ? 'var(--white)' : 'transparent',
+              boxShadow: activeTab === tab.id ? 'var(--shadow-sm)' : 'none',
+              color: activeTab === tab.id ? 'var(--brown)' : 'var(--brown-light)',
+              fontSize: '13px',
+              fontWeight: activeTab === tab.id ? 600 : 500,
+              cursor: 'pointer',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <tab.icon size={16} />
+            {tab.label}
+          </button>
+        ))}
       </div>
+
+      {/* TAB: Dashboard */}
+      {activeTab === 'dashboard' && (
+        <div>
+          <div className="grid grid-2" style={{ gap: '20px', marginBottom: '24px' }}>
+            {/* Resumo Geral */}
+            <div className="card">
+              <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)', marginBottom: '16px' }}>
+                Resumo da Obra
+              </h3>
+              <div style={{ display: 'grid', gap: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--stone)' }}>
+                  <span style={{ color: 'var(--brown-light)', fontSize: '13px' }}>Tipo de Obra</span>
+                  <span style={{ fontWeight: 600, fontSize: '13px' }}>{obra.tipo || 'Não definido'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--stone)' }}>
+                  <span style={{ color: 'var(--brown-light)', fontSize: '13px' }}>Localização</span>
+                  <span style={{ fontWeight: 600, fontSize: '13px' }}>{obra.localizacao || '-'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--stone)' }}>
+                  <span style={{ color: 'var(--brown-light)', fontSize: '13px' }}>Data Início</span>
+                  <span style={{ fontWeight: 600, fontSize: '13px' }}>{formatShortDate(obra.data_inicio) || '-'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0' }}>
+                  <span style={{ color: 'var(--brown-light)', fontSize: '13px' }}>Prazo Previsto</span>
+                  <span style={{ fontWeight: 600, fontSize: '13px' }}>{formatShortDate(obra.data_prevista) || '-'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Indicadores */}
+            <div className="card">
+              <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)', marginBottom: '16px' }}>
+                Indicadores
+              </h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div style={{ padding: '16px', background: 'var(--cream)', borderRadius: '12px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '28px', fontWeight: 700, color: colors.success }}>{obra.progresso || 0}%</div>
+                  <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>Progresso</div>
+                </div>
+                <div style={{ padding: '16px', background: 'var(--cream)', borderRadius: '12px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--brown)' }}>{equipaAtiva}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>Equipa Ativa</div>
+                </div>
+                <div style={{ padding: '16px', background: 'var(--cream)', borderRadius: '12px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--brown)' }}>{zonas.length}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>Zonas</div>
+                </div>
+                <div style={{ padding: '16px', background: ocorrenciasAbertas > 0 ? '#FEF2F2' : 'var(--cream)', borderRadius: '12px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '28px', fontWeight: 700, color: ocorrenciasAbertas > 0 ? '#DC2626' : 'var(--brown)' }}>{ocorrenciasAbertas}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>Ocorrências Abertas</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Últimos Diários */}
+          <div className="card">
+            <div className="flex items-center justify-between mb-lg">
+              <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)', margin: 0 }}>
+                Últimos Registos - Diário de Obra
+              </h3>
+              <button className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={() => handleTabChange('diario')}>
+                Ver Todos
+              </button>
+            </div>
+            {diarios.length === 0 ? (
+              <p style={{ color: 'var(--brown-light)', fontSize: '13px', textAlign: 'center', padding: '24px' }}>
+                Sem registos no diário de obra
+              </p>
+            ) : (
+              <div style={{ display: 'grid', gap: '12px' }}>
+                {diarios.slice(0, 3).map(diario => (
+                  <div key={diario.id} style={{ padding: '12px 16px', background: 'var(--cream)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '13px' }}>{formatShortDate(diario.data)}</div>
+                      <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>{diario.resumo?.substring(0, 60) || 'Sem resumo'}...</div>
+                    </div>
+                    <span style={{ padding: '4px 8px', background: 'var(--white)', borderRadius: '6px', fontSize: '11px', color: 'var(--brown)' }}>
+                      {diario.condicoes_meteo}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* TAB: Tracking */}
       {activeTab === 'tracking' && (
         <ObraTracking obra={obra} />
       )}
 
-      {/* TAB: Projeto em Execução */}
-      {activeTab === 'projeto-execucao' && (
+      {/* TAB: Financeiro com subtabs */}
+      {activeTab === 'financeiro' && (
+        <div>
+          {/* Subtabs */}
+          <div style={{
+            display: 'flex',
+            gap: '8px',
+            marginBottom: '20px',
+            borderBottom: '1px solid var(--stone)',
+            paddingBottom: '12px'
+          }}>
+            {financeiroSubtabs.map(subtab => (
+              <button
+                key={subtab.id}
+                onClick={() => setActiveFinanceiroSubtab(subtab.id)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 14px',
+                  background: activeFinanceiroSubtab === subtab.id ? 'var(--brown)' : 'transparent',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: activeFinanceiroSubtab === subtab.id ? 'var(--white)' : 'var(--brown-light)',
+                  fontSize: '13px',
+                  fontWeight: activeFinanceiroSubtab === subtab.id ? 600 : 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <subtab.icon size={14} />
+                {subtab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Conteúdo Subtabs Financeiro */}
+          {activeFinanceiroSubtab === 'orcamentacao' && <ObraOrcamentacao obra={obra} />}
+          {activeFinanceiroSubtab === 'compras' && (
+            <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
+              <ShoppingCart size={48} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '16px' }} />
+              <h3 style={{ margin: '0 0 8px', color: 'var(--brown)' }}>Compras</h3>
+              <p style={{ color: 'var(--brown-light)', margin: 0 }}>Módulo de gestão de compras em desenvolvimento</p>
+            </div>
+          )}
+          {activeFinanceiroSubtab === 'controle-executado' && (
+            <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
+              <TrendingUp size={48} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '16px' }} />
+              <h3 style={{ margin: '0 0 8px', color: 'var(--brown)' }}>Controle Executado</h3>
+              <p style={{ color: 'var(--brown-light)', margin: 0 }}>Módulo de controle executado em desenvolvimento</p>
+            </div>
+          )}
+          {activeFinanceiroSubtab === 'componentes' && renderComponentesTab()}
+        </div>
+      )}
+
+      {/* TAB: Acompanhamento com subtabs */}
+      {activeTab === 'acompanhamento' && (
+        <div>
+          {/* Subtabs */}
+          <div style={{
+            display: 'flex',
+            gap: '8px',
+            marginBottom: '20px',
+            borderBottom: '1px solid var(--stone)',
+            paddingBottom: '12px'
+          }}>
+            {acompanhamentoSubtabs.map(subtab => (
+              <button
+                key={subtab.id}
+                onClick={() => setActiveAcompanhamentoSubtab(subtab.id)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 14px',
+                  background: activeAcompanhamentoSubtab === subtab.id ? 'var(--brown)' : 'transparent',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: activeAcompanhamentoSubtab === subtab.id ? 'var(--white)' : 'var(--brown-light)',
+                  fontSize: '13px',
+                  fontWeight: activeAcompanhamentoSubtab === subtab.id ? 600 : 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <subtab.icon size={14} />
+                {subtab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Conteúdo Subtabs Acompanhamento */}
+          {activeAcompanhamentoSubtab === 'fotografias' && <ObraFotografias obraId={obra.id} />}
+          {activeAcompanhamentoSubtab === 'relatorios' && <ObraRelatorios obraId={obra.id} />}
+          {activeAcompanhamentoSubtab === 'nao-conformidades' && <ObraNaoConformidades obraId={obra.id} />}
+          {activeAcompanhamentoSubtab === 'diario' && renderDiarioTab()}
+          {activeAcompanhamentoSubtab === 'diario-projeto' && <DiarioObraProjeto obraId={obra.id} projetoId={obra.projeto_id} />}
+        </div>
+      )}
+
+      {/* TAB: Fiscalização com subtabs */}
+      {activeTab === 'fiscalizacao' && (
+        <div>
+          {/* Subtabs */}
+          <div style={{
+            display: 'flex',
+            gap: '8px',
+            marginBottom: '20px',
+            borderBottom: '1px solid var(--stone)',
+            paddingBottom: '12px'
+          }}>
+            {fiscalizacaoSubtabs.map(subtab => (
+              <button
+                key={subtab.id}
+                onClick={() => setActiveFiscalizacaoSubtab(subtab.id)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 14px',
+                  background: activeFiscalizacaoSubtab === subtab.id ? 'var(--brown)' : 'transparent',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: activeFiscalizacaoSubtab === subtab.id ? 'var(--white)' : 'var(--brown-light)',
+                  fontSize: '13px',
+                  fontWeight: activeFiscalizacaoSubtab === subtab.id ? 600 : 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <subtab.icon size={14} />
+                {subtab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Conteúdo Subtabs Fiscalização */}
+          {activeFiscalizacaoSubtab === 'autos' && <ObraAutos obraId={obra.id} />}
+          {activeFiscalizacaoSubtab === 'hso' && (
+            <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
+              <Shield size={48} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '16px' }} />
+              <h3 style={{ margin: '0 0 8px', color: 'var(--brown)' }}>HSO - Higiene e Segurança</h3>
+              <p style={{ color: 'var(--brown-light)', margin: 0 }}>Módulo HSO em desenvolvimento</p>
+            </div>
+          )}
+          {activeFiscalizacaoSubtab === 'ocorrencias' && renderOcorrenciasTab()}
+        </div>
+      )}
+
+      {/* TAB: Equipas com subtabs */}
+      {activeTab === 'equipas' && (
+        <div>
+          {/* Subtabs */}
+          <div style={{
+            display: 'flex',
+            gap: '8px',
+            marginBottom: '20px',
+            borderBottom: '1px solid var(--stone)',
+            paddingBottom: '12px'
+          }}>
+            {equipasSubtabs.map(subtab => (
+              <button
+                key={subtab.id}
+                onClick={() => setActiveEquipasSubtab(subtab.id)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 14px',
+                  background: activeEquipasSubtab === subtab.id ? 'var(--brown)' : 'transparent',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: activeEquipasSubtab === subtab.id ? 'var(--white)' : 'var(--brown-light)',
+                  fontSize: '13px',
+                  fontWeight: activeEquipasSubtab === subtab.id ? 600 : 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <subtab.icon size={14} />
+                {subtab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Conteúdo Subtabs Equipas */}
+          {activeEquipasSubtab === 'equipa' && renderEquipaTab()}
+          {activeEquipasSubtab === 'subempreiteiros' && renderSubempreiteirosTab()}
+          {activeEquipasSubtab === 'zonas' && renderZonasTab()}
+        </div>
+      )}
+
+      {/* TAB: Projeto */}
+      {activeTab === 'projeto' && (
         <ObraProjetoExecucao obra={obra} />
       )}
 
-      {/* TAB: Orçamentação */}
-      {activeTab === 'orcamentacao' && (
-        <ObraOrcamentacao obra={obra} />
-      )}
-
-      {/* TAB: Compras (placeholder) */}
-      {activeTab === 'compras' && (
-        <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
-          <ShoppingCart size={48} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '16px' }} />
-          <h3 style={{ margin: '0 0 8px', color: 'var(--brown)' }}>Compras</h3>
-          <p style={{ color: 'var(--brown-light)', margin: 0 }}>Módulo de gestão de compras em desenvolvimento</p>
-        </div>
-      )}
-
-      {/* TAB: Controle Executado (placeholder) */}
-      {activeTab === 'controle-executado' && (
-        <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
-          <TrendingUp size={48} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '16px' }} />
-          <h3 style={{ margin: '0 0 8px', color: 'var(--brown)' }}>Controle Executado</h3>
-          <p style={{ color: 'var(--brown-light)', margin: 0 }}>Módulo de controle de execução em desenvolvimento</p>
-        </div>
-      )}
-
-      {/* TAB: Contratos/Componentes */}
-      {activeTab === 'componentes' && (
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <div>
-              <h2 style={{ fontSize: '20px', fontWeight: 600, margin: 0 }}>Contratos de Obra</h2>
-              <p style={{ fontSize: '13px', color: 'var(--brown-light)', margin: '4px 0 0' }}>
-                Componentes de faturação separados por entidade
-              </p>
-            </div>
-            <button className="btn btn-primary" onClick={() => {
-              setEditingComponente(null)
-              setComponenteForm({
-                tipo: 'construcao',
-                nome: 'Construção',
-                entidade_faturacao_id: '',
-                valor_contrato: '',
-                percentagem_adiantamento: 20,
-                percentagem_retencao: 5,
-                notas: ''
-              })
-              setShowComponenteModal(true)
-            }}>
-              <Plus size={16} /> Novo Contrato
-            </button>
-          </div>
-
-          {componentes.length === 0 ? (
-            <div className="card" style={{ textAlign: 'center', padding: '48px' }}>
-              <Building2 size={48} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '16px' }} />
-              <p style={{ color: 'var(--brown-light)', marginBottom: '16px' }}>Sem contratos definidos</p>
-              <p style={{ fontSize: '13px', color: 'var(--brown-light)', maxWidth: '400px', margin: '0 auto' }}>
-                Adicione os componentes de obra: Construção (Gavinho & Associados) e Design de Interiores (Gavinho Arquitetura e Interiores)
-              </p>
-            </div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '20px' }}>
-              {componentes.map((comp) => (
-                <div key={comp.id} className="card" style={{ 
-                  borderLeft: `4px solid ${comp.tipo === 'construcao' ? '#f59e0b' : '#8b5cf6'}`,
-                  position: 'relative'
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-                    <div>
-                      <span style={{ 
-                        display: 'inline-block',
-                        padding: '4px 10px', 
-                        borderRadius: '12px', 
-                        fontSize: '11px', 
-                        fontWeight: 600,
-                        background: comp.tipo === 'construcao' ? '#fef3c7' : '#ede9fe',
-                        color: comp.tipo === 'construcao' ? '#92400e' : '#6d28d9',
-                        marginBottom: '8px'
-                      }}>
-                        {comp.tipo === 'construcao' ? 'CONSTRUÇÃO' : 'DESIGN INTERIORES'}
-                      </span>
-                      <h3 style={{ fontSize: '18px', fontWeight: 600, margin: '0 0 4px' }}>{comp.nome}</h3>
-                      <p style={{ fontSize: '13px', color: 'var(--brown-light)', margin: 0 }}>
-                        {comp.entidades_faturacao?.nome || 'Entidade não definida'}
-                      </p>
-                    </div>
-                    <div style={{ display: 'flex', gap: '4px' }}>
-                      <button className="btn btn-ghost btn-icon" onClick={() => handleEditComponente(comp)}>
-                        <Edit size={14} />
-                      </button>
-                      <button className="btn btn-ghost btn-icon" style={{ color: '#dc2626' }} onClick={() => handleDeleteComponente(comp.id)}>
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                    <div>
-                      <div style={{ fontSize: '11px', color: 'var(--brown-light)', marginBottom: '2px' }}>Valor Contrato</div>
-                      <div style={{ fontSize: '18px', fontWeight: 600 }}>
-                        {comp.valor_contrato?.toLocaleString('pt-PT')} €
-                      </div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '11px', color: 'var(--brown-light)', marginBottom: '2px' }}>Adiantamento</div>
-                      <div style={{ fontSize: '18px', fontWeight: 600 }}>{comp.percentagem_adiantamento}%</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '11px', color: 'var(--brown-light)', marginBottom: '2px' }}>Retenção</div>
-                      <div style={{ fontSize: '18px', fontWeight: 600 }}>{comp.percentagem_retencao}%</div>
-                    </div>
-                  </div>
-
-                  {comp.notas && (
-                    <div style={{ fontSize: '13px', color: 'var(--brown-light)', padding: '12px', background: 'var(--cream)', borderRadius: '8px' }}>
-                      {comp.notas}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Resumo total */}
-          {componentes.length > 0 && (
-            <div className="card" style={{ marginTop: '24px', background: 'var(--cream)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div style={{ fontSize: '13px', color: 'var(--brown-light)' }}>Valor Total da Obra</div>
-                  <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--brown)' }}>
-                    {componentes.reduce((sum, c) => sum + (c.valor_contrato || 0), 0).toLocaleString('pt-PT')} €
-                  </div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '13px', color: 'var(--brown-light)' }}>{componentes.length} contratos</div>
-                  <div style={{ fontSize: '13px' }}>
-                    {componentes.filter(c => c.tipo === 'construcao').length} construção • {componentes.filter(c => c.tipo === 'design_interiores').length} design
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* TAB: Autos de Medição */}
-      {activeTab === 'autos' && (
-        <ObraAutos obra={obra} />
-      )}
-
+      
+      
       {/* TAB: Diário */}
       {activeTab === 'diario' && (
         <div>
