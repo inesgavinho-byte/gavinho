@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { Plus, Lock, Unlock, Copy, Download, Upload, Trash2, Check, ChevronDown } from 'lucide-react'
 
 // Design tokens
 const colors = {
@@ -16,43 +17,40 @@ const colors = {
   info: '#4a6fa5',
   gridHeader: '#f8f7f5',
   gridSelected: '#e8f0e8',
-  gridHover: '#fafaf8'
+  gridHover: '#fafaf8',
+  locked: '#f5f5f5',
+  inherited: '#fafaf8'
 }
 
-const unidades = ['m²', 'm³', 'ml', 'un', 'vg', 'kg', 'ton', 'dia', 'hora', 'conj', 'pç']
+const unidades = ['un', 'm²', 'm³', 'ml', 'vg', 'kg', 'ton', 'dia', 'hora', 'conj', 'pç']
 
 export default function MQT() {
   const [obras, setObras] = useState([])
   const [selectedObra, setSelectedObra] = useState(null)
-  const [mapas, setMapas] = useState([])
-  const [selectedMapa, setSelectedMapa] = useState(null)
-  const [items, setItems] = useState([])
-  const [capitulos, setCapitulos] = useState([])
+  const [versoes, setVersoes] = useState([])
+  const [selectedVersao, setSelectedVersao] = useState(null)
+  const [linhas, setLinhas] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [showNewMapaModal, setShowNewMapaModal] = useState(false)
+  const [showNewVersaoModal, setShowNewVersaoModal] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
-  const [newMapaNome, setNewMapaNome] = useState('')
+  const [newVersaoNome, setNewVersaoNome] = useState('')
+  const [baseVersaoId, setBaseVersaoId] = useState('')
   const [selectedCell, setSelectedCell] = useState({ row: null, col: null })
   const [editingCell, setEditingCell] = useState({ row: null, col: null })
   const [editValue, setEditValue] = useState('')
-  const [totals, setTotals] = useState({ valor: 0, executado: 0 })
   const gridRef = useRef(null)
   const inputRef = useRef(null)
 
-  // Colunas do grid
+  // Colunas do grid MQT (sem preços - só quantidades)
   const columns = [
-    { key: 'capitulo', label: 'Cap.', width: 60, type: 'number', editable: true },
-    { key: 'referencia', label: 'Ref.', width: 80, type: 'text', editable: true },
-    { key: 'tipo', label: 'Tipo/Subtipo', width: 160, type: 'text', editable: true },
-    { key: 'zona', label: 'Zona', width: 140, type: 'text', editable: true },
-    { key: 'descricao', label: 'Descrição', width: 300, type: 'text', editable: true },
+    { key: 'capitulo', label: 'CAP.', width: 70, type: 'number', editable: true },
+    { key: 'referencia', label: 'REF.', width: 80, type: 'text', editable: true },
+    { key: 'tipo_subtipo', label: 'TIPO/SUBTIPO', width: 160, type: 'text', editable: true },
+    { key: 'zona', label: 'ZONA', width: 140, type: 'text', editable: true },
+    { key: 'descricao', label: 'DESCRIÇÃO', width: 350, type: 'text', editable: true },
     { key: 'unidade', label: 'UN', width: 70, type: 'select', options: unidades, editable: true },
-    { key: 'quantidade', label: 'QTD', width: 90, type: 'number', editable: true },
-    { key: 'preco_unitario', label: 'Preço Un.', width: 100, type: 'currency', editable: true },
-    { key: 'valor_total', label: 'Total', width: 110, type: 'currency', editable: false },
-    { key: 'quantidade_executada', label: 'QTD Exec.', width: 100, type: 'number', editable: true },
-    { key: 'percentagem', label: '% Exec.', width: 80, type: 'percent', editable: false }
+    { key: 'quantidade', label: 'QTD', width: 100, type: 'number', editable: true }
   ]
 
   useEffect(() => {
@@ -61,22 +59,15 @@ export default function MQT() {
 
   useEffect(() => {
     if (selectedObra) {
-      loadMapas(selectedObra)
+      loadVersoes(selectedObra)
     }
   }, [selectedObra])
 
   useEffect(() => {
-    if (selectedMapa) {
-      loadItems(selectedMapa)
+    if (selectedVersao) {
+      loadLinhas(selectedVersao)
     }
-  }, [selectedMapa])
-
-  useEffect(() => {
-    // Calcular totais
-    const valorTotal = items.reduce((acc, item) => acc + (item.quantidade || 0) * (item.preco_unitario || 0), 0)
-    const valorExecutado = items.reduce((acc, item) => acc + (item.quantidade_executada || 0) * (item.preco_unitario || 0), 0)
-    setTotals({ valor: valorTotal, executado: valorExecutado })
-  }, [items])
+  }, [selectedVersao])
 
   useEffect(() => {
     if (editingCell.row !== null && inputRef.current) {
@@ -91,124 +82,147 @@ export default function MQT() {
     setLoading(false)
   }
 
-  const loadMapas = async (obraId) => {
+  const loadVersoes = async (obraId) => {
     const { data } = await supabase
-      .from('mqt_mapas')
+      .from('mqt_versoes')
       .select('*')
       .eq('obra_id', obraId)
       .order('created_at', { ascending: false })
-    setMapas(data || [])
-    if (data && data.length > 0) {
-      setSelectedMapa(data[0].id)
+    setVersoes(data || [])
+
+    // Selecionar versão ativa ou primeira
+    const ativa = data?.find(v => v.is_ativa) || data?.[0]
+    if (ativa) {
+      setSelectedVersao(ativa.id)
     } else {
-      setSelectedMapa(null)
-      setItems([])
+      setSelectedVersao(null)
+      setLinhas([])
     }
   }
 
-  const loadItems = async (mapaId) => {
+  const loadLinhas = async (versaoId) => {
     setLoading(true)
     const { data } = await supabase
-      .from('mqt_items')
-      .select('*, mqt_capitulos(numero, nome)')
-      .eq('mapa_id', mapaId)
+      .from('mqt_linhas')
+      .select('*')
+      .eq('mqt_versao_id', versaoId)
       .order('ordem')
 
-    const formattedItems = (data || []).map(item => ({
-      ...item,
-      capitulo: item.mqt_capitulos?.numero || 1,
-      valor_total: (item.quantidade || 0) * (item.preco_unitario || 0),
-      percentagem: item.quantidade > 0 ? Math.min((item.quantidade_executada / item.quantidade) * 100, 100) : 0
-    }))
-
-    setItems(formattedItems)
+    setLinhas(data || [])
     setLoading(false)
   }
 
-  const createMapa = async () => {
-    if (!newMapaNome.trim() || !selectedObra) return
+  const getVersaoInfo = () => {
+    return versoes.find(v => v.id === selectedVersao)
+  }
 
-    const { data, error } = await supabase.from('mqt_mapas').insert({
+  const isLocked = () => {
+    const versao = getVersaoInfo()
+    return versao?.is_congelada || false
+  }
+
+  const createVersao = async () => {
+    if (!selectedObra) return
+
+    // Determinar próxima versão
+    const existingVersions = versoes.map(v => v.versao)
+    let nextVersion = 'v1.0'
+    if (existingVersions.length > 0) {
+      const lastVersion = existingVersions[0]
+      const [major, minor] = lastVersion.replace('v', '').split('.').map(Number)
+      nextVersion = `v${major}.${minor + 1}`
+    }
+
+    const versaoId = `MQT_${selectedObra}_${nextVersion}`.replace(/-/g, '_')
+
+    const { data: versaoData, error: versaoError } = await supabase.from('mqt_versoes').insert({
+      id: versaoId,
       obra_id: selectedObra,
-      nome: newMapaNome,
-      status: 'rascunho'
+      versao: nextVersion,
+      is_ativa: versoes.length === 0
+    }).select().single()
+
+    if (versaoError) {
+      console.error('Erro ao criar versão:', versaoError)
+      return
+    }
+
+    // Se baseado em versão existente, copiar linhas
+    if (baseVersaoId) {
+      const { data: linhasBase } = await supabase
+        .from('mqt_linhas')
+        .select('*')
+        .eq('mqt_versao_id', baseVersaoId)
+
+      if (linhasBase && linhasBase.length > 0) {
+        const novasLinhas = linhasBase.map(l => ({
+          mqt_versao_id: versaoId,
+          ordem: l.ordem,
+          capitulo: l.capitulo,
+          referencia: l.referencia,
+          tipo_subtipo: l.tipo_subtipo,
+          zona: l.zona,
+          descricao: l.descricao,
+          unidade: l.unidade,
+          quantidade: l.quantidade
+        }))
+        await supabase.from('mqt_linhas').insert(novasLinhas)
+      }
+    }
+
+    setShowNewVersaoModal(false)
+    setNewVersaoNome('')
+    setBaseVersaoId('')
+    loadVersoes(selectedObra)
+  }
+
+  const setVersaoAtiva = async (versaoId) => {
+    // Desativar todas
+    await supabase
+      .from('mqt_versoes')
+      .update({ is_ativa: false })
+      .eq('obra_id', selectedObra)
+
+    // Ativar selecionada
+    await supabase
+      .from('mqt_versoes')
+      .update({ is_ativa: true })
+      .eq('id', versaoId)
+
+    loadVersoes(selectedObra)
+  }
+
+  const addNewRow = async () => {
+    if (!selectedVersao || isLocked()) return
+
+    const newRef = linhas.length > 0
+      ? `${Math.floor(linhas[linhas.length - 1].capitulo || 1)}.${linhas.length + 1}`
+      : '1.1'
+
+    const { data, error } = await supabase.from('mqt_linhas').insert({
+      mqt_versao_id: selectedVersao,
+      ordem: linhas.length,
+      capitulo: 1,
+      referencia: newRef,
+      descricao: 'Novo item',
+      unidade: 'un',
+      quantidade: 0
     }).select().single()
 
     if (!error && data) {
-      // Criar capítulo inicial
-      await supabase.from('mqt_capitulos').insert({
-        mapa_id: data.id,
-        numero: 1,
-        nome: 'Capítulo 1',
-        ordem: 0
-      })
-
-      setMapas([data, ...mapas])
-      setSelectedMapa(data.id)
-      setShowNewMapaModal(false)
-      setNewMapaNome('')
-      // Adicionar linha inicial
-      addNewRow(data.id)
-    }
-  }
-
-  const addNewRow = async (mapaId = selectedMapa) => {
-    if (!mapaId) return
-
-    // Buscar ou criar capítulo 1
-    let { data: cap } = await supabase
-      .from('mqt_capitulos')
-      .select('id')
-      .eq('mapa_id', mapaId)
-      .eq('numero', 1)
-      .single()
-
-    if (!cap) {
-      const { data: newCap } = await supabase.from('mqt_capitulos').insert({
-        mapa_id: mapaId,
-        numero: 1,
-        nome: 'Capítulo 1'
-      }).select().single()
-      cap = newCap
-    }
-
-    const newRef = `1.${items.length + 1}`
-    const newItem = {
-      mapa_id: mapaId,
-      capitulo_id: cap.id,
-      referencia: newRef,
-      tipo: '',
-      zona: '',
-      descricao: 'Novo item',
-      unidade: 'un',
-      quantidade: 0,
-      preco_unitario: 0,
-      quantidade_executada: 0,
-      ordem: items.length
-    }
-
-    const { data, error } = await supabase.from('mqt_items').insert(newItem).select().single()
-
-    if (!error && data) {
-      const formattedItem = {
-        ...data,
-        capitulo: 1,
-        valor_total: 0,
-        percentagem: 0
-      }
-      setItems([...items, formattedItem])
-      // Selecionar a nova linha
-      setSelectedCell({ row: items.length, col: 1 })
+      setLinhas([...linhas, data])
+      setSelectedCell({ row: linhas.length, col: 4 }) // Focar na descrição
     }
   }
 
   const deleteRow = async (index) => {
-    const item = items[index]
+    if (isLocked()) return
+    const item = linhas[index]
     if (!item?.id) return
 
-    const { error } = await supabase.from('mqt_items').delete().eq('id', item.id)
+    const { error } = await supabase.from('mqt_linhas').delete().eq('id', item.id)
     if (!error) {
-      setItems(items.filter((_, i) => i !== index))
+      setLinhas(linhas.filter((_, i) => i !== index))
       setSelectedCell({ row: null, col: null })
       setEditingCell({ row: null, col: null })
     }
@@ -220,20 +234,22 @@ export default function MQT() {
   }
 
   const handleCellDoubleClick = (rowIndex, colIndex) => {
+    if (isLocked()) return
     const col = columns[colIndex]
     if (!col.editable) return
 
     setEditingCell({ row: rowIndex, col: colIndex })
-    const item = items[rowIndex]
+    const item = linhas[rowIndex]
     setEditValue(item[col.key]?.toString() || '')
   }
 
   const handleKeyDown = useCallback((e) => {
+    if (isLocked()) return
+
     if (editingCell.row !== null) {
       if (e.key === 'Enter') {
         saveCell()
-        // Mover para baixo
-        if (selectedCell.row < items.length - 1) {
+        if (selectedCell.row < linhas.length - 1) {
           setSelectedCell({ row: selectedCell.row + 1, col: selectedCell.col })
         }
       } else if (e.key === 'Escape') {
@@ -242,10 +258,9 @@ export default function MQT() {
       } else if (e.key === 'Tab') {
         e.preventDefault()
         saveCell()
-        // Mover para próxima coluna
         if (selectedCell.col < columns.length - 1) {
           setSelectedCell({ row: selectedCell.row, col: selectedCell.col + 1 })
-        } else if (selectedCell.row < items.length - 1) {
+        } else if (selectedCell.row < linhas.length - 1) {
           setSelectedCell({ row: selectedCell.row + 1, col: 0 })
         }
       }
@@ -255,7 +270,7 @@ export default function MQT() {
         if (col.editable) {
           handleCellDoubleClick(selectedCell.row, selectedCell.col)
         }
-      } else if (e.key === 'ArrowDown' && selectedCell.row < items.length - 1) {
+      } else if (e.key === 'ArrowDown' && selectedCell.row < linhas.length - 1) {
         e.preventDefault()
         setSelectedCell({ row: selectedCell.row + 1, col: selectedCell.col })
       } else if (e.key === 'ArrowUp' && selectedCell.row > 0) {
@@ -272,7 +287,6 @@ export default function MQT() {
           deleteRow(selectedCell.row)
         }
       } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
-        // Começar a editar ao digitar
         const col = columns[selectedCell.col]
         if (col.editable) {
           setEditingCell({ row: selectedCell.row, col: selectedCell.col })
@@ -280,7 +294,7 @@ export default function MQT() {
         }
       }
     }
-  }, [selectedCell, editingCell, items])
+  }, [selectedCell, editingCell, linhas, columns])
 
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown)
@@ -288,34 +302,22 @@ export default function MQT() {
   }, [handleKeyDown])
 
   const saveCell = async () => {
-    if (editingCell.row === null) return
+    if (editingCell.row === null || isLocked()) return
 
-    const item = items[editingCell.row]
+    const item = linhas[editingCell.row]
     const col = columns[editingCell.col]
     let value = editValue
 
-    // Converter tipos
-    if (col.type === 'number' || col.type === 'currency') {
+    if (col.type === 'number') {
       value = parseFloat(value.replace(',', '.')) || 0
     }
 
-    // Atualizar localmente
-    const updatedItems = [...items]
-    updatedItems[editingCell.row] = {
-      ...item,
-      [col.key]: value,
-      valor_total: col.key === 'quantidade' || col.key === 'preco_unitario'
-        ? (col.key === 'quantidade' ? value : item.quantidade) * (col.key === 'preco_unitario' ? value : item.preco_unitario)
-        : item.valor_total,
-      percentagem: col.key === 'quantidade' || col.key === 'quantidade_executada'
-        ? ((col.key === 'quantidade_executada' ? value : item.quantidade_executada) / (col.key === 'quantidade' ? value : item.quantidade)) * 100
-        : item.percentagem
-    }
-    setItems(updatedItems)
+    const updatedLinhas = [...linhas]
+    updatedLinhas[editingCell.row] = { ...item, [col.key]: value }
+    setLinhas(updatedLinhas)
 
-    // Salvar na BD
     setSaving(true)
-    await supabase.from('mqt_items').update({ [col.key]: value }).eq('id', item.id)
+    await supabase.from('mqt_linhas').update({ [col.key]: value }).eq('id', item.id)
     setSaving(false)
 
     setEditingCell({ row: null, col: null })
@@ -324,15 +326,13 @@ export default function MQT() {
 
   const formatValue = (value, type) => {
     if (value === null || value === undefined || value === '') return ''
-    if (type === 'currency') return `€ ${parseFloat(value).toLocaleString('pt-PT', { minimumFractionDigits: 2 })}`
-    if (type === 'percent') return `${parseFloat(value).toFixed(1)}%`
     if (type === 'number') return parseFloat(value).toLocaleString('pt-PT', { minimumFractionDigits: 2 })
     return value
   }
 
   const handleImportCSV = async (e) => {
     const file = e.target.files[0]
-    if (!file || !selectedMapa) return
+    if (!file || !selectedVersao || isLocked()) return
 
     const reader = new FileReader()
     reader.onload = async (event) => {
@@ -340,16 +340,14 @@ export default function MQT() {
       const lines = text.split('\n').filter(line => line.trim())
       const headers = lines[0].split(';').map(h => h.trim().toLowerCase())
 
-      // Mapear headers
       const headerMap = {
         'cap': 'capitulo', 'cap.': 'capitulo', 'capitulo': 'capitulo',
         'ref': 'referencia', 'ref.': 'referencia', 'referencia': 'referencia',
-        'tipo': 'tipo', 'tipo/subtipo': 'tipo', 'subtipo': 'subtipo',
+        'tipo': 'tipo_subtipo', 'tipo/subtipo': 'tipo_subtipo', 'subtipo': 'tipo_subtipo',
         'zona': 'zona',
         'descricao': 'descricao', 'descrição': 'descricao',
         'un': 'unidade', 'unidade': 'unidade',
-        'qtd': 'quantidade', 'quantidade': 'quantidade',
-        'preco': 'preco_unitario', 'preço': 'preco_unitario', 'preco unitario': 'preco_unitario', 'preço unitário': 'preco_unitario'
+        'qtd': 'quantidade', 'quantidade': 'quantidade'
       }
 
       const colIndexes = {}
@@ -358,48 +356,29 @@ export default function MQT() {
         if (mapped) colIndexes[mapped] = i
       })
 
-      // Buscar ou criar capítulo 1
-      let { data: cap } = await supabase
-        .from('mqt_capitulos')
-        .select('id')
-        .eq('mapa_id', selectedMapa)
-        .eq('numero', 1)
-        .single()
-
-      if (!cap) {
-        const { data: newCap } = await supabase.from('mqt_capitulos').insert({
-          mapa_id: selectedMapa,
-          numero: 1,
-          nome: 'Capítulo 1'
-        }).select().single()
-        cap = newCap
-      }
-
       const newItems = []
       for (let i = 1; i < lines.length; i++) {
         const values = lines[i].split(';').map(v => v.trim())
         if (values.length < 3) continue
 
         const item = {
-          mapa_id: selectedMapa,
-          capitulo_id: cap.id,
+          mqt_versao_id: selectedVersao,
+          ordem: linhas.length + i - 1,
+          capitulo: parseFloat((values[colIndexes.capitulo] || '1').replace(',', '.')) || 1,
           referencia: values[colIndexes.referencia] || `1.${i}`,
-          tipo: values[colIndexes.tipo] || '',
+          tipo_subtipo: values[colIndexes.tipo_subtipo] || '',
           zona: values[colIndexes.zona] || '',
           descricao: values[colIndexes.descricao] || 'Item importado',
           unidade: values[colIndexes.unidade] || 'un',
-          quantidade: parseFloat((values[colIndexes.quantidade] || '0').replace(',', '.')) || 0,
-          preco_unitario: parseFloat((values[colIndexes.preco_unitario] || '0').replace(',', '.')) || 0,
-          quantidade_executada: 0,
-          ordem: items.length + i - 1
+          quantidade: parseFloat((values[colIndexes.quantidade] || '0').replace(',', '.')) || 0
         }
         newItems.push(item)
       }
 
       if (newItems.length > 0) {
-        const { data, error } = await supabase.from('mqt_items').insert(newItems).select()
-        if (!error && data) {
-          loadItems(selectedMapa)
+        const { error } = await supabase.from('mqt_linhas').insert(newItems)
+        if (!error) {
+          loadLinhas(selectedVersao)
         }
       }
 
@@ -409,34 +388,32 @@ export default function MQT() {
   }
 
   const exportCSV = () => {
-    if (items.length === 0) return
+    if (linhas.length === 0) return
 
-    const headers = ['Cap.', 'Ref.', 'Tipo/Subtipo', 'Zona', 'Descrição', 'UN', 'QTD', 'Preço Un.', 'Total', 'QTD Exec.', '% Exec.']
-    const rows = items.map(item => [
+    const headers = ['Cap.', 'Ref.', 'Tipo/Subtipo', 'Zona', 'Descrição', 'UN', 'QTD']
+    const rows = linhas.map(item => [
       item.capitulo,
       item.referencia,
-      item.tipo || '',
+      item.tipo_subtipo || '',
       item.zona || '',
       item.descricao,
       item.unidade,
-      item.quantidade,
-      item.preco_unitario,
-      item.valor_total,
-      item.quantidade_executada,
-      item.percentagem?.toFixed(1) || '0'
+      item.quantidade
     ])
 
     const csvContent = [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n')
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
     const link = document.createElement('a')
+    const versaoInfo = getVersaoInfo()
     link.href = URL.createObjectURL(blob)
-    link.download = `MQT_${selectedObra}_${new Date().toISOString().split('T')[0]}.csv`
+    link.download = `MQT_${versaoInfo?.versao || 'export'}_${new Date().toISOString().split('T')[0]}.csv`
     link.click()
   }
 
   const getCellStyle = (rowIndex, colIndex, col) => {
     const isSelected = selectedCell.row === rowIndex && selectedCell.col === colIndex
     const isEditing = editingCell.row === rowIndex && editingCell.col === colIndex
+    const locked = isLocked()
 
     return {
       width: col.width,
@@ -444,18 +421,19 @@ export default function MQT() {
       padding: '8px 10px',
       borderRight: `1px solid ${colors.border}`,
       borderBottom: `1px solid ${colors.border}`,
-      background: isEditing ? colors.white : isSelected ? colors.gridSelected : rowIndex % 2 === 0 ? colors.white : colors.gridHeader,
-      cursor: col.editable ? 'cell' : 'default',
+      background: locked ? colors.locked : isEditing ? colors.white : isSelected ? colors.gridSelected : rowIndex % 2 === 0 ? colors.white : colors.gridHeader,
+      cursor: locked ? 'not-allowed' : col.editable ? 'cell' : 'default',
       outline: isSelected ? `2px solid ${colors.primary}` : 'none',
       outlineOffset: '-2px',
       fontSize: '13px',
-      textAlign: col.type === 'number' || col.type === 'currency' || col.type === 'percent' ? 'right' : 'left',
+      textAlign: col.type === 'number' ? 'right' : 'left',
       whiteSpace: 'nowrap',
       overflow: 'hidden',
-      textOverflow: 'ellipsis',
-      position: 'relative'
+      textOverflow: 'ellipsis'
     }
   }
+
+  const versaoInfo = getVersaoInfo()
 
   return (
     <div style={{ padding: '24px', background: colors.background, minHeight: '100vh' }}>
@@ -466,7 +444,7 @@ export default function MQT() {
             Mapa de Quantidades (MQT)
           </h1>
           <p style={{ fontSize: '14px', color: colors.textLight, marginTop: '4px' }}>
-            Gerir quantidades e acompanhamento de obra
+            Gerir quantidades e versões por obra
           </p>
         </div>
         {saving && (
@@ -477,9 +455,9 @@ export default function MQT() {
         )}
       </div>
 
-      {/* Seleção de Obra e Mapa */}
-      <div style={{ display: 'flex', gap: '16px', marginBottom: '20px', flexWrap: 'wrap' }}>
-        <div style={{ minWidth: '250px' }}>
+      {/* Seleção de Obra e Versão */}
+      <div style={{ display: 'flex', gap: '16px', marginBottom: '20px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+        <div style={{ minWidth: '280px' }}>
           <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: colors.textLight, marginBottom: '6px' }}>
             Obra
           </label>
@@ -503,14 +481,14 @@ export default function MQT() {
         </div>
 
         {selectedObra && (
-          <div style={{ minWidth: '250px' }}>
+          <div style={{ minWidth: '200px' }}>
             <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: colors.textLight, marginBottom: '6px' }}>
-              Mapa
+              Versão
             </label>
             <div style={{ display: 'flex', gap: '8px' }}>
               <select
-                value={selectedMapa || ''}
-                onChange={(e) => setSelectedMapa(e.target.value || null)}
+                value={selectedVersao || ''}
+                onChange={(e) => setSelectedVersao(e.target.value || null)}
                 style={{
                   flex: 1,
                   padding: '10px 12px',
@@ -520,13 +498,15 @@ export default function MQT() {
                   background: colors.white
                 }}
               >
-                <option value="">Selecionar mapa...</option>
-                {mapas.map(mapa => (
-                  <option key={mapa.id} value={mapa.id}>{mapa.nome} (v{mapa.versao})</option>
+                <option value="">Selecionar versão...</option>
+                {versoes.map(v => (
+                  <option key={v.id} value={v.id}>
+                    {v.versao} {v.is_ativa ? '(Ativa)' : ''} {v.is_congelada ? '🔒' : ''}
+                  </option>
                 ))}
               </select>
               <button
-                onClick={() => setShowNewMapaModal(true)}
+                onClick={() => setShowNewVersaoModal(true)}
                 style={{
                   padding: '10px 16px',
                   background: colors.primary,
@@ -535,18 +515,59 @@ export default function MQT() {
                   borderRadius: '8px',
                   cursor: 'pointer',
                   fontSize: '14px',
-                  fontWeight: 500
+                  fontWeight: 500,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
                 }}
               >
-                + Novo
+                <Plus size={16} /> Nova
               </button>
             </div>
+          </div>
+        )}
+
+        {versaoInfo && (
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {versaoInfo.is_congelada ? (
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 12px', background: colors.locked, borderRadius: '8px', fontSize: '12px', color: colors.textLight }}>
+                <Lock size={14} /> Congelada
+              </span>
+            ) : (
+              <>
+                {!versaoInfo.is_ativa && (
+                  <button
+                    onClick={() => setVersaoAtiva(versaoInfo.id)}
+                    style={{
+                      padding: '8px 12px',
+                      background: colors.success,
+                      color: colors.white,
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      fontWeight: 500,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    <Check size={14} /> Definir Ativa
+                  </button>
+                )}
+                {versaoInfo.is_ativa && (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 12px', background: '#E8F5E9', borderRadius: '8px', fontSize: '12px', color: colors.success, fontWeight: 600 }}>
+                    <Check size={14} /> Ativa
+                  </span>
+                )}
+              </>
+            )}
           </div>
         )}
       </div>
 
       {/* Toolbar */}
-      {selectedMapa && (
+      {selectedVersao && (
         <div style={{
           display: 'flex',
           gap: '8px',
@@ -555,17 +576,19 @@ export default function MQT() {
           background: colors.white,
           borderRadius: '8px',
           border: `1px solid ${colors.border}`,
-          flexWrap: 'wrap'
+          flexWrap: 'wrap',
+          alignItems: 'center'
         }}>
           <button
-            onClick={() => addNewRow()}
+            onClick={addNewRow}
+            disabled={isLocked()}
             style={{
               padding: '8px 16px',
-              background: colors.success,
-              color: colors.white,
+              background: isLocked() ? colors.locked : colors.success,
+              color: isLocked() ? colors.textLight : colors.white,
               border: 'none',
               borderRadius: '6px',
-              cursor: 'pointer',
+              cursor: isLocked() ? 'not-allowed' : 'pointer',
               fontSize: '13px',
               fontWeight: 500,
               display: 'flex',
@@ -573,22 +596,26 @@ export default function MQT() {
               gap: '6px'
             }}
           >
-            + Adicionar Linha
+            <Plus size={14} /> Adicionar Linha
           </button>
           <button
-            onClick={() => setShowImportModal(true)}
+            onClick={() => !isLocked() && setShowImportModal(true)}
+            disabled={isLocked()}
             style={{
               padding: '8px 16px',
-              background: colors.info,
-              color: colors.white,
+              background: isLocked() ? colors.locked : colors.info,
+              color: isLocked() ? colors.textLight : colors.white,
               border: 'none',
               borderRadius: '6px',
-              cursor: 'pointer',
+              cursor: isLocked() ? 'not-allowed' : 'pointer',
               fontSize: '13px',
-              fontWeight: 500
+              fontWeight: 500,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
             }}
           >
-            Importar CSV
+            <Upload size={14} /> Importar CSV
           </button>
           <button
             onClick={exportCSV}
@@ -600,28 +627,23 @@ export default function MQT() {
               borderRadius: '6px',
               cursor: 'pointer',
               fontSize: '13px',
-              fontWeight: 500
+              fontWeight: 500,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
             }}
           >
-            Exportar CSV
+            <Download size={14} /> Exportar CSV
           </button>
           <div style={{ flex: 1 }} />
-          <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-            <span style={{ fontSize: '13px', color: colors.textLight }}>
-              Total: <strong style={{ color: colors.text }}>€ {totals.valor.toLocaleString('pt-PT', { minimumFractionDigits: 2 })}</strong>
-            </span>
-            <span style={{ fontSize: '13px', color: colors.textLight }}>
-              Executado: <strong style={{ color: colors.success }}>€ {totals.executado.toLocaleString('pt-PT', { minimumFractionDigits: 2 })}</strong>
-            </span>
-            <span style={{ fontSize: '13px', color: colors.textLight }}>
-              Progresso: <strong style={{ color: colors.info }}>{totals.valor > 0 ? ((totals.executado / totals.valor) * 100).toFixed(1) : 0}%</strong>
-            </span>
-          </div>
+          <span style={{ fontSize: '13px', color: colors.textLight }}>
+            Total Linhas: <strong style={{ color: colors.text }}>{linhas.length}</strong>
+          </span>
         </div>
       )}
 
       {/* Grid Spreadsheet */}
-      {selectedMapa && (
+      {selectedVersao && (
         <div
           ref={gridRef}
           style={{
@@ -629,10 +651,10 @@ export default function MQT() {
             borderRadius: '8px',
             border: `1px solid ${colors.border}`,
             overflow: 'auto',
-            maxHeight: 'calc(100vh - 320px)'
+            maxHeight: 'calc(100vh - 340px)'
           }}
         >
-          <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: '1200px' }}>
+          <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: '1000px' }}>
             <thead>
               <tr>
                 <th style={{
@@ -651,7 +673,7 @@ export default function MQT() {
                 }}>
                   #
                 </th>
-                {columns.map((col, i) => (
+                {columns.map((col) => (
                   <th key={col.key} style={{
                     width: col.width,
                     minWidth: col.width,
@@ -662,7 +684,7 @@ export default function MQT() {
                     fontSize: '11px',
                     fontWeight: 600,
                     color: colors.textLight,
-                    textAlign: col.type === 'number' || col.type === 'currency' || col.type === 'percent' ? 'right' : 'left',
+                    textAlign: col.type === 'number' ? 'right' : 'left',
                     position: 'sticky',
                     top: 0,
                     zIndex: 1
@@ -673,7 +695,7 @@ export default function MQT() {
               </tr>
             </thead>
             <tbody>
-              {items.map((item, rowIndex) => (
+              {linhas.map((item, rowIndex) => (
                 <tr key={item.id || rowIndex}>
                   <td style={{
                     padding: '8px',
@@ -718,7 +740,7 @@ export default function MQT() {
                         ) : (
                           <input
                             ref={inputRef}
-                            type={col.type === 'number' || col.type === 'currency' ? 'text' : 'text'}
+                            type="text"
                             value={editValue}
                             onChange={(e) => setEditValue(e.target.value)}
                             onBlur={saveCell}
@@ -727,27 +749,19 @@ export default function MQT() {
                               border: 'none',
                               outline: 'none',
                               fontSize: '13px',
-                              textAlign: col.type === 'number' || col.type === 'currency' ? 'right' : 'left',
+                              textAlign: col.type === 'number' ? 'right' : 'left',
                               background: 'transparent'
                             }}
                           />
                         )
                       ) : (
-                        <span style={{
-                          color: col.key === 'percentagem'
-                            ? item.percentagem >= 100 ? colors.success
-                              : item.percentagem > 0 ? colors.info
-                              : colors.textLight
-                            : colors.text
-                        }}>
-                          {formatValue(item[col.key], col.type)}
-                        </span>
+                        <span>{formatValue(item[col.key], col.type)}</span>
                       )}
                     </td>
                   ))}
                 </tr>
               ))}
-              {items.length === 0 && (
+              {linhas.length === 0 && (
                 <tr>
                   <td colSpan={columns.length + 1} style={{
                     padding: '40px',
@@ -755,7 +769,9 @@ export default function MQT() {
                     color: colors.textLight,
                     fontSize: '14px'
                   }}>
-                    Nenhum item. Clique em "Adicionar Linha" para começar.
+                    {isLocked()
+                      ? 'Esta versão está congelada. Crie uma nova versão para editar.'
+                      : 'Nenhum item. Clique em "Adicionar Linha" para começar.'}
                   </td>
                 </tr>
               )}
@@ -765,7 +781,7 @@ export default function MQT() {
       )}
 
       {/* Instruções */}
-      {selectedMapa && (
+      {selectedVersao && !isLocked() && (
         <div style={{
           marginTop: '16px',
           padding: '12px 16px',
@@ -774,12 +790,12 @@ export default function MQT() {
           fontSize: '12px',
           color: colors.textLight
         }}>
-          <strong>Atalhos:</strong> Enter/F2 para editar • Tab para próxima célula • Setas para navegar • Delete para eliminar linha • Duplo-clique para editar
+          <strong>Atalhos:</strong> Enter/F2 para editar • Tab para próxima célula • Setas para navegar • Delete para eliminar linha
         </div>
       )}
 
-      {/* Modal Novo Mapa */}
-      {showNewMapaModal && (
+      {/* Modal Nova Versão */}
+      {showNewVersaoModal && (
         <div style={{
           position: 'fixed',
           inset: 0,
@@ -796,26 +812,33 @@ export default function MQT() {
             width: '400px',
             maxWidth: '90%'
           }}>
-            <h3 style={{ margin: '0 0 16px', fontSize: '18px', fontWeight: 600 }}>Novo Mapa MQT</h3>
-            <input
-              type="text"
-              value={newMapaNome}
-              onChange={(e) => setNewMapaNome(e.target.value)}
-              placeholder="Nome do mapa (ex: MQT Demolições)"
-              style={{
-                width: '100%',
-                padding: '12px',
-                border: `1px solid ${colors.border}`,
-                borderRadius: '8px',
-                fontSize: '14px',
-                marginBottom: '16px',
-                boxSizing: 'border-box'
-              }}
-              autoFocus
-            />
+            <h3 style={{ margin: '0 0 16px', fontSize: '18px', fontWeight: 600 }}>Nova Versão MQT</h3>
+
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '6px' }}>
+                Copiar de (opcional)
+              </label>
+              <select
+                value={baseVersaoId}
+                onChange={(e) => setBaseVersaoId(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: '8px',
+                  fontSize: '14px'
+                }}
+              >
+                <option value="">Começar do zero</option>
+                {versoes.map(v => (
+                  <option key={v.id} value={v.id}>{v.versao}</option>
+                ))}
+              </select>
+            </div>
+
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
               <button
-                onClick={() => setShowNewMapaModal(false)}
+                onClick={() => { setShowNewVersaoModal(false); setBaseVersaoId('') }}
                 style={{
                   padding: '10px 20px',
                   background: colors.white,
@@ -827,7 +850,7 @@ export default function MQT() {
                 Cancelar
               </button>
               <button
-                onClick={createMapa}
+                onClick={createVersao}
                 style={{
                   padding: '10px 20px',
                   background: colors.primary,
@@ -838,7 +861,7 @@ export default function MQT() {
                   fontWeight: 500
                 }}
               >
-                Criar
+                Criar Versão
               </button>
             </div>
           </div>
@@ -867,7 +890,7 @@ export default function MQT() {
             <p style={{ fontSize: '13px', color: colors.textLight, marginBottom: '16px' }}>
               O ficheiro deve ter colunas separadas por ponto e vírgula (;) com headers na primeira linha.
               <br /><br />
-              <strong>Colunas reconhecidas:</strong> Cap., Ref., Tipo/Subtipo, Zona, Descrição, UN, QTD, Preço Un.
+              <strong>Colunas reconhecidas:</strong> Cap., Ref., Tipo/Subtipo, Zona, Descrição, UN, QTD
             </p>
             <input
               type="file"
