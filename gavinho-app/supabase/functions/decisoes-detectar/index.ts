@@ -85,6 +85,7 @@ Responde APENAS com JSON válido: { "tem_decisoes": boolean, "decisoes": [...], 
         }
         const categoria = categoriaMap[dec.tipo] || 'tecnica'
 
+        // Usar apenas colunas que existem na tabela
         const { error: insertError } = await supabase.from('decisoes').insert({
           projeto_id,
           titulo: dec.titulo,
@@ -92,13 +93,12 @@ Responde APENAS com JSON válido: { "tem_decisoes": boolean, "decisoes": [...], 
           categoria,
           tipo: dec.tipo || 'design',
           impacto: dec.impacto || 'medio',
-          decidido_por: dec.decidido_por || 'Não identificado',
           decidido_por_tipo: dec.decidido_por_tipo || 'cliente',
-          impacto_prazo_dias: dec.impacto_prazo_dias,
-          divisao: dec.divisao,
-          justificacao: dec.justificacao,
+          impacto_prazo_dias: dec.impacto_prazo_dias || null,
+          divisao: dec.divisao || null,
+          justificacao: dec.justificacao || null,
           fonte: fonteInfo.tipo,
-          fonte_excerto: dec.excerto,
+          fonte_excerto: dec.excerto || null,
           estado: 'sugerida'
         })
 
