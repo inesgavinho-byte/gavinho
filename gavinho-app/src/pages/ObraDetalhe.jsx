@@ -6,8 +6,10 @@ import {
   ChevronDown, Check, X, FileText, Calculator, Receipt, ShoppingCart,
   TrendingUp, ClipboardList, Building2, MapPin, Calendar, Users, HardHat,
   AlertTriangle, Eye, Send, FileCheck, MoreVertical, Camera, BookOpen,
-  Shield, Truck, Grid3X3, BarChart3
+  Shield, Truck, Grid3X3, BarChart3, MessageSquare, CheckSquare
 } from 'lucide-react'
+import ObraChat from '../components/ObraChat'
+import ObraChecklist from '../components/ObraChecklist'
 
 // ============================================
 // CONFIGURAÇÃO DAS TABS PRINCIPAIS
@@ -19,6 +21,7 @@ const mainTabs = [
   { id: 'fiscalizacao', label: 'Fiscalização', icon: Shield, hasSubtabs: true },
   { id: 'equipas', label: 'Equipas', icon: Users, hasSubtabs: true },
   { id: 'projeto', label: 'Projeto', icon: FileText },
+  { id: 'chat', label: 'Chat', icon: MessageSquare },
 ]
 
 // Sub-tabs do Tracking (MQT → Orçamento → POPs → Compras → Execução → Autos)
@@ -90,6 +93,9 @@ export default function ObraDetalhe() {
   const [activeFiscalizacaoSubtab, setActiveFiscalizacaoSubtab] = useState('hso')
   const [activeEquipasSubtab, setActiveEquipasSubtab] = useState('equipa')
   const [saving, setSaving] = useState(false)
+  const [checklistCount, setChecklistCount] = useState(0)
+  const [showChecklist, setShowChecklist] = useState(false)
+  const [currentUser, setCurrentUser] = useState(null)
 
   // Estados MQT
   const [mqtVersoes, setMqtVersoes] = useState([])
@@ -129,7 +135,35 @@ export default function ObraDetalhe() {
 
   useEffect(() => {
     if (id) fetchObra()
+    fetchCurrentUser()
   }, [id])
+
+  useEffect(() => {
+    if (obra?.id) {
+      fetchChecklistCount()
+    }
+  }, [obra?.id])
+
+  const fetchCurrentUser = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+      setCurrentUser(profile || { id: user.id, email: user.email, nome: user.email?.split('@')[0] })
+    }
+  }
+
+  const fetchChecklistCount = async () => {
+    const { count } = await supabase
+      .from('checklist_items')
+      .select('*', { count: 'exact', head: true })
+      .eq('obra_id', obra.id)
+      .eq('estado', 'aberto')
+    setChecklistCount(count || 0)
+  }
 
   useEffect(() => {
     if (urlTab) {
@@ -1560,11 +1594,32 @@ export default function ObraDetalhe() {
               color: activeMainTab === tab.id ? colors.text : colors.textMuted,
               fontWeight: activeMainTab === tab.id ? 600 : 400,
               fontSize: '14px',
-              transition: 'all 0.2s'
+              transition: 'all 0.2s',
+              position: 'relative'
             }}
           >
             <tab.icon size={16} />
             {tab.label}
+            {tab.id === 'chat' && checklistCount > 0 && (
+              <span style={{
+                position: 'absolute',
+                top: '6px',
+                right: '8px',
+                minWidth: '18px',
+                height: '18px',
+                padding: '0 5px',
+                borderRadius: '9px',
+                background: colors.warning,
+                color: colors.white,
+                fontSize: '11px',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                {checklistCount}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -1801,6 +1856,18 @@ export default function ObraDetalhe() {
             <FileText size={48} style={{ color: colors.textMuted, opacity: 0.3, marginBottom: '16px' }} />
             <h3 style={{ margin: '0 0 8px', color: colors.text }}>Projeto de Execução</h3>
             <p style={{ color: colors.textMuted }}>Documentação e peças desenhadas</p>
+          </div>
+        )}
+
+        {/* Chat com J.A.R.V.I.S. */}
+        {activeMainTab === 'chat' && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '24px' }}>
+            <ObraChat
+              obraId={obra.id}
+              obraCodigo={obra.codigo}
+              currentUser={currentUser}
+            />
+            <ObraChecklist obraId={obra.id} />
           </div>
         )}
       </div>
