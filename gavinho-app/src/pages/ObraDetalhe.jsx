@@ -5,19 +5,51 @@ import {
   ArrowLeft, Plus, Edit, Trash2, Save, Download, Upload, Lock, Unlock, Copy,
   ChevronDown, Check, X, FileText, Calculator, Receipt, ShoppingCart,
   TrendingUp, ClipboardList, Building2, MapPin, Calendar, Users, HardHat,
-  AlertTriangle, Eye, Send, FileCheck, MoreVertical
+  AlertTriangle, Eye, Send, FileCheck, MoreVertical, Camera, BookOpen,
+  Shield, Truck, Grid3X3, BarChart3
 } from 'lucide-react'
 
 // ============================================
 // CONFIGURAÇÃO DAS TABS PRINCIPAIS
 // ============================================
 const mainTabs = [
-  { id: 'mqt', label: 'MQT', icon: ClipboardList, description: 'Mapa de Quantidades de Trabalho' },
-  { id: 'orcamento', label: 'Orçamento', icon: Calculator, description: 'Orçamento Interno' },
-  { id: 'pops', label: 'POPs', icon: FileText, description: 'Propostas de Orçamento' },
-  { id: 'compras', label: 'Compras', icon: ShoppingCart, description: 'Compras da Obra' },
-  { id: 'execucao', label: 'Execução', icon: TrendingUp, description: 'Controlo de Execução' },
-  { id: 'autos', label: 'Autos', icon: Receipt, description: 'Autos de Medição' },
+  { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
+  { id: 'tracking', label: 'Tracking', icon: ClipboardList, hasSubtabs: true },
+  { id: 'acompanhamento', label: 'Acompanhamento', icon: Camera, hasSubtabs: true },
+  { id: 'fiscalizacao', label: 'Fiscalização', icon: Shield, hasSubtabs: true },
+  { id: 'equipas', label: 'Equipas', icon: Users, hasSubtabs: true },
+  { id: 'projeto', label: 'Projeto', icon: FileText },
+]
+
+// Sub-tabs do Tracking (MQT → Orçamento → POPs → Compras → Execução → Autos)
+const trackingSubtabs = [
+  { id: 'mqt', label: 'MQT', icon: ClipboardList },
+  { id: 'orcamento', label: 'Orçamento', icon: Calculator },
+  { id: 'pops', label: 'POPs', icon: FileText },
+  { id: 'compras', label: 'Compras', icon: ShoppingCart },
+  { id: 'execucao', label: 'Execução', icon: TrendingUp },
+  { id: 'autos', label: 'Autos', icon: Receipt },
+]
+
+// Sub-tabs de Acompanhamento
+const acompanhamentoSubtabs = [
+  { id: 'fotografias', label: 'Fotografias', icon: Camera },
+  { id: 'diario', label: 'Diário de Obra', icon: BookOpen },
+  { id: 'relatorios', label: 'Relatórios', icon: FileText },
+  { id: 'nao-conformidades', label: 'Não Conformidades', icon: AlertTriangle },
+]
+
+// Sub-tabs de Fiscalização
+const fiscalizacaoSubtabs = [
+  { id: 'hso', label: 'HSO', icon: Shield },
+  { id: 'ocorrencias', label: 'Ocorrências', icon: AlertTriangle },
+]
+
+// Sub-tabs de Equipas
+const equipasSubtabs = [
+  { id: 'equipa', label: 'Equipa Gavinho', icon: Users },
+  { id: 'subempreiteiros', label: 'SubEmpreiteiros', icon: Truck },
+  { id: 'zonas', label: 'Zonas', icon: Grid3X3 },
 ]
 
 // Unidades disponíveis
@@ -52,7 +84,11 @@ export default function ObraDetalhe() {
   // Estados principais
   const [obra, setObra] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState(urlTab || 'mqt')
+  const [activeMainTab, setActiveMainTab] = useState('tracking')
+  const [activeTrackingSubtab, setActiveTrackingSubtab] = useState('mqt')
+  const [activeAcompanhamentoSubtab, setActiveAcompanhamentoSubtab] = useState('fotografias')
+  const [activeFiscalizacaoSubtab, setActiveFiscalizacaoSubtab] = useState('hso')
+  const [activeEquipasSubtab, setActiveEquipasSubtab] = useState('equipa')
   const [saving, setSaving] = useState(false)
 
   // Estados MQT
@@ -96,8 +132,17 @@ export default function ObraDetalhe() {
   }, [id])
 
   useEffect(() => {
-    if (urlTab && urlTab !== activeTab) {
-      setActiveTab(urlTab)
+    if (urlTab) {
+      // Check if urlTab is a main tab or a subtab
+      const isMainTab = mainTabs.some(t => t.id === urlTab)
+      const isTrackingSubtab = trackingSubtabs.some(t => t.id === urlTab)
+
+      if (isMainTab) {
+        setActiveMainTab(urlTab)
+      } else if (isTrackingSubtab) {
+        setActiveMainTab('tracking')
+        setActiveTrackingSubtab(urlTab)
+      }
     }
   }, [urlTab])
 
@@ -105,7 +150,7 @@ export default function ObraDetalhe() {
     if (obra?.id) {
       loadTabData()
     }
-  }, [obra?.id, activeTab])
+  }, [obra?.id, activeMainTab, activeTrackingSubtab])
 
   // ============================================
   // FUNÇÕES DE FETCH
@@ -129,25 +174,27 @@ export default function ObraDetalhe() {
   }
 
   const loadTabData = async () => {
-    switch (activeTab) {
-      case 'mqt':
-        await fetchMqtVersoes()
-        break
-      case 'orcamento':
-        await fetchOrcamentos()
-        break
-      case 'pops':
-        await fetchPops()
-        break
-      case 'compras':
-        await fetchCompras()
-        break
-      case 'execucao':
-        await fetchExecucao()
-        break
-      case 'autos':
-        await fetchAutos()
-        break
+    if (activeMainTab === 'tracking') {
+      switch (activeTrackingSubtab) {
+        case 'mqt':
+          await fetchMqtVersoes()
+          break
+        case 'orcamento':
+          await fetchOrcamentos()
+          break
+        case 'pops':
+          await fetchPops()
+          break
+        case 'compras':
+          await fetchCompras()
+          break
+        case 'execucao':
+          await fetchExecucao()
+          break
+        case 'autos':
+          await fetchAutos()
+          break
+      }
     }
   }
 
@@ -484,9 +531,14 @@ export default function ObraDetalhe() {
   // NAVEGAÇÃO
   // ============================================
 
-  const handleTabChange = (tabId) => {
+  const handleMainTabChange = (tabId) => {
+    setActiveMainTab(tabId)
     navigate(`/obras/${id}/${tabId}`, { replace: true })
-    setActiveTab(tabId)
+  }
+
+  const handleTrackingSubtabChange = (subtabId) => {
+    setActiveTrackingSubtab(subtabId)
+    navigate(`/obras/${id}/${subtabId}`, { replace: true })
   }
 
   const formatDate = (date) => {
@@ -1486,27 +1538,27 @@ export default function ObraDetalhe() {
       <div style={{
         display: 'flex',
         gap: '4px',
-        marginBottom: '24px',
+        marginBottom: '0',
         borderBottom: `1px solid ${colors.border}`,
         paddingBottom: '0'
       }}>
         {mainTabs.map(tab => (
           <button
             key={tab.id}
-            onClick={() => handleTabChange(tab.id)}
+            onClick={() => handleMainTabChange(tab.id)}
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
               padding: '12px 20px',
-              background: activeTab === tab.id ? colors.white : 'transparent',
-              border: activeTab === tab.id ? `1px solid ${colors.border}` : '1px solid transparent',
-              borderBottom: activeTab === tab.id ? `1px solid ${colors.white}` : '1px solid transparent',
+              background: activeMainTab === tab.id ? colors.white : 'transparent',
+              border: activeMainTab === tab.id ? `1px solid ${colors.border}` : '1px solid transparent',
+              borderBottom: activeMainTab === tab.id ? `1px solid ${colors.white}` : '1px solid transparent',
               borderRadius: '8px 8px 0 0',
               marginBottom: '-1px',
               cursor: 'pointer',
-              color: activeTab === tab.id ? colors.text : colors.textMuted,
-              fontWeight: activeTab === tab.id ? 600 : 400,
+              color: activeMainTab === tab.id ? colors.text : colors.textMuted,
+              fontWeight: activeMainTab === tab.id ? 600 : 400,
               fontSize: '14px',
               transition: 'all 0.2s'
             }}
@@ -1517,14 +1569,240 @@ export default function ObraDetalhe() {
         ))}
       </div>
 
+      {/* Sub-tabs for Tracking */}
+      {activeMainTab === 'tracking' && (
+        <div style={{
+          display: 'flex',
+          gap: '8px',
+          padding: '16px 0',
+          marginBottom: '20px',
+          background: colors.white,
+          borderBottom: `1px solid ${colors.border}`
+        }}>
+          {trackingSubtabs.map(subtab => (
+            <button
+              key={subtab.id}
+              onClick={() => handleTrackingSubtabChange(subtab.id)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 16px',
+                background: activeTrackingSubtab === subtab.id ? colors.primary : 'transparent',
+                border: activeTrackingSubtab === subtab.id ? 'none' : `1px solid ${colors.border}`,
+                borderRadius: '20px',
+                cursor: 'pointer',
+                color: activeTrackingSubtab === subtab.id ? colors.white : colors.textMuted,
+                fontWeight: activeTrackingSubtab === subtab.id ? 600 : 400,
+                fontSize: '13px',
+                transition: 'all 0.2s'
+              }}
+            >
+              <subtab.icon size={14} />
+              {subtab.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Sub-tabs for Acompanhamento */}
+      {activeMainTab === 'acompanhamento' && (
+        <div style={{
+          display: 'flex',
+          gap: '8px',
+          padding: '16px 0',
+          marginBottom: '20px',
+          background: colors.white,
+          borderBottom: `1px solid ${colors.border}`
+        }}>
+          {acompanhamentoSubtabs.map(subtab => (
+            <button
+              key={subtab.id}
+              onClick={() => setActiveAcompanhamentoSubtab(subtab.id)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 16px',
+                background: activeAcompanhamentoSubtab === subtab.id ? colors.primary : 'transparent',
+                border: activeAcompanhamentoSubtab === subtab.id ? 'none' : `1px solid ${colors.border}`,
+                borderRadius: '20px',
+                cursor: 'pointer',
+                color: activeAcompanhamentoSubtab === subtab.id ? colors.white : colors.textMuted,
+                fontWeight: activeAcompanhamentoSubtab === subtab.id ? 600 : 400,
+                fontSize: '13px',
+                transition: 'all 0.2s'
+              }}
+            >
+              <subtab.icon size={14} />
+              {subtab.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Sub-tabs for Fiscalização */}
+      {activeMainTab === 'fiscalizacao' && (
+        <div style={{
+          display: 'flex',
+          gap: '8px',
+          padding: '16px 0',
+          marginBottom: '20px',
+          background: colors.white,
+          borderBottom: `1px solid ${colors.border}`
+        }}>
+          {fiscalizacaoSubtabs.map(subtab => (
+            <button
+              key={subtab.id}
+              onClick={() => setActiveFiscalizacaoSubtab(subtab.id)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 16px',
+                background: activeFiscalizacaoSubtab === subtab.id ? colors.primary : 'transparent',
+                border: activeFiscalizacaoSubtab === subtab.id ? 'none' : `1px solid ${colors.border}`,
+                borderRadius: '20px',
+                cursor: 'pointer',
+                color: activeFiscalizacaoSubtab === subtab.id ? colors.white : colors.textMuted,
+                fontWeight: activeFiscalizacaoSubtab === subtab.id ? 600 : 400,
+                fontSize: '13px',
+                transition: 'all 0.2s'
+              }}
+            >
+              <subtab.icon size={14} />
+              {subtab.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Sub-tabs for Equipas */}
+      {activeMainTab === 'equipas' && (
+        <div style={{
+          display: 'flex',
+          gap: '8px',
+          padding: '16px 0',
+          marginBottom: '20px',
+          background: colors.white,
+          borderBottom: `1px solid ${colors.border}`
+        }}>
+          {equipasSubtabs.map(subtab => (
+            <button
+              key={subtab.id}
+              onClick={() => setActiveEquipasSubtab(subtab.id)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 16px',
+                background: activeEquipasSubtab === subtab.id ? colors.primary : 'transparent',
+                border: activeEquipasSubtab === subtab.id ? 'none' : `1px solid ${colors.border}`,
+                borderRadius: '20px',
+                cursor: 'pointer',
+                color: activeEquipasSubtab === subtab.id ? colors.white : colors.textMuted,
+                fontWeight: activeEquipasSubtab === subtab.id ? 600 : 400,
+                fontSize: '13px',
+                transition: 'all 0.2s'
+              }}
+            >
+              <subtab.icon size={14} />
+              {subtab.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Tab Content */}
-      <div>
-        {activeTab === 'mqt' && renderMqtTab()}
-        {activeTab === 'orcamento' && renderOrcamentoTab()}
-        {activeTab === 'pops' && renderPopsTab()}
-        {activeTab === 'compras' && renderComprasTab()}
-        {activeTab === 'execucao' && renderExecucaoTab()}
-        {activeTab === 'autos' && renderAutosTab()}
+      <div style={{ marginTop: activeMainTab === 'dashboard' || activeMainTab === 'projeto' ? '24px' : '0' }}>
+        {/* Dashboard */}
+        {activeMainTab === 'dashboard' && (
+          <div style={{
+            background: colors.white,
+            borderRadius: '12px',
+            padding: '48px',
+            textAlign: 'center',
+            border: `1px solid ${colors.border}`
+          }}>
+            <BarChart3 size={48} style={{ color: colors.textMuted, opacity: 0.3, marginBottom: '16px' }} />
+            <h3 style={{ margin: '0 0 8px', color: colors.text }}>Dashboard da Obra</h3>
+            <p style={{ color: colors.textMuted }}>Visão geral do progresso, KPIs e alertas</p>
+          </div>
+        )}
+
+        {/* Tracking Sub-tabs Content */}
+        {activeMainTab === 'tracking' && activeTrackingSubtab === 'mqt' && renderMqtTab()}
+        {activeMainTab === 'tracking' && activeTrackingSubtab === 'orcamento' && renderOrcamentoTab()}
+        {activeMainTab === 'tracking' && activeTrackingSubtab === 'pops' && renderPopsTab()}
+        {activeMainTab === 'tracking' && activeTrackingSubtab === 'compras' && renderComprasTab()}
+        {activeMainTab === 'tracking' && activeTrackingSubtab === 'execucao' && renderExecucaoTab()}
+        {activeMainTab === 'tracking' && activeTrackingSubtab === 'autos' && renderAutosTab()}
+
+        {/* Acompanhamento - Placeholder */}
+        {activeMainTab === 'acompanhamento' && (
+          <div style={{
+            background: colors.white,
+            borderRadius: '12px',
+            padding: '48px',
+            textAlign: 'center',
+            border: `1px solid ${colors.border}`
+          }}>
+            <Camera size={48} style={{ color: colors.textMuted, opacity: 0.3, marginBottom: '16px' }} />
+            <h3 style={{ margin: '0 0 8px', color: colors.text }}>
+              {acompanhamentoSubtabs.find(s => s.id === activeAcompanhamentoSubtab)?.label}
+            </h3>
+            <p style={{ color: colors.textMuted }}>Em desenvolvimento</p>
+          </div>
+        )}
+
+        {/* Fiscalização - Placeholder */}
+        {activeMainTab === 'fiscalizacao' && (
+          <div style={{
+            background: colors.white,
+            borderRadius: '12px',
+            padding: '48px',
+            textAlign: 'center',
+            border: `1px solid ${colors.border}`
+          }}>
+            <Shield size={48} style={{ color: colors.textMuted, opacity: 0.3, marginBottom: '16px' }} />
+            <h3 style={{ margin: '0 0 8px', color: colors.text }}>
+              {fiscalizacaoSubtabs.find(s => s.id === activeFiscalizacaoSubtab)?.label}
+            </h3>
+            <p style={{ color: colors.textMuted }}>Em desenvolvimento</p>
+          </div>
+        )}
+
+        {/* Equipas - Placeholder */}
+        {activeMainTab === 'equipas' && (
+          <div style={{
+            background: colors.white,
+            borderRadius: '12px',
+            padding: '48px',
+            textAlign: 'center',
+            border: `1px solid ${colors.border}`
+          }}>
+            <Users size={48} style={{ color: colors.textMuted, opacity: 0.3, marginBottom: '16px' }} />
+            <h3 style={{ margin: '0 0 8px', color: colors.text }}>
+              {equipasSubtabs.find(s => s.id === activeEquipasSubtab)?.label}
+            </h3>
+            <p style={{ color: colors.textMuted }}>Em desenvolvimento</p>
+          </div>
+        )}
+
+        {/* Projeto - Placeholder */}
+        {activeMainTab === 'projeto' && (
+          <div style={{
+            background: colors.white,
+            borderRadius: '12px',
+            padding: '48px',
+            textAlign: 'center',
+            border: `1px solid ${colors.border}`
+          }}>
+            <FileText size={48} style={{ color: colors.textMuted, opacity: 0.3, marginBottom: '16px' }} />
+            <h3 style={{ margin: '0 0 8px', color: colors.text }}>Projeto de Execução</h3>
+            <p style={{ color: colors.textMuted }}>Documentação e peças desenhadas</p>
+          </div>
+        )}
       </div>
     </div>
   )
