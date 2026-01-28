@@ -45,6 +45,7 @@ const tipoConfig = {
 export default function ObraChecklist({ obraId }) {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [showAddModal, setShowAddModal] = useState(false)
   const [expandedPriority, setExpandedPriority] = useState({
     urgente: true,
@@ -71,7 +72,8 @@ export default function ObraChecklist({ obraId }) {
 
   const fetchItems = async () => {
     try {
-      const { data, error } = await supabase
+      setError(null)
+      const { data, error: fetchError } = await supabase
         .from('checklist_items')
         .select('*')
         .eq('obra_id', obraId)
@@ -79,7 +81,15 @@ export default function ObraChecklist({ obraId }) {
         .order('prioridade')
         .order('data_limite', { ascending: true, nullsFirst: false })
 
-      if (error) throw error
+      if (fetchError) {
+        // Check if table doesn't exist (404) or permission issues
+        if (fetchError.code === 'PGRST204' || fetchError.code === '42P01' || fetchError.message?.includes('does not exist')) {
+          setError('migration_needed')
+        } else {
+          setError('load_error')
+        }
+        throw fetchError
+      }
       setItems(data || [])
     } catch (err) {
       console.error('Erro ao carregar checklist:', err)
@@ -202,6 +212,32 @@ export default function ObraChecklist({ obraId }) {
         color: colors.textMuted
       }}>
         A carregar checklist...
+      </div>
+    )
+  }
+
+  // Show error state if tables don't exist
+  if (error === 'migration_needed') {
+    return (
+      <div style={{
+        background: colors.white,
+        borderRadius: '12px',
+        border: `1px solid ${colors.border}`,
+        padding: '32px',
+        textAlign: 'center'
+      }}>
+        <AlertCircle size={32} style={{ color: colors.warning, marginBottom: '12px' }} />
+        <h4 style={{ margin: '0 0 8px', fontSize: '14px', color: colors.text }}>
+          Checklist não configurada
+        </h4>
+        <p style={{
+          fontSize: '12px',
+          color: colors.textMuted,
+          margin: 0,
+          lineHeight: '1.4'
+        }}>
+          Execute a migração do J.A.R.V.I.S. para ativar.
+        </p>
       </div>
     )
   }

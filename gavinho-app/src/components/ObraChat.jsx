@@ -26,6 +26,7 @@ export default function ObraChat({ obraId, obraCodigo, currentUser }) {
   const [sending, setSending] = useState(false)
   const [anexos, setAnexos] = useState([])
   const [uploadingAnexo, setUploadingAnexo] = useState(false)
+  const [error, setError] = useState(null)
 
   const chatContainerRef = useRef(null)
   const fileInputRef = useRef(null)
@@ -48,6 +49,7 @@ export default function ObraChat({ obraId, obraCodigo, currentUser }) {
 
   const fetchMensagens = async () => {
     try {
+      setError(null)
       const { data, error } = await supabase
         .from('chat_mensagens')
         .select(`
@@ -58,7 +60,15 @@ export default function ObraChat({ obraId, obraCodigo, currentUser }) {
         .order('created_at', { ascending: true })
         .limit(100)
 
-      if (error) throw error
+      if (error) {
+        // Check if table doesn't exist (404) or permission issues
+        if (error.code === 'PGRST204' || error.code === '42P01' || error.message?.includes('does not exist')) {
+          setError('migration_needed')
+        } else {
+          setError('load_error')
+        }
+        throw error
+      }
       setMensagens(data || [])
     } catch (err) {
       console.error('Erro ao carregar mensagens:', err)
@@ -94,11 +104,12 @@ export default function ObraChat({ obraId, obraCodigo, currentUser }) {
 
   const enviarMensagem = async () => {
     if (!novaMensagem.trim() && anexos.length === 0) return
+    if (error === 'migration_needed') return // Don't send if tables don't exist
 
     setSending(true)
     try {
       // Criar mensagem
-      const { data: mensagem, error } = await supabase
+      const { data: mensagem, error: insertError } = await supabase
         .from('chat_mensagens')
         .insert({
           obra_id: obraId,
@@ -112,7 +123,12 @@ export default function ObraChat({ obraId, obraCodigo, currentUser }) {
         .select()
         .single()
 
-      if (error) throw error
+      if (insertError) {
+        if (insertError.code === 'PGRST204' || insertError.code === '42P01' || insertError.message?.includes('does not exist')) {
+          setError('migration_needed')
+        }
+        throw insertError
+      }
 
       // Upload de anexos se houver
       if (anexos.length > 0) {
@@ -238,6 +254,56 @@ export default function ObraChat({ obraId, obraCodigo, currentUser }) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
         <Loader2 className="animate-spin" size={32} style={{ color: colors.textMuted }} />
+      </div>
+    )
+  }
+
+  // Show error state if tables don't exist
+  if (error === 'migration_needed') {
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: 'calc(100vh - 300px)',
+        minHeight: '400px',
+        background: colors.white,
+        borderRadius: '12px',
+        border: `1px solid ${colors.border}`,
+        padding: '48px'
+      }}>
+        <AlertCircle size={48} style={{ color: colors.warning, marginBottom: '16px' }} />
+        <h3 style={{ margin: '0 0 8px', color: colors.text, textAlign: 'center' }}>
+          Sistema de Chat não configurado
+        </h3>
+        <p style={{
+          textAlign: 'center',
+          color: colors.textMuted,
+          maxWidth: '400px',
+          marginBottom: '24px',
+          lineHeight: '1.5'
+        }}>
+          As tabelas do J.A.R.V.I.S. ainda não foram criadas no Supabase.
+          Execute a migração <code style={{
+            background: colors.background,
+            padding: '2px 6px',
+            borderRadius: '4px',
+            fontSize: '12px'
+          }}>20250127_jarvis_system.sql</code> para ativar o chat.
+        </p>
+        <div style={{
+          background: colors.background,
+          padding: '16px',
+          borderRadius: '8px',
+          fontSize: '12px',
+          fontFamily: 'monospace',
+          color: colors.text,
+          maxWidth: '100%',
+          overflow: 'auto'
+        }}>
+          supabase db push
+        </div>
       </div>
     )
   }
