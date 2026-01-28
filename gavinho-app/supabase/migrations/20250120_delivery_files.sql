@@ -186,7 +186,7 @@ SELECT
   ef.aprovado_por_nome,
   ef.notas,
   pe.codigo AS entregavel_codigo,
-  pe.descricao AS entregavel_descricao,
+  pe.nome AS entregavel_descricao,
   pe.escala,
   pe.fase,
   p.id AS projeto_id,
