@@ -283,6 +283,18 @@ CREATE INDEX idx_diario_obra_data ON obra_diario_entradas(obra_id, data DESC);
 CREATE INDEX idx_diario_tipo ON obra_diario_entradas(tipo);
 
 -- ============================================
+-- FUNÇÃO PARA UPDATED_AT (se não existir)
+-- ============================================
+
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ============================================
 -- TRIGGERS PARA UPDATED_AT
 -- ============================================
 
