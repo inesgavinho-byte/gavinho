@@ -1850,6 +1850,27 @@ export default function ProjetoDetalhe() {
     }
     
     fetchProject()
+
+    // Supabase Realtime subscription para sincronizar alterações
+    const channel = supabase
+      .channel(`projeto-${id}-changes`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'projetos' },
+        (payload) => {
+          // Verificar se é o projeto atual
+          const projectCode = projectsMap[id] || id
+          if (payload.new.codigo === projectCode) {
+            console.log('Projeto atualizado:', payload.new)
+            setProject(prev => prev ? { ...prev, ...payload.new } : payload.new)
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [id])
 
   // Loading state

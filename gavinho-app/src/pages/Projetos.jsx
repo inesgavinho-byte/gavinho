@@ -43,23 +43,51 @@ export default function Projetos() {
   })
 
   // Carregar projetos e clientes
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const [projRes, cliRes] = await Promise.all([
-          supabase.from('projetos').select('*').order('codigo', { ascending: true }),
-          supabase.from('clientes').select('id, nome').order('nome')
-        ])
-        
-        setProjects(projRes.data || [])
-        setClientes(cliRes.data || [])
-      } catch (err) {
-        console.error('Erro ao carregar dados:', err)
-      } finally {
-        setLoading(false)
-      }
+  const loadData = async () => {
+    try {
+      const [projRes, cliRes] = await Promise.all([
+        supabase.from('projetos').select('*').order('codigo', { ascending: true }),
+        supabase.from('clientes').select('id, nome').order('nome')
+      ])
+
+      setProjects(projRes.data || [])
+      setClientes(cliRes.data || [])
+    } catch (err) {
+      console.error('Erro ao carregar dados:', err)
+    } finally {
+      setLoading(false)
     }
+  }
+
+  // Carregar dados inicialmente e configurar realtime subscription
+  useEffect(() => {
     loadData()
+
+    // Supabase Realtime subscription para sincronizar alterações
+    const channel = supabase
+      .channel('projetos-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'projetos' },
+        (payload) => {
+          console.log('Projetos alterado:', payload)
+          if (payload.eventType === 'INSERT') {
+            setProjects(prev => [...prev, payload.new])
+          } else if (payload.eventType === 'UPDATE') {
+            setProjects(prev => prev.map(p =>
+              p.id === payload.new.id ? payload.new : p
+            ))
+          } else if (payload.eventType === 'DELETE') {
+            setProjects(prev => prev.filter(p => p.id !== payload.old.id))
+          }
+        }
+      )
+      .subscribe()
+
+    // Cleanup subscription
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   // Filtrar projetos

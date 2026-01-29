@@ -42,6 +42,32 @@ export default function Obras() {
   useEffect(() => {
     fetchObras()
     fetchProjetos()
+
+    // Supabase Realtime subscription para sincronizar alterações
+    const channel = supabase
+      .channel('obras-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'obras' },
+        (payload) => {
+          console.log('Obras alterado:', payload)
+          if (payload.eventType === 'INSERT') {
+            // Refetch to get joined data
+            fetchObras()
+          } else if (payload.eventType === 'UPDATE') {
+            setObras(prev => prev.map(o =>
+              o.id === payload.new.id ? { ...o, ...payload.new } : o
+            ))
+          } else if (payload.eventType === 'DELETE') {
+            setObras(prev => prev.filter(o => o.id !== payload.old.id))
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   const fetchObras = async () => {
