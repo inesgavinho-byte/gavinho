@@ -675,8 +675,7 @@ function WorkerLogin({ onLogin }) {
       // Get all obras (managers can access all)
       const { data: obrasData, error: obrasError } = await supabase
         .from('obras')
-        .select('id, codigo, nome')
-        .in('status', ['em_curso', 'em_projeto'])
+        .select('id, codigo, nome, status')
         .order('codigo', { ascending: false })
 
       if (obrasError) throw obrasError
