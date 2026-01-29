@@ -30,7 +30,8 @@ import {
   FileSearch,
   Mail,
   Table2,
-  Clock
+  Clock,
+  Package
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -60,6 +61,7 @@ const navigation = [
       { name: 'Dashboard Obras', href: '/obras', icon: HardHat },
       { name: 'Trabalhadores', href: '/trabalhadores', icon: UsersRound },
       { name: 'Presenças', href: '/presencas', icon: Clock },
+      { name: 'Requisições', href: '/requisicoes', icon: Package },
       { name: 'MQT - Quantidades', href: '/mqt', icon: Table2 },
       { name: 'Chat Obras', href: '/chat-obras', icon: MessageSquare },
     ]
