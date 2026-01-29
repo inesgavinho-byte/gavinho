@@ -62,8 +62,6 @@ const navigation = [
       { name: 'Trabalhadores', href: '/trabalhadores', icon: UsersRound },
       { name: 'Presenças', href: '/presencas', icon: Clock },
       { name: 'Requisições', href: '/requisicoes', icon: Package },
-      { name: 'MQT - Quantidades', href: '/mqt', icon: Table2 },
-      { name: 'Chat Obras', href: '/chat-obras', icon: MessageSquare },
     ]
   },
   {
