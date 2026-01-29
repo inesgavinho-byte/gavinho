@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import {
   Send, Camera, Image, Mic, Menu, ArrowLeft, Plus, Check, CheckCheck,
@@ -65,7 +65,9 @@ function urlBase64ToUint8Array(base64String) {
 
 export default function ObraApp() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [user, setUser] = useState(null)
+  const [obras, setObras] = useState([])
   const [obra, setObra] = useState(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('chat')
@@ -117,11 +119,24 @@ export default function ObraApp() {
   const checkSession = async () => {
     try {
       const savedUser = localStorage.getItem('obra_app_user')
+      const savedObras = localStorage.getItem('obra_app_obras')
       const savedObra = localStorage.getItem('obra_app_obra')
 
-      if (savedUser && savedObra) {
-        setUser(JSON.parse(savedUser))
-        setObra(JSON.parse(savedObra))
+      if (savedUser) {
+        const userData = JSON.parse(savedUser)
+        setUser(userData)
+
+        if (savedObras) {
+          const obrasData = JSON.parse(savedObras)
+          setObras(obrasData)
+
+          // If only one obra or has saved obra, select it
+          if (obrasData.length === 1) {
+            setObra(obrasData[0])
+          } else if (savedObra) {
+            setObra(JSON.parse(savedObra))
+          }
+        }
       }
     } catch (err) {
       console.error('Erro ao verificar sessão:', err)
@@ -284,8 +299,15 @@ export default function ObraApp() {
 
   const handleLogout = () => {
     localStorage.removeItem('obra_app_user')
+    localStorage.removeItem('obra_app_obras')
     localStorage.removeItem('obra_app_obra')
     setUser(null)
+    setObras([])
+    setObra(null)
+  }
+
+  const handleSwitchObra = () => {
+    localStorage.removeItem('obra_app_obra')
     setObra(null)
   }
 
@@ -307,9 +329,45 @@ export default function ObraApp() {
     )
   }
 
-  // Login screen
-  if (!user || !obra) {
-    return <ObraLogin onLogin={(u, o) => { setUser(u); setObra(o) }} />
+  // Login screen (not logged in)
+  if (!user) {
+    return <WorkerLogin onLogin={(u, obrasData) => {
+      setUser(u)
+      setObras(obrasData)
+      if (obrasData.length === 1) {
+        setObra(obrasData[0])
+        localStorage.setItem('obra_app_obra', JSON.stringify(obrasData[0]))
+      }
+    }} />
+  }
+
+  // Obra selector (logged in but no obra selected)
+  if (!obra && obras.length > 1) {
+    return <ObraSelector obras={obras} onSelect={(o) => {
+      setObra(o)
+      localStorage.setItem('obra_app_obra', JSON.stringify(o))
+    }} />
+  }
+
+  // No obras assigned
+  if (!obra && obras.length === 0) {
+    return (
+      <div style={styles.loginContainer}>
+        <div style={styles.loginCard}>
+          <div style={styles.loginHeader}>
+            <HardHat size={48} style={{ color: '#f4a261' }} />
+            <h1 style={{ margin: '12px 0 4px' }}>Olá, {user.nome}</h1>
+            <p style={{ margin: 0, opacity: 0.7 }}>Não tens obras atribuídas</p>
+          </div>
+          <p style={{ textAlign: 'center', color: '#666' }}>
+            Fala com o teu encarregado para seres adicionado a uma obra.
+          </p>
+          <button onClick={handleLogout} style={styles.loginButton}>
+            Sair
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -359,6 +417,11 @@ export default function ObraApp() {
                 <Users size={20} /> Equipa
               </button>
             </nav>
+            {obras.length > 1 && (
+              <button onClick={() => { handleSwitchObra(); setMenuOpen(false) }} style={styles.menuItem}>
+                <HardHat size={20} /> Mudar de Obra
+              </button>
+            )}
             <button onClick={handleLogout} style={styles.logoutButton}>
               <LogOut size={20} /> Sair
             </button>
@@ -511,61 +574,70 @@ export default function ObraApp() {
   )
 }
 
-// Login Component
-function ObraLogin({ onLogin }) {
-  const [step, setStep] = useState(1)
-  const [codigoObra, setCodigoObra] = useState('')
-  const [nome, setNome] = useState('')
-  const [obras, setObras] = useState([])
-  const [selectedObra, setSelectedObra] = useState(null)
+// Worker Login Component
+function WorkerLogin({ onLogin }) {
+  const [telefone, setTelefone] = useState('')
+  const [pin, setPin] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const searchObras = async () => {
-    if (!codigoObra.trim()) return
+  const handleLogin = async () => {
+    if (!telefone.trim() || !pin.trim()) return
 
     setLoading(true)
     setError('')
 
     try {
-      const { data, error } = await supabase
-        .from('obras')
-        .select('id, codigo, nome')
-        .or(`codigo.ilike.%${codigoObra}%,nome.ilike.%${codigoObra}%`)
-        .limit(5)
-
-      if (error) throw error
-
-      if (data.length === 0) {
-        setError('Obra não encontrada')
-      } else {
-        setObras(data)
+      // Format phone number
+      let phone = telefone.replace(/\s/g, '')
+      if (!phone.startsWith('+')) {
+        phone = '+351' + phone.replace(/^0/, '')
       }
+
+      // Check credentials
+      const { data: trabalhador, error: authError } = await supabase
+        .from('trabalhadores')
+        .select('id, nome, telefone, cargo')
+        .eq('telefone', phone)
+        .eq('pin', pin)
+        .eq('ativo', true)
+        .single()
+
+      if (authError || !trabalhador) {
+        throw new Error('Telefone ou PIN incorreto')
+      }
+
+      // Get assigned obras
+      const { data: obrasData, error: obrasError } = await supabase
+        .from('trabalhador_obras')
+        .select('obra_id, obras(id, codigo, nome)')
+        .eq('trabalhador_id', trabalhador.id)
+
+      if (obrasError) throw obrasError
+
+      const obras = obrasData?.map(o => o.obras).filter(Boolean) || []
+
+      if (obras.length === 0) {
+        throw new Error('Não tens obras atribuídas')
+      }
+
+      // Save to localStorage
+      const user = {
+        id: trabalhador.id,
+        nome: trabalhador.nome,
+        telefone: trabalhador.telefone,
+        cargo: trabalhador.cargo || 'Equipa'
+      }
+
+      localStorage.setItem('obra_app_user', JSON.stringify(user))
+      localStorage.setItem('obra_app_obras', JSON.stringify(obras))
+
+      onLogin(user, obras)
     } catch (err) {
-      setError('Erro ao procurar obra')
+      setError(err.message || 'Erro ao fazer login')
     } finally {
       setLoading(false)
     }
-  }
-
-  const handleSelectObra = (obra) => {
-    setSelectedObra(obra)
-    setStep(2)
-  }
-
-  const handleLogin = () => {
-    if (!nome.trim() || !selectedObra) return
-
-    const user = {
-      id: `user_${Date.now()}`,
-      nome: nome.trim(),
-      cargo: 'Equipa'
-    }
-
-    localStorage.setItem('obra_app_user', JSON.stringify(user))
-    localStorage.setItem('obra_app_obra', JSON.stringify(selectedObra))
-
-    onLogin(user, selectedObra)
   }
 
   return (
@@ -574,85 +646,78 @@ function ObraLogin({ onLogin }) {
         <div style={styles.loginHeader}>
           <HardHat size={48} style={{ color: '#f4a261' }} />
           <h1 style={{ margin: '12px 0 4px' }}>Gavinho Obras</h1>
-          <p style={{ margin: 0, opacity: 0.7 }}>App de comunicação da equipa</p>
+          <p style={{ margin: 0, opacity: 0.7 }}>Entra com o teu telemóvel</p>
         </div>
 
-        {step === 1 ? (
-          <>
-            <div style={styles.loginField}>
-              <label>Código ou nome da obra</label>
-              <input
-                type="text"
-                value={codigoObra}
-                onChange={(e) => setCodigoObra(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && searchObras()}
-                placeholder="Ex: GB00466"
-                style={styles.loginInput}
-                autoFocus
-              />
-              <button
-                onClick={searchObras}
-                disabled={loading || !codigoObra.trim()}
-                style={styles.loginButton}
-              >
-                {loading ? 'A procurar...' : 'Procurar Obra'}
-              </button>
-            </div>
+        <div style={styles.loginField}>
+          <label>Telemóvel</label>
+          <input
+            type="tel"
+            value={telefone}
+            onChange={(e) => setTelefone(e.target.value)}
+            placeholder="912 345 678"
+            style={styles.loginInput}
+            autoFocus
+          />
+        </div>
 
-            {error && <p style={styles.error}>{error}</p>}
+        <div style={styles.loginField}>
+          <label>PIN</label>
+          <input
+            type="password"
+            value={pin}
+            onChange={(e) => setPin(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+            placeholder="••••"
+            maxLength={6}
+            style={{ ...styles.loginInput, letterSpacing: 8, textAlign: 'center' }}
+          />
+        </div>
 
-            {obras.length > 0 && (
-              <div style={styles.obrasList}>
-                {obras.map(obra => (
-                  <button
-                    key={obra.id}
-                    onClick={() => handleSelectObra(obra)}
-                    style={styles.obraItem}
-                  >
-                    <HardHat size={20} />
-                    <div>
-                      <strong>{obra.codigo}</strong>
-                      <p style={{ margin: 0, fontSize: 12 }}>{obra.nome}</p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </>
-        ) : (
-          <>
-            <div style={styles.selectedObraCard}>
-              <HardHat size={24} />
+        {error && <p style={styles.error}>{error}</p>}
+
+        <button
+          onClick={handleLogin}
+          disabled={loading || !telefone.trim() || !pin.trim()}
+          style={styles.loginButton}
+        >
+          {loading ? 'A entrar...' : 'Entrar'}
+        </button>
+
+        <p style={{ textAlign: 'center', fontSize: 12, color: '#888', marginTop: 16 }}>
+          Não tens conta? Fala com o teu encarregado.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// Obra Selector (when user has multiple obras)
+function ObraSelector({ obras, onSelect }) {
+  return (
+    <div style={styles.loginContainer}>
+      <div style={styles.loginCard}>
+        <div style={styles.loginHeader}>
+          <HardHat size={48} style={{ color: '#f4a261' }} />
+          <h1 style={{ margin: '12px 0 4px' }}>As tuas obras</h1>
+          <p style={{ margin: 0, opacity: 0.7 }}>Seleciona uma obra</p>
+        </div>
+
+        <div style={styles.obrasList}>
+          {obras.map(obra => (
+            <button
+              key={obra.id}
+              onClick={() => onSelect(obra)}
+              style={styles.obraItem}
+            >
+              <HardHat size={24} style={{ color: '#f4a261' }} />
               <div>
-                <strong>{selectedObra.codigo}</strong>
-                <p style={{ margin: 0, fontSize: 12 }}>{selectedObra.nome}</p>
+                <strong>{obra.codigo}</strong>
+                <p style={{ margin: 0, fontSize: 13, opacity: 0.7 }}>{obra.nome}</p>
               </div>
-              <button onClick={() => setStep(1)} style={styles.changeButton}>
-                Mudar
-              </button>
-            </div>
-
-            <div style={styles.loginField}>
-              <label>O teu nome</label>
-              <input
-                type="text"
-                value={nome}
-                onChange={(e) => setNome(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
-                placeholder="Ex: Manuel Silva"
-                style={styles.loginInput}
-                autoFocus
-              />
-              <button
-                onClick={handleLogin}
-                disabled={!nome.trim()}
-                style={styles.loginButton}
-              >
-                Entrar na Obra
-              </button>
-            </div>
-          </>
-        )}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   )
