@@ -192,6 +192,7 @@ export default function ChatObras() {
 
   // Verificar se WhatsApp está configurado
   const checkWhatsAppConfig = async () => {
+    console.log('A verificar configuração WhatsApp...')
     try {
       const { data, error } = await supabase
         .from('whatsapp_config')
@@ -199,10 +200,13 @@ export default function ChatObras() {
         .eq('ativo', true)
         .maybeSingle() // Use maybeSingle instead of single to avoid error when no rows
 
+      console.log('Resultado da query whatsapp_config:', { data, error })
+
       if (error) {
         // Table might not exist yet
         console.error('Erro ao verificar config WhatsApp:', error)
         if (error.code === '42P01' || error.message?.includes('does not exist')) {
+          console.warn('Tabela whatsapp_config não existe - executar migração')
           setWhatsappConnected(false)
           return
         }
@@ -210,7 +214,11 @@ export default function ChatObras() {
       }
 
       if (data && data.twilio_account_sid && data.twilio_phone_number) {
-        console.log('WhatsApp config encontrada:', data.twilio_phone_number)
+        console.log('WhatsApp config encontrada:', {
+          accountSid: data.twilio_account_sid?.substring(0, 10) + '...',
+          phoneNumber: data.twilio_phone_number,
+          ativo: data.ativo
+        })
         setWhatsappConnected(true)
         setTwilioConfig({
           accountSid: data.twilio_account_sid || '',
@@ -218,7 +226,7 @@ export default function ChatObras() {
           phoneNumber: data.twilio_phone_number || ''
         })
       } else {
-        console.log('WhatsApp config não encontrada ou incompleta')
+        console.log('WhatsApp config não encontrada ou incompleta:', data)
         setWhatsappConnected(false)
       }
     } catch (err) {
@@ -245,12 +253,22 @@ export default function ChatObras() {
     setConfigError('')
 
     try {
-      // Check if config exists
-      const { data: existing } = await supabase
+      // Check if config exists (use maybeSingle to avoid error when no rows)
+      const { data: existing, error: checkError } = await supabase
         .from('whatsapp_config')
         .select('id')
         .eq('ativo', true)
-        .single()
+        .maybeSingle()
+
+      if (checkError) {
+        console.error('Erro ao verificar config existente:', checkError)
+        // If table doesn't exist, show specific message
+        if (checkError.code === '42P01' || checkError.message?.includes('does not exist')) {
+          throw new Error('Tabela whatsapp_config não existe. Executa a migração primeiro.')
+        }
+      }
+
+      console.log('Config existente:', existing)
 
       const configData = {
         twilio_account_sid: twilioConfig.accountSid,
@@ -266,28 +284,41 @@ export default function ChatObras() {
 
       if (existing) {
         // Update existing config
-        const { error } = await supabase
+        console.log('A atualizar config existente:', existing.id)
+        const { data: updated, error } = await supabase
           .from('whatsapp_config')
           .update(configData)
           .eq('id', existing.id)
+          .select()
 
-        if (error) throw error
+        if (error) {
+          console.error('Erro ao atualizar config:', error)
+          throw error
+        }
+        console.log('Config atualizada:', updated)
       } else {
         // Insert new config - auth token é obrigatório
         if (!twilioConfig.authToken) {
-          throw new Error('Auth Token é obrigatório')
+          throw new Error('Auth Token é obrigatório na primeira configuração')
         }
-        const { error } = await supabase
+        console.log('A inserir nova config...')
+        const { data: inserted, error } = await supabase
           .from('whatsapp_config')
           .insert({
             ...configData,
             twilio_auth_token_encrypted: twilioConfig.authToken,
             created_at: new Date().toISOString()
           })
+          .select()
 
-        if (error) throw error
+        if (error) {
+          console.error('Erro ao inserir config:', error)
+          throw error
+        }
+        console.log('Config inserida:', inserted)
       }
 
+      console.log('Config guardada com sucesso!')
       setWhatsappConnected(true)
       setShowConfig(false)
       setTwilioConfig(prev => ({ ...prev, authToken: '' })) // Clear token from memory
@@ -336,7 +367,7 @@ export default function ChatObras() {
           obra_id: selectedObra.id,
           nome: newContact.nome,
           telefone: phone,
-          funcao: newContact.funcao || null,
+          cargo: newContact.funcao || null, // Column in DB is 'cargo'
           ativo: true
         })
 
@@ -583,6 +614,7 @@ export default function ChatObras() {
             conteudo: messageContent,
             autor_nome: 'Gavinho',
             telefone_origem: 'local',
+            telefone_destino: 'local', // Required field
             lida: true,
             processada_ia: true
           })
@@ -1778,7 +1810,7 @@ export default function ChatObras() {
                         <div style={{ fontWeight: 500 }}>{contact.nome}</div>
                         <div style={{ fontSize: 13, color: '#666' }}>
                           {contact.telefone}
-                          {contact.funcao && <span style={{ marginLeft: 8, opacity: 0.7 }}>• {contact.funcao}</span>}
+                          {contact.cargo && <span style={{ marginLeft: 8, opacity: 0.7 }}>• {contact.cargo}</span>}
                         </div>
                       </div>
                       <button
