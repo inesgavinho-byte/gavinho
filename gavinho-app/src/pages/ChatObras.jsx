@@ -197,17 +197,20 @@ export default function ChatObras() {
         .from('whatsapp_config')
         .select('*')
         .eq('ativo', true)
-        .single()
+        .maybeSingle() // Use maybeSingle instead of single to avoid error when no rows
 
       if (error) {
         // Table might not exist yet
-        if (error.code === 'PGRST116' || error.message?.includes('does not exist')) {
+        console.error('Erro ao verificar config WhatsApp:', error)
+        if (error.code === '42P01' || error.message?.includes('does not exist')) {
           setWhatsappConnected(false)
           return
         }
+        throw error
       }
 
-      if (data) {
+      if (data && data.twilio_account_sid && data.twilio_phone_number) {
+        console.log('WhatsApp config encontrada:', data.twilio_phone_number)
         setWhatsappConnected(true)
         setTwilioConfig({
           accountSid: data.twilio_account_sid || '',
@@ -215,17 +218,26 @@ export default function ChatObras() {
           phoneNumber: data.twilio_phone_number || ''
         })
       } else {
+        console.log('WhatsApp config não encontrada ou incompleta')
         setWhatsappConnected(false)
       }
-    } catch {
+    } catch (err) {
+      console.error('Erro ao verificar config:', err)
       setWhatsappConnected(false)
     }
   }
 
   // Guardar configuração Twilio
   const saveTwilioConfig = async () => {
-    if (!twilioConfig.accountSid || !twilioConfig.authToken || !twilioConfig.phoneNumber) {
-      setConfigError('Preenche todos os campos')
+    // Se já está conectado, o auth token pode ficar vazio (manter o existente)
+    if (!twilioConfig.accountSid || !twilioConfig.phoneNumber) {
+      setConfigError('Preenche Account SID e Número WhatsApp')
+      return
+    }
+
+    // Auth token é obrigatório apenas na primeira configuração
+    if (!whatsappConnected && !twilioConfig.authToken) {
+      setConfigError('Preenche o Auth Token')
       return
     }
 
@@ -242,10 +254,14 @@ export default function ChatObras() {
 
       const configData = {
         twilio_account_sid: twilioConfig.accountSid,
-        twilio_auth_token_encrypted: twilioConfig.authToken, // In production, encrypt this
         twilio_phone_number: twilioConfig.phoneNumber.replace(/\s/g, ''),
         ativo: true,
         updated_at: new Date().toISOString()
+      }
+
+      // Só atualizar o token se foi preenchido
+      if (twilioConfig.authToken) {
+        configData.twilio_auth_token_encrypted = twilioConfig.authToken
       }
 
       if (existing) {
@@ -257,11 +273,15 @@ export default function ChatObras() {
 
         if (error) throw error
       } else {
-        // Insert new config
+        // Insert new config - auth token é obrigatório
+        if (!twilioConfig.authToken) {
+          throw new Error('Auth Token é obrigatório')
+        }
         const { error } = await supabase
           .from('whatsapp_config')
           .insert({
             ...configData,
+            twilio_auth_token_encrypted: twilioConfig.authToken,
             created_at: new Date().toISOString()
           })
 
