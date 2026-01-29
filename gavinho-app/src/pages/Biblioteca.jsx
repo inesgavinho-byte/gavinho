@@ -778,35 +778,117 @@ export default function Biblioteca() {
       {/* Modal Adicionar/Editar */}
       {showModal && (
         <div className="modal-overlay" onClick={closeModal}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px', maxHeight: '90vh', overflow: 'auto' }}>
-            <div className="modal-header">
-              <h3>{editingItem ? 'Editar' : 'Adicionar'} {activeTab === 'materiais' ? 'Material' : activeTab === 'modelos3d' ? 'Modelo 3D' : 'Inspiração'}</h3>
-              <button onClick={closeModal} className="btn-icon"><X size={18} /></button>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{
+            maxWidth: '640px',
+            maxHeight: '90vh',
+            overflow: 'hidden',
+            borderRadius: '20px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+          }}>
+            {/* Header melhorado */}
+            <div style={{
+              padding: '24px 28px 20px',
+              borderBottom: '1px solid var(--stone)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: 'linear-gradient(to bottom, var(--off-white), var(--white))'
+            }}>
+              <div>
+                <h3 style={{
+                  fontSize: '20px',
+                  fontWeight: 700,
+                  color: 'var(--brown)',
+                  margin: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px'
+                }}>
+                  {activeTab === 'materiais' && <Layers size={22} style={{ color: 'var(--gold)' }} />}
+                  {activeTab === 'modelos3d' && <Box size={22} style={{ color: 'var(--gold)' }} />}
+                  {activeTab === 'inspiracao' && <Sparkles size={22} style={{ color: 'var(--gold)' }} />}
+                  {editingItem ? 'Editar' : 'Novo'} {activeTab === 'materiais' ? 'Material' : activeTab === 'modelos3d' ? 'Modelo 3D' : 'Inspiração'}
+                </h3>
+                <p style={{ fontSize: '13px', color: 'var(--brown-light)', margin: '4px 0 0' }}>
+                  {activeTab === 'materiais' && 'Adicionar à biblioteca de materiais'}
+                  {activeTab === 'modelos3d' && 'Adicionar à biblioteca de modelos 3D'}
+                  {activeTab === 'inspiracao' && 'Adicionar à biblioteca de inspiração'}
+                </p>
+              </div>
+              <button
+                onClick={closeModal}
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '10px',
+                  border: '1px solid var(--stone)',
+                  background: 'var(--white)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <X size={18} style={{ color: 'var(--brown-light)' }} />
+              </button>
             </div>
-            <div className="modal-body">
+
+            {/* Body com scroll */}
+            <div style={{
+              padding: '24px 28px',
+              overflowY: 'auto',
+              maxHeight: 'calc(90vh - 180px)',
+              background: 'var(--white)'
+            }}>
               {/* Material Form */}
               {activeTab === 'materiais' && (
                 <>
-                  {/* Secção: Imagem/Textura */}
-                  <div style={{ background: 'var(--cream)', padding: '16px', borderRadius: '12px', marginBottom: '20px' }}>
-                    <h4 style={{ fontSize: '12px', fontWeight: 600, color: 'var(--brown)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                      Textura / Imagem
-                    </h4>
+                  {/* Secção: Imagem/Textura - Design melhorado */}
+                  <div style={{ marginBottom: '28px' }}>
                     <div style={{
-                      border: '2px dashed var(--stone)',
-                      borderRadius: '12px',
-                      padding: '20px',
-                      textAlign: 'center',
-                      background: (tempFileUrl || editingItem?.textura_url) ? `url(${tempFileUrl || editingItem?.textura_url}) center/cover` : 'var(--white)',
-                      minHeight: '120px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      marginBottom: '14px'
+                    }}>
+                      <div style={{
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '8px',
+                        background: 'linear-gradient(135deg, var(--gold) 0%, var(--gold-dark) 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <Image size={14} style={{ color: 'white' }} />
+                      </div>
+                      <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--brown)' }}>
+                        Textura / Imagem
+                      </span>
+                    </div>
+
+                    <div style={{
+                      border: (tempFileUrl || editingItem?.textura_url) ? '2px solid var(--success)' : '2px dashed var(--stone)',
+                      borderRadius: '16px',
+                      overflow: 'hidden',
+                      background: (tempFileUrl || editingItem?.textura_url) ? `url(${tempFileUrl || editingItem?.textura_url}) center/cover` : 'linear-gradient(135deg, var(--cream) 0%, var(--off-white) 100%)',
+                      minHeight: '180px',
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      position: 'relative'
+                      position: 'relative',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s ease'
                     }}>
                       {(tempFileUrl || editingItem?.textura_url) && (
-                        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.3)', borderRadius: '10px' }} />
+                        <div style={{
+                          position: 'absolute',
+                          inset: 0,
+                          background: 'linear-gradient(to top, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.1) 100%)',
+                          borderRadius: '14px'
+                        }} />
                       )}
                       <input
                         type="file"
@@ -815,81 +897,391 @@ export default function Biblioteca() {
                         style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }}
                         disabled={uploadingFile}
                       />
-                      <Upload size={24} style={{ color: (tempFileUrl || editingItem?.textura_url) ? 'white' : 'var(--brown-light)', marginBottom: '8px', position: 'relative', zIndex: 1 }} />
-                      <span style={{ fontSize: '13px', color: (tempFileUrl || editingItem?.textura_url) ? 'white' : 'var(--brown-light)', position: 'relative', zIndex: 1 }}>
-                        {uploadingFile ? 'A carregar...' : 'Clica ou arrasta para fazer upload'}
+
+                      {(tempFileUrl || editingItem?.textura_url) ? (
+                        <div style={{ position: 'relative', zIndex: 1, textAlign: 'center', padding: '20px' }}>
+                          <div style={{
+                            width: '48px',
+                            height: '48px',
+                            borderRadius: '50%',
+                            background: 'rgba(255,255,255,0.95)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            margin: '0 auto 12px',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+                          }}>
+                            <Check size={24} style={{ color: 'var(--success)' }} />
+                          </div>
+                          <span style={{
+                            fontSize: '14px',
+                            fontWeight: 600,
+                            color: 'white',
+                            textShadow: '0 1px 3px rgba(0,0,0,0.3)'
+                          }}>
+                            Imagem carregada
+                          </span>
+                          <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.8)', marginTop: '4px' }}>
+                            Clica para substituir
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ textAlign: 'center', padding: '30px' }}>
+                          <div style={{
+                            width: '56px',
+                            height: '56px',
+                            borderRadius: '16px',
+                            background: 'var(--white)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            margin: '0 auto 16px',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
+                          }}>
+                            <Upload size={24} style={{ color: 'var(--brown-light)' }} />
+                          </div>
+                          <span style={{
+                            fontSize: '14px',
+                            fontWeight: 500,
+                            color: 'var(--brown)',
+                            display: 'block',
+                            marginBottom: '6px'
+                          }}>
+                            {uploadingFile ? 'A carregar...' : 'Clica ou arrasta para fazer upload'}
+                          </span>
+                          <span style={{ fontSize: '12px', color: 'var(--brown-light)' }}>
+                            PNG, JPG ou WEBP até 10MB
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Secção: Identificação - Design melhorado */}
+                  <div style={{ marginBottom: '28px' }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      marginBottom: '14px'
+                    }}>
+                      <div style={{
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '8px',
+                        background: 'linear-gradient(135deg, var(--info) 0%, #5a7a9a 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <Tag size={14} style={{ color: 'white' }} />
+                      </div>
+                      <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--brown)' }}>
+                        Identificação
                       </span>
                     </div>
-                  </div>
 
-                  {/* Secção: Identificação */}
-                  <div style={{ background: 'var(--cream)', padding: '16px', borderRadius: '12px', marginBottom: '20px' }}>
-                    <h4 style={{ fontSize: '12px', fontWeight: 600, color: 'var(--brown)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                      Identificação
-                    </h4>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, marginBottom: '6px', color: 'var(--brown)' }}>Nome *</label>
-                        <input type="text" value={materialForm.nome} onChange={e => setMaterialForm({ ...materialForm, nome: e.target.value })} className="form-input" placeholder="Nome do material" style={{ background: 'var(--white)' }} />
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, marginBottom: '6px', color: 'var(--brown)' }}>Categoria</label>
-                        <select value={materialForm.categoria_id} onChange={e => setMaterialForm({ ...materialForm, categoria_id: e.target.value })} className="form-input" style={{ background: 'var(--white)' }}>
-                          <option value="">Selecionar...</option>
-                          {getCategoriasByTipo('materiais').map(cat => (
-                            <option key={cat.id} value={cat.id}>{cat.nome}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, marginBottom: '6px', color: 'var(--brown)' }}>Fornecedor</label>
-                        <input type="text" value={materialForm.fornecedor} onChange={e => setMaterialForm({ ...materialForm, fornecedor: e.target.value })} className="form-input" placeholder="Nome do fornecedor" style={{ background: 'var(--white)' }} />
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, marginBottom: '6px', color: 'var(--brown)' }}>Referência</label>
-                        <input type="text" value={materialForm.referencia} onChange={e => setMaterialForm({ ...materialForm, referencia: e.target.value })} className="form-input" placeholder="Código de referência" style={{ background: 'var(--white)' }} />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Secção: Características */}
-                  <div style={{ background: 'var(--cream)', padding: '16px', borderRadius: '12px', marginBottom: '20px' }}>
-                    <h4 style={{ fontSize: '12px', fontWeight: 600, color: 'var(--brown)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                      Características
-                    </h4>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, marginBottom: '6px', color: 'var(--brown)' }}>Preço/m² (€)</label>
-                        <input type="number" step="0.01" value={materialForm.preco_m2} onChange={e => setMaterialForm({ ...materialForm, preco_m2: e.target.value })} className="form-input" placeholder="0.00" style={{ background: 'var(--white)' }} />
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, marginBottom: '6px', color: 'var(--brown)' }}>Cor</label>
-                        <input type="text" value={materialForm.cor} onChange={e => setMaterialForm({ ...materialForm, cor: e.target.value })} className="form-input" placeholder="Cor principal" style={{ background: 'var(--white)' }} />
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, marginBottom: '6px', color: 'var(--brown)' }}>Acabamento</label>
-                        <input type="text" value={materialForm.acabamento} onChange={e => setMaterialForm({ ...materialForm, acabamento: e.target.value })} className="form-input" placeholder="Tipo de acabamento" style={{ background: 'var(--white)' }} />
-                      </div>
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, marginBottom: '6px', color: 'var(--brown)' }}>Descrição</label>
-                      <textarea value={materialForm.descricao} onChange={e => setMaterialForm({ ...materialForm, descricao: e.target.value })} className="form-input" rows={2} placeholder="Descrição do material..." style={{ background: 'var(--white)' }} />
-                    </div>
-                  </div>
-
-                  {/* Secção: Documentação */}
-                  <div style={{ background: 'var(--cream)', padding: '16px', borderRadius: '12px', marginBottom: '20px' }}>
-                    <h4 style={{ fontSize: '12px', fontWeight: 600, color: 'var(--brown)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                      Ficha Técnica (PDF)
-                    </h4>
                     <div style={{
-                      border: '2px dashed var(--stone)',
-                      borderRadius: '8px',
-                      padding: '16px',
-                      textAlign: 'center',
-                      background: 'var(--white)',
+                      background: 'var(--off-white)',
+                      padding: '20px',
+                      borderRadius: '14px',
+                      border: '1px solid var(--stone)'
+                    }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                        <div>
+                          <label style={{
+                            display: 'block',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            marginBottom: '8px',
+                            color: 'var(--brown)',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.3px'
+                          }}>
+                            Nome do Material *
+                          </label>
+                          <input
+                            type="text"
+                            value={materialForm.nome}
+                            onChange={e => setMaterialForm({ ...materialForm, nome: e.target.value })}
+                            placeholder="Ex: Mármore Carrara"
+                            style={{
+                              width: '100%',
+                              padding: '12px 14px',
+                              border: '2px solid var(--stone)',
+                              borderRadius: '10px',
+                              fontSize: '14px',
+                              background: 'var(--white)',
+                              transition: 'border-color 0.2s',
+                              boxSizing: 'border-box'
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{
+                            display: 'block',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            marginBottom: '8px',
+                            color: 'var(--brown)',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.3px'
+                          }}>
+                            Categoria
+                          </label>
+                          <select
+                            value={materialForm.categoria_id}
+                            onChange={e => setMaterialForm({ ...materialForm, categoria_id: e.target.value })}
+                            style={{
+                              width: '100%',
+                              padding: '12px 14px',
+                              border: '2px solid var(--stone)',
+                              borderRadius: '10px',
+                              fontSize: '14px',
+                              background: 'var(--white)',
+                              cursor: 'pointer',
+                              boxSizing: 'border-box'
+                            }}
+                          >
+                            <option value="">Selecionar...</option>
+                            {getCategoriasByTipo('materiais').map(cat => (
+                              <option key={cat.id} value={cat.id}>{cat.nome}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                        <div>
+                          <label style={{
+                            display: 'block',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            marginBottom: '8px',
+                            color: 'var(--brown)',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.3px'
+                          }}>
+                            Fornecedor
+                          </label>
+                          <input
+                            type="text"
+                            value={materialForm.fornecedor}
+                            onChange={e => setMaterialForm({ ...materialForm, fornecedor: e.target.value })}
+                            placeholder="Ex: AtlasPlan"
+                            style={{
+                              width: '100%',
+                              padding: '12px 14px',
+                              border: '2px solid var(--stone)',
+                              borderRadius: '10px',
+                              fontSize: '14px',
+                              background: 'var(--white)',
+                              boxSizing: 'border-box'
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{
+                            display: 'block',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            marginBottom: '8px',
+                            color: 'var(--brown)',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.3px'
+                          }}>
+                            Referência
+                          </label>
+                          <input
+                            type="text"
+                            value={materialForm.referencia}
+                            onChange={e => setMaterialForm({ ...materialForm, referencia: e.target.value })}
+                            placeholder="Código de referência"
+                            style={{
+                              width: '100%',
+                              padding: '12px 14px',
+                              border: '2px solid var(--stone)',
+                              borderRadius: '10px',
+                              fontSize: '14px',
+                              background: 'var(--white)',
+                              boxSizing: 'border-box'
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Secção: Características - Design melhorado */}
+                  <div style={{ marginBottom: '28px' }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      marginBottom: '14px'
+                    }}>
+                      <div style={{
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '8px',
+                        background: 'linear-gradient(135deg, var(--success) 0%, #5a8a5a 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <Filter size={14} style={{ color: 'white' }} />
+                      </div>
+                      <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--brown)' }}>
+                        Características
+                      </span>
+                    </div>
+
+                    <div style={{
+                      background: 'var(--off-white)',
+                      padding: '20px',
+                      borderRadius: '14px',
+                      border: '1px solid var(--stone)'
+                    }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                        <div>
+                          <label style={{
+                            display: 'block',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            marginBottom: '8px',
+                            color: 'var(--brown)',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.3px'
+                          }}>
+                            Preço/m²
+                          </label>
+                          <div style={{ position: 'relative' }}>
+                            <span style={{
+                              position: 'absolute',
+                              left: '14px',
+                              top: '50%',
+                              transform: 'translateY(-50%)',
+                              color: 'var(--brown-light)',
+                              fontSize: '14px',
+                              fontWeight: 500
+                            }}>€</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={materialForm.preco_m2}
+                              onChange={e => setMaterialForm({ ...materialForm, preco_m2: e.target.value })}
+                              placeholder="0.00"
+                              style={{
+                                width: '100%',
+                                padding: '12px 14px 12px 32px',
+                                border: '2px solid var(--stone)',
+                                borderRadius: '10px',
+                                fontSize: '14px',
+                                background: 'var(--white)',
+                                boxSizing: 'border-box'
+                              }}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label style={{
+                            display: 'block',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            marginBottom: '8px',
+                            color: 'var(--brown)',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.3px'
+                          }}>
+                            Cor
+                          </label>
+                          <input
+                            type="text"
+                            value={materialForm.cor}
+                            onChange={e => setMaterialForm({ ...materialForm, cor: e.target.value })}
+                            placeholder="Ex: Branco"
+                            style={{
+                              width: '100%',
+                              padding: '12px 14px',
+                              border: '2px solid var(--stone)',
+                              borderRadius: '10px',
+                              fontSize: '14px',
+                              background: 'var(--white)',
+                              boxSizing: 'border-box'
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{
+                            display: 'block',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            marginBottom: '8px',
+                            color: 'var(--brown)',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.3px'
+                          }}>
+                            Acabamento
+                          </label>
+                          <input
+                            type="text"
+                            value={materialForm.acabamento}
+                            onChange={e => setMaterialForm({ ...materialForm, acabamento: e.target.value })}
+                            placeholder="Ex: Polido"
+                            style={{
+                              width: '100%',
+                              padding: '12px 14px',
+                              border: '2px solid var(--stone)',
+                              borderRadius: '10px',
+                              fontSize: '14px',
+                              background: 'var(--white)',
+                              boxSizing: 'border-box'
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label style={{
+                          display: 'block',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          marginBottom: '8px',
+                          color: 'var(--brown)',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.3px'
+                        }}>
+                          Descrição
+                        </label>
+                        <textarea
+                          value={materialForm.descricao}
+                          onChange={e => setMaterialForm({ ...materialForm, descricao: e.target.value })}
+                          rows={2}
+                          placeholder="Notas ou descrição do material..."
+                          style={{
+                            width: '100%',
+                            padding: '12px 14px',
+                            border: '2px solid var(--stone)',
+                            borderRadius: '10px',
+                            fontSize: '14px',
+                            background: 'var(--white)',
+                            resize: 'vertical',
+                            minHeight: '70px',
+                            boxSizing: 'border-box'
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Secção: Documentação - Compacta */}
+                  <div style={{ marginBottom: '28px' }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '16px 20px',
+                      background: 'var(--off-white)',
+                      borderRadius: '14px',
+                      border: '1px solid var(--stone)',
                       position: 'relative'
                     }}>
                       <input
@@ -899,50 +1291,90 @@ export default function Biblioteca() {
                         style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }}
                         disabled={uploadingFile}
                       />
-                      {(tempFichaTecnicaUrl || editingItem?.ficha_tecnica_url) ? (
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                          <Check size={16} style={{ color: 'var(--success)' }} />
-                          <span style={{ fontSize: '13px', color: 'var(--brown)' }}>PDF carregado</span>
-                          <a
-                            href={tempFichaTecnicaUrl || editingItem?.ficha_tecnica_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{ color: 'var(--gold-dark)', fontSize: '12px' }}
-                            onClick={e => e.stopPropagation()}
-                          >
-                            Ver ficheiro
-                          </a>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{
+                          width: '40px',
+                          height: '40px',
+                          borderRadius: '10px',
+                          background: (tempFichaTecnicaUrl || editingItem?.ficha_tecnica_url) ? 'var(--success)' : 'var(--stone)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}>
+                          {(tempFichaTecnicaUrl || editingItem?.ficha_tecnica_url) ? (
+                            <Check size={20} style={{ color: 'white' }} />
+                          ) : (
+                            <Upload size={18} style={{ color: 'var(--brown-light)' }} />
+                          )}
                         </div>
-                      ) : (
-                        <>
-                          <Upload size={20} style={{ color: 'var(--brown-light)', marginBottom: '4px' }} />
-                          <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>
-                            {uploadingFile ? 'A carregar...' : 'Upload ficha técnica (PDF)'}
+                        <div>
+                          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--brown)' }}>
+                            Ficha Técnica (PDF)
                           </div>
-                        </>
+                          <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>
+                            {(tempFichaTecnicaUrl || editingItem?.ficha_tecnica_url)
+                              ? 'Ficheiro carregado'
+                              : uploadingFile ? 'A carregar...' : 'Clica para fazer upload'}
+                          </div>
+                        </div>
+                      </div>
+                      {(tempFichaTecnicaUrl || editingItem?.ficha_tecnica_url) && (
+                        <a
+                          href={tempFichaTecnicaUrl || editingItem?.ficha_tecnica_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            padding: '8px 14px',
+                            background: 'var(--white)',
+                            borderRadius: '8px',
+                            fontSize: '12px',
+                            fontWeight: 500,
+                            color: 'var(--brown)',
+                            textDecoration: 'none',
+                            border: '1px solid var(--stone)',
+                            position: 'relative',
+                            zIndex: 1
+                          }}
+                          onClick={e => e.stopPropagation()}
+                        >
+                          Ver PDF
+                        </a>
                       )}
                     </div>
                   </div>
 
-                  {/* Secção: Vincular a Projeto */}
-                  <div style={{ background: 'var(--cream)', padding: '16px', borderRadius: '12px', marginBottom: '16px' }}>
-                    <h4 style={{ fontSize: '12px', fontWeight: 600, color: 'var(--brown)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                      Vincular a Projeto <span style={{ fontWeight: 400, textTransform: 'none' }}>(opcional)</span>
-                    </h4>
+                  {/* Secção: Vincular a Projeto - Compacta */}
+                  <div style={{ marginBottom: '20px' }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      marginBottom: '10px'
+                    }}>
+                      <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--brown)' }}>
+                        Vincular a Projeto
+                      </span>
+                      <span style={{ fontSize: '11px', color: 'var(--brown-light)' }}>(opcional)</span>
+                    </div>
                     <select
                       value={materialForm.projeto_id}
                       onChange={e => setMaterialForm({ ...materialForm, projeto_id: e.target.value })}
-                      className="form-input"
-                      style={{ background: 'var(--white)' }}
+                      style={{
+                        width: '100%',
+                        padding: '12px 14px',
+                        border: '2px solid var(--stone)',
+                        borderRadius: '10px',
+                        fontSize: '14px',
+                        background: 'var(--white)',
+                        cursor: 'pointer',
+                        boxSizing: 'border-box'
+                      }}
                     >
                       <option value="">Nenhum projeto selecionado</option>
                       {projetos.map(proj => (
                         <option key={proj.id} value={proj.id}>{proj.codigo} - {proj.nome}</option>
                       ))}
                     </select>
-                    <p style={{ fontSize: '11px', color: 'var(--brown-light)', marginTop: '6px' }}>
-                      Este material aparecerá na biblioteca do projeto selecionado
-                    </p>
                   </div>
                 </>
               )}
