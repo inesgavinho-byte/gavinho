@@ -355,7 +355,7 @@ export default function ObraApp() {
       <div style={styles.loginContainer}>
         <div style={styles.loginCard}>
           <div style={styles.loginHeader}>
-            <HardHat size={48} style={{ color: '#f4a261' }} />
+            <HardHat size={48} style={{ color: '#6b7280' }} />
             <h1 style={{ margin: '12px 0 4px' }}>Olá, {user.nome}</h1>
             <p style={{ margin: 0, opacity: 0.7 }}>Não tens obras atribuídas</p>
           </div>
@@ -469,7 +469,7 @@ export default function ObraApp() {
                     <span style={styles.messageTime}>
                       {new Date(msg.created_at).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
                       {msg.autor_id === user.id && (
-                        msg.pending ? <Clock size={12} /> : <CheckCheck size={12} style={{ color: '#4FC3F7' }} />
+                        msg.pending ? <Clock size={12} /> : <CheckCheck size={12} style={{ color: '#6b7280' }} />
                       )}
                     </span>
                   </div>
@@ -710,7 +710,7 @@ function WorkerLogin({ onLogin }) {
     <div style={styles.loginContainer}>
       <div style={styles.loginCard}>
         <div style={styles.loginHeader}>
-          <HardHat size={48} style={{ color: '#f4a261' }} />
+          <HardHat size={48} style={{ color: '#6b7280' }} />
           <h1 style={{ margin: '12px 0 4px' }}>Gavinho Obras</h1>
           <p style={{ margin: 0, opacity: 0.7 }}>App de comunicação da equipa</p>
         </div>
@@ -819,7 +819,7 @@ function ObraSelector({ obras, onSelect }) {
     <div style={styles.loginContainer}>
       <div style={styles.loginCard}>
         <div style={styles.loginHeader}>
-          <HardHat size={48} style={{ color: '#f4a261' }} />
+          <HardHat size={48} style={{ color: '#6b7280' }} />
           <h1 style={{ margin: '12px 0 4px' }}>As tuas obras</h1>
           <p style={{ margin: 0, opacity: 0.7 }}>Seleciona uma obra</p>
         </div>
@@ -831,7 +831,7 @@ function ObraSelector({ obras, onSelect }) {
               onClick={() => onSelect(obra)}
               style={styles.obraItem}
             >
-              <HardHat size={24} style={{ color: '#f4a261' }} />
+              <HardHat size={24} style={{ color: '#6b7280' }} />
               <div>
                 <strong>{obra.codigo}</strong>
                 <p style={{ margin: 0, fontSize: 13, opacity: 0.7 }}>{obra.nome}</p>
@@ -1146,10 +1146,10 @@ const styles = {
   spinner: {
     width: 40,
     height: 40,
-    color: '#f4a261'
+    color: '#3d4349'
   },
   header: {
-    background: '#1a1a2e',
+    background: '#3d4349',
     color: 'white',
     padding: '12px 16px',
     display: 'flex',
@@ -1202,7 +1202,7 @@ const styles = {
     top: 0,
     bottom: 0,
     width: 280,
-    background: '#1a1a2e',
+    background: '#3d4349',
     color: 'white',
     display: 'flex',
     flexDirection: 'column'
@@ -1252,7 +1252,7 @@ const styles = {
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
-    background: '#ECE5DD'
+    background: '#e8e9ea'
   },
   messagesContainer: {
     flex: 1,
@@ -1278,7 +1278,7 @@ const styles = {
   },
   messageOwn: {
     alignSelf: 'flex-end',
-    background: '#DCF8C6',
+    background: '#d4d6d8',
     borderBottomRightRadius: 0
   },
   messageOther: {
@@ -1289,7 +1289,7 @@ const styles = {
   messageAuthor: {
     fontSize: 12,
     fontWeight: 600,
-    color: '#075E54',
+    color: '#3d4349',
     display: 'block',
     marginBottom: 2
   },
@@ -1368,7 +1368,7 @@ const styles = {
     width: 44,
     height: 44,
     borderRadius: '50%',
-    background: '#075E54',
+    background: '#3d4349',
     border: 'none',
     color: 'white',
     display: 'flex',
@@ -1396,14 +1396,14 @@ const styles = {
     cursor: 'pointer'
   },
   navButtonActive: {
-    color: '#f4a261'
+    color: '#3d4349'
   },
   loginContainer: {
     minHeight: '100vh',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+    background: '#3d4349',
     padding: 20
   },
   loginCard: {
@@ -1434,7 +1434,7 @@ const styles = {
   loginButton: {
     width: '100%',
     padding: 14,
-    background: '#f4a261',
+    background: '#3d4349',
     border: 'none',
     borderRadius: 8,
     color: 'white',
@@ -1522,7 +1522,7 @@ const styles = {
   submitButton: {
     width: '100%',
     padding: 14,
-    background: '#f4a261',
+    background: '#3d4349',
     border: 'none',
     borderRadius: 8,
     color: 'white',
@@ -1572,7 +1572,7 @@ const styles = {
     width: 40,
     height: 40,
     borderRadius: '50%',
-    background: '#f4a261',
+    background: '#3d4349',
     color: 'white',
     display: 'flex',
     alignItems: 'center',
@@ -1600,7 +1600,7 @@ const styles = {
   },
   toggleButtonActive: {
     background: 'white',
-    color: '#1a1a2e',
+    color: '#3d4349',
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
   }
 }

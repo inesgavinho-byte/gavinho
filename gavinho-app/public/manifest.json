@@ -4,8 +4,8 @@
   "description": "App de comunicação para equipas de obra",
   "start_url": "/obra-app",
   "display": "standalone",
-  "background_color": "#1a1a2e",
-  "theme_color": "#f4a261",
+  "background_color": "#3d4349",
+  "theme_color": "#3d4349",
   "orientation": "portrait",
   "icons": [
     {
