@@ -576,12 +576,15 @@ export default function ObraApp() {
 
 // Worker Login Component
 function WorkerLogin({ onLogin }) {
+  const [loginType, setLoginType] = useState('phone') // 'phone' or 'email'
   const [telefone, setTelefone] = useState('')
   const [pin, setPin] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const handleLogin = async () => {
+  const handlePhoneLogin = async () => {
     if (!telefone.trim() || !pin.trim()) return
 
     setLoading(true)
@@ -626,7 +629,8 @@ function WorkerLogin({ onLogin }) {
         id: trabalhador.id,
         nome: trabalhador.nome,
         telefone: trabalhador.telefone,
-        cargo: trabalhador.cargo || 'Equipa'
+        cargo: trabalhador.cargo || 'Equipa',
+        tipo: 'trabalhador'
       }
 
       localStorage.setItem('obra_app_user', JSON.stringify(user))
@@ -640,52 +644,169 @@ function WorkerLogin({ onLogin }) {
     }
   }
 
+  const handleEmailLogin = async () => {
+    if (!email.trim() || !password.trim()) return
+
+    setLoading(true)
+    setError('')
+
+    try {
+      // Use Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password
+      })
+
+      if (authError) {
+        throw new Error(authError.message === 'Invalid login credentials'
+          ? 'Email ou password incorretos'
+          : authError.message)
+      }
+
+      // Get user profile
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id, nome, email, cargo')
+        .eq('id', authData.user.id)
+        .single()
+
+      // Get all obras (managers can access all)
+      const { data: obrasData, error: obrasError } = await supabase
+        .from('obras')
+        .select('id, codigo, nome')
+        .in('status', ['em_curso', 'em_projeto'])
+        .order('codigo', { ascending: false })
+
+      if (obrasError) throw obrasError
+
+      const user = {
+        id: authData.user.id,
+        nome: profile?.nome || authData.user.email.split('@')[0],
+        email: authData.user.email,
+        cargo: profile?.cargo || 'Gestão',
+        tipo: 'gestao'
+      }
+
+      localStorage.setItem('obra_app_user', JSON.stringify(user))
+      localStorage.setItem('obra_app_obras', JSON.stringify(obrasData || []))
+
+      onLogin(user, obrasData || [])
+    } catch (err) {
+      setError(err.message || 'Erro ao fazer login')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleLogin = () => {
+    if (loginType === 'phone') {
+      handlePhoneLogin()
+    } else {
+      handleEmailLogin()
+    }
+  }
+
   return (
     <div style={styles.loginContainer}>
       <div style={styles.loginCard}>
         <div style={styles.loginHeader}>
           <HardHat size={48} style={{ color: '#f4a261' }} />
           <h1 style={{ margin: '12px 0 4px' }}>Gavinho Obras</h1>
-          <p style={{ margin: 0, opacity: 0.7 }}>Entra com o teu telemóvel</p>
+          <p style={{ margin: 0, opacity: 0.7 }}>App de comunicação da equipa</p>
         </div>
 
-        <div style={styles.loginField}>
-          <label>Telemóvel</label>
-          <input
-            type="tel"
-            value={telefone}
-            onChange={(e) => setTelefone(e.target.value)}
-            placeholder="912 345 678"
-            style={styles.loginInput}
-            autoFocus
-          />
+        {/* Login type toggle */}
+        <div style={styles.loginToggle}>
+          <button
+            onClick={() => { setLoginType('phone'); setError('') }}
+            style={{
+              ...styles.toggleButton,
+              ...(loginType === 'phone' ? styles.toggleButtonActive : {})
+            }}
+          >
+            Trabalhador
+          </button>
+          <button
+            onClick={() => { setLoginType('email'); setError('') }}
+            style={{
+              ...styles.toggleButton,
+              ...(loginType === 'email' ? styles.toggleButtonActive : {})
+            }}
+          >
+            Gestão
+          </button>
         </div>
 
-        <div style={styles.loginField}>
-          <label>PIN</label>
-          <input
-            type="password"
-            value={pin}
-            onChange={(e) => setPin(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
-            placeholder="••••"
-            maxLength={6}
-            style={{ ...styles.loginInput, letterSpacing: 8, textAlign: 'center' }}
-          />
-        </div>
+        {loginType === 'phone' ? (
+          <>
+            <div style={styles.loginField}>
+              <label>Telemóvel</label>
+              <input
+                type="tel"
+                value={telefone}
+                onChange={(e) => setTelefone(e.target.value)}
+                placeholder="912 345 678"
+                style={styles.loginInput}
+                autoFocus
+              />
+            </div>
+
+            <div style={styles.loginField}>
+              <label>PIN</label>
+              <input
+                type="password"
+                value={pin}
+                onChange={(e) => setPin(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+                placeholder="••••"
+                maxLength={6}
+                style={{ ...styles.loginInput, letterSpacing: 8, textAlign: 'center' }}
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={styles.loginField}>
+              <label>Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="email@gavinho.pt"
+                style={styles.loginInput}
+                autoFocus
+              />
+            </div>
+
+            <div style={styles.loginField}>
+              <label>Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+                placeholder="••••••••"
+                style={styles.loginInput}
+              />
+            </div>
+          </>
+        )}
 
         {error && <p style={styles.error}>{error}</p>}
 
         <button
           onClick={handleLogin}
-          disabled={loading || !telefone.trim() || !pin.trim()}
+          disabled={loading || (loginType === 'phone' ? (!telefone.trim() || !pin.trim()) : (!email.trim() || !password.trim()))}
           style={styles.loginButton}
         >
           {loading ? 'A entrar...' : 'Entrar'}
         </button>
 
         <p style={{ textAlign: 'center', fontSize: 12, color: '#888', marginTop: 16 }}>
-          Não tens conta? Fala com o teu encarregado.
+          {loginType === 'phone'
+            ? 'Não tens conta? Fala com o teu encarregado.'
+            : 'Usa as mesmas credenciais da plataforma web.'
+          }
         </p>
       </div>
     </div>
@@ -1457,5 +1578,29 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     fontWeight: 600
+  },
+  loginToggle: {
+    display: 'flex',
+    background: '#F5F5F5',
+    borderRadius: 8,
+    padding: 4,
+    marginBottom: 20
+  },
+  toggleButton: {
+    flex: 1,
+    padding: '10px 16px',
+    background: 'transparent',
+    border: 'none',
+    borderRadius: 6,
+    fontSize: 14,
+    fontWeight: 500,
+    color: '#666',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease'
+  },
+  toggleButtonActive: {
+    background: 'white',
+    color: '#1a1a2e',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
   }
 }
