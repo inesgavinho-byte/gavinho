@@ -149,15 +149,16 @@ export default function ChatObras() {
       loadMensagens()
       loadAISugestoes()
       loadObraContacts()
-      // Subscrever a novas mensagens em tempo real
+      // Subscrever a novas mensagens em tempo real (obra_mensagens - partilhado com PWA)
       const channel = supabase
-        .channel(`whatsapp_${selectedObra.id}`)
+        .channel(`obra_chat_${selectedObra.id}`)
         .on('postgres_changes', {
           event: 'INSERT',
           schema: 'public',
-          table: 'whatsapp_mensagens',
+          table: 'obra_mensagens',
           filter: `obra_id=eq.${selectedObra.id}`
-        }, () => {
+        }, (payload) => {
+          console.log('Nova mensagem recebida:', payload.new)
           loadMensagens()
         })
         .subscribe()
@@ -436,41 +437,48 @@ export default function ChatObras() {
     }
   }
 
-  // Carregar mensagens WhatsApp da obra
+  // Carregar mensagens da obra (partilhado com PWA)
   const loadMensagens = async () => {
     if (!selectedObra) return
 
     try {
       const { data, error } = await supabase
-        .from('whatsapp_mensagens')
+        .from('obra_mensagens')
         .select('*')
         .eq('obra_id', selectedObra.id)
         .order('created_at', { ascending: true })
+        .limit(100)
 
-      if (error) throw error
+      if (error) {
+        // Se tabela não existe, mostrar mock
+        if (error.code === '42P01') {
+          console.warn('Tabela obra_mensagens não existe')
+          setMensagens(MOCK_WHATSAPP_MESSAGES)
+          return
+        }
+        throw error
+      }
 
-      // Se houver mensagens reais, usar; senão, usar mock
       if (data && data.length > 0) {
         const formattedMessages = data.map(msg => ({
           id: msg.id,
-          tipo: msg.tipo,
-          autor: msg.autor_nome || msg.telefone_origem,
-          telefone: msg.telefone_origem,
+          tipo: msg.autor_nome === 'Gavinho' ? 'enviada' : 'recebida',
+          autor: msg.autor_nome,
           conteudo: msg.conteudo,
           hora: new Date(msg.created_at).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }),
           data: msg.created_at.split('T')[0],
           lida: msg.lida,
-          anexos: msg.anexos
+          anexos: msg.anexos,
+          dadosTipo: msg.tipo // pedido_material, registo_horas, etc.
         }))
         setMensagens(formattedMessages)
       } else {
-        // Usar dados mock para demonstração
-        setMensagens(MOCK_WHATSAPP_MESSAGES)
+        // Sem mensagens ainda
+        setMensagens([])
       }
     } catch (err) {
       console.error('Erro ao carregar mensagens:', err)
-      // Fallback para mock
-      setMensagens(MOCK_WHATSAPP_MESSAGES)
+      setMensagens([])
     }
   }
 
@@ -604,30 +612,28 @@ export default function ChatObras() {
         ))
 
         console.log('Mensagem enviada via Twilio:', data)
-      } else {
-        // Guardar localmente mesmo sem WhatsApp configurado
-        const { error } = await supabase
-          .from('whatsapp_mensagens')
-          .insert({
-            obra_id: selectedObra.id,
-            tipo: 'enviada',
-            conteudo: messageContent,
-            autor_nome: 'Gavinho',
-            telefone_origem: 'local',
-            telefone_destino: 'local', // Required field
-            lida: true,
-            processada_ia: true
-          })
-
-        if (error) {
-          console.error('Erro ao guardar mensagem:', error)
-        }
-
-        // Update message to show as sent (local only)
-        setMensagens(prev => prev.map(m =>
-          m.id === tempId ? { ...m, pending: false } : m
-        ))
       }
+
+      // Guardar sempre na tabela obra_mensagens (partilhada com PWA)
+      const { error: obraError } = await supabase
+        .from('obra_mensagens')
+        .insert({
+          obra_id: selectedObra.id,
+          autor_id: 'backoffice',
+          autor_nome: 'Gavinho',
+          conteudo: messageContent,
+          tipo: 'texto',
+          lida: false
+        })
+
+      if (obraError) {
+        console.error('Erro ao guardar mensagem na obra:', obraError)
+      }
+
+      // Update message to show as sent
+      setMensagens(prev => prev.map(m =>
+        m.id === tempId ? { ...m, pending: false, lida: true } : m
+      ))
     } catch (err) {
       console.error('Erro ao enviar mensagem:', err)
       // Mark message as failed
