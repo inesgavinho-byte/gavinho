@@ -39,9 +39,7 @@ import Emails from './pages/Emails'
 import DecisoesPagina from './pages/DecisoesPagina'
 import MQT from './pages/MQT'
 import ObraApp from './pages/ObraApp'
-import Trabalhadores from './pages/Trabalhadores'
-import Presencas from './pages/Presencas'
-import Requisicoes from './pages/Requisicoes'
+import GestaoObras from './pages/GestaoObras'
 
 function App() {
   return (
@@ -83,9 +81,7 @@ function App() {
             <Route path="diario-obra" element={<DiarioObra />} />
             <Route path="equipa" element={<Equipa />} />
             <Route path="equipa/:id" element={<PlaceholderPage title="Perfil do Colaborador" subtitle="Informações e alocações" />} />
-            <Route path="trabalhadores" element={<Trabalhadores />} />
-            <Route path="presencas" element={<Presencas />} />
-            <Route path="requisicoes" element={<Requisicoes />} />
+            <Route path="gestao-obras" element={<GestaoObras />} />
             <Route path="tarefas" element={<Tarefas />} />
             <Route path="bloqueios" element={<BlockersDecisions />} />
             <Route path="chat" element={<ChatColaborativo />} />

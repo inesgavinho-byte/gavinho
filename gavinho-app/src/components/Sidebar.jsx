@@ -59,9 +59,7 @@ const navigation = [
     section: 'Módulo Obras',
     items: [
       { name: 'Dashboard Obras', href: '/obras', icon: HardHat },
-      { name: 'Trabalhadores', href: '/trabalhadores', icon: UsersRound },
-      { name: 'Presenças', href: '/presencas', icon: Clock },
-      { name: 'Requisições', href: '/requisicoes', icon: Package },
+      { name: 'Gestão Obras', href: '/gestao-obras', icon: UsersRound },
     ]
   },
   {
