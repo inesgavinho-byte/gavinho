@@ -57,6 +57,7 @@ const navigation = [
     section: 'Módulo Obras',
     items: [
       { name: 'Dashboard Obras', href: '/obras', icon: HardHat },
+      { name: 'Trabalhadores', href: '/trabalhadores', icon: UsersRound },
       { name: 'MQT - Quantidades', href: '/mqt', icon: Table2 },
       { name: 'Chat Obras', href: '/chat-obras', icon: MessageSquare },
     ]
