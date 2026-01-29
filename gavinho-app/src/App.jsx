@@ -40,6 +40,7 @@ import DecisoesPagina from './pages/DecisoesPagina'
 import MQT from './pages/MQT'
 import ObraApp from './pages/ObraApp'
 import Trabalhadores from './pages/Trabalhadores'
+import Presencas from './pages/Presencas'
 
 function App() {
   return (
@@ -82,6 +83,7 @@ function App() {
             <Route path="equipa" element={<Equipa />} />
             <Route path="equipa/:id" element={<PlaceholderPage title="Perfil do Colaborador" subtitle="Informações e alocações" />} />
             <Route path="trabalhadores" element={<Trabalhadores />} />
+            <Route path="presencas" element={<Presencas />} />
             <Route path="tarefas" element={<Tarefas />} />
             <Route path="bloqueios" element={<BlockersDecisions />} />
             <Route path="chat" element={<ChatColaborativo />} />

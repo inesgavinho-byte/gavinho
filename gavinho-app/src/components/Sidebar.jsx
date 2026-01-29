@@ -29,7 +29,8 @@ import {
   Shield,
   FileSearch,
   Mail,
-  Table2
+  Table2,
+  Clock
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -58,6 +59,7 @@ const navigation = [
     items: [
       { name: 'Dashboard Obras', href: '/obras', icon: HardHat },
       { name: 'Trabalhadores', href: '/trabalhadores', icon: UsersRound },
+      { name: 'Presenças', href: '/presencas', icon: Clock },
       { name: 'MQT - Quantidades', href: '/mqt', icon: Table2 },
       { name: 'Chat Obras', href: '/chat-obras', icon: MessageSquare },
     ]
