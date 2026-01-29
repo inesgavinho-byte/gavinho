@@ -583,6 +583,8 @@ function WorkerLogin({ onLogin }) {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [resetMode, setResetMode] = useState(false)
+  const [resetSent, setResetSent] = useState(false)
 
   const handlePhoneLogin = async () => {
     if (!telefone.trim() || !pin.trim()) return
@@ -706,6 +708,91 @@ function WorkerLogin({ onLogin }) {
     }
   }
 
+  const handleResetPassword = async () => {
+    if (!email.trim()) {
+      setError('Introduz o teu email')
+      return
+    }
+
+    setLoading(true)
+    setError('')
+
+    try {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: window.location.origin + '/reset-password'
+      })
+
+      if (resetError) throw resetError
+
+      setResetSent(true)
+    } catch (err) {
+      setError(err.message || 'Erro ao enviar email')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Reset password mode
+  if (resetMode) {
+    return (
+      <div style={styles.loginContainer}>
+        <div style={styles.loginCard}>
+          <div style={styles.loginHeader}>
+            <HardHat size={48} style={{ color: '#6b7280' }} />
+            <h1 style={{ margin: '12px 0 4px' }}>Recuperar Password</h1>
+            <p style={{ margin: 0, opacity: 0.7 }}>Vamos enviar um email de recuperação</p>
+          </div>
+
+          {resetSent ? (
+            <>
+              <div style={styles.successMessage}>
+                <Check size={20} /> Email enviado! Verifica a tua caixa de entrada.
+              </div>
+              <button
+                onClick={() => { setResetMode(false); setResetSent(false); setError('') }}
+                style={styles.loginButton}
+              >
+                Voltar ao Login
+              </button>
+            </>
+          ) : (
+            <>
+              <div style={styles.loginField}>
+                <label>Email</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleResetPassword()}
+                  placeholder="email@gavinho.pt"
+                  style={styles.loginInput}
+                  autoFocus
+                />
+              </div>
+
+              {error && <p style={styles.error}>{error}</p>}
+
+              <button
+                onClick={handleResetPassword}
+                disabled={loading || !email.trim()}
+                style={styles.loginButton}
+              >
+                {loading ? 'A enviar...' : 'Enviar Email'}
+              </button>
+
+              <button
+                onClick={() => { setResetMode(false); setError('') }}
+                style={{ ...styles.loginButton, background: 'transparent', color: '#666', marginTop: 8 }}
+              >
+                Voltar
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={styles.loginContainer}>
       <div style={styles.loginCard}>
@@ -805,7 +892,18 @@ function WorkerLogin({ onLogin }) {
         <p style={{ textAlign: 'center', fontSize: 12, color: '#888', marginTop: 16 }}>
           {loginType === 'phone'
             ? 'Não tens conta? Fala com o teu encarregado.'
-            : 'Usa as mesmas credenciais da plataforma web.'
+            : (
+              <>
+                <span>Usa as mesmas credenciais da plataforma web.</span>
+                <br />
+                <button
+                  onClick={() => { setResetMode(true); setError('') }}
+                  style={{ background: 'none', border: 'none', color: '#3d4349', textDecoration: 'underline', cursor: 'pointer', fontSize: 12, marginTop: 8 }}
+                >
+                  Esqueci a password
+                </button>
+              </>
+            )
           }
         </p>
       </div>

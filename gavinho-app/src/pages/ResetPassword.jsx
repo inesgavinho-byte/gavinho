@@ -1,462 +1,222 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { Lock, Eye, EyeOff, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
+import { HardHat, Check, Eye, EyeOff } from 'lucide-react'
 
 export default function ResetPassword() {
+  const navigate = useNavigate()
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
-  const [validSession, setValidSession] = useState(false)
-  const [checking, setChecking] = useState(true)
-  
-  const navigate = useNavigate()
 
   useEffect(() => {
-    // Check if user has a valid recovery session
+    // Check if we have a valid session from the reset link
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()
-      if (session) {
-        setValidSession(true)
-      }
-      setChecking(false)
-    }
-    checkSession()
+      if (!session) {
+        // No session, might need to handle the hash
+        const hashParams = new URLSearchParams(window.location.hash.substring(1))
+        const accessToken = hashParams.get('access_token')
+        const refreshToken = hashParams.get('refresh_token')
 
-    // Listen for auth state changes (when user clicks recovery link)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (event === 'PASSWORD_RECOVERY') {
-          setValidSession(true)
+        if (accessToken && refreshToken) {
+          await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken
+          })
         }
       }
-    )
-
-    return () => subscription.unsubscribe()
+    }
+    checkSession()
   }, [])
 
-  const validatePassword = () => {
-    if (password.length < 8) {
-      setError('A password deve ter pelo menos 8 caracteres')
-      return false
+  const handleUpdatePassword = async () => {
+    if (!password.trim()) {
+      setError('Introduz uma nova password')
+      return
     }
+
+    if (password.length < 6) {
+      setError('A password deve ter pelo menos 6 caracteres')
+      return
+    }
+
     if (password !== confirmPassword) {
       setError('As passwords não coincidem')
-      return false
+      return
     }
-    return true
-  }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setError('')
-    
-    if (!validatePassword()) return
-    
     setLoading(true)
+    setError('')
 
     try {
-      const { error } = await supabase.auth.updateUser({
+      const { error: updateError } = await supabase.auth.updateUser({
         password: password
       })
-      
-      if (error) throw error
-      
+
+      if (updateError) throw updateError
+
       setSuccess(true)
-      
+
       // Redirect to login after 3 seconds
       setTimeout(() => {
-        navigate('/login')
+        navigate('/obra-app')
       }, 3000)
     } catch (err) {
-      console.error('Reset password error:', err)
-      if (err.message.includes('same as')) {
-        setError('A nova password deve ser diferente da atual')
-      } else {
-        setError('Erro ao alterar password. Tente novamente.')
-      }
+      setError(err.message || 'Erro ao atualizar password')
     } finally {
       setLoading(false)
     }
   }
 
-  // Loading state
-  if (checking) {
-    return (
-      <div 
-        style={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: 'var(--sandy-beach)'
-        }}
-      >
-        <Loader2 size={32} className="spin" style={{ color: 'var(--brown-light)' }} />
-        <style>{`
-          @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-          }
-          .spin { animation: spin 1s linear infinite; }
-        `}</style>
-      </div>
-    )
-  }
-
-  // Invalid session
-  if (!validSession && !checking) {
-    return (
-      <div 
-        style={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: 'var(--sandy-beach)',
-          padding: '20px'
-        }}
-      >
-        <div style={{ width: '100%', maxWidth: '420px' }}>
-          <div 
-            className="card"
-            style={{
-              padding: '32px',
-              borderRadius: '24px',
-              boxShadow: 'var(--shadow-lg)',
-              textAlign: 'center'
-            }}
-          >
-            <div 
-              style={{
-                width: '64px',
-                height: '64px',
-                borderRadius: '50%',
-                background: 'rgba(184, 138, 138, 0.15)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 20px'
-              }}
-            >
-              <AlertCircle size={32} style={{ color: 'var(--error)' }} />
-            </div>
-            <h2 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '12px', color: 'var(--brown)' }}>
-              Link Inválido
-            </h2>
-            <p style={{ color: 'var(--brown-light)', fontSize: '14px', marginBottom: '24px', lineHeight: 1.5 }}>
-              Este link de recuperação expirou ou é inválido. Por favor, solicite um novo link.
-            </p>
-            <button
-              onClick={() => navigate('/forgot-password')}
-              className="btn btn-primary"
-              style={{
-                width: '100%',
-                height: '48px',
-                fontSize: '15px',
-                fontWeight: 600,
-                borderRadius: '12px',
-                justifyContent: 'center'
-              }}
-            >
-              Solicitar Novo Link
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <div 
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'var(--sandy-beach)',
-        padding: '20px'
-      }}
-    >
-      <div style={{ width: '100%', maxWidth: '420px' }}>
-        {/* Logo & Brand */}
-        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-          <div 
-            style={{
-              width: '64px',
-              height: '64px',
-              background: 'linear-gradient(135deg, var(--brown), var(--brown-dark))',
-              borderRadius: '16px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 20px',
-              fontSize: '28px',
-              fontWeight: 700,
-              color: 'var(--sandy-beach)'
-            }}
-          >
-            G
-          </div>
-          <h1 
-            style={{ 
-              fontSize: '28px', 
-              fontWeight: 700, 
-              color: 'var(--brown)',
-              letterSpacing: '2px',
-              marginBottom: '8px'
-            }}
-          >
-            GAVINHO
-          </h1>
+    <div style={styles.container}>
+      <div style={styles.card}>
+        <div style={styles.header}>
+          <HardHat size={48} style={{ color: '#6b7280' }} />
+          <h1 style={{ margin: '12px 0 4px' }}>Nova Password</h1>
+          <p style={{ margin: 0, opacity: 0.7 }}>Define a tua nova password</p>
         </div>
 
-        {/* Card */}
-        <div 
-          className="card"
-          style={{
-            padding: '32px',
-            borderRadius: '24px',
-            boxShadow: 'var(--shadow-lg)'
-          }}
-        >
-          {success ? (
-            /* Success State */
-            <div style={{ textAlign: 'center' }}>
-              <div 
-                style={{
-                  width: '64px',
-                  height: '64px',
-                  borderRadius: '50%',
-                  background: 'rgba(122, 158, 122, 0.15)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  margin: '0 auto 20px'
-                }}
-              >
-                <CheckCircle size={32} style={{ color: 'var(--success)' }} />
-              </div>
-              <h2 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '12px', color: 'var(--brown)' }}>
-                Password Alterada
-              </h2>
-              <p style={{ color: 'var(--brown-light)', fontSize: '14px', marginBottom: '24px', lineHeight: 1.5 }}>
-                A sua password foi alterada com sucesso. Será redirecionado para o login...
-              </p>
-              <Loader2 size={24} className="spin" style={{ color: 'var(--brown-light)' }} />
+        {success ? (
+          <>
+            <div style={styles.successMessage}>
+              <Check size={20} /> Password atualizada com sucesso!
             </div>
-          ) : (
-            /* Form State */
-            <>
-              <h2 
-                style={{ 
-                  fontSize: '20px', 
-                  fontWeight: 600, 
-                  marginBottom: '8px',
-                  textAlign: 'center',
-                  color: 'var(--brown)'
-                }}
-              >
-                Nova Password
-              </h2>
-              <p style={{ 
-                textAlign: 'center', 
-                color: 'var(--brown-light)', 
-                fontSize: '14px',
-                marginBottom: '24px'
-              }}>
-                Introduza a sua nova password
-              </p>
-
-              {/* Error Message */}
-              {error && (
-                <div 
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    padding: '12px 16px',
-                    background: 'rgba(184, 138, 138, 0.15)',
-                    borderRadius: '12px',
-                    marginBottom: '20px',
-                    color: 'var(--error)',
-                    fontSize: '13px'
-                  }}
-                >
-                  <AlertCircle size={18} />
-                  {error}
-                </div>
-              )}
-
-              <form onSubmit={handleSubmit}>
-                <div style={{ marginBottom: '16px' }}>
-                  <label 
-                    style={{ 
-                      display: 'block', 
-                      fontSize: '13px', 
-                      fontWeight: 500, 
-                      marginBottom: '8px',
-                      color: 'var(--brown)'
-                    }}
-                  >
-                    Nova Password
-                  </label>
-                  <div style={{ position: 'relative' }}>
-                    <Lock 
-                      size={18} 
-                      style={{ 
-                        position: 'absolute', 
-                        left: '14px', 
-                        top: '50%', 
-                        transform: 'translateY(-50%)',
-                        color: 'var(--brown-light)'
-                      }} 
-                    />
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      className="input"
-                      placeholder="Mínimo 8 caracteres"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      minLength={8}
-                      style={{ 
-                        paddingLeft: '44px',
-                        paddingRight: '44px',
-                        height: '48px',
-                        borderRadius: '12px'
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      style={{
-                        position: 'absolute',
-                        right: '14px',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        color: 'var(--brown-light)',
-                        padding: '4px'
-                      }}
-                    >
-                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
-                  </div>
-                </div>
-
-                <div style={{ marginBottom: '24px' }}>
-                  <label 
-                    style={{ 
-                      display: 'block', 
-                      fontSize: '13px', 
-                      fontWeight: 500, 
-                      marginBottom: '8px',
-                      color: 'var(--brown)'
-                    }}
-                  >
-                    Confirmar Password
-                  </label>
-                  <div style={{ position: 'relative' }}>
-                    <Lock 
-                      size={18} 
-                      style={{ 
-                        position: 'absolute', 
-                        left: '14px', 
-                        top: '50%', 
-                        transform: 'translateY(-50%)',
-                        color: 'var(--brown-light)'
-                      }} 
-                    />
-                    <input
-                      type={showConfirmPassword ? 'text' : 'password'}
-                      className="input"
-                      placeholder="Repita a password"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      required
-                      style={{ 
-                        paddingLeft: '44px',
-                        paddingRight: '44px',
-                        height: '48px',
-                        borderRadius: '12px'
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      style={{
-                        position: 'absolute',
-                        right: '14px',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        color: 'var(--brown-light)',
-                        padding: '4px'
-                      }}
-                    >
-                      {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
-                  </div>
-                </div>
-
+            <p style={{ textAlign: 'center', color: '#666', fontSize: 14 }}>
+              A redirecionar para o login...
+            </p>
+          </>
+        ) : (
+          <>
+            <div style={styles.field}>
+              <label>Nova Password</label>
+              <div style={styles.passwordWrapper}>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  style={styles.input}
+                  autoFocus
+                />
                 <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={loading}
-                  style={{
-                    width: '100%',
-                    height: '48px',
-                    fontSize: '15px',
-                    fontWeight: 600,
-                    borderRadius: '12px',
-                    justifyContent: 'center'
-                  }}
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  style={styles.eyeButton}
                 >
-                  {loading ? (
-                    <>
-                      <Loader2 size={18} className="spin" />
-                      A guardar...
-                    </>
-                  ) : (
-                    'Alterar Password'
-                  )}
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
-              </form>
-            </>
-          )}
-        </div>
+              </div>
+            </div>
 
-        {/* Footer */}
-        <p 
-          style={{ 
-            textAlign: 'center', 
-            marginTop: '24px', 
-            fontSize: '12px', 
-            color: 'var(--brown-light)' 
-          }}
-        >
-          Ã‚Â© 2024 GAVINHO Group. Design & Build de Luxo.
-        </p>
+            <div style={styles.field}>
+              <label>Confirmar Password</label>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleUpdatePassword()}
+                placeholder="••••••••"
+                style={styles.input}
+              />
+            </div>
+
+            {error && <p style={styles.error}>{error}</p>}
+
+            <button
+              onClick={handleUpdatePassword}
+              disabled={loading || !password.trim() || !confirmPassword.trim()}
+              style={styles.button}
+            >
+              {loading ? 'A atualizar...' : 'Atualizar Password'}
+            </button>
+          </>
+        )}
       </div>
-
-      <style>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-        .spin {
-          animation: spin 1s linear infinite;
-        }
-      `}</style>
     </div>
   )
+}
+
+const styles = {
+  container: {
+    minHeight: '100vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: '#3d4349',
+    padding: 20,
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+  },
+  card: {
+    background: 'white',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 360,
+    boxShadow: '0 10px 40px rgba(0,0,0,0.3)'
+  },
+  header: {
+    textAlign: 'center',
+    marginBottom: 24
+  },
+  field: {
+    marginBottom: 16
+  },
+  input: {
+    width: '100%',
+    padding: '14px 16px',
+    border: '2px solid #E5E5E5',
+    borderRadius: 8,
+    fontSize: 16,
+    marginTop: 6,
+    outline: 'none',
+    boxSizing: 'border-box'
+  },
+  passwordWrapper: {
+    position: 'relative'
+  },
+  eyeButton: {
+    position: 'absolute',
+    right: 12,
+    top: '50%',
+    transform: 'translateY(-50%)',
+    background: 'none',
+    border: 'none',
+    color: '#666',
+    cursor: 'pointer',
+    padding: 4,
+    marginTop: 3
+  },
+  button: {
+    width: '100%',
+    padding: 14,
+    background: '#3d4349',
+    border: 'none',
+    borderRadius: 8,
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 600,
+    cursor: 'pointer',
+    marginTop: 12
+  },
+  error: {
+    color: '#F44336',
+    fontSize: 13,
+    textAlign: 'center'
+  },
+  successMessage: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    padding: 12,
+    background: '#E8F5E9',
+    color: '#2E7D32',
+    borderRadius: 8,
+    marginBottom: 16
+  }
 }
