@@ -1114,9 +1114,26 @@ export default function ChatObras() {
                             {msg.autor}
                           </div>
                         )}
-                        <p style={{ margin: 0, fontSize: 14, color: '#303030', lineHeight: 1.4 }}>
-                          {msg.conteudo}
-                        </p>
+                        {/* Show photo if exists */}
+                        {msg.anexos && msg.anexos.length > 0 && msg.anexos[0]?.url && (
+                          <img
+                            src={msg.anexos[0].url}
+                            alt="Foto"
+                            style={{
+                              maxWidth: '100%',
+                              maxHeight: 300,
+                              borderRadius: 8,
+                              marginBottom: 4,
+                              cursor: 'pointer'
+                            }}
+                            onClick={() => window.open(msg.anexos[0].url, '_blank')}
+                          />
+                        )}
+                        {msg.conteudo && msg.conteudo !== '📷 Foto' && (
+                          <p style={{ margin: 0, fontSize: 14, color: '#303030', lineHeight: 1.4 }}>
+                            {msg.conteudo}
+                          </p>
+                        )}
                         <div style={{
                           display: 'flex',
                           alignItems: 'center',

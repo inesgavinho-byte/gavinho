@@ -75,6 +75,10 @@ export default function ObraApp() {
   const [messages, setMessages] = useState([])
   const [newMessage, setNewMessage] = useState('')
   const [sending, setSending] = useState(false)
+  const [selectedPhoto, setSelectedPhoto] = useState(null)
+  const [photoPreview, setPhotoPreview] = useState(null)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const fileInputRef = useRef(null)
   const messagesEndRef = useRef(null)
 
   // Push notifications
@@ -160,12 +164,66 @@ export default function ObraApp() {
     return () => supabase.removeChannel(channel)
   }
 
+  // Handle photo selection
+  const handlePhotoSelect = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Por favor seleciona uma imagem')
+      return
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      alert('A imagem deve ter no máximo 10MB')
+      return
+    }
+
+    setSelectedPhoto(file)
+    setPhotoPreview(URL.createObjectURL(file))
+  }
+
+  // Upload photo to Supabase Storage
+  const uploadPhoto = async (file) => {
+    const fileExt = file.name.split('.').pop()
+    const fileName = `${obra.id}/${Date.now()}.${fileExt}`
+
+    const { data, error } = await supabase.storage
+      .from('obra-fotos')
+      .upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: false
+      })
+
+    if (error) throw error
+
+    // Get public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('obra-fotos')
+      .getPublicUrl(fileName)
+
+    return publicUrl
+  }
+
+  // Cancel photo selection
+  const cancelPhoto = () => {
+    setSelectedPhoto(null)
+    setPhotoPreview(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || !obra || !user) return
+    if ((!newMessage.trim() && !selectedPhoto) || !obra || !user) return
 
     setSending(true)
     const messageText = newMessage.trim()
     setNewMessage('')
+
+    let photoUrl = null
 
     // Optimistic update
     const tempMessage = {
@@ -174,34 +232,50 @@ export default function ObraApp() {
       autor_id: user.id,
       autor_nome: user.nome,
       conteudo: messageText,
-      tipo: 'texto',
+      tipo: selectedPhoto ? 'foto' : 'texto',
+      anexos: photoPreview ? [{ url: photoPreview, tipo: 'image' }] : null,
       created_at: new Date().toISOString(),
       pending: true
     }
     setMessages(prev => [...prev, tempMessage])
 
+    // Clear photo state
+    const photoToUpload = selectedPhoto
+    cancelPhoto()
+
     try {
+      // Upload photo if selected
+      if (photoToUpload) {
+        setUploadingPhoto(true)
+        photoUrl = await uploadPhoto(photoToUpload)
+        setUploadingPhoto(false)
+      }
+
       const { error } = await supabase
         .from('obra_mensagens')
         .insert({
           obra_id: obra.id,
           autor_id: user.id,
           autor_nome: user.nome,
-          conteudo: messageText,
-          tipo: 'texto'
+          conteudo: messageText || (photoUrl ? '📷 Foto' : ''),
+          tipo: photoUrl ? 'foto' : 'texto',
+          anexos: photoUrl ? [{ url: photoUrl, tipo: 'image' }] : null
         })
 
       if (error) throw error
 
-      // Remove pending flag
+      // Update message with real photo URL
       setMessages(prev => prev.map(m =>
-        m.id === tempMessage.id ? { ...m, pending: false } : m
+        m.id === tempMessage.id
+          ? { ...m, pending: false, anexos: photoUrl ? [{ url: photoUrl, tipo: 'image' }] : null }
+          : m
       ))
     } catch (err) {
       console.error('Erro ao enviar:', err)
+      setUploadingPhoto(false)
       // Mark as failed
       setMessages(prev => prev.map(m =>
-        m.id === tempMessage.id ? { ...m, failed: true } : m
+        m.id === tempMessage.id ? { ...m, failed: true, pending: false } : m
       ))
     } finally {
       setSending(false)
@@ -317,7 +391,18 @@ export default function ObraApp() {
                     {msg.autor_id !== user.id && (
                       <span style={styles.messageAuthor}>{msg.autor_nome}</span>
                     )}
-                    <p style={styles.messageText}>{msg.conteudo}</p>
+                    {/* Show photo if exists */}
+                    {msg.anexos && msg.anexos.length > 0 && msg.anexos[0]?.url && (
+                      <img
+                        src={msg.anexos[0].url}
+                        alt="Foto"
+                        style={styles.messagePhoto}
+                        onClick={() => window.open(msg.anexos[0].url, '_blank')}
+                      />
+                    )}
+                    {msg.conteudo && msg.conteudo !== '📷 Foto' && (
+                      <p style={styles.messageText}>{msg.conteudo}</p>
+                    )}
                     <span style={styles.messageTime}>
                       {new Date(msg.created_at).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
                       {msg.autor_id === user.id && (
@@ -330,9 +415,31 @@ export default function ObraApp() {
               <div ref={messagesEndRef} />
             </div>
 
+            {/* Photo Preview */}
+            {photoPreview && (
+              <div style={styles.photoPreviewContainer}>
+                <img src={photoPreview} alt="Preview" style={styles.photoPreview} />
+                <button onClick={cancelPhoto} style={styles.cancelPhotoButton}>
+                  ✕
+                </button>
+              </div>
+            )}
+
             {/* Input */}
             <div style={styles.inputContainer}>
-              <button style={styles.attachButton}>
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept="image/*"
+                capture="environment"
+                onChange={handlePhotoSelect}
+                style={{ display: 'none' }}
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                style={styles.attachButton}
+                disabled={uploadingPhoto}
+              >
                 <Camera size={24} />
               </button>
               <input
@@ -340,18 +447,18 @@ export default function ObraApp() {
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                placeholder="Escreve uma mensagem..."
+                placeholder={photoPreview ? "Adiciona uma legenda..." : "Escreve uma mensagem..."}
                 style={styles.input}
               />
               <button
                 onClick={handleSendMessage}
-                disabled={!newMessage.trim() || sending}
+                disabled={(!newMessage.trim() && !selectedPhoto) || sending || uploadingPhoto}
                 style={{
                   ...styles.sendButton,
-                  opacity: newMessage.trim() ? 1 : 0.5
+                  opacity: (newMessage.trim() || selectedPhoto) ? 1 : 0.5
                 }}
               >
-                <Send size={20} />
+                {uploadingPhoto ? <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={20} />}
               </button>
             </div>
           </div>
@@ -1005,6 +1112,40 @@ const styles = {
     fontSize: 14,
     lineHeight: 1.4,
     whiteSpace: 'pre-wrap'
+  },
+  messagePhoto: {
+    maxWidth: '100%',
+    maxHeight: 300,
+    borderRadius: 8,
+    marginBottom: 4,
+    cursor: 'pointer'
+  },
+  photoPreviewContainer: {
+    position: 'relative',
+    padding: 12,
+    background: '#F0F2F5',
+    borderTop: '1px solid #E5E5E5'
+  },
+  photoPreview: {
+    maxWidth: '100%',
+    maxHeight: 200,
+    borderRadius: 8
+  },
+  cancelPhotoButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 28,
+    height: 28,
+    borderRadius: '50%',
+    background: 'rgba(0,0,0,0.5)',
+    color: 'white',
+    border: 'none',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: 16
   },
   messageTime: {
     display: 'flex',
