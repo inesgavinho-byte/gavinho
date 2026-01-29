@@ -38,6 +38,7 @@ import Viabilidade from './pages/Viabilidade'
 import Emails from './pages/Emails'
 import DecisoesPagina from './pages/DecisoesPagina'
 import MQT from './pages/MQT'
+import ObraApp from './pages/ObraApp'
 
 function App() {
   return (
@@ -49,6 +50,10 @@ function App() {
           <Route path="/registo" element={<Registo />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+
+          {/* PWA App para Trabalhadores */}
+          <Route path="/obra-app" element={<ObraApp />} />
+          <Route path="/obra-app/*" element={<ObraApp />} />
           
           {/* Protected Routes */}
           <Route path="/" element={
