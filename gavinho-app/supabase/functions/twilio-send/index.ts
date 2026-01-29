@@ -67,8 +67,10 @@ serve(async (req) => {
       formData.append('MediaUrl', mediaUrl)
     }
 
-    // Nota: O auth token deve estar desencriptado ou usar Supabase Vault
-    const twilioAuth = btoa(`${config.twilio_account_sid}:${config.twilio_auth_token_encrypted}`)
+    // Usar Supabase secrets para o auth token (mais seguro)
+    // Se não houver secret, usar o token da config (fallback para desenvolvimento)
+    const twilioAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN') || config.twilio_auth_token_encrypted
+    const twilioAuth = btoa(`${config.twilio_account_sid}:${twilioAuthToken}`)
 
     const twilioResponse = await fetch(twilioUrl, {
       method: 'POST',

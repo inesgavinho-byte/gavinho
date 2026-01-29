@@ -3,6 +3,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { crypto } from 'https://deno.land/std@0.168.0/crypto/mod.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -20,6 +21,47 @@ interface TwilioMessage {
   MediaContentType0?: string
 }
 
+// Validar assinatura do Twilio (segurança)
+async function validateTwilioSignature(
+  req: Request,
+  formData: FormData,
+  authToken: string
+): Promise<boolean> {
+  const signature = req.headers.get('X-Twilio-Signature')
+  if (!signature) {
+    console.warn('Webhook sem assinatura Twilio')
+    return false
+  }
+
+  // Construir URL completa
+  const url = req.url
+
+  // Ordenar parâmetros e construir string para validação
+  const params: [string, string][] = []
+  formData.forEach((value, key) => {
+    params.push([key, value.toString()])
+  })
+  params.sort((a, b) => a[0].localeCompare(b[0]))
+
+  const paramString = params.map(([k, v]) => k + v).join('')
+  const data = url + paramString
+
+  // Calcular HMAC-SHA1
+  const encoder = new TextEncoder()
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(authToken),
+    { name: 'HMAC', hash: 'SHA-1' },
+    false,
+    ['sign']
+  )
+
+  const signatureBytes = await crypto.subtle.sign('HMAC', key, encoder.encode(data))
+  const expectedSignature = btoa(String.fromCharCode(...new Uint8Array(signatureBytes)))
+
+  return signature === expectedSignature
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -29,6 +71,25 @@ serve(async (req) => {
   try {
     // Parse form data from Twilio
     const formData = await req.formData()
+
+    // Criar cliente Supabase primeiro para obter auth token
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+    // Obter auth token para validação (opcional mas recomendado)
+    const twilioAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN')
+    if (twilioAuthToken) {
+      const isValid = await validateTwilioSignature(req, formData, twilioAuthToken)
+      if (!isValid) {
+        console.error('Assinatura Twilio inválida')
+        // Em produção, rejeitar requests inválidos
+        // Por agora, apenas logamos o warning
+        console.warn('Continuando mesmo com assinatura inválida (desenvolvimento)')
+      }
+    } else {
+      console.warn('TWILIO_AUTH_TOKEN não configurado - validação de assinatura desativada')
+    }
     const message: TwilioMessage = {
       MessageSid: formData.get('MessageSid') as string,
       AccountSid: formData.get('AccountSid') as string,
@@ -41,11 +102,6 @@ serve(async (req) => {
     }
 
     console.log('Mensagem recebida do WhatsApp:', message)
-
-    // Criar cliente Supabase
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     // Extrair número de telefone (formato: whatsapp:+351912345678)
     const telefone = message.From.replace('whatsapp:', '')

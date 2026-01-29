@@ -68,6 +68,21 @@ export default function ChatObras() {
   const [showAIPanel, setShowAIPanel] = useState(true)
   const [processedSuggestions, setProcessedSuggestions] = useState({})
 
+  // Estados Twilio Config
+  const [twilioConfig, setTwilioConfig] = useState({
+    accountSid: '',
+    authToken: '',
+    phoneNumber: ''
+  })
+  const [savingConfig, setSavingConfig] = useState(false)
+  const [configError, setConfigError] = useState('')
+
+  // Estados Contactos WhatsApp
+  const [showContactModal, setShowContactModal] = useState(false)
+  const [obraContacts, setObraContacts] = useState([])
+  const [newContact, setNewContact] = useState({ nome: '', telefone: '', funcao: '' })
+  const [savingContact, setSavingContact] = useState(false)
+
   const messagesEndRef = useRef(null)
   const messagesContainerRef = useRef(null)
   const isInitialLoad = useRef(true)
@@ -133,6 +148,7 @@ export default function ChatObras() {
 
       loadMensagens()
       loadAISugestoes()
+      loadObraContacts()
       // Subscrever a novas mensagens em tempo real
       const channel = supabase
         .channel(`whatsapp_${selectedObra.id}`)
@@ -177,14 +193,195 @@ export default function ChatObras() {
   // Verificar se WhatsApp está configurado
   const checkWhatsAppConfig = async () => {
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('whatsapp_config')
-        .select('ativo')
+        .select('*')
         .eq('ativo', true)
         .single()
-      setWhatsappConnected(!!data)
+
+      if (error) {
+        // Table might not exist yet
+        if (error.code === 'PGRST116' || error.message?.includes('does not exist')) {
+          setWhatsappConnected(false)
+          return
+        }
+      }
+
+      if (data) {
+        setWhatsappConnected(true)
+        setTwilioConfig({
+          accountSid: data.twilio_account_sid || '',
+          authToken: '', // Never show auth token
+          phoneNumber: data.twilio_phone_number || ''
+        })
+      } else {
+        setWhatsappConnected(false)
+      }
     } catch {
       setWhatsappConnected(false)
+    }
+  }
+
+  // Guardar configuração Twilio
+  const saveTwilioConfig = async () => {
+    if (!twilioConfig.accountSid || !twilioConfig.authToken || !twilioConfig.phoneNumber) {
+      setConfigError('Preenche todos os campos')
+      return
+    }
+
+    setSavingConfig(true)
+    setConfigError('')
+
+    try {
+      // Check if config exists
+      const { data: existing } = await supabase
+        .from('whatsapp_config')
+        .select('id')
+        .eq('ativo', true)
+        .single()
+
+      const configData = {
+        twilio_account_sid: twilioConfig.accountSid,
+        twilio_auth_token_encrypted: twilioConfig.authToken, // In production, encrypt this
+        twilio_phone_number: twilioConfig.phoneNumber.replace(/\s/g, ''),
+        ativo: true,
+        updated_at: new Date().toISOString()
+      }
+
+      if (existing) {
+        // Update existing config
+        const { error } = await supabase
+          .from('whatsapp_config')
+          .update(configData)
+          .eq('id', existing.id)
+
+        if (error) throw error
+      } else {
+        // Insert new config
+        const { error } = await supabase
+          .from('whatsapp_config')
+          .insert({
+            ...configData,
+            created_at: new Date().toISOString()
+          })
+
+        if (error) throw error
+      }
+
+      setWhatsappConnected(true)
+      setShowConfig(false)
+      setTwilioConfig(prev => ({ ...prev, authToken: '' })) // Clear token from memory
+    } catch (err) {
+      console.error('Erro ao guardar config:', err)
+      setConfigError(err.message || 'Erro ao guardar configuração')
+    } finally {
+      setSavingConfig(false)
+    }
+  }
+
+  // Carregar contactos da obra
+  const loadObraContacts = async () => {
+    if (!selectedObra) return
+
+    try {
+      const { data, error } = await supabase
+        .from('whatsapp_contactos')
+        .select('*')
+        .eq('obra_id', selectedObra.id)
+        .order('nome')
+
+      if (error) throw error
+      setObraContacts(data || [])
+    } catch (err) {
+      console.error('Erro ao carregar contactos:', err)
+      setObraContacts([])
+    }
+  }
+
+  // Guardar novo contacto
+  const saveContact = async () => {
+    if (!newContact.nome || !newContact.telefone) return
+
+    setSavingContact(true)
+    try {
+      // Format phone number
+      let phone = newContact.telefone.replace(/\s/g, '')
+      if (!phone.startsWith('+')) {
+        phone = '+351' + phone // Default to Portugal
+      }
+
+      const { error } = await supabase
+        .from('whatsapp_contactos')
+        .insert({
+          obra_id: selectedObra.id,
+          nome: newContact.nome,
+          telefone: phone,
+          funcao: newContact.funcao || null,
+          ativo: true
+        })
+
+      if (error) throw error
+
+      setNewContact({ nome: '', telefone: '', funcao: '' })
+      await loadObraContacts()
+    } catch (err) {
+      console.error('Erro ao guardar contacto:', err)
+      alert('Erro ao guardar contacto')
+    } finally {
+      setSavingContact(false)
+    }
+  }
+
+  // Eliminar contacto
+  const deleteContact = async (contactId) => {
+    if (!confirm('Eliminar este contacto?')) return
+
+    try {
+      const { error } = await supabase
+        .from('whatsapp_contactos')
+        .delete()
+        .eq('id', contactId)
+
+      if (error) throw error
+      await loadObraContacts()
+    } catch (err) {
+      console.error('Erro ao eliminar contacto:', err)
+    }
+  }
+
+  // Testar conexão Twilio
+  const testTwilioConnection = async () => {
+    if (!twilioConfig.accountSid || !twilioConfig.authToken) {
+      setConfigError('Preenche Account SID e Auth Token')
+      return
+    }
+
+    setSavingConfig(true)
+    setConfigError('')
+
+    try {
+      // Test by fetching account info from Twilio
+      const auth = btoa(`${twilioConfig.accountSid}:${twilioConfig.authToken}`)
+      const response = await fetch(
+        `https://api.twilio.com/2010-04-01/Accounts/${twilioConfig.accountSid}.json`,
+        {
+          headers: {
+            'Authorization': `Basic ${auth}`
+          }
+        }
+      )
+
+      if (response.ok) {
+        setConfigError('')
+        alert('Conexão bem sucedida!')
+      } else {
+        const data = await response.json()
+        throw new Error(data.message || 'Credenciais inválidas')
+      }
+    } catch (err) {
+      setConfigError(err.message || 'Erro ao testar conexão')
+    } finally {
+      setSavingConfig(false)
     }
   }
 
@@ -313,46 +510,87 @@ export default function ChatObras() {
     if (!newMessage.trim() || !selectedObra) return
 
     setSending(true)
+    const messageContent = newMessage.trim()
+
+    // Adicionar mensagem localmente primeiro (optimistic update)
+    const tempId = Date.now()
+    const novaMensagem = {
+      id: tempId,
+      tipo: 'enviada',
+      autor: 'Gavinho',
+      conteudo: messageContent,
+      hora: new Date().toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }),
+      data: new Date().toISOString().split('T')[0],
+      lida: false,
+      pending: true
+    }
+    setMensagens(prev => [...prev, novaMensagem])
+    setNewMessage('')
+
+    // Forçar scroll para baixo ao enviar mensagem
+    setTimeout(() => scrollToBottom(true), 50)
+
     try {
-      // Adicionar mensagem localmente primeiro (optimistic update)
-      const novaMensagem = {
-        id: Date.now(),
-        tipo: 'enviada',
-        autor: 'Gavinho',
-        conteudo: newMessage.trim(),
-        hora: new Date().toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }),
-        data: new Date().toISOString().split('T')[0],
-        lida: false
-      }
-      setMensagens(prev => [...prev, novaMensagem])
-      const messageContent = newMessage.trim()
-      setNewMessage('')
-
-      // Forçar scroll para baixo ao enviar mensagem
-      setTimeout(() => scrollToBottom(true), 50)
-
       // Se WhatsApp estiver configurado, enviar via Twilio
-      if (whatsappConnected) {
-        // Obter contacto principal da obra
-        const { data: contacto } = await supabase
-          .from('whatsapp_contactos')
-          .select('telefone')
-          .eq('obra_id', selectedObra.id)
-          .limit(1)
-          .single()
+      if (whatsappConnected && obraContacts.length > 0) {
+        const destinatario = obraContacts[0] // Primeiro contacto
 
-        if (contacto) {
-          await supabase.functions.invoke('twilio-send', {
-            body: {
-              to: contacto.telefone,
-              body: messageContent,
-              obra_id: selectedObra.id
-            }
-          })
+        const { data, error } = await supabase.functions.invoke('twilio-send', {
+          body: {
+            to: destinatario.telefone,
+            body: messageContent,
+            obra_id: selectedObra.id
+          }
+        })
+
+        if (error) {
+          throw new Error(error.message || 'Erro ao enviar via Twilio')
         }
+
+        // Update message to show as sent
+        setMensagens(prev => prev.map(m =>
+          m.id === tempId ? { ...m, pending: false, lida: true } : m
+        ))
+
+        console.log('Mensagem enviada via Twilio:', data)
+      } else {
+        // Guardar localmente mesmo sem WhatsApp configurado
+        const { error } = await supabase
+          .from('whatsapp_mensagens')
+          .insert({
+            obra_id: selectedObra.id,
+            tipo: 'enviada',
+            conteudo: messageContent,
+            autor_nome: 'Gavinho',
+            telefone_origem: 'local',
+            lida: true,
+            processada_ia: true
+          })
+
+        if (error) {
+          console.error('Erro ao guardar mensagem:', error)
+        }
+
+        // Update message to show as sent (local only)
+        setMensagens(prev => prev.map(m =>
+          m.id === tempId ? { ...m, pending: false } : m
+        ))
       }
     } catch (err) {
       console.error('Erro ao enviar mensagem:', err)
+      // Mark message as failed
+      setMensagens(prev => prev.map(m =>
+        m.id === tempId ? { ...m, pending: false, failed: true } : m
+      ))
+
+      // Show error to user
+      if (!whatsappConnected) {
+        // Silently save locally
+      } else if (obraContacts.length === 0) {
+        alert('Adiciona um contacto WhatsApp para esta obra primeiro')
+      } else {
+        alert('Erro ao enviar mensagem: ' + err.message)
+      }
     } finally {
       setSending(false)
     }
@@ -699,6 +937,33 @@ export default function ChatObras() {
                 <h3 style={{ margin: 0, fontSize: 15, fontWeight: 500 }}>{selectedObra.nome}</h3>
                 <p style={{ margin: 0, fontSize: 12, opacity: 0.8 }}>{selectedObra.codigo} • Manuel Encarregado</p>
               </div>
+              <button
+                onClick={() => setShowContactModal(true)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  borderRadius: 8,
+                  padding: '8px',
+                  cursor: 'pointer',
+                  color: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6
+                }}
+                title="Gerir contactos"
+              >
+                <Users style={{ width: 18, height: 18 }} />
+                {obraContacts.length > 0 && (
+                  <span style={{
+                    background: 'rgba(255,255,255,0.3)',
+                    borderRadius: 4,
+                    padding: '2px 6px',
+                    fontSize: 11
+                  }}>
+                    {obraContacts.length}
+                  </span>
+                )}
+              </button>
               <button
                 onClick={() => setShowAIPanel(!showAIPanel)}
                 style={{
@@ -1134,8 +1399,10 @@ export default function ChatObras() {
             background: 'white',
             borderRadius: 12,
             padding: 24,
-            width: 450,
-            maxWidth: '90%'
+            width: 480,
+            maxWidth: '90%',
+            maxHeight: '90vh',
+            overflow: 'auto'
           }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
               <h3 style={{ margin: 0, fontSize: 18 }}>Configuração Twilio WhatsApp</h3>
@@ -1144,75 +1411,145 @@ export default function ChatObras() {
               </button>
             </div>
 
+            {whatsappConnected && (
+              <div style={{
+                padding: 12,
+                background: '#E8F5E9',
+                borderRadius: 8,
+                fontSize: 13,
+                color: '#2E7D32',
+                marginBottom: 16,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8
+              }}>
+                <Wifi style={{ width: 16, height: 16 }} />
+                WhatsApp conectado • {twilioConfig.phoneNumber}
+              </div>
+            )}
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
                 <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
-                  Account SID
+                  Account SID *
                 </label>
                 <input
                   type="text"
+                  value={twilioConfig.accountSid}
+                  onChange={(e) => setTwilioConfig(prev => ({ ...prev, accountSid: e.target.value }))}
                   placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                   style={{
                     width: '100%',
                     padding: '10px 12px',
                     border: '1px solid #DDD',
                     borderRadius: 8,
-                    fontSize: 14
+                    fontSize: 14,
+                    fontFamily: 'monospace'
                   }}
                 />
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
-                  Auth Token
+                  Auth Token * {whatsappConnected && <span style={{ color: '#888', fontWeight: 400 }}>(deixa vazio para manter)</span>}
                 </label>
                 <input
                   type="password"
-                  placeholder="••••••••••••••••••••••••••••••••"
+                  value={twilioConfig.authToken}
+                  onChange={(e) => setTwilioConfig(prev => ({ ...prev, authToken: e.target.value }))}
+                  placeholder={whatsappConnected ? "••••••••••••••••••••••••••••••••" : "Colar Auth Token aqui"}
                   style={{
                     width: '100%',
                     padding: '10px 12px',
                     border: '1px solid #DDD',
                     borderRadius: 8,
-                    fontSize: 14
+                    fontSize: 14,
+                    fontFamily: 'monospace'
                   }}
                 />
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
-                  Número WhatsApp (Twilio)
+                  Número WhatsApp (Twilio) *
                 </label>
                 <input
                   type="text"
-                  placeholder="+1 415 XXX XXXX"
+                  value={twilioConfig.phoneNumber}
+                  onChange={(e) => setTwilioConfig(prev => ({ ...prev, phoneNumber: e.target.value }))}
+                  placeholder="+14155238886"
                   style={{
                     width: '100%',
                     padding: '10px 12px',
                     border: '1px solid #DDD',
                     borderRadius: 8,
-                    fontSize: 14
+                    fontSize: 14,
+                    fontFamily: 'monospace'
                   }}
                 />
+                <p style={{ margin: '6px 0 0', fontSize: 11, color: '#888' }}>
+                  Formato internacional com + (ex: +14155238886)
+                </p>
+              </div>
+
+              {configError && (
+                <div style={{
+                  padding: 12,
+                  background: '#FFEBEE',
+                  borderRadius: 8,
+                  fontSize: 13,
+                  color: '#C62828',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8
+                }}>
+                  <AlertCircle style={{ width: 16, height: 16 }} />
+                  {configError}
+                </div>
+              )}
+
+              <div style={{
+                padding: 12,
+                background: '#F5F5F5',
+                borderRadius: 8,
+                fontSize: 13,
+                color: '#666'
+              }}>
+                <strong>Como obter credenciais Twilio:</strong>
+                <ol style={{ margin: '8px 0 0', paddingLeft: 20, lineHeight: 1.6 }}>
+                  <li>Acede a <a href="https://console.twilio.com" target="_blank" rel="noopener noreferrer" style={{ color: '#075E54' }}>console.twilio.com</a></li>
+                  <li>Copia o Account SID e Auth Token</li>
+                  <li>Vai a Messaging → Try it out → Send a WhatsApp message</li>
+                  <li>Copia o número do Sandbox (ou ativa WhatsApp Business)</li>
+                </ol>
               </div>
 
               <div style={{
                 padding: 12,
-                background: '#FFF3E0',
+                background: '#FFF8E1',
                 borderRadius: 8,
-                fontSize: 13,
-                color: '#E65100'
+                fontSize: 12,
+                color: '#F57F17'
               }}>
-                <strong>Nota:</strong> Precisas de uma conta Twilio com WhatsApp Business API ativada.
-                <a href="https://www.twilio.com/whatsapp" target="_blank" rel="noopener noreferrer" style={{ color: '#E65100', marginLeft: 4 }}>
-                  Saber mais
-                </a>
+                <strong>Webhook URL:</strong> Configura este URL no Twilio para receber mensagens:
+                <code style={{
+                  display: 'block',
+                  marginTop: 6,
+                  padding: 8,
+                  background: 'rgba(0,0,0,0.05)',
+                  borderRadius: 4,
+                  wordBreak: 'break-all'
+                }}>
+                  https://vctcppuvqjstscbzdykn.supabase.co/functions/v1/twilio-webhook
+                </code>
               </div>
 
               <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
                 <button
-                  onClick={() => setShowConfig(false)}
+                  onClick={() => {
+                    setShowConfig(false)
+                    setConfigError('')
+                  }}
                   style={{
-                    flex: 1,
-                    padding: '12px',
+                    padding: '12px 20px',
                     border: '1px solid #DDD',
                     borderRadius: 8,
                     background: 'white',
@@ -1223,10 +1560,24 @@ export default function ChatObras() {
                   Cancelar
                 </button>
                 <button
-                  onClick={() => {
-                    setWhatsappConnected(true)
-                    setShowConfig(false)
+                  onClick={testTwilioConnection}
+                  disabled={savingConfig}
+                  style={{
+                    padding: '12px 20px',
+                    border: '1px solid #075E54',
+                    borderRadius: 8,
+                    background: 'white',
+                    color: '#075E54',
+                    cursor: savingConfig ? 'wait' : 'pointer',
+                    fontSize: 14,
+                    opacity: savingConfig ? 0.6 : 1
                   }}
+                >
+                  Testar
+                </button>
+                <button
+                  onClick={saveTwilioConfig}
+                  disabled={savingConfig}
                   style={{
                     flex: 1,
                     padding: '12px',
@@ -1234,14 +1585,212 @@ export default function ChatObras() {
                     borderRadius: 8,
                     background: '#25D366',
                     color: 'white',
-                    cursor: 'pointer',
+                    cursor: savingConfig ? 'wait' : 'pointer',
                     fontSize: 14,
-                    fontWeight: 500
+                    fontWeight: 500,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    opacity: savingConfig ? 0.6 : 1
                   }}
                 >
-                  Conectar
+                  {savingConfig ? (
+                    <>
+                      <Loader2 style={{ width: 16, height: 16, animation: 'spin 1s linear infinite' }} />
+                      A guardar...
+                    </>
+                  ) : (
+                    'Guardar Configuração'
+                  )}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Contactos */}
+      {showContactModal && selectedObra && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }} onClick={() => setShowContactModal(false)}>
+          <div style={{
+            background: 'white',
+            borderRadius: 12,
+            padding: 24,
+            width: 500,
+            maxWidth: '90%',
+            maxHeight: '80vh',
+            overflow: 'auto'
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <h3 style={{ margin: 0, fontSize: 18 }}>Contactos WhatsApp - {selectedObra.codigo}</h3>
+              <button onClick={() => setShowContactModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                <X style={{ width: 20, height: 20 }} />
+              </button>
+            </div>
+
+            {/* Adicionar novo contacto */}
+            <div style={{
+              background: '#F5F5F5',
+              borderRadius: 8,
+              padding: 16,
+              marginBottom: 20
+            }}>
+              <h4 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 600 }}>Adicionar Contacto</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                <input
+                  type="text"
+                  value={newContact.nome}
+                  onChange={(e) => setNewContact(prev => ({ ...prev, nome: e.target.value }))}
+                  placeholder="Nome"
+                  style={{
+                    padding: '10px 12px',
+                    border: '1px solid #DDD',
+                    borderRadius: 6,
+                    fontSize: 14
+                  }}
+                />
+                <input
+                  type="text"
+                  value={newContact.telefone}
+                  onChange={(e) => setNewContact(prev => ({ ...prev, telefone: e.target.value }))}
+                  placeholder="+351 912 345 678"
+                  style={{
+                    padding: '10px 12px',
+                    border: '1px solid #DDD',
+                    borderRadius: 6,
+                    fontSize: 14
+                  }}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: 12 }}>
+                <input
+                  type="text"
+                  value={newContact.funcao}
+                  onChange={(e) => setNewContact(prev => ({ ...prev, funcao: e.target.value }))}
+                  placeholder="Função (ex: Encarregado, Cliente...)"
+                  style={{
+                    flex: 1,
+                    padding: '10px 12px',
+                    border: '1px solid #DDD',
+                    borderRadius: 6,
+                    fontSize: 14
+                  }}
+                />
+                <button
+                  onClick={saveContact}
+                  disabled={savingContact || !newContact.nome || !newContact.telefone}
+                  style={{
+                    padding: '10px 20px',
+                    background: '#25D366',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 6,
+                    fontSize: 14,
+                    fontWeight: 500,
+                    cursor: savingContact ? 'wait' : 'pointer',
+                    opacity: (!newContact.nome || !newContact.telefone) ? 0.5 : 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6
+                  }}
+                >
+                  <Plus style={{ width: 16, height: 16 }} />
+                  Adicionar
+                </button>
+              </div>
+            </div>
+
+            {/* Lista de contactos */}
+            <div>
+              <h4 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 600, color: '#666' }}>
+                Contactos ({obraContacts.length})
+              </h4>
+              {obraContacts.length === 0 ? (
+                <div style={{
+                  padding: 32,
+                  textAlign: 'center',
+                  color: '#888',
+                  background: '#FAFAFA',
+                  borderRadius: 8
+                }}>
+                  <Users style={{ width: 32, height: 32, marginBottom: 8, opacity: 0.5 }} />
+                  <p style={{ margin: 0 }}>Sem contactos registados para esta obra</p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {obraContacts.map(contact => (
+                    <div
+                      key={contact.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 12,
+                        padding: 12,
+                        background: '#FAFAFA',
+                        borderRadius: 8,
+                        border: '1px solid #E5E5E5'
+                      }}
+                    >
+                      <div style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: '50%',
+                        background: '#25D366',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'white',
+                        fontWeight: 600,
+                        fontSize: 14
+                      }}>
+                        {contact.nome?.charAt(0).toUpperCase()}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 500 }}>{contact.nome}</div>
+                        <div style={{ fontSize: 13, color: '#666' }}>
+                          {contact.telefone}
+                          {contact.funcao && <span style={{ marginLeft: 8, opacity: 0.7 }}>• {contact.funcao}</span>}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => deleteContact(contact.id)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          padding: 8,
+                          color: '#999',
+                          borderRadius: 4
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.color = '#F44336'}
+                        onMouseLeave={(e) => e.currentTarget.style.color = '#999'}
+                      >
+                        <X style={{ width: 16, height: 16 }} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div style={{
+              marginTop: 20,
+              padding: 12,
+              background: '#E3F2FD',
+              borderRadius: 8,
+              fontSize: 12,
+              color: '#1565C0'
+            }}>
+              <strong>Dica:</strong> O primeiro contacto da lista será usado como destinatário por defeito ao enviar mensagens.
             </div>
           </div>
         </div>
