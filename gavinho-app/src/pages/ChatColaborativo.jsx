@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -13,7 +13,10 @@ import {
   ThumbsUp, Laugh, Frown, PartyPopper, Fire, Eye,
   Link2, Copy, Check, Edit, Trash2, CornerUpLeft, Quote,
   BookmarkCheck, Volume2, VolumeX, User, CalendarDays,
-  FileImage, AtSignIcon, LinkIcon, SlidersHorizontal
+  FileImage, AtSignIcon, LinkIcon, SlidersHorizontal,
+  Bold, Italic, Code, List, ListOrdered, Link as LinkIcon2,
+  Forward, CheckCheck, Circle, Keyboard, Upload, ExternalLink,
+  Grip, Type, Code2, FileCode
 } from 'lucide-react'
 
 // Estrutura de equipas GAVINHO (baseado no Teams)
@@ -136,6 +139,40 @@ export default function ChatColaborativo() {
     hasAttachments: false,
     hasMentions: false
   })
+
+  // Rich Text Formatting
+  const [showFormattingToolbar, setShowFormattingToolbar] = useState(true)
+
+  // Typing Indicator
+  const [typingUsers, setTypingUsers] = useState([])
+  const typingTimeoutRef = useRef(null)
+
+  // Online Status
+  const [onlineUsers, setOnlineUsers] = useState(['user1', 'user2', 'user3']) // Simulated
+
+  // Read Receipts
+  const [readReceipts, setReadReceipts] = useState({})
+
+  // Favorite Channels
+  const [favoriteChannels, setFavoriteChannels] = useState([])
+
+  // Pinned Messages
+  const [channelPinnedMessages, setChannelPinnedMessages] = useState({})
+  const [showPinnedMessages, setShowPinnedMessages] = useState(false)
+
+  // Create Task Modal
+  const [showCreateTaskModal, setShowCreateTaskModal] = useState(false)
+  const [taskFromMessage, setTaskFromMessage] = useState(null)
+
+  // Forward Message Modal
+  const [showForwardModal, setShowForwardModal] = useState(false)
+  const [messageToForward, setMessageToForward] = useState(null)
+
+  // Drag & Drop
+  const [isDragging, setIsDragging] = useState(false)
+
+  // Keyboard shortcuts help
+  const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false)
 
   const fileInputRef = useRef(null)
   const messagesEndRef = useRef(null)
@@ -829,11 +866,321 @@ export default function ChatColaborativo() {
   }
 
   const filteredPosts = applyFilters(posts)
-    ? posts.filter(p =>
-        p.conteudo?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.autor?.nome?.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : posts
+
+  // ========== RICH TEXT FORMATTING ==========
+  const applyFormatting = (format) => {
+    const input = messageInputRef.current
+    if (!input) return
+
+    const start = input.selectionStart
+    const end = input.selectionEnd
+    const text = messageInput
+    const selectedText = text.substring(start, end)
+
+    let formattedText = ''
+    let cursorOffset = 0
+
+    switch (format) {
+      case 'bold':
+        formattedText = `**${selectedText || 'texto'}**`
+        cursorOffset = selectedText ? formattedText.length : 2
+        break
+      case 'italic':
+        formattedText = `_${selectedText || 'texto'}_`
+        cursorOffset = selectedText ? formattedText.length : 1
+        break
+      case 'code':
+        formattedText = `\`${selectedText || 'código'}\``
+        cursorOffset = selectedText ? formattedText.length : 1
+        break
+      case 'codeblock':
+        formattedText = `\`\`\`\n${selectedText || 'código'}\n\`\`\``
+        cursorOffset = selectedText ? formattedText.length : 4
+        break
+      case 'list':
+        formattedText = `\n- ${selectedText || 'item'}`
+        cursorOffset = formattedText.length
+        break
+      case 'numbered':
+        formattedText = `\n1. ${selectedText || 'item'}`
+        cursorOffset = formattedText.length
+        break
+      case 'link':
+        formattedText = `[${selectedText || 'texto'}](url)`
+        cursorOffset = selectedText ? formattedText.length - 4 : 1
+        break
+      default:
+        return
+    }
+
+    const newText = text.substring(0, start) + formattedText + text.substring(end)
+    setMessageInput(newText)
+
+    setTimeout(() => {
+      input.focus()
+      input.setSelectionRange(start + cursorOffset, start + cursorOffset)
+    }, 0)
+  }
+
+  // Render formatted text (bold, italic, code, links)
+  const renderFormattedText = (text) => {
+    if (!text) return null
+
+    // Process code blocks first
+    const codeBlockRegex = /```([\s\S]*?)```/g
+    const inlineCodeRegex = /`([^`]+)`/g
+    const boldRegex = /\*\*([^*]+)\*\*/g
+    const italicRegex = /_([^_]+)_/g
+    const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g
+    const urlRegex = /(https?:\/\/[^\s]+)/g
+
+    let result = text
+
+    // Code blocks
+    result = result.replace(codeBlockRegex, '<pre class="code-block">$1</pre>')
+    // Inline code
+    result = result.replace(inlineCodeRegex, '<code class="inline-code">$1</code>')
+    // Bold
+    result = result.replace(boldRegex, '<strong>$1</strong>')
+    // Italic
+    result = result.replace(italicRegex, '<em>$1</em>')
+    // Links
+    result = result.replace(linkRegex, '<a href="$2" target="_blank" class="chat-link">$1</a>')
+    // Auto-link URLs
+    result = result.replace(urlRegex, (match) => {
+      if (result.includes(`href="${match}"`)) return match
+      return `<a href="${match}" target="_blank" class="chat-link">${match}</a>`
+    })
+
+    return <span dangerouslySetInnerHTML={{ __html: result }} />
+  }
+
+  // Extract URL previews from text
+  const extractUrls = (text) => {
+    if (!text) return []
+    const urlRegex = /(https?:\/\/[^\s]+)/g
+    return text.match(urlRegex) || []
+  }
+
+  // ========== TYPING INDICATOR ==========
+  const handleTyping = () => {
+    // Emit typing event (in production, would broadcast via Supabase realtime)
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current)
+    }
+    typingTimeoutRef.current = setTimeout(() => {
+      // Stop typing indicator after 3 seconds of no input
+    }, 3000)
+  }
+
+  // ========== ONLINE STATUS ==========
+  const isUserOnline = (userId) => {
+    return onlineUsers.includes(userId)
+  }
+
+  // ========== READ RECEIPTS ==========
+  const markMessageAsRead = (messageId) => {
+    setReadReceipts(prev => ({
+      ...prev,
+      [messageId]: {
+        read: true,
+        readAt: new Date().toISOString(),
+        readBy: [...(prev[messageId]?.readBy || []), profile?.id]
+      }
+    }))
+  }
+
+  const getReadStatus = (message) => {
+    const receipt = readReceipts[message.id]
+    if (!receipt) return 'sent'
+    if (receipt.readBy?.length > 0) return 'read'
+    return 'delivered'
+  }
+
+  // ========== FAVORITE CHANNELS ==========
+  const toggleFavoriteChannel = (channelId) => {
+    setFavoriteChannels(prev =>
+      prev.includes(channelId)
+        ? prev.filter(id => id !== channelId)
+        : [...prev, channelId]
+    )
+  }
+
+  const isFavoriteChannel = (channelId) => {
+    return favoriteChannels.includes(channelId)
+  }
+
+  // Sort channels: favorites first
+  const sortedCanais = [...canais].sort((a, b) => {
+    const aFav = isFavoriteChannel(a.id)
+    const bFav = isFavoriteChannel(b.id)
+    if (aFav && !bFav) return -1
+    if (!aFav && bFav) return 1
+    return 0
+  })
+
+  // ========== PINNED MESSAGES ==========
+  const togglePinMessage = (post) => {
+    if (!canalAtivo) return
+    const channelId = canalAtivo.id
+    const isPinned = channelPinnedMessages[channelId]?.some(m => m.id === post.id)
+
+    setChannelPinnedMessages(prev => ({
+      ...prev,
+      [channelId]: isPinned
+        ? (prev[channelId] || []).filter(m => m.id !== post.id)
+        : [...(prev[channelId] || []), { ...post, pinnedAt: new Date().toISOString() }]
+    }))
+    setShowMessageMenu(null)
+  }
+
+  const isMessagePinned = (postId) => {
+    if (!canalAtivo) return false
+    return channelPinnedMessages[canalAtivo.id]?.some(m => m.id === postId)
+  }
+
+  const getCurrentChannelPinnedMessages = () => {
+    if (!canalAtivo) return []
+    return channelPinnedMessages[canalAtivo.id] || []
+  }
+
+  // ========== CREATE TASK FROM MESSAGE ==========
+  const openCreateTaskModal = (post) => {
+    setTaskFromMessage(post)
+    setShowCreateTaskModal(true)
+    setShowMessageMenu(null)
+  }
+
+  const handleCreateTask = (taskData) => {
+    // In production, would insert into tasks table
+    console.log('Creating task:', taskData)
+    setShowCreateTaskModal(false)
+    setTaskFromMessage(null)
+    // Show success toast
+    alert('Tarefa criada com sucesso!')
+  }
+
+  // ========== FORWARD MESSAGE ==========
+  const openForwardModal = (post) => {
+    setMessageToForward(post)
+    setShowForwardModal(true)
+    setShowMessageMenu(null)
+  }
+
+  const handleForwardMessage = (targetChannelId) => {
+    if (!messageToForward) return
+
+    const targetChannel = canais.find(c => c.id === targetChannelId)
+    console.log('Forwarding to:', targetChannel?.nome)
+
+    // In production, would insert forwarded message
+    setShowForwardModal(false)
+    setMessageToForward(null)
+    alert(`Mensagem reencaminhada para ${targetChannel?.nome}`)
+  }
+
+  // ========== DRAG & DROP FILES ==========
+  const handleDragOver = useCallback((e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(true)
+  }, [])
+
+  const handleDragLeave = useCallback((e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+  }, [])
+
+  const handleDrop = useCallback((e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+
+    const files = Array.from(e.dataTransfer.files)
+    if (files.length > 0) {
+      const newFiles = files.map(file => ({
+        file,
+        name: file.name,
+        size: file.size,
+        type: file.type.startsWith('image/') ? 'image' : 'file'
+      }))
+      setSelectedFiles(prev => [...prev, ...newFiles])
+    }
+  }, [])
+
+  // ========== KEYBOARD SHORTCUTS ==========
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Ctrl/Cmd + Enter to send
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault()
+        handleSendMessage()
+        return
+      }
+
+      // Escape to close modals/menus
+      if (e.key === 'Escape') {
+        setShowEmojiPicker(false)
+        setShowMentions(false)
+        setShowMessageMenu(null)
+        setShowForwardModal(false)
+        setShowCreateTaskModal(false)
+        setShowKeyboardShortcuts(false)
+        setActiveThread(null)
+        return
+      }
+
+      // Ctrl/Cmd + K for search
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault()
+        setShowSearch(true)
+        return
+      }
+
+      // Ctrl/Cmd + B for bold (when input focused)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'b' && document.activeElement === messageInputRef.current) {
+        e.preventDefault()
+        applyFormatting('bold')
+        return
+      }
+
+      // Ctrl/Cmd + I for italic (when input focused)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'i' && document.activeElement === messageInputRef.current) {
+        e.preventDefault()
+        applyFormatting('italic')
+        return
+      }
+
+      // Ctrl/Cmd + Shift + C for code (when input focused)
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'C' && document.activeElement === messageInputRef.current) {
+        e.preventDefault()
+        applyFormatting('code')
+        return
+      }
+
+      // ? for keyboard shortcuts help
+      if (e.key === '?' && !['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
+        e.preventDefault()
+        setShowKeyboardShortcuts(true)
+        return
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [messageInput])
+
+  // KEYBOARD_SHORTCUTS constant for help modal
+  const KEYBOARD_SHORTCUTS = [
+    { keys: ['Ctrl', 'Enter'], description: 'Enviar mensagem' },
+    { keys: ['Ctrl', 'K'], description: 'Pesquisar' },
+    { keys: ['Ctrl', 'B'], description: 'Negrito' },
+    { keys: ['Ctrl', 'I'], description: 'Itálico' },
+    { keys: ['Ctrl', 'Shift', 'C'], description: 'Código' },
+    { keys: ['Esc'], description: 'Fechar menus/modais' },
+    { keys: ['?'], description: 'Atalhos de teclado' }
+  ]
 
   if (loading) {
     return (
@@ -1083,51 +1430,97 @@ export default function ChatColaborativo() {
                 {/* Canais */}
                 {isExpanded && (
                   <div style={{ paddingLeft: '28px' }}>
-                    {equipaCanais.map(canal => {
+                    {equipaCanais
+                      .sort((a, b) => {
+                        const aFav = isFavoriteChannel(a.id)
+                        const bFav = isFavoriteChannel(b.id)
+                        if (aFav && !bFav) return -1
+                        if (!aFav && bFav) return 1
+                        return 0
+                      })
+                      .map(canal => {
                       const isActive = canalAtivo?.id === canal.id
+                      const isFav = isFavoriteChannel(canal.id)
                       return (
-                        <button
+                        <div
                           key={canal.id}
-                          onClick={() => selectCanal(canal)}
                           style={{
-                            width: '100%',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '10px',
-                            padding: '8px 16px 8px 12px',
-                            background: isActive ? 'var(--stone)' : 'transparent',
-                            border: 'none',
-                            cursor: 'pointer',
-                            textAlign: 'left',
-                            borderRadius: '6px',
                             marginRight: '8px',
-                            marginBottom: '2px',
-                            transition: 'background 0.15s'
+                            marginBottom: '2px'
                           }}
+                          className="channel-item"
                         >
-                          <Hash size={16} style={{ color: isActive ? 'var(--brown)' : 'var(--brown-light)', flexShrink: 0 }} />
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{
-                              fontSize: '13px',
-                              fontWeight: isActive ? 600 : canal.unreadCount > 0 ? 600 : 400,
-                              color: isActive ? 'var(--brown)' : 'var(--brown-light)',
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis'
-                            }}>
-                              {canal.codigo}
+                          <button
+                            onClick={() => selectCanal(canal)}
+                            style={{
+                              flex: 1,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '10px',
+                              padding: '8px 8px 8px 12px',
+                              background: isActive ? 'var(--stone)' : 'transparent',
+                              border: 'none',
+                              cursor: 'pointer',
+                              textAlign: 'left',
+                              borderRadius: '6px 0 0 6px',
+                              transition: 'background 0.15s'
+                            }}
+                          >
+                            {isFav ? (
+                              <Star size={16} fill="var(--warning)" style={{ color: 'var(--warning)', flexShrink: 0 }} />
+                            ) : (
+                              <Hash size={16} style={{ color: isActive ? 'var(--brown)' : 'var(--brown-light)', flexShrink: 0 }} />
+                            )}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{
+                                fontSize: '13px',
+                                fontWeight: isActive ? 600 : canal.unreadCount > 0 ? 600 : 400,
+                                color: isActive ? 'var(--brown)' : 'var(--brown-light)',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis'
+                              }}>
+                                {canal.codigo}
+                              </div>
                             </div>
-                          </div>
-                          {canal.unreadCount > 0 && (
-                            <span style={{
-                              width: '8px',
-                              height: '8px',
-                              borderRadius: '50%',
-                              background: 'var(--accent-olive)',
-                              flexShrink: 0
-                            }} />
-                          )}
-                        </button>
+                            {canal.unreadCount > 0 && (
+                              <span style={{
+                                width: '8px',
+                                height: '8px',
+                                borderRadius: '50%',
+                                background: 'var(--accent-olive)',
+                                flexShrink: 0
+                              }} />
+                            )}
+                          </button>
+                          {/* Favorite star button */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              toggleFavoriteChannel(canal.id)
+                            }}
+                            title={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+                            style={{
+                              width: '28px',
+                              height: '32px',
+                              background: isActive ? 'var(--stone)' : 'transparent',
+                              border: 'none',
+                              cursor: 'pointer',
+                              color: isFav ? 'var(--warning)' : 'var(--brown-light)',
+                              opacity: isFav ? 1 : 0,
+                              transition: 'opacity 0.15s',
+                              borderRadius: '0 6px 6px 0',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
+                            className="favorite-btn"
+                          >
+                            <Star size={14} fill={isFav ? 'var(--warning)' : 'none'} />
+                          </button>
+                        </div>
                       )
                     })}
                   </div>
@@ -1272,7 +1665,37 @@ export default function ChatColaborativo() {
       )}
 
       {/* ========== ÁREA PRINCIPAL ========== */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div
+        style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        {/* Drag & Drop Overlay */}
+        {isDragging && (
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(139, 155, 123, 0.95)',
+            zIndex: 100,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '16px'
+          }}>
+            <Upload size={64} style={{ color: 'white' }} />
+            <div style={{ fontSize: '20px', fontWeight: 600, color: 'white' }}>
+              Arrasta ficheiros para enviar
+            </div>
+            <div style={{ fontSize: '14px', color: 'rgba(255,255,255,0.8)' }}>
+              Imagens, documentos, ou outros ficheiros
+            </div>
+          </div>
+        )}
 
         {/* Header do canal */}
         {canalAtivo && (
@@ -1620,6 +2043,119 @@ export default function ChatColaborativo() {
           </div>
         )}
 
+        {/* Pinned Messages Bar */}
+        {canalAtivo && getCurrentChannelPinnedMessages().length > 0 && (
+          <div style={{
+            padding: '10px 24px',
+            background: 'rgba(201, 168, 130, 0.1)',
+            borderBottom: '1px solid var(--stone)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px'
+          }}>
+            <Pin size={16} style={{ color: 'var(--warning)' }} />
+            <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--brown)' }}>
+              {getCurrentChannelPinnedMessages().length} mensagem(ns) fixada(s)
+            </span>
+            <button
+              onClick={() => setShowPinnedMessages(!showPinnedMessages)}
+              style={{
+                marginLeft: 'auto',
+                padding: '4px 12px',
+                borderRadius: '4px',
+                background: showPinnedMessages ? 'var(--accent-olive)' : 'var(--white)',
+                border: '1px solid var(--stone)',
+                cursor: 'pointer',
+                color: showPinnedMessages ? 'white' : 'var(--brown)',
+                fontSize: '12px'
+              }}
+            >
+              {showPinnedMessages ? 'Ocultar' : 'Ver todas'}
+            </button>
+          </div>
+        )}
+
+        {/* Pinned Messages Panel */}
+        {showPinnedMessages && canalAtivo && getCurrentChannelPinnedMessages().length > 0 && (
+          <div style={{
+            padding: '16px 24px',
+            background: 'var(--cream)',
+            borderBottom: '1px solid var(--stone)',
+            maxHeight: '200px',
+            overflowY: 'auto'
+          }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {getCurrentChannelPinnedMessages().map(msg => (
+                <div
+                  key={msg.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '12px',
+                    padding: '12px',
+                    background: 'var(--white)',
+                    borderRadius: '8px',
+                    borderLeft: '3px solid var(--warning)'
+                  }}
+                >
+                  <div style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, var(--blush) 0%, var(--blush-dark) 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    color: 'var(--brown-dark)',
+                    flexShrink: 0
+                  }}>
+                    {getInitials(msg.autor?.nome)}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                      <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--brown)' }}>
+                        {msg.autor?.nome}
+                      </span>
+                      <span style={{ fontSize: '10px', color: 'var(--brown-light)' }}>
+                        {formatDateTime(msg.pinnedAt)}
+                      </span>
+                    </div>
+                    <p style={{
+                      margin: 0,
+                      fontSize: '12px',
+                      color: 'var(--brown)',
+                      lineHeight: 1.4,
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden'
+                    }}>
+                      {msg.conteudo}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => togglePinMessage(msg)}
+                    title="Desafixar"
+                    style={{
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '4px',
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: 'var(--brown-light)'
+                    }}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Messages Area */}
         <div style={{
           flex: 1,
@@ -1677,22 +2213,34 @@ export default function ChatColaborativo() {
                         >
                           {showAuthor && (
                             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: '8px' }}>
-                              <div style={{
-                                width: '40px',
-                                height: '40px',
-                                borderRadius: '50%',
-                                background: post.autor?.avatar_url
-                                  ? `url(${post.autor.avatar_url}) center/cover`
-                                  : 'linear-gradient(135deg, var(--blush) 0%, var(--blush-dark) 100%)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                color: 'var(--brown-dark)',
-                                fontSize: '14px',
-                                fontWeight: 600,
-                                flexShrink: 0
-                              }}>
-                                {!post.autor?.avatar_url && getInitials(post.autor?.nome)}
+                              <div style={{ position: 'relative', flexShrink: 0 }}>
+                                <div style={{
+                                  width: '40px',
+                                  height: '40px',
+                                  borderRadius: '50%',
+                                  background: post.autor?.avatar_url
+                                    ? `url(${post.autor.avatar_url}) center/cover`
+                                    : 'linear-gradient(135deg, var(--blush) 0%, var(--blush-dark) 100%)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  color: 'var(--brown-dark)',
+                                  fontSize: '14px',
+                                  fontWeight: 600
+                                }}>
+                                  {!post.autor?.avatar_url && getInitials(post.autor?.nome)}
+                                </div>
+                                {/* Online status indicator */}
+                                <div style={{
+                                  position: 'absolute',
+                                  bottom: '0',
+                                  right: '0',
+                                  width: '12px',
+                                  height: '12px',
+                                  borderRadius: '50%',
+                                  background: isUserOnline(post.autor?.id) ? '#22c55e' : '#9ca3af',
+                                  border: '2px solid var(--white)'
+                                }} title={isUserOnline(post.autor?.id) ? 'Online' : 'Offline'} />
                               </div>
                               <div style={{ flex: 1 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1879,6 +2427,69 @@ export default function ChatColaborativo() {
                                         {isMessageSaved(post.id) ? <BookmarkCheck size={16} /> : <Bookmark size={16} />}
                                         {isMessageSaved(post.id) ? 'Remover guardado' : 'Guardar'}
                                       </button>
+                                      <button
+                                        onClick={() => togglePinMessage(post)}
+                                        style={{
+                                          width: '100%',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '10px',
+                                          padding: '10px 14px',
+                                          border: 'none',
+                                          background: 'transparent',
+                                          cursor: 'pointer',
+                                          fontSize: '13px',
+                                          color: isMessagePinned(post.id) ? 'var(--warning)' : 'var(--brown)',
+                                          textAlign: 'left'
+                                        }}
+                                        onMouseEnter={e => e.currentTarget.style.background = 'var(--cream)'}
+                                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                      >
+                                        <Pin size={16} />
+                                        {isMessagePinned(post.id) ? 'Desafixar' : 'Fixar no canal'}
+                                      </button>
+                                      <button
+                                        onClick={() => openForwardModal(post)}
+                                        style={{
+                                          width: '100%',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '10px',
+                                          padding: '10px 14px',
+                                          border: 'none',
+                                          background: 'transparent',
+                                          cursor: 'pointer',
+                                          fontSize: '13px',
+                                          color: 'var(--brown)',
+                                          textAlign: 'left'
+                                        }}
+                                        onMouseEnter={e => e.currentTarget.style.background = 'var(--cream)'}
+                                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                      >
+                                        <Forward size={16} />
+                                        Reencaminhar
+                                      </button>
+                                      <button
+                                        onClick={() => openCreateTaskModal(post)}
+                                        style={{
+                                          width: '100%',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '10px',
+                                          padding: '10px 14px',
+                                          border: 'none',
+                                          background: 'transparent',
+                                          cursor: 'pointer',
+                                          fontSize: '13px',
+                                          color: 'var(--brown)',
+                                          textAlign: 'left'
+                                        }}
+                                        onMouseEnter={e => e.currentTarget.style.background = 'var(--cream)'}
+                                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                      >
+                                        <CheckSquare size={16} />
+                                        Criar tarefa
+                                      </button>
                                       {isOwnMessage(post) && (
                                         <>
                                           <div style={{ height: '1px', background: 'var(--stone)', margin: '4px 0' }} />
@@ -2011,20 +2622,76 @@ export default function ChatColaborativo() {
                                 </div>
                               </div>
                             ) : (
-                              <p style={{
-                                fontSize: '14px',
-                                color: 'var(--brown)',
-                                margin: 0,
-                                lineHeight: 1.6,
-                                whiteSpace: 'pre-wrap'
-                              }}>
-                                {post.conteudo}
-                                {post.editado && (
-                                  <span style={{ fontSize: '11px', color: 'var(--brown-light)', marginLeft: '6px' }}>
-                                    (editado)
-                                  </span>
+                              <div>
+                                <p style={{
+                                  fontSize: '14px',
+                                  color: 'var(--brown)',
+                                  margin: 0,
+                                  lineHeight: 1.6,
+                                  whiteSpace: 'pre-wrap'
+                                }}>
+                                  {renderFormattedText(post.conteudo)}
+                                  {post.editado && (
+                                    <span style={{ fontSize: '11px', color: 'var(--brown-light)', marginLeft: '6px' }}>
+                                      (editado)
+                                    </span>
+                                  )}
+                                </p>
+
+                                {/* Link Preview */}
+                                {extractUrls(post.conteudo).slice(0, 1).map((url, idx) => (
+                                  <div
+                                    key={idx}
+                                    style={{
+                                      marginTop: '10px',
+                                      padding: '12px',
+                                      background: 'var(--cream)',
+                                      borderRadius: '8px',
+                                      borderLeft: '3px solid var(--accent-olive)',
+                                      maxWidth: '400px'
+                                    }}
+                                  >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                      <ExternalLink size={14} style={{ color: 'var(--brown-light)' }} />
+                                      <span style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
+                                        {new URL(url).hostname}
+                                      </span>
+                                    </div>
+                                    <a
+                                      href={url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      style={{
+                                        fontSize: '13px',
+                                        color: 'var(--accent-olive)',
+                                        textDecoration: 'none',
+                                        fontWeight: 500
+                                      }}
+                                    >
+                                      {url.length > 60 ? url.substring(0, 60) + '...' : url}
+                                    </a>
+                                  </div>
+                                ))}
+
+                                {/* Read Receipt (for own messages) */}
+                                {isOwnMessage(post) && (
+                                  <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    marginTop: '4px',
+                                    justifyContent: 'flex-end'
+                                  }}>
+                                    {getReadStatus(post) === 'read' ? (
+                                      <CheckCheck size={14} style={{ color: 'var(--accent-olive)' }} title="Lido" />
+                                    ) : getReadStatus(post) === 'delivered' ? (
+                                      <CheckCheck size={14} style={{ color: 'var(--brown-light)' }} title="Entregue" />
+                                    ) : (
+                                      <Check size={14} style={{ color: 'var(--brown-light)' }} title="Enviado" />
+                                    )}
+                                  </div>
                                 )}
-                              </p>
+                              </div>
                             )}
 
                             {/* Image */}
@@ -2161,6 +2828,211 @@ export default function ChatColaborativo() {
                   borderTop: '1px solid var(--stone)',
                   background: 'var(--white)'
                 }}>
+                  {/* Typing Indicator */}
+                  {typingUsers.length > 0 && (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '8px 12px',
+                      marginBottom: '10px',
+                      fontSize: '12px',
+                      color: 'var(--brown-light)'
+                    }}>
+                      <div style={{ display: 'flex', gap: '3px' }}>
+                        <span style={{
+                          width: '6px',
+                          height: '6px',
+                          borderRadius: '50%',
+                          background: 'var(--brown-light)',
+                          animation: 'bounce 1.4s ease-in-out infinite'
+                        }} />
+                        <span style={{
+                          width: '6px',
+                          height: '6px',
+                          borderRadius: '50%',
+                          background: 'var(--brown-light)',
+                          animation: 'bounce 1.4s ease-in-out infinite',
+                          animationDelay: '0.2s'
+                        }} />
+                        <span style={{
+                          width: '6px',
+                          height: '6px',
+                          borderRadius: '50%',
+                          background: 'var(--brown-light)',
+                          animation: 'bounce 1.4s ease-in-out infinite',
+                          animationDelay: '0.4s'
+                        }} />
+                      </div>
+                      <span>
+                        {typingUsers.length === 1
+                          ? `${typingUsers[0]} está a escrever...`
+                          : `${typingUsers.slice(0, 2).join(', ')} estão a escrever...`}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Formatting Toolbar */}
+                  {showFormattingToolbar && (
+                    <div style={{
+                      display: 'flex',
+                      gap: '2px',
+                      marginBottom: '10px',
+                      padding: '6px 8px',
+                      background: 'var(--cream)',
+                      borderRadius: '8px',
+                      alignItems: 'center'
+                    }}>
+                      <button
+                        onClick={() => applyFormatting('bold')}
+                        title="Negrito (Ctrl+B)"
+                        style={{
+                          width: '30px',
+                          height: '30px',
+                          borderRadius: '4px',
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: 'var(--brown-light)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                      >
+                        <Bold size={16} />
+                      </button>
+                      <button
+                        onClick={() => applyFormatting('italic')}
+                        title="Itálico (Ctrl+I)"
+                        style={{
+                          width: '30px',
+                          height: '30px',
+                          borderRadius: '4px',
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: 'var(--brown-light)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                      >
+                        <Italic size={16} />
+                      </button>
+                      <button
+                        onClick={() => applyFormatting('code')}
+                        title="Código inline (Ctrl+Shift+C)"
+                        style={{
+                          width: '30px',
+                          height: '30px',
+                          borderRadius: '4px',
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: 'var(--brown-light)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                      >
+                        <Code size={16} />
+                      </button>
+                      <button
+                        onClick={() => applyFormatting('codeblock')}
+                        title="Bloco de código"
+                        style={{
+                          width: '30px',
+                          height: '30px',
+                          borderRadius: '4px',
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: 'var(--brown-light)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                      >
+                        <FileCode size={16} />
+                      </button>
+                      <div style={{ width: '1px', height: '20px', background: 'var(--stone)', margin: '0 6px' }} />
+                      <button
+                        onClick={() => applyFormatting('list')}
+                        title="Lista"
+                        style={{
+                          width: '30px',
+                          height: '30px',
+                          borderRadius: '4px',
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: 'var(--brown-light)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                      >
+                        <List size={16} />
+                      </button>
+                      <button
+                        onClick={() => applyFormatting('numbered')}
+                        title="Lista numerada"
+                        style={{
+                          width: '30px',
+                          height: '30px',
+                          borderRadius: '4px',
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: 'var(--brown-light)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                      >
+                        <ListOrdered size={16} />
+                      </button>
+                      <button
+                        onClick={() => applyFormatting('link')}
+                        title="Inserir link"
+                        style={{
+                          width: '30px',
+                          height: '30px',
+                          borderRadius: '4px',
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: 'var(--brown-light)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                      >
+                        <LinkIcon2 size={16} />
+                      </button>
+                      <div style={{ flex: 1 }} />
+                      <button
+                        onClick={() => setShowKeyboardShortcuts(true)}
+                        title="Atalhos de teclado (?)"
+                        style={{
+                          padding: '4px 8px',
+                          borderRadius: '4px',
+                          background: 'transparent',
+                          border: '1px solid var(--stone)',
+                          cursor: 'pointer',
+                          color: 'var(--brown-light)',
+                          fontSize: '10px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        <Keyboard size={12} />
+                        Atalhos
+                      </button>
+                    </div>
+                  )}
+
                   {/* Reply-to quote */}
                   {replyingTo && (
                     <div style={{
@@ -2814,7 +3686,386 @@ export default function ChatColaborativo() {
         .message-card:hover {
           background: var(--off-white) !important;
         }
+        .channel-item:hover .favorite-btn {
+          opacity: 1 !important;
+        }
+        .code-block {
+          display: block;
+          background: #1e1e1e;
+          color: #d4d4d4;
+          padding: 12px 16px;
+          border-radius: 6px;
+          font-family: 'Fira Code', 'Monaco', monospace;
+          font-size: 12px;
+          overflow-x: auto;
+          margin: 8px 0;
+          white-space: pre;
+        }
+        .inline-code {
+          background: var(--cream);
+          color: var(--brown);
+          padding: 2px 6px;
+          border-radius: 4px;
+          font-family: 'Fira Code', 'Monaco', monospace;
+          font-size: 12px;
+        }
+        .chat-link {
+          color: var(--accent-olive);
+          text-decoration: none;
+        }
+        .chat-link:hover {
+          text-decoration: underline;
+        }
+        @keyframes bounce {
+          0%, 60%, 100% { transform: translateY(0); }
+          30% { transform: translateY(-4px); }
+        }
       `}</style>
+
+      {/* ========== MODALS ========== */}
+
+      {/* Keyboard Shortcuts Modal */}
+      {showKeyboardShortcuts && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2000
+        }} onClick={() => setShowKeyboardShortcuts(false)}>
+          <div
+            style={{
+              background: 'var(--white)',
+              borderRadius: '16px',
+              padding: '24px',
+              width: '400px',
+              maxHeight: '80vh',
+              overflow: 'auto'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--brown)' }}>
+                <Keyboard size={20} style={{ verticalAlign: 'middle', marginRight: '8px' }} />
+                Atalhos de Teclado
+              </h3>
+              <button
+                onClick={() => setShowKeyboardShortcuts(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--brown-light)' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {KEYBOARD_SHORTCUTS.map((shortcut, idx) => (
+                <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '13px', color: 'var(--brown)' }}>{shortcut.description}</span>
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    {shortcut.keys.map((key, kidx) => (
+                      <span key={kidx} style={{
+                        padding: '4px 8px',
+                        background: 'var(--cream)',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        color: 'var(--brown)',
+                        border: '1px solid var(--stone)'
+                      }}>
+                        {key}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Task Modal */}
+      {showCreateTaskModal && taskFromMessage && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2000
+        }} onClick={() => setShowCreateTaskModal(false)}>
+          <div
+            style={{
+              background: 'var(--white)',
+              borderRadius: '16px',
+              padding: '24px',
+              width: '480px',
+              maxHeight: '80vh',
+              overflow: 'auto'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--brown)' }}>
+                <CheckSquare size={20} style={{ verticalAlign: 'middle', marginRight: '8px' }} />
+                Criar Tarefa
+              </h3>
+              <button
+                onClick={() => setShowCreateTaskModal(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--brown-light)' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{
+              padding: '12px',
+              background: 'var(--cream)',
+              borderRadius: '8px',
+              borderLeft: '3px solid var(--accent-olive)',
+              marginBottom: '20px'
+            }}>
+              <div style={{ fontSize: '11px', color: 'var(--brown-light)', marginBottom: '4px' }}>
+                Mensagem de {taskFromMessage.autor?.nome}
+              </div>
+              <p style={{ margin: 0, fontSize: '13px', color: 'var(--brown)' }}>
+                {taskFromMessage.conteudo?.substring(0, 150)}{taskFromMessage.conteudo?.length > 150 ? '...' : ''}
+              </p>
+            </div>
+
+            <form onSubmit={(e) => {
+              e.preventDefault()
+              const formData = new FormData(e.target)
+              handleCreateTask({
+                titulo: formData.get('titulo'),
+                descricao: formData.get('descricao'),
+                prioridade: formData.get('prioridade'),
+                prazo: formData.get('prazo'),
+                mensagem_origem: taskFromMessage.id
+              })
+            }}>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--brown-light)', marginBottom: '6px' }}>
+                  Título da tarefa
+                </label>
+                <input
+                  name="titulo"
+                  type="text"
+                  defaultValue={taskFromMessage.conteudo?.substring(0, 50)}
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid var(--stone)',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--brown-light)', marginBottom: '6px' }}>
+                  Descrição
+                </label>
+                <textarea
+                  name="descricao"
+                  rows={3}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid var(--stone)',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    outline: 'none',
+                    resize: 'vertical'
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '16px', marginBottom: '20px' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--brown-light)', marginBottom: '6px' }}>
+                    Prioridade
+                  </label>
+                  <select
+                    name="prioridade"
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      border: '1px solid var(--stone)',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      outline: 'none',
+                      background: 'white'
+                    }}
+                  >
+                    <option value="baixa">Baixa</option>
+                    <option value="media">Média</option>
+                    <option value="alta">Alta</option>
+                    <option value="urgente">Urgente</option>
+                  </select>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--brown-light)', marginBottom: '6px' }}>
+                    Prazo
+                  </label>
+                  <input
+                    name="prazo"
+                    type="date"
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      border: '1px solid var(--stone)',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateTaskModal(false)}
+                  style={{
+                    padding: '10px 20px',
+                    borderRadius: '8px',
+                    background: 'var(--stone)',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: 'var(--brown)',
+                    fontWeight: 500
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    padding: '10px 20px',
+                    borderRadius: '8px',
+                    background: 'var(--accent-olive)',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: 'white',
+                    fontWeight: 500
+                  }}
+                >
+                  Criar Tarefa
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Forward Message Modal */}
+      {showForwardModal && messageToForward && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2000
+        }} onClick={() => setShowForwardModal(false)}>
+          <div
+            style={{
+              background: 'var(--white)',
+              borderRadius: '16px',
+              padding: '24px',
+              width: '400px',
+              maxHeight: '80vh',
+              overflow: 'auto'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--brown)' }}>
+                <Forward size={20} style={{ verticalAlign: 'middle', marginRight: '8px' }} />
+                Reencaminhar Mensagem
+              </h3>
+              <button
+                onClick={() => setShowForwardModal(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--brown-light)' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{
+              padding: '12px',
+              background: 'var(--cream)',
+              borderRadius: '8px',
+              marginBottom: '20px'
+            }}>
+              <div style={{ fontSize: '11px', color: 'var(--brown-light)', marginBottom: '4px' }}>
+                De: {messageToForward.autor?.nome}
+              </div>
+              <p style={{ margin: 0, fontSize: '13px', color: 'var(--brown)' }}>
+                {messageToForward.conteudo?.substring(0, 100)}{messageToForward.conteudo?.length > 100 ? '...' : ''}
+              </p>
+            </div>
+
+            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--brown-light)', marginBottom: '12px' }}>
+              Selecionar canal de destino
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '250px', overflowY: 'auto' }}>
+              {canais.filter(c => c.id !== canalAtivo?.id).map(canal => (
+                <button
+                  key={canal.id}
+                  onClick={() => handleForwardMessage(canal.id)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '12px',
+                    background: 'var(--off-white)',
+                    border: '1px solid var(--stone)',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    transition: 'all 0.15s'
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = 'var(--cream)'
+                    e.currentTarget.style.borderColor = 'var(--accent-olive)'
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = 'var(--off-white)'
+                    e.currentTarget.style.borderColor = 'var(--stone)'
+                  }}
+                >
+                  <Hash size={16} style={{ color: 'var(--brown-light)' }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--brown)' }}>
+                      {canal.codigo}
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
+                      {canal.nome}
+                    </div>
+                  </div>
+                  <Forward size={14} style={{ color: 'var(--brown-light)' }} />
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
