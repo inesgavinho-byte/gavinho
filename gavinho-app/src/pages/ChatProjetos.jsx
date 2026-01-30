@@ -1,12 +1,57 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { 
+import {
   Hash, Lock, Plus, Send, Paperclip, Smile, AtSign, Search,
   MoreVertical, Edit, Trash2, Reply, Pin, X, ChevronDown, ChevronRight,
   MessageSquare, Users, Settings, Bell, BellOff, Image,
-  File, Download, Check, CheckCheck, Megaphone, FolderOpen
+  File, Download, Check, CheckCheck, Megaphone, FolderOpen,
+  Bold, Italic, Code, List, Link2
 } from 'lucide-react'
+
+// Função para renderizar texto com formatação markdown simples
+const renderFormattedText = (text) => {
+  if (!text) return null
+
+  // Escapar HTML para segurança
+  const escapeHtml = (str) => str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+
+  let html = escapeHtml(text)
+
+  // Código em bloco ```code```
+  html = html.replace(/```([\s\S]*?)```/g, '<pre style="background:#f3f4f6;padding:8px 12px;border-radius:6px;overflow-x:auto;font-family:monospace;font-size:13px;margin:4px 0">$1</pre>')
+
+  // Código inline `code`
+  html = html.replace(/`([^`]+)`/g, '<code style="background:#f3f4f6;padding:2px 6px;border-radius:4px;font-family:monospace;font-size:13px">$1</code>')
+
+  // Negrito **text** ou __text__
+  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+  html = html.replace(/__([^_]+)__/g, '<strong>$1</strong>')
+
+  // Itálico *text* ou _text_
+  html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>')
+  html = html.replace(/_([^_]+)_/g, '<em>$1</em>')
+
+  // Riscado ~~text~~
+  html = html.replace(/~~([^~]+)~~/g, '<del>$1</del>')
+
+  // Links [text](url)
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" style="color:#C9A882;text-decoration:underline">$1</a>')
+
+  // Menções @[nome](id) - destacar
+  html = html.replace(/@\[([^\]]+)\]\([^)]+\)/g, '<span style="background:rgba(201,168,130,0.2);color:#8B7355;padding:0 4px;border-radius:4px;font-weight:500">@$1</span>')
+
+  // Listas - linhas que começam com - ou *
+  html = html.replace(/^[\-\*]\s+(.+)$/gm, '<li style="margin-left:16px;list-style-type:disc">$1</li>')
+
+  // Listas numeradas - linhas que começam com número.
+  html = html.replace(/^\d+\.\s+(.+)$/gm, '<li style="margin-left:16px;list-style-type:decimal">$1</li>')
+
+  return <span dangerouslySetInnerHTML={{ __html: html }} />
+}
 
 const REACTION_EMOJIS = ['👍', '❤️', '😄', '🎉', '😮', '😢', '🔥', '👀']
 
@@ -1258,14 +1303,14 @@ export default function ChatProjetos() {
                             <Download size={16} style={{ marginLeft: '8px' }} />
                           </a>
                         ) : (
-                          <div style={{ 
-                            fontSize: '14px', 
+                          <div style={{
+                            fontSize: '14px',
                             color: 'var(--brown)',
                             lineHeight: 1.5,
                             whiteSpace: 'pre-wrap',
                             wordBreak: 'break-word'
                           }}>
-                            {msg.conteudo}
+                            {renderFormattedText(msg.conteudo)}
                           </div>
                         )}
                         
@@ -1495,9 +1540,9 @@ export default function ChatProjetos() {
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploading}
-                  style={{ 
-                    background: 'none', 
-                    border: 'none', 
+                  style={{
+                    background: 'none',
+                    border: 'none',
                     cursor: 'pointer',
                     color: 'var(--brown-light)',
                     padding: '4px'
@@ -1505,7 +1550,97 @@ export default function ChatProjetos() {
                 >
                   <Paperclip size={18} />
                 </button>
-                
+
+                {/* Toolbar de formatação */}
+                <div style={{ display: 'flex', gap: '2px', borderRight: '1px solid var(--stone)', paddingRight: '8px', marginRight: '4px' }}>
+                  <button
+                    onClick={() => {
+                      const textarea = inputRef.current
+                      if (!textarea) return
+                      const start = textarea.selectionStart
+                      const end = textarea.selectionEnd
+                      const text = novaMensagem
+                      const selectedText = text.substring(start, end)
+                      const newText = text.substring(0, start) + '**' + (selectedText || 'texto') + '**' + text.substring(end)
+                      setNovaMensagem(newText)
+                      setTimeout(() => {
+                        textarea.focus()
+                        textarea.setSelectionRange(start + 2, end + 2 + (selectedText ? 0 : 5))
+                      }, 0)
+                    }}
+                    title="Negrito (Ctrl+B)"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--brown-light)', padding: '4px', borderRadius: '4px' }}
+                    className="hover-bg"
+                  >
+                    <Bold size={16} />
+                  </button>
+                  <button
+                    onClick={() => {
+                      const textarea = inputRef.current
+                      if (!textarea) return
+                      const start = textarea.selectionStart
+                      const end = textarea.selectionEnd
+                      const text = novaMensagem
+                      const selectedText = text.substring(start, end)
+                      const newText = text.substring(0, start) + '*' + (selectedText || 'texto') + '*' + text.substring(end)
+                      setNovaMensagem(newText)
+                      setTimeout(() => {
+                        textarea.focus()
+                        textarea.setSelectionRange(start + 1, end + 1 + (selectedText ? 0 : 5))
+                      }, 0)
+                    }}
+                    title="Itálico (Ctrl+I)"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--brown-light)', padding: '4px', borderRadius: '4px' }}
+                    className="hover-bg"
+                  >
+                    <Italic size={16} />
+                  </button>
+                  <button
+                    onClick={() => {
+                      const textarea = inputRef.current
+                      if (!textarea) return
+                      const start = textarea.selectionStart
+                      const end = textarea.selectionEnd
+                      const text = novaMensagem
+                      const selectedText = text.substring(start, end)
+                      const newText = text.substring(0, start) + '`' + (selectedText || 'código') + '`' + text.substring(end)
+                      setNovaMensagem(newText)
+                      setTimeout(() => {
+                        textarea.focus()
+                        textarea.setSelectionRange(start + 1, end + 1 + (selectedText ? 0 : 6))
+                      }, 0)
+                    }}
+                    title="Código"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--brown-light)', padding: '4px', borderRadius: '4px' }}
+                    className="hover-bg"
+                  >
+                    <Code size={16} />
+                  </button>
+                  <button
+                    onClick={() => {
+                      const textarea = inputRef.current
+                      if (!textarea) return
+                      const start = textarea.selectionStart
+                      const text = novaMensagem
+                      const beforeCursor = text.substring(0, start)
+                      const afterCursor = text.substring(start)
+                      const lineStart = beforeCursor.lastIndexOf('\n') + 1
+                      const prefix = beforeCursor.substring(lineStart).match(/^[\-\*]\s/) ? '' : '- '
+                      const newText = beforeCursor + prefix + afterCursor
+                      setNovaMensagem(newText)
+                      setTimeout(() => {
+                        textarea.focus()
+                        textarea.setSelectionRange(start + prefix.length, start + prefix.length)
+                      }, 0)
+                    }}
+                    title="Lista"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--brown-light)', padding: '4px', borderRadius: '4px' }}
+                    className="hover-bg"
+                  >
+                    <List size={16} />
+                  </button>
+                </div>
+
                 <textarea
                   ref={inputRef}
                   value={novaMensagem}
