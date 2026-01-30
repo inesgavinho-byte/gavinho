@@ -45,10 +45,10 @@ import OAuthCallback from './pages/OAuthCallback'
 
 // OAuth Callback Handler - runs before anything else (handles legacy routes)
 function OAuthCallbackHandler({ children }) {
-  const [handled, setHandled] = useState(false)
+  const [status, setStatus] = useState('checking') // 'checking', 'handled', 'continue'
 
   useEffect(() => {
-    // Check if we have OAuth response in hash (for legacy/fallback handling)
+    // Check if we have OAuth response in hash
     const hash = window.location.hash
     if (hash && hash.includes('access_token')) {
       const params = new URLSearchParams(hash.substring(1))
@@ -58,44 +58,53 @@ function OAuthCallbackHandler({ children }) {
         // Store in localStorage - triggers storage event in parent window
         localStorage.setItem('teams_oauth_token', token)
         localStorage.setItem('teams_oauth_timestamp', Date.now().toString())
+        setStatus('handled')
 
-        // If in popup, close after a delay
-        if (window.opener) {
-          setTimeout(() => {
-            window.close()
-          }, 1500)
-          return
-        } else {
-          // Not in popup - clear hash
-          window.history.replaceState(null, '', window.location.pathname)
-        }
+        // Try to close popup
+        setTimeout(() => {
+          window.close()
+        }, 2000)
+        return
       }
     }
 
     if (hash && hash.includes('error')) {
       const params = new URLSearchParams(hash.substring(1))
       const error = params.get('error_description') || params.get('error')
-      localStorage.setItem('teams_oauth_error', error)
+      localStorage.setItem('teams_oauth_error', error || 'Erro')
       localStorage.setItem('teams_oauth_timestamp', Date.now().toString())
+      setStatus('handled')
 
-      if (window.opener) {
-        setTimeout(() => {
-          window.close()
-        }, 1500)
-        return
-      }
+      setTimeout(() => {
+        window.close()
+      }, 2000)
+      return
     }
 
-    setHandled(true)
+    setStatus('continue')
   }, [])
 
-  // Don't render children until we've checked for OAuth callback
-  if (!handled && window.location.hash && (window.location.hash.includes('access_token') || window.location.hash.includes('error'))) {
-    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
-      <p>A autenticar...</p>
+  // Show loading while checking
+  if (status === 'checking') {
+    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+      <div style={{ background: 'white', padding: '40px', borderRadius: '16px', textAlign: 'center' }}>
+        <p style={{ color: '#333' }}>A verificar...</p>
+      </div>
     </div>
   }
 
+  // If we handled OAuth, show success and DON'T render children
+  if (status === 'handled') {
+    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+      <div style={{ background: 'white', padding: '40px', borderRadius: '16px', textAlign: 'center' }}>
+        <div style={{ fontSize: '48px', marginBottom: '20px' }}>✅</div>
+        <h2 style={{ color: '#333', marginBottom: '10px' }}>Autenticação Concluída!</h2>
+        <p style={{ color: '#666', fontSize: '14px' }}>Pode fechar esta janela.</p>
+      </div>
+    </div>
+  }
+
+  // Normal flow - render app
   return children
 }
 
