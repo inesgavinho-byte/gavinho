@@ -41,6 +41,7 @@ import DecisoesPagina from './pages/DecisoesPagina'
 import MQT from './pages/MQT'
 import ObraApp from './pages/ObraApp'
 import GestaoObras from './pages/GestaoObras'
+import OAuthCallback from './pages/OAuthCallback'
 
 // OAuth Callback Handler - runs before anything else
 function OAuthCallbackHandler({ children }) {
@@ -118,6 +119,7 @@ function App() {
           <Route path="/registo" element={<Registo />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/oauth/callback" element={<OAuthCallback />} />
 
           {/* PWA App para Trabalhadores */}
           <Route path="/obra-app" element={<ObraApp />} />

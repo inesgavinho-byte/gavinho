@@ -31,7 +31,7 @@ import {
 const MS_GRAPH_CONFIG = {
   clientId: import.meta.env.VITE_MS_CLIENT_ID || 'YOUR_CLIENT_ID',
   authority: 'https://login.microsoftonline.com/common',
-  redirectUri: typeof window !== 'undefined' ? window.location.origin + '/workspace' : '',
+  redirectUri: typeof window !== 'undefined' ? window.location.origin + '/oauth/callback' : '',
   scopes: ['User.Read', 'Team.ReadBasic.All', 'Channel.ReadBasic.All', 'ChannelMessage.Read.All', 'Files.Read.All']
 }
 
