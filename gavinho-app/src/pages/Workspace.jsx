@@ -1369,10 +1369,9 @@ export default function Workspace() {
   }
 
   return (
-    <div className="fade-in" style={{
-      height: 'calc(100vh - 64px)',
-      margin: '-24px',
-      marginTop: '-16px',
+    <div className="fade-in workspace-container" style={{
+      height: '100%',
+      width: '100%',
       display: 'flex',
       background: 'var(--white)'
     }}>
