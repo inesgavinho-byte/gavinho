@@ -1951,61 +1951,53 @@ export default function Workspace() {
 
     let authCompleted = false
 
-    // Function to handle successful auth
+    // Function to handle successful auth - simplified, no storage events
     const handleAuthSuccess = (token) => {
       if (authCompleted) return
       authCompleted = true
 
-      // Use setTimeout to avoid any race conditions with React rendering
+      // Process the token first
+      setTeamsAccessToken(token)
+      setTeamsAuthState('authenticated')
+      fetchTeamsUser(token)
+      fetchAvailableTeams(token)
+      setImportStep(2)
+
+      // Clean up localStorage much later to avoid any interference
       setTimeout(() => {
         try {
-          // Clean up localStorage
-          localStorage.removeItem('teams_oauth_token')
-          localStorage.removeItem('teams_oauth_timestamp')
-          window.removeEventListener('storage', handleStorageEvent)
-
-          setTeamsAccessToken(token)
-          setTeamsAuthState('authenticated')
-          fetchTeamsUser(token)
-          fetchAvailableTeams(token)
-          setImportStep(2)
-        } catch (err) {
-          console.error('Error handling Teams auth:', err)
-        }
-      }, 100)
+          localStorage.removeItem('ms_teams_oauth_token')
+          localStorage.removeItem('ms_teams_oauth_error')
+        } catch (e) { /* ignore */ }
+      }, 10000)
     }
 
     // Function to handle auth error
     const handleAuthError = (error) => {
       if (authCompleted) return
       authCompleted = true
-      localStorage.removeItem('teams_oauth_error')
-      localStorage.removeItem('teams_oauth_timestamp')
-      window.removeEventListener('storage', handleStorageEvent)
 
       setTeamsAuthState('error')
       addImportLog('error', error || 'Erro de autenticação')
+
+      setTimeout(() => {
+        try {
+          localStorage.removeItem('ms_teams_oauth_token')
+          localStorage.removeItem('ms_teams_oauth_error')
+        } catch (e) { /* ignore */ }
+      }, 10000)
     }
 
-    // Listen for storage events (fired when localStorage changes in another window)
-    const handleStorageEvent = (event) => {
-      if (event.key === 'teams_oauth_token' && event.newValue) {
-        handleAuthSuccess(event.newValue)
-      } else if (event.key === 'teams_oauth_error' && event.newValue) {
-        handleAuthError(event.newValue)
-      }
-    }
-    window.addEventListener('storage', handleStorageEvent)
-
-    // Also poll localStorage as backup (storage event might not fire in same window)
+    // Only use polling - avoid storage events which can interfere with Supabase
     const checkStorage = setInterval(() => {
       if (authCompleted) {
         clearInterval(checkStorage)
         return
       }
 
-      const token = localStorage.getItem('teams_oauth_token')
-      const error = localStorage.getItem('teams_oauth_error')
+      // Use unique prefixed keys to avoid conflicts
+      const token = localStorage.getItem('ms_teams_oauth_token')
+      const error = localStorage.getItem('ms_teams_oauth_error')
 
       if (token) {
         clearInterval(checkStorage)
@@ -2014,13 +2006,12 @@ export default function Workspace() {
         clearInterval(checkStorage)
         handleAuthError(error)
       }
-    }, 1000)
+    }, 500)
 
     // Timeout after 2 minutes
     setTimeout(() => {
       if (!authCompleted) {
         clearInterval(checkStorage)
-        window.removeEventListener('storage', handleStorageEvent)
         setTeamsAuthState('error')
         addImportLog('error', 'Autenticação expirou. Tente novamente.')
       }

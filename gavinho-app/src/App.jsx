@@ -55,9 +55,8 @@ function OAuthCallbackHandler({ children }) {
       const token = params.get('access_token')
 
       if (token) {
-        // Store in localStorage - triggers storage event in parent window
-        localStorage.setItem('teams_oauth_token', token)
-        localStorage.setItem('teams_oauth_timestamp', Date.now().toString())
+        // Store in localStorage with prefixed key to avoid Supabase conflicts
+        localStorage.setItem('ms_teams_oauth_token', token)
         setStatus('handled')
 
         // Try to close popup
@@ -71,8 +70,7 @@ function OAuthCallbackHandler({ children }) {
     if (hash && hash.includes('error')) {
       const params = new URLSearchParams(hash.substring(1))
       const error = params.get('error_description') || params.get('error')
-      localStorage.setItem('teams_oauth_error', error || 'Erro')
-      localStorage.setItem('teams_oauth_timestamp', Date.now().toString())
+      localStorage.setItem('ms_teams_oauth_error', error || 'Erro')
       setStatus('handled')
 
       setTimeout(() => {

@@ -11,10 +11,8 @@ export default function OAuthCallback() {
       const token = params.get('access_token')
 
       if (token) {
-        // Use localStorage to trigger storage event in parent window
-        // This works even with COOP restrictions
-        localStorage.setItem('teams_oauth_token', token)
-        localStorage.setItem('teams_oauth_timestamp', Date.now().toString())
+        // Use localStorage with prefixed keys to avoid conflicts with Supabase
+        localStorage.setItem('ms_teams_oauth_token', token)
         setStatus('Autenticação concluída! A fechar...')
 
         // Close popup after a short delay
@@ -30,8 +28,7 @@ export default function OAuthCallback() {
     if (hash && hash.includes('error')) {
       const params = new URLSearchParams(hash.substring(1))
       const error = params.get('error_description') || params.get('error')
-      localStorage.setItem('teams_oauth_error', error || 'Erro desconhecido')
-      localStorage.setItem('teams_oauth_timestamp', Date.now().toString())
+      localStorage.setItem('ms_teams_oauth_error', error || 'Erro desconhecido')
       setStatus('Erro na autenticação: ' + (error || 'Erro desconhecido'))
 
       setTimeout(() => {
