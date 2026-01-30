@@ -1955,16 +1955,24 @@ export default function Workspace() {
     const handleAuthSuccess = (token) => {
       if (authCompleted) return
       authCompleted = true
-      // Clean up localStorage
-      localStorage.removeItem('teams_oauth_token')
-      localStorage.removeItem('teams_oauth_timestamp')
-      window.removeEventListener('storage', handleStorageEvent)
 
-      setTeamsAccessToken(token)
-      setTeamsAuthState('authenticated')
-      fetchTeamsUser(token)
-      fetchAvailableTeams(token)
-      setImportStep(2)
+      // Use setTimeout to avoid any race conditions with React rendering
+      setTimeout(() => {
+        try {
+          // Clean up localStorage
+          localStorage.removeItem('teams_oauth_token')
+          localStorage.removeItem('teams_oauth_timestamp')
+          window.removeEventListener('storage', handleStorageEvent)
+
+          setTeamsAccessToken(token)
+          setTeamsAuthState('authenticated')
+          fetchTeamsUser(token)
+          fetchAvailableTeams(token)
+          setImportStep(2)
+        } catch (err) {
+          console.error('Error handling Teams auth:', err)
+        }
+      }, 100)
     }
 
     // Function to handle auth error
