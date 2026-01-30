@@ -158,7 +158,7 @@ export default function Sidebar({ isOpen, onClose, isMobile, collapsed, onToggle
     const isExpanded = expandedItems[item.name]
     const isActive = isItemActive(item)
 
-    // Collapsed mode - show only icons with tooltip
+    // Collapsed mode - show only icons with custom tooltip
     if (collapsed) {
       return (
         <NavLink
@@ -169,25 +169,9 @@ export default function Sidebar({ isOpen, onClose, isMobile, collapsed, onToggle
           className={({ isActive }) =>
             `nav-item nav-item-collapsed ${isActive ? 'active' : ''} ${item.highlight ? 'nav-item-highlight' : ''}`
           }
-          title={item.name}
-          style={{
-            justifyContent: 'center',
-            padding: '12px',
-            position: 'relative'
-          }}
         >
           <item.icon size={20} />
-          {item.highlight && isActive && (
-            <span style={{
-              position: 'absolute',
-              top: '6px',
-              right: '6px',
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              background: 'var(--accent-olive)'
-            }} />
-          )}
+          <span className="nav-tooltip">{item.name}</span>
         </NavLink>
       )
     }
@@ -296,10 +280,10 @@ export default function Sidebar({ isOpen, onClose, isMobile, collapsed, onToggle
       <nav className="sidebar-nav">
         {navigation
           .filter(group => !group.adminOnly || shouldShowAsAdmin())
-          .map((group) => (
+          .map((group, index) => (
           <div key={group.section} className="nav-section">
             {!collapsed && <div className="nav-section-title">{group.section}</div>}
-            {collapsed && <div style={{ height: '8px' }} />}
+            {collapsed && index > 0 && <div className="nav-section-divider" />}
             {group.items.map((item) => renderNavItem(item))}
           </div>
         ))}
@@ -307,6 +291,26 @@ export default function Sidebar({ isOpen, onClose, isMobile, collapsed, onToggle
 
       {/* Footer */}
       <div className="sidebar-footer" style={collapsed ? { padding: '12px 8px' } : {}}>
+        {/* View As indicator - collapsed mode */}
+        {isAdmin() && collapsed && (
+          <div
+            className="view-as-indicator"
+            onClick={() => setViewAsRole(viewAsRole ? null : 'user')}
+            style={{
+              background: viewAsRole ? 'rgba(239, 68, 68, 0.15)' : 'var(--cream)',
+              border: viewAsRole ? '2px solid rgba(239, 68, 68, 0.4)' : '1px solid var(--stone)',
+              color: viewAsRole ? '#dc2626' : 'var(--brown-light)'
+            }}
+            title={viewAsRole ? 'A ver como: Utilizador - Clique para voltar ao normal' : 'Visualizar como utilizador normal'}
+          >
+            {viewAsRole ? <EyeOff size={16} /> : <Eye size={16} />}
+            <div className="user-tooltip" style={{ minWidth: '160px' }}>
+              <div className="tooltip-name">{viewAsRole ? 'Modo: Utilizador' : 'Visualizar como...'}</div>
+              <div className="tooltip-role">{viewAsRole ? 'Clique para voltar ao normal' : 'Clique para simular utilizador'}</div>
+            </div>
+          </div>
+        )}
+
         {/* View As - apenas para admins reais */}
         {isAdmin() && !collapsed && (
           <div style={{ marginBottom: '12px', position: 'relative' }}>
@@ -438,6 +442,12 @@ export default function Sidebar({ isOpen, onClose, isMobile, collapsed, onToggle
                   }}
                 />
               </>
+            )}
+            {collapsed && (
+              <div className="user-tooltip">
+                <div className="tooltip-name">{getUserName()}</div>
+                <div className="tooltip-role">{getUserRole()}</div>
+              </div>
             )}
           </div>
 
