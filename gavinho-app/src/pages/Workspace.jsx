@@ -10,7 +10,6 @@ import {
   Smile, Pin, Bookmark, Bell, BellOff, Settings,
   Video, Phone, ScreenShare, Calendar, Star, Filter,
   ArrowUp, ArrowDown, Clock, CheckCircle2, AlertCircle,
-  ThumbsUp, Laugh, Frown, PartyPopper, Fire, Eye,
   Link2, Copy, Check, Edit, Trash2, CornerUpLeft, Quote,
   BookmarkCheck, Volume2, VolumeX, User, CalendarDays,
   FileImage, SlidersHorizontal,
