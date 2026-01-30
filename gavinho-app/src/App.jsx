@@ -138,7 +138,6 @@ function App() {
             <Route path="projetos/:id" element={<ProjetoDetalhe />} />
             <Route path="projetos/:id/:tab" element={<ProjetoDetalhe />} />
             <Route path="projetos/:id/:tab/:subtab" element={<ProjetoDetalhe />} />
-            <Route path="projetos/:id/decisoes" element={<DecisoesPagina />} />
             <Route path="clientes" element={<Clientes />} />
             <Route path="obras" element={<Obras />} />
             <Route path="obras/:id" element={<ObraDetalhe />} />
