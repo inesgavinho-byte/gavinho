@@ -944,6 +944,12 @@ export default function Workspace() {
     setShowAdvancedSearch(false)
   }
 
+  // Filter posts by topic (moved here to avoid TDZ error)
+  const getPostsForTopic = (postsToFilter) => {
+    if (activeTopic === 'geral') return postsToFilter
+    return postsToFilter.filter(p => p.topic === activeTopic)
+  }
+
   const filteredPosts = getPostsForTopic(applyFilters(posts))
 
   // ========== RICH TEXT FORMATTING ==========
@@ -1344,12 +1350,6 @@ export default function Workspace() {
     if (activeTopic === topicId) {
       setActiveTopic('geral')
     }
-  }
-
-  // Filter posts by topic
-  const getPostsForTopic = (postsToFilter) => {
-    if (activeTopic === 'geral') return postsToFilter
-    return postsToFilter.filter(p => p.topic === activeTopic)
   }
 
   // Get topic icon component
