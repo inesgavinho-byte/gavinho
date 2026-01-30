@@ -43,26 +43,36 @@ import ObraApp from './pages/ObraApp'
 import GestaoObras from './pages/GestaoObras'
 import OAuthCallback from './pages/OAuthCallback'
 
-// OAuth Callback Handler - runs before anything else (handles legacy routes)
+// OAuth Callback Handler - ONLY for MS Teams OAuth on specific routes
+// Does NOT interfere with Supabase auth flow
 function OAuthCallbackHandler({ children }) {
-  const [status, setStatus] = useState('checking') // 'checking', 'handled', 'continue'
+  const [status, setStatus] = useState('checking')
 
   useEffect(() => {
-    // Check if we have OAuth response in hash
     const hash = window.location.hash
+    const pathname = window.location.pathname
+
+    // ONLY handle MS Teams OAuth on /oauth/callback route
+    // This prevents interference with Supabase Google OAuth
+    const isMSTeamsCallback = pathname.includes('/oauth/callback') ||
+                              pathname.includes('/ms-teams') ||
+                              pathname.includes('/teams-callback')
+
+    if (!isMSTeamsCallback) {
+      // Not a MS Teams callback - let the app render normally
+      setStatus('continue')
+      return
+    }
+
+    // Only process if this is explicitly a MS Teams OAuth callback
     if (hash && hash.includes('access_token')) {
       const params = new URLSearchParams(hash.substring(1))
       const token = params.get('access_token')
 
       if (token) {
-        // Store in localStorage with prefixed key to avoid Supabase conflicts
         localStorage.setItem('ms_teams_oauth_token', token)
         setStatus('handled')
-
-        // Try to close popup
-        setTimeout(() => {
-          window.close()
-        }, 2000)
+        setTimeout(() => window.close(), 2000)
         return
       }
     }
@@ -72,26 +82,17 @@ function OAuthCallbackHandler({ children }) {
       const error = params.get('error_description') || params.get('error')
       localStorage.setItem('ms_teams_oauth_error', error || 'Erro')
       setStatus('handled')
-
-      setTimeout(() => {
-        window.close()
-      }, 2000)
+      setTimeout(() => window.close(), 2000)
       return
     }
 
     setStatus('continue')
   }, [])
 
-  // Show loading while checking
   if (status === 'checking') {
-    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-      <div style={{ background: 'white', padding: '40px', borderRadius: '16px', textAlign: 'center' }}>
-        <p style={{ color: '#333' }}>A verificar...</p>
-      </div>
-    </div>
+    return null // Quick check, no loading screen needed
   }
 
-  // If we handled OAuth, show success and DON'T render children
   if (status === 'handled') {
     return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
       <div style={{ background: 'white', padding: '40px', borderRadius: '16px', textAlign: 'center' }}>
@@ -102,7 +103,6 @@ function OAuthCallbackHandler({ children }) {
     </div>
   }
 
-  // Normal flow - render app
   return children
 }
 
