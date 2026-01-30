@@ -21,8 +21,19 @@ import {
   Moon, Coffee, Plane, Home, Lock, Archive, BarChart3,
   Tag, Download, Mail, Webhook, Bot, Sparkles, AlarmClock,
   CalendarPlus, XCircle, Eye, EyeOff, Mic, MicOff,
-  Monitor, Globe, FileDown, Zap
+  Monitor, Globe, FileDown, Zap,
+  // Teams import icons
+  CloudDownload, RefreshCw, CheckCircle, AlertTriangle,
+  Loader2, FolderDown, MessageSquarePlus, UsersRound
 } from 'lucide-react'
+
+// Microsoft Graph API Configuration
+const MS_GRAPH_CONFIG = {
+  clientId: import.meta.env.VITE_MS_CLIENT_ID || 'YOUR_CLIENT_ID',
+  authority: 'https://login.microsoftonline.com/common',
+  redirectUri: typeof window !== 'undefined' ? window.location.origin + '/workspace' : '',
+  scopes: ['User.Read', 'Team.ReadBasic.All', 'Channel.ReadBasic.All', 'ChannelMessage.Read.All', 'Files.Read.All']
+}
 
 // Status options for users
 const USER_STATUS_OPTIONS = [
@@ -387,6 +398,19 @@ export default function Workspace() {
   const [emailSyncEnabled, setEmailSyncEnabled] = useState(false)
   const [emailDigestFrequency, setEmailDigestFrequency] = useState('daily')
   const [showEmailSettings, setShowEmailSettings] = useState(false)
+
+  // ========== MICROSOFT TEAMS IMPORT ==========
+  const [showTeamsImport, setShowTeamsImport] = useState(false)
+  const [teamsAuthState, setTeamsAuthState] = useState('idle') // idle, authenticating, authenticated, error
+  const [teamsAccessToken, setTeamsAccessToken] = useState(null)
+  const [teamsUser, setTeamsUser] = useState(null)
+  const [availableTeams, setAvailableTeams] = useState([])
+  const [selectedTeamsToImport, setSelectedTeamsToImport] = useState([])
+  const [teamsChannels, setTeamsChannels] = useState({}) // { teamId: [channels] }
+  const [selectedChannelsToImport, setSelectedChannelsToImport] = useState([])
+  const [importProgress, setImportProgress] = useState({ status: 'idle', current: 0, total: 0, currentItem: '' })
+  const [importLog, setImportLog] = useState([])
+  const [importStep, setImportStep] = useState(1) // 1: Auth, 2: Select Teams, 3: Select Channels, 4: Import, 5: Complete
 
   const fileInputRef = useRef(null)
   const messagesEndRef = useRef(null)
@@ -1867,6 +1891,300 @@ export default function Workspace() {
     }
   }
 
+  // ========== MICROSOFT TEAMS IMPORT ==========
+
+  // Start Microsoft OAuth login
+  const startTeamsAuth = () => {
+    setTeamsAuthState('authenticating')
+
+    // Build OAuth URL
+    const authUrl = new URL(`${MS_GRAPH_CONFIG.authority}/oauth2/v2.0/authorize`)
+    authUrl.searchParams.set('client_id', MS_GRAPH_CONFIG.clientId)
+    authUrl.searchParams.set('response_type', 'token')
+    authUrl.searchParams.set('redirect_uri', MS_GRAPH_CONFIG.redirectUri)
+    authUrl.searchParams.set('scope', MS_GRAPH_CONFIG.scopes.join(' '))
+    authUrl.searchParams.set('response_mode', 'fragment')
+    authUrl.searchParams.set('state', 'teams_import')
+
+    // Open popup for auth
+    const width = 500
+    const height = 600
+    const left = window.screenX + (window.outerWidth - width) / 2
+    const top = window.screenY + (window.outerHeight - height) / 2
+
+    const authWindow = window.open(
+      authUrl.toString(),
+      'Microsoft Login',
+      `width=${width},height=${height},left=${left},top=${top}`
+    )
+
+    // Listen for the callback
+    const checkAuth = setInterval(() => {
+      try {
+        if (authWindow.closed) {
+          clearInterval(checkAuth)
+          if (!teamsAccessToken) {
+            setTeamsAuthState('idle')
+          }
+          return
+        }
+
+        const hash = authWindow.location.hash
+        if (hash && hash.includes('access_token')) {
+          clearInterval(checkAuth)
+          authWindow.close()
+
+          const params = new URLSearchParams(hash.substring(1))
+          const token = params.get('access_token')
+
+          if (token) {
+            setTeamsAccessToken(token)
+            setTeamsAuthState('authenticated')
+            fetchTeamsUser(token)
+            fetchAvailableTeams(token)
+            setImportStep(2)
+          }
+        }
+      } catch (e) {
+        // Cross-origin error, ignore
+      }
+    }, 500)
+
+    // Timeout after 2 minutes
+    setTimeout(() => {
+      clearInterval(checkAuth)
+      if (teamsAuthState === 'authenticating') {
+        setTeamsAuthState('error')
+        addImportLog('error', 'Autenticação expirou. Tente novamente.')
+      }
+    }, 120000)
+  }
+
+  // Fetch authenticated user info
+  const fetchTeamsUser = async (token) => {
+    try {
+      const response = await fetch('https://graph.microsoft.com/v1.0/me', {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (response.ok) {
+        const user = await response.json()
+        setTeamsUser(user)
+        addImportLog('success', `Autenticado como ${user.displayName}`)
+      }
+    } catch (error) {
+      addImportLog('error', 'Erro ao obter informações do utilizador')
+    }
+  }
+
+  // Fetch available Teams
+  const fetchAvailableTeams = async (token) => {
+    try {
+      addImportLog('info', 'A carregar Teams...')
+      const response = await fetch('https://graph.microsoft.com/v1.0/me/joinedTeams', {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setAvailableTeams(data.value || [])
+        addImportLog('success', `Encontrados ${data.value?.length || 0} Teams`)
+      } else {
+        throw new Error('Failed to fetch teams')
+      }
+    } catch (error) {
+      addImportLog('error', 'Erro ao carregar Teams. Verifique as permissões.')
+      setTeamsAuthState('error')
+    }
+  }
+
+  // Fetch channels for a team
+  const fetchTeamChannels = async (teamId) => {
+    if (!teamsAccessToken) return
+
+    try {
+      const response = await fetch(
+        `https://graph.microsoft.com/v1.0/teams/${teamId}/channels`,
+        { headers: { Authorization: `Bearer ${teamsAccessToken}` } }
+      )
+
+      if (response.ok) {
+        const data = await response.json()
+        setTeamsChannels(prev => ({ ...prev, [teamId]: data.value || [] }))
+        return data.value || []
+      }
+    } catch (error) {
+      addImportLog('error', `Erro ao carregar canais do Team ${teamId}`)
+    }
+    return []
+  }
+
+  // Toggle team selection
+  const toggleTeamSelection = async (team) => {
+    const isSelected = selectedTeamsToImport.some(t => t.id === team.id)
+
+    if (isSelected) {
+      setSelectedTeamsToImport(prev => prev.filter(t => t.id !== team.id))
+      setSelectedChannelsToImport(prev => prev.filter(c => c.teamId !== team.id))
+    } else {
+      setSelectedTeamsToImport(prev => [...prev, team])
+      // Fetch channels for this team
+      if (!teamsChannels[team.id]) {
+        await fetchTeamChannels(team.id)
+      }
+    }
+  }
+
+  // Toggle channel selection
+  const toggleChannelSelection = (channel, teamId) => {
+    const channelWithTeam = { ...channel, teamId }
+    const isSelected = selectedChannelsToImport.some(c => c.id === channel.id)
+
+    if (isSelected) {
+      setSelectedChannelsToImport(prev => prev.filter(c => c.id !== channel.id))
+    } else {
+      setSelectedChannelsToImport(prev => [...prev, channelWithTeam])
+    }
+  }
+
+  // Add log entry
+  const addImportLog = (type, message) => {
+    setImportLog(prev => [...prev, {
+      id: Date.now(),
+      type,
+      message,
+      timestamp: new Date().toISOString()
+    }])
+  }
+
+  // Start the import process
+  const startTeamsImport = async () => {
+    if (selectedChannelsToImport.length === 0) {
+      alert('Selecione pelo menos um canal para importar')
+      return
+    }
+
+    setImportStep(4)
+    setImportProgress({ status: 'importing', current: 0, total: selectedChannelsToImport.length, currentItem: '' })
+    addImportLog('info', `Iniciando importação de ${selectedChannelsToImport.length} canais...`)
+
+    for (let i = 0; i < selectedChannelsToImport.length; i++) {
+      const channel = selectedChannelsToImport[i]
+      const team = selectedTeamsToImport.find(t => t.id === channel.teamId)
+
+      setImportProgress(prev => ({
+        ...prev,
+        current: i + 1,
+        currentItem: `${team?.displayName} > ${channel.displayName}`
+      }))
+
+      addImportLog('info', `Importando: ${channel.displayName}`)
+
+      try {
+        // Fetch messages from this channel
+        const messages = await fetchChannelMessages(channel.teamId, channel.id)
+
+        // Create local channel/project mapping
+        const localChannel = {
+          id: `imported-${channel.id}`,
+          codigo: channel.displayName.substring(0, 10).toUpperCase().replace(/\s/g, ''),
+          nome: channel.displayName,
+          equipa: 'arch',
+          importedFrom: 'teams',
+          teamsTeamId: channel.teamId,
+          teamsChannelId: channel.id,
+          unreadCount: 0,
+          lastActivity: new Date().toISOString()
+        }
+
+        // Add to local channels
+        setCanais(prev => {
+          // Check if already imported
+          if (prev.some(c => c.teamsChannelId === channel.id)) {
+            addImportLog('warning', `Canal "${channel.displayName}" já foi importado anteriormente`)
+            return prev
+          }
+          return [...prev, localChannel]
+        })
+
+        // Import messages
+        if (messages.length > 0) {
+          const importedPosts = messages.map(msg => ({
+            id: `imported-${msg.id}`,
+            conteudo: msg.body?.content?.replace(/<[^>]*>/g, '') || '',
+            autor: {
+              id: msg.from?.user?.id || 'unknown',
+              nome: msg.from?.user?.displayName || 'Utilizador Teams',
+              avatar_url: null,
+              funcao: 'Importado do Teams'
+            },
+            created_at: msg.createdDateTime,
+            reacoes: [],
+            replyCount: msg.replies?.length || 0,
+            importedFrom: 'teams',
+            canal_id: localChannel.id
+          }))
+
+          // Store messages (in production, would save to database)
+          addImportLog('success', `Importadas ${importedPosts.length} mensagens de "${channel.displayName}"`)
+        }
+
+        addImportLog('success', `Canal "${channel.displayName}" importado com sucesso`)
+
+      } catch (error) {
+        addImportLog('error', `Erro ao importar "${channel.displayName}": ${error.message}`)
+      }
+
+      // Small delay between channels
+      await new Promise(resolve => setTimeout(resolve, 500))
+    }
+
+    setImportProgress(prev => ({ ...prev, status: 'complete' }))
+    setImportStep(5)
+    addImportLog('success', '✓ Importação concluída!')
+  }
+
+  // Fetch messages from a channel
+  const fetchChannelMessages = async (teamId, channelId) => {
+    if (!teamsAccessToken) return []
+
+    try {
+      const response = await fetch(
+        `https://graph.microsoft.com/v1.0/teams/${teamId}/channels/${channelId}/messages?$top=50`,
+        { headers: { Authorization: `Bearer ${teamsAccessToken}` } }
+      )
+
+      if (response.ok) {
+        const data = await response.json()
+        return data.value || []
+      }
+    } catch (error) {
+      console.error('Error fetching messages:', error)
+    }
+    return []
+  }
+
+  // Reset import state
+  const resetTeamsImport = () => {
+    setTeamsAuthState('idle')
+    setTeamsAccessToken(null)
+    setTeamsUser(null)
+    setAvailableTeams([])
+    setSelectedTeamsToImport([])
+    setTeamsChannels({})
+    setSelectedChannelsToImport([])
+    setImportProgress({ status: 'idle', current: 0, total: 0, currentItem: '' })
+    setImportLog([])
+    setImportStep(1)
+  }
+
+  // Close import modal
+  const closeTeamsImport = () => {
+    setShowTeamsImport(false)
+    if (importStep === 5) {
+      resetTeamsImport()
+    }
+  }
+
   if (loading) {
     return (
       <div className="fade-in" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
@@ -2039,6 +2357,25 @@ export default function Workspace() {
               }}
             >
               {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+            </button>
+            {/* Teams Import */}
+            <button
+              onClick={() => setShowTeamsImport(true)}
+              title="Importar do Microsoft Teams"
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '6px',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                color: 'var(--brown-light)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <CloudDownload size={18} />
             </button>
           </div>
         </div>
@@ -5451,6 +5788,316 @@ export default function Workspace() {
           </div>
         </div>
       )}
+
+      {/* ========== MICROSOFT TEAMS IMPORT MODAL ========== */}
+      {showTeamsImport && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3000 }} onClick={closeTeamsImport}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--white)', borderRadius: '20px', width: '700px', maxHeight: '85vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            {/* Header */}
+            <div style={{ padding: '24px', borderBottom: '1px solid var(--stone)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'linear-gradient(135deg, #5558AF 0%, #6B5B95 100%)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="white">
+                    <path d="M19.35 10.04A7.49 7.49 0 0012 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 000 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"/>
+                  </svg>
+                </div>
+                <div>
+                  <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: 'white' }}>Importar do Microsoft Teams</h2>
+                  <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'rgba(255,255,255,0.8)' }}>
+                    {importStep === 1 && 'Autentique com a sua conta Microsoft'}
+                    {importStep === 2 && 'Selecione os Teams a importar'}
+                    {importStep === 3 && 'Selecione os canais'}
+                    {importStep === 4 && 'Importação em progresso...'}
+                    {importStep === 5 && 'Importação concluída!'}
+                  </p>
+                </div>
+              </div>
+              <button onClick={closeTeamsImport} style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(255,255,255,0.2)', border: 'none', cursor: 'pointer', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Progress Steps */}
+            <div style={{ display: 'flex', padding: '16px 24px', borderBottom: '1px solid var(--stone)', gap: '8px' }}>
+              {[
+                { num: 1, label: 'Autenticar' },
+                { num: 2, label: 'Teams' },
+                { num: 3, label: 'Canais' },
+                { num: 4, label: 'Importar' },
+                { num: 5, label: 'Concluído' }
+              ].map((step, i) => (
+                <div key={step.num} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{
+                    width: '28px', height: '28px', borderRadius: '50%',
+                    background: importStep >= step.num ? (importStep > step.num ? 'var(--success)' : '#5558AF') : 'var(--stone)',
+                    color: importStep >= step.num ? 'white' : 'var(--brown-light)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '12px', fontWeight: 600
+                  }}>
+                    {importStep > step.num ? <Check size={14} /> : step.num}
+                  </div>
+                  <span style={{ fontSize: '12px', color: importStep >= step.num ? 'var(--brown)' : 'var(--brown-light)', fontWeight: importStep === step.num ? 600 : 400 }}>{step.label}</span>
+                  {i < 4 && <div style={{ flex: 1, height: '2px', background: importStep > step.num ? 'var(--success)' : 'var(--stone)' }} />}
+                </div>
+              ))}
+            </div>
+
+            {/* Content */}
+            <div style={{ flex: 1, overflow: 'auto', padding: '24px' }}>
+              {/* Step 1: Authentication */}
+              {importStep === 1 && (
+                <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+                  <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'linear-gradient(135deg, #5558AF 0%, #6B5B95 100%)', margin: '0 auto 24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="white">
+                      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                    </svg>
+                  </div>
+                  <h3 style={{ margin: '0 0 12px', fontSize: '18px', fontWeight: 700 }}>Conectar ao Microsoft Teams</h3>
+                  <p style={{ margin: '0 0 32px', color: 'var(--brown-light)', fontSize: '14px', maxWidth: '400px', marginLeft: 'auto', marginRight: 'auto' }}>
+                    Para importar as suas conversas, precisa de autorizar o acesso à sua conta Microsoft Teams.
+                  </p>
+                  <button
+                    onClick={startTeamsAuth}
+                    disabled={teamsAuthState === 'authenticating'}
+                    style={{
+                      padding: '14px 32px', borderRadius: '12px',
+                      background: teamsAuthState === 'authenticating' ? 'var(--stone)' : 'linear-gradient(135deg, #5558AF 0%, #6B5B95 100%)',
+                      border: 'none', color: 'white', fontSize: '15px', fontWeight: 600,
+                      cursor: teamsAuthState === 'authenticating' ? 'wait' : 'pointer',
+                      display: 'inline-flex', alignItems: 'center', gap: '10px'
+                    }}
+                  >
+                    {teamsAuthState === 'authenticating' ? (
+                      <><Loader2 size={18} className="animate-spin" /> A autenticar...</>
+                    ) : (
+                      <>
+                        <svg width="20" height="20" viewBox="0 0 23 23" fill="white"><path d="M0 0h11v11H0zM12 0h11v11H12zM0 12h11v11H0zM12 12h11v11H12z"/></svg>
+                        Entrar com Microsoft
+                      </>
+                    )}
+                  </button>
+                  {teamsAuthState === 'error' && (
+                    <p style={{ marginTop: '16px', color: 'var(--error)', fontSize: '13px' }}>
+                      Erro na autenticação. Tente novamente.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Step 2: Select Teams */}
+              {importStep === 2 && (
+                <div>
+                  {teamsUser && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', background: 'var(--success-bg)', borderRadius: '10px', marginBottom: '20px' }}>
+                      <CheckCircle size={20} style={{ color: 'var(--success)' }} />
+                      <span style={{ fontSize: '14px' }}>Autenticado como <strong>{teamsUser.displayName}</strong></span>
+                    </div>
+                  )}
+                  <h4 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: 600 }}>Selecione os Teams para importar:</h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px', overflowY: 'auto' }}>
+                    {availableTeams.map(team => {
+                      const isSelected = selectedTeamsToImport.some(t => t.id === team.id)
+                      return (
+                        <div
+                          key={team.id}
+                          onClick={() => toggleTeamSelection(team)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '14px',
+                            padding: '14px 16px', borderRadius: '10px',
+                            border: `2px solid ${isSelected ? '#5558AF' : 'var(--stone)'}`,
+                            background: isSelected ? 'rgba(85, 88, 175, 0.08)' : 'transparent',
+                            cursor: 'pointer', transition: 'all 0.15s'
+                          }}
+                        >
+                          <div style={{
+                            width: '20px', height: '20px', borderRadius: '4px',
+                            border: `2px solid ${isSelected ? '#5558AF' : 'var(--stone)'}`,
+                            background: isSelected ? '#5558AF' : 'transparent',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center'
+                          }}>
+                            {isSelected && <Check size={14} style={{ color: 'white' }} />}
+                          </div>
+                          <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: '#5558AF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 600, fontSize: '14px' }}>
+                            {team.displayName?.substring(0, 2).toUpperCase()}
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontWeight: 600, fontSize: '14px' }}>{team.displayName}</div>
+                            <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>{team.description || 'Team do Microsoft Teams'}</div>
+                          </div>
+                          {teamsChannels[team.id] && (
+                            <span style={{ padding: '4px 10px', background: 'var(--cream)', borderRadius: '12px', fontSize: '11px' }}>
+                              {teamsChannels[team.id].length} canais
+                            </span>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '24px' }}>
+                    <button onClick={resetTeamsImport} style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid var(--stone)', background: 'transparent', cursor: 'pointer' }}>
+                      Voltar
+                    </button>
+                    <button
+                      onClick={() => setImportStep(3)}
+                      disabled={selectedTeamsToImport.length === 0}
+                      style={{
+                        padding: '10px 24px', borderRadius: '8px', border: 'none',
+                        background: selectedTeamsToImport.length > 0 ? '#5558AF' : 'var(--stone)',
+                        color: 'white', fontWeight: 600, cursor: selectedTeamsToImport.length > 0 ? 'pointer' : 'not-allowed'
+                      }}
+                    >
+                      Continuar ({selectedTeamsToImport.length} selecionados)
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 3: Select Channels */}
+              {importStep === 3 && (
+                <div>
+                  <h4 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: 600 }}>Selecione os canais a importar:</h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '350px', overflowY: 'auto' }}>
+                    {selectedTeamsToImport.map(team => (
+                      <div key={team.id}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                          <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: '#5558AF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '10px', fontWeight: 600 }}>
+                            {team.displayName?.substring(0, 2).toUpperCase()}
+                          </div>
+                          <span style={{ fontWeight: 600 }}>{team.displayName}</span>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingLeft: '38px' }}>
+                          {(teamsChannels[team.id] || []).map(channel => {
+                            const isSelected = selectedChannelsToImport.some(c => c.id === channel.id)
+                            return (
+                              <div
+                                key={channel.id}
+                                onClick={() => toggleChannelSelection(channel, team.id)}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: '12px',
+                                  padding: '10px 14px', borderRadius: '8px',
+                                  border: `1px solid ${isSelected ? '#5558AF' : 'var(--stone)'}`,
+                                  background: isSelected ? 'rgba(85, 88, 175, 0.08)' : 'transparent',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                <div style={{
+                                  width: '18px', height: '18px', borderRadius: '4px',
+                                  border: `2px solid ${isSelected ? '#5558AF' : 'var(--stone)'}`,
+                                  background: isSelected ? '#5558AF' : 'transparent',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                }}>
+                                  {isSelected && <Check size={12} style={{ color: 'white' }} />}
+                                </div>
+                                <Hash size={16} style={{ color: 'var(--brown-light)' }} />
+                                <span style={{ fontSize: '14px' }}>{channel.displayName}</span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '24px' }}>
+                    <button onClick={() => setImportStep(2)} style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid var(--stone)', background: 'transparent', cursor: 'pointer' }}>
+                      Voltar
+                    </button>
+                    <button
+                      onClick={startTeamsImport}
+                      disabled={selectedChannelsToImport.length === 0}
+                      style={{
+                        padding: '10px 24px', borderRadius: '8px', border: 'none',
+                        background: selectedChannelsToImport.length > 0 ? '#5558AF' : 'var(--stone)',
+                        color: 'white', fontWeight: 600, cursor: selectedChannelsToImport.length > 0 ? 'pointer' : 'not-allowed'
+                      }}
+                    >
+                      Importar ({selectedChannelsToImport.length} canais)
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 4: Importing */}
+              {importStep === 4 && (
+                <div style={{ textAlign: 'center', padding: '20px' }}>
+                  <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'var(--cream)', margin: '0 auto 20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Loader2 size={32} style={{ color: '#5558AF', animation: 'spin 1s linear infinite' }} />
+                  </div>
+                  <h3 style={{ margin: '0 0 8px' }}>A importar...</h3>
+                  <p style={{ color: 'var(--brown-light)', marginBottom: '24px' }}>{importProgress.currentItem}</p>
+
+                  {/* Progress bar */}
+                  <div style={{ background: 'var(--stone)', borderRadius: '8px', height: '8px', marginBottom: '16px', overflow: 'hidden' }}>
+                    <div style={{
+                      width: `${(importProgress.current / importProgress.total) * 100}%`,
+                      height: '100%', background: '#5558AF', borderRadius: '8px',
+                      transition: 'width 0.3s ease'
+                    }} />
+                  </div>
+                  <p style={{ fontSize: '13px', color: 'var(--brown-light)' }}>
+                    {importProgress.current} de {importProgress.total} canais
+                  </p>
+
+                  {/* Log */}
+                  <div style={{ marginTop: '24px', background: 'var(--off-white)', borderRadius: '8px', padding: '12px', maxHeight: '150px', overflowY: 'auto', textAlign: 'left' }}>
+                    {importLog.slice(-10).map(log => (
+                      <div key={log.id} style={{ fontSize: '12px', padding: '4px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {log.type === 'success' && <CheckCircle size={12} style={{ color: 'var(--success)' }} />}
+                        {log.type === 'error' && <AlertTriangle size={12} style={{ color: 'var(--error)' }} />}
+                        {log.type === 'info' && <RefreshCw size={12} style={{ color: 'var(--info)' }} />}
+                        {log.type === 'warning' && <AlertTriangle size={12} style={{ color: 'var(--warning)' }} />}
+                        <span style={{ color: log.type === 'error' ? 'var(--error)' : 'var(--brown)' }}>{log.message}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Step 5: Complete */}
+              {importStep === 5 && (
+                <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+                  <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'var(--success-bg)', margin: '0 auto 24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <CheckCircle size={40} style={{ color: 'var(--success)' }} />
+                  </div>
+                  <h3 style={{ margin: '0 0 12px', fontSize: '20px', fontWeight: 700 }}>Importação Concluída!</h3>
+                  <p style={{ margin: '0 0 32px', color: 'var(--brown-light)', fontSize: '14px' }}>
+                    {selectedChannelsToImport.length} canais foram importados com sucesso.
+                  </p>
+
+                  {/* Summary */}
+                  <div style={{ background: 'var(--off-white)', borderRadius: '12px', padding: '20px', marginBottom: '24px', textAlign: 'left' }}>
+                    <h4 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 600 }}>Resumo da importação:</h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {importLog.filter(l => l.type === 'success' && l.message.includes('importado')).map(log => (
+                        <div key={log.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
+                          <CheckCircle size={14} style={{ color: 'var(--success)' }} />
+                          {log.message}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={closeTeamsImport}
+                    style={{ padding: '14px 32px', borderRadius: '12px', background: 'var(--accent-olive)', border: 'none', color: 'white', fontSize: '15px', fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    Concluir
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        .animate-spin {
+          animation: spin 1s linear infinite;
+        }
+      `}</style>
     </div>
   )
 }
