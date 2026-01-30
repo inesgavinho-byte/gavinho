@@ -35,7 +35,10 @@ import {
   Package,
   PanelLeftClose,
   PanelLeft,
-  Layers
+  Layers,
+  Eye,
+  EyeOff,
+  Check
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -61,6 +64,7 @@ const navigation = [
   },
   {
     section: 'Módulo Obras',
+    adminOnly: true, // Restrito a administradores
     items: [
       { name: 'Dashboard Obras', href: '/obras', icon: HardHat },
       { name: 'Gestão Obras', href: '/gestao-obras', icon: UsersRound },
@@ -68,6 +72,7 @@ const navigation = [
   },
   {
     section: 'Gestão Projetos',
+    adminOnly: true, // Restrito a administradores
     items: [
       { name: 'Dashboard Gestão', href: '/gestao', icon: LayoutDashboard },
       { name: 'Emails', href: '/emails', icon: Mail },
@@ -88,6 +93,7 @@ const navigation = [
   },
   {
     section: 'Administração',
+    adminOnly: true, // Restrito a administradores
     items: [
       { name: 'Recursos Humanos', href: '/equipa', icon: UsersRound },
       { name: 'Seed de Dados', href: '/admin/seed', icon: Database },
@@ -97,11 +103,19 @@ const navigation = [
 ]
 
 export default function Sidebar({ isOpen, onClose, isMobile, collapsed, onToggleCollapse, isWorkspace }) {
-  const { user, signOut, getUserName, getUserInitials, getUserAvatar } = useAuth()
+  const { user, signOut, getUserName, getUserInitials, getUserAvatar, isAdmin } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [expandedItems, setExpandedItems] = useState({})
+  const [viewAsRole, setViewAsRole] = useState(null) // null = normal, 'user' = ver como utilizador normal
+  const [showViewAsMenu, setShowViewAsMenu] = useState(false)
+
+  // Verificar se deve mostrar como admin (real ou simulado)
+  const shouldShowAsAdmin = () => {
+    if (viewAsRole === 'user') return false
+    return isAdmin()
+  }
 
   const handleLogout = async () => {
     try {
@@ -280,7 +294,9 @@ export default function Sidebar({ isOpen, onClose, isMobile, collapsed, onToggle
 
       {/* Navigation */}
       <nav className="sidebar-nav">
-        {navigation.map((group) => (
+        {navigation
+          .filter(group => !group.adminOnly || shouldShowAsAdmin())
+          .map((group) => (
           <div key={group.section} className="nav-section">
             {!collapsed && <div className="nav-section-title">{group.section}</div>}
             {collapsed && <div style={{ height: '8px' }} />}
@@ -291,6 +307,95 @@ export default function Sidebar({ isOpen, onClose, isMobile, collapsed, onToggle
 
       {/* Footer */}
       <div className="sidebar-footer" style={collapsed ? { padding: '12px 8px' } : {}}>
+        {/* View As - apenas para admins reais */}
+        {isAdmin() && !collapsed && (
+          <div style={{ marginBottom: '12px', position: 'relative' }}>
+            <button
+              onClick={() => setShowViewAsMenu(!showViewAsMenu)}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px',
+                padding: '10px 12px',
+                background: viewAsRole ? 'rgba(239, 68, 68, 0.1)' : 'var(--cream)',
+                border: viewAsRole ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid var(--stone)',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                color: viewAsRole ? '#dc2626' : 'var(--brown)',
+                fontWeight: 500
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {viewAsRole ? <EyeOff size={14} /> : <Eye size={14} />}
+                <span>{viewAsRole ? 'A ver como: Utilizador' : 'Visualizar como...'}</span>
+              </div>
+              <ChevronDown size={14} style={{ transform: showViewAsMenu ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+            </button>
+
+            {showViewAsMenu && (
+              <div style={{
+                position: 'absolute',
+                bottom: '100%',
+                left: 0,
+                right: 0,
+                marginBottom: '4px',
+                background: 'var(--white)',
+                borderRadius: '8px',
+                boxShadow: 'var(--shadow-lg)',
+                overflow: 'hidden',
+                zIndex: 100
+              }}>
+                <div style={{ padding: '8px 12px', fontSize: '11px', color: 'var(--brown-light)', borderBottom: '1px solid var(--stone)' }}>
+                  Visualizar plataforma como:
+                </div>
+                <button
+                  onClick={() => { setViewAsRole(null); setShowViewAsMenu(false); }}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '10px 12px',
+                    background: !viewAsRole ? 'var(--cream)' : 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    color: 'var(--brown)',
+                    textAlign: 'left'
+                  }}
+                >
+                  <Shield size={14} />
+                  Administrador (normal)
+                  {!viewAsRole && <Check size={14} style={{ marginLeft: 'auto', color: 'var(--success)' }} />}
+                </button>
+                <button
+                  onClick={() => { setViewAsRole('user'); setShowViewAsMenu(false); }}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '10px 12px',
+                    background: viewAsRole === 'user' ? 'var(--cream)' : 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    color: 'var(--brown)',
+                    textAlign: 'left'
+                  }}
+                >
+                  <User size={14} />
+                  Utilizador normal
+                  {viewAsRole === 'user' && <Check size={14} style={{ marginLeft: 'auto', color: 'var(--success)' }} />}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* User Card with Dropdown */}
         <div style={{ position: 'relative' }}>
           <div
