@@ -476,7 +476,7 @@ export default function Dashboard() {
             <MessageSquare size={20} style={{ color: 'var(--accent-olive)' }} />
             <h3 className="card-title">Últimos Desenvolvimentos</h3>
           </div>
-          <button className="btn btn-ghost btn-sm" onClick={() => navigate('/chat')}>
+          <button className="btn btn-ghost btn-sm" onClick={() => navigate('/workspace')}>
             Ver todos <ArrowRight size={14} style={{ marginLeft: '4px' }} />
           </button>
         </div>
@@ -485,7 +485,7 @@ export default function Dashboard() {
           {recentActivity.map((activity, idx) => (
             <div
               key={activity.id}
-              onClick={() => navigate(`/chat?canal=${activity.projeto.codigo}`)}
+              onClick={() => navigate(`/workspace?canal=${activity.projeto.codigo}`)}
               style={{
                 display: 'flex',
                 alignItems: 'flex-start',

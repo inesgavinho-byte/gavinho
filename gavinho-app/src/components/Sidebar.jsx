@@ -18,6 +18,7 @@ import {
   LogOut,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   User,
   UsersRound,
   Receipt,
@@ -31,7 +32,10 @@ import {
   Mail,
   Table2,
   Clock,
-  Package
+  Package,
+  PanelLeftClose,
+  PanelLeft,
+  Layers
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -41,7 +45,7 @@ const navigation = [
     items: [
       { name: 'Dashboard Projetos', href: '/dashboard-projetos', icon: LayoutDashboard },
       { name: 'Projetos', href: '/projetos', icon: FolderKanban },
-      { name: 'Chat Colaborativo', href: '/chat', icon: MessageSquare },
+      { name: 'Workspace', href: '/workspace', icon: Layers, highlight: true },
       {
         name: 'Planning',
         href: '/planning',
@@ -92,7 +96,7 @@ const navigation = [
   }
 ]
 
-export default function Sidebar({ isOpen, onClose, isMobile }) {
+export default function Sidebar({ isOpen, onClose, isMobile, collapsed, onToggleCollapse, isWorkspace }) {
   const { user, signOut, getUserName, getUserInitials, getUserAvatar } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
@@ -139,6 +143,40 @@ export default function Sidebar({ isOpen, onClose, isMobile }) {
     const hasSubItems = item.subItems && item.subItems.length > 0
     const isExpanded = expandedItems[item.name]
     const isActive = isItemActive(item)
+
+    // Collapsed mode - show only icons with tooltip
+    if (collapsed) {
+      return (
+        <NavLink
+          key={item.name}
+          to={item.href}
+          end={item.href === '/'}
+          onClick={handleNavClick}
+          className={({ isActive }) =>
+            `nav-item nav-item-collapsed ${isActive ? 'active' : ''} ${item.highlight ? 'nav-item-highlight' : ''}`
+          }
+          title={item.name}
+          style={{
+            justifyContent: 'center',
+            padding: '12px',
+            position: 'relative'
+          }}
+        >
+          <item.icon size={20} />
+          {item.highlight && isActive && (
+            <span style={{
+              position: 'absolute',
+              top: '6px',
+              right: '6px',
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              background: 'var(--accent-olive)'
+            }} />
+          )}
+        </NavLink>
+      )
+    }
 
     if (hasSubItems) {
       return (
@@ -188,7 +226,7 @@ export default function Sidebar({ isOpen, onClose, isMobile }) {
         end={item.href === '/'}
         onClick={handleNavClick}
         className={({ isActive }) =>
-          `nav-item ${isActive ? 'active' : ''}`
+          `nav-item ${isActive ? 'active' : ''} ${item.highlight ? 'nav-item-highlight' : ''}`
         }
       >
         <item.icon size={18} />
@@ -201,60 +239,101 @@ export default function Sidebar({ isOpen, onClose, isMobile }) {
   }
 
   return (
-    <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
+    <aside className={`sidebar ${isOpen ? 'open' : ''} ${collapsed ? 'collapsed' : ''}`}>
       {/* Logo */}
-      <div className="sidebar-header">
-        <NavLink to="/" className="sidebar-logo" onClick={handleNavClick}>
+      <div className="sidebar-header" style={collapsed ? { justifyContent: 'center', padding: '16px 8px' } : {}}>
+        <NavLink to="/" className="sidebar-logo" onClick={handleNavClick} style={collapsed ? { gap: 0 } : {}}>
           <div className="logo-mark">G</div>
-          <span className="logo-text">GAVINHO</span>
+          {!collapsed && <span className="logo-text">GAVINHO</span>}
         </NavLink>
       </div>
+
+      {/* Collapse Toggle Button */}
+      {!isMobile && (
+        <button
+          onClick={onToggleCollapse}
+          className="sidebar-collapse-btn"
+          title={collapsed ? 'Expandir sidebar' : 'Colapsar sidebar'}
+          style={{
+            position: 'absolute',
+            top: '70px',
+            right: collapsed ? '50%' : '-12px',
+            transform: collapsed ? 'translateX(50%)' : 'none',
+            width: '24px',
+            height: '24px',
+            borderRadius: '50%',
+            background: 'var(--white)',
+            border: '1px solid var(--stone)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'var(--brown-light)',
+            zIndex: 10,
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+            transition: 'all 0.2s'
+          }}
+        >
+          {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+        </button>
+      )}
 
       {/* Navigation */}
       <nav className="sidebar-nav">
         {navigation.map((group) => (
           <div key={group.section} className="nav-section">
-            <div className="nav-section-title">{group.section}</div>
+            {!collapsed && <div className="nav-section-title">{group.section}</div>}
+            {collapsed && <div style={{ height: '8px' }} />}
             {group.items.map((item) => renderNavItem(item))}
           </div>
         ))}
       </nav>
 
       {/* Footer */}
-      <div className="sidebar-footer">
+      <div className="sidebar-footer" style={collapsed ? { padding: '12px 8px' } : {}}>
         {/* User Card with Dropdown */}
         <div style={{ position: 'relative' }}>
-          <div 
-            className="user-card"
+          <div
+            className={`user-card ${collapsed ? 'user-card-collapsed' : ''}`}
             onClick={() => setShowUserMenu(!showUserMenu)}
-            style={{ cursor: 'pointer' }}
+            style={collapsed ? {
+              cursor: 'pointer',
+              justifyContent: 'center',
+              padding: '8px'
+            } : { cursor: 'pointer' }}
           >
             {getUserAvatar() ? (
-              <img 
-                src={getUserAvatar()} 
+              <img
+                src={getUserAvatar()}
                 alt={getUserName()}
                 style={{
-                  width: '36px',
-                  height: '36px',
+                  width: collapsed ? '32px' : '36px',
+                  height: collapsed ? '32px' : '36px',
                   borderRadius: '50%',
                   objectFit: 'cover'
                 }}
               />
             ) : (
-              <div className="user-avatar">{getUserInitials()}</div>
+              <div className="user-avatar" style={collapsed ? { width: '32px', height: '32px', fontSize: '11px' } : {}}>
+                {getUserInitials()}
+              </div>
             )}
-            <div className="user-info">
-              <div className="user-name">{getUserName()}</div>
-              <div className="user-role">{getUserRole()}</div>
-            </div>
-            <ChevronDown 
-              size={16} 
-              style={{ 
-                color: 'var(--brown-light)',
-                transform: showUserMenu ? 'rotate(180deg)' : 'rotate(0)',
-                transition: 'transform 0.2s'
-              }} 
-            />
+            {!collapsed && (
+              <>
+                <div className="user-info">
+                  <div className="user-name">{getUserName()}</div>
+                  <div className="user-role">{getUserRole()}</div>
+                </div>
+                <ChevronDown
+                  size={16}
+                  style={{
+                    color: 'var(--brown-light)',
+                    transform: showUserMenu ? 'rotate(180deg)' : 'rotate(0)',
+                    transition: 'transform 0.2s'
+                  }}
+                />
+              </>
+            )}
           </div>
 
           {/* User Menu Dropdown */}

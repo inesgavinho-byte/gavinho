@@ -1238,6 +1238,73 @@ tbody tr:last-child td {
 }
 
 /* ========================================
+   COLLAPSED SIDEBAR
+   ======================================== */
+.sidebar.collapsed {
+  width: 72px;
+  padding: 20px 8px;
+}
+
+.sidebar.collapsed .nav-section-title {
+  display: none;
+}
+
+.sidebar.collapsed .nav-item {
+  justify-content: center;
+  padding: 12px;
+}
+
+.sidebar.collapsed .nav-item span {
+  display: none;
+}
+
+.sidebar.collapsed .nav-item svg {
+  width: 20px;
+  height: 20px;
+}
+
+.sidebar.collapsed .user-card {
+  justify-content: center;
+  padding: 8px;
+}
+
+.sidebar.collapsed .user-info,
+.sidebar.collapsed .user-card > svg {
+  display: none;
+}
+
+.app-layout.sidebar-collapsed .main-content {
+  margin-left: 72px;
+}
+
+/* Workspace mode - full width content */
+.main-content.workspace-mode {
+  padding: 0;
+  overflow: hidden;
+}
+
+/* Nav item highlight (Workspace) */
+.nav-item.nav-item-highlight {
+  background: rgba(139, 155, 123, 0.15);
+  border-left: 3px solid var(--accent-olive);
+}
+
+.nav-item.nav-item-highlight:hover {
+  background: rgba(139, 155, 123, 0.25);
+}
+
+.nav-item.nav-item-highlight.active {
+  background: rgba(139, 155, 123, 0.35);
+  color: var(--accent-olive);
+}
+
+/* Sidebar collapse button hover */
+.sidebar-collapse-btn:hover {
+  background: var(--cream) !important;
+  color: var(--brown) !important;
+}
+
+/* ========================================
    RESPONSIVE
    ======================================== */
 

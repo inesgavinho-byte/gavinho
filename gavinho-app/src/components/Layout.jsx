@@ -1,11 +1,16 @@
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import Sidebar from './Sidebar'
 import { Menu, X } from 'lucide-react'
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+  const location = useLocation()
+
+  // Auto-collapse sidebar when on workspace
+  const isWorkspace = location.pathname === '/workspace' || location.pathname === '/chat'
 
   useEffect(() => {
     const checkMobile = () => {
@@ -14,16 +19,24 @@ export default function Layout() {
         setSidebarOpen(false)
       }
     }
-    
+
     checkMobile()
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
+  // Auto-collapse on workspace
+  useEffect(() => {
+    if (isWorkspace && !isMobile) {
+      setSidebarCollapsed(true)
+    }
+  }, [isWorkspace, isMobile])
+
   const closeSidebar = () => setSidebarOpen(false)
+  const toggleCollapsed = () => setSidebarCollapsed(!sidebarCollapsed)
 
   return (
-    <div className="app-layout">
+    <div className={`app-layout ${sidebarCollapsed && !isMobile ? 'sidebar-collapsed' : ''}`}>
       {/* Mobile Header */}
       {isMobile && (
         <div className="mobile-header" style={{ display: 'flex' }}>
@@ -36,14 +49,21 @@ export default function Layout() {
           </div>
         </div>
       )}
-      
+
       {/* Overlay */}
       {isMobile && sidebarOpen && (
         <div className="sidebar-overlay open" onClick={closeSidebar} />
       )}
-      
-      <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} isMobile={isMobile} />
-      <main className="main-content">
+
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={closeSidebar}
+        isMobile={isMobile}
+        collapsed={sidebarCollapsed && !isMobile}
+        onToggleCollapse={toggleCollapsed}
+        isWorkspace={isWorkspace}
+      />
+      <main className={`main-content ${isWorkspace ? 'workspace-mode' : ''}`}>
         <Outlet />
       </main>
     </div>

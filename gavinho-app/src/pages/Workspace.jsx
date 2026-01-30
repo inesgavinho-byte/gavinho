@@ -74,7 +74,7 @@ const EMOJI_CATEGORIES = [
   }
 ]
 
-export default function ChatColaborativo() {
+export default function Workspace() {
   const { profile, getUserInitials } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const [loading, setLoading] = useState(true)

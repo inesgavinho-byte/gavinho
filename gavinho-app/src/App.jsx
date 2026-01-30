@@ -23,7 +23,7 @@ import Orcamentos from './pages/Orcamentos'
 import OrcamentoDetalhe from './pages/OrcamentoDetalhe'
 import BlockersDecisions from './pages/BlockersDecisions'
 import ChatProjetos from './pages/ChatProjetos'
-import ChatColaborativo from './pages/ChatColaborativo'
+import Workspace from './pages/Workspace'
 import Finance from './pages/Finance'
 import Planning from './pages/Planning'
 import Calendario from './pages/Calendario'
@@ -84,7 +84,8 @@ function App() {
             <Route path="gestao-obras" element={<GestaoObras />} />
             <Route path="tarefas" element={<Tarefas />} />
             <Route path="bloqueios" element={<BlockersDecisions />} />
-            <Route path="chat" element={<ChatColaborativo />} />
+            <Route path="workspace" element={<Workspace />} />
+            <Route path="chat" element={<Workspace />} /> {/* Backward compatibility */}
             <Route path="chat-obras" element={<ChatObras />} />
             <Route path="biblioteca" element={<Biblioteca />} />
             <Route path="planning" element={<Planning />} />
