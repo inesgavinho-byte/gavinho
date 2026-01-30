@@ -46,8 +46,7 @@ const navigation = [
   {
     section: 'Módulo Projetos',
     items: [
-      { name: 'Gestão de Projeto', href: '/gestao-projeto', icon: LayoutDashboard, highlight: true },
-      { name: 'Dashboard Projetos', href: '/dashboard-projetos', icon: PieChart },
+      { name: 'Dashboard Projetos', href: '/dashboard-projetos', icon: LayoutDashboard },
       { name: 'Projetos', href: '/projetos', icon: FolderKanban },
       { name: 'Workspace', href: '/workspace', icon: Layers },
       {
@@ -75,7 +74,7 @@ const navigation = [
     section: 'Gestão Projetos',
     adminOnly: true, // Restrito a administradores
     items: [
-      { name: 'Dashboard Gestão', href: '/gestao', icon: LayoutDashboard },
+      { name: 'Gestão de Projeto', href: '/gestao-projeto', icon: LayoutDashboard, highlight: true },
       { name: 'Emails', href: '/emails', icon: Mail },
       { name: 'Clientes', href: '/clientes', icon: Users },
       { name: 'Viabilidade', href: '/viabilidade', icon: FileSearch },
