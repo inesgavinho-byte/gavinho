@@ -149,15 +149,15 @@ CREATE TABLE IF NOT EXISTS chat_mencoes (
     utilizador_id UUID NOT NULL REFERENCES utilizadores(id) ON DELETE CASCADE,
 
     -- Estado de leitura
-    lido BOOLEAN DEFAULT false,
-    lido_at TIMESTAMP WITH TIME ZONE,
+    lida BOOLEAN DEFAULT false,
+    lida_at TIMESTAMP WITH TIME ZONE,
 
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_chat_mencoes_mensagem ON chat_mencoes(mensagem_id);
 CREATE INDEX IF NOT EXISTS idx_chat_mencoes_utilizador ON chat_mencoes(utilizador_id);
-CREATE INDEX IF NOT EXISTS idx_chat_mencoes_nao_lidas ON chat_mencoes(utilizador_id, lido) WHERE NOT lido;
+CREATE INDEX IF NOT EXISTS idx_chat_mencoes_nao_lidas ON chat_mencoes(utilizador_id, lida) WHERE NOT lida;
 
 -- =====================================================
 -- 7. ANEXOS DE MENSAGENS
