@@ -124,6 +124,32 @@ const EMOJI_CATEGORIES = [
 ]
 
 export default function Workspace() {
+  // Handle OAuth callback in popup
+  useEffect(() => {
+    // Check if we're in a popup and have a token in the hash
+    if (window.opener && window.location.hash) {
+      const hash = window.location.hash.substring(1)
+      if (hash.includes('access_token')) {
+        const params = new URLSearchParams(hash)
+        const token = params.get('access_token')
+        if (token) {
+          // Send token to parent window
+          window.opener.postMessage({ type: 'teams_auth_success', token }, window.location.origin)
+          window.close()
+          return
+        }
+      }
+      // Check for error
+      if (hash.includes('error')) {
+        const params = new URLSearchParams(hash)
+        const error = params.get('error_description') || params.get('error')
+        window.opener.postMessage({ type: 'teams_auth_error', error }, window.location.origin)
+        window.close()
+        return
+      }
+    }
+  }, [])
+
   const { profile, getUserInitials } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const [loading, setLoading] = useState(true)
@@ -1918,41 +1944,40 @@ export default function Workspace() {
       `width=${width},height=${height},left=${left},top=${top}`
     )
 
-    // Listen for the callback
-    const checkAuth = setInterval(() => {
-      try {
-        if (authWindow.closed) {
-          clearInterval(checkAuth)
-          if (!teamsAccessToken) {
-            setTeamsAuthState('idle')
-          }
-          return
-        }
+    // Listen for postMessage from popup
+    const handleMessage = (event) => {
+      if (event.origin !== window.location.origin) return
 
-        const hash = authWindow.location.hash
-        if (hash && hash.includes('access_token')) {
-          clearInterval(checkAuth)
-          authWindow.close()
-
-          const params = new URLSearchParams(hash.substring(1))
-          const token = params.get('access_token')
-
-          if (token) {
-            setTeamsAccessToken(token)
-            setTeamsAuthState('authenticated')
-            fetchTeamsUser(token)
-            fetchAvailableTeams(token)
-            setImportStep(2)
-          }
-        }
-      } catch (e) {
-        // Cross-origin error, ignore
+      if (event.data.type === 'teams_auth_success' && event.data.token) {
+        window.removeEventListener('message', handleMessage)
+        setTeamsAccessToken(event.data.token)
+        setTeamsAuthState('authenticated')
+        fetchTeamsUser(event.data.token)
+        fetchAvailableTeams(event.data.token)
+        setImportStep(2)
+      } else if (event.data.type === 'teams_auth_error') {
+        window.removeEventListener('message', handleMessage)
+        setTeamsAuthState('error')
+        addImportLog('error', event.data.error || 'Erro de autenticação')
       }
-    }, 500)
+    }
+    window.addEventListener('message', handleMessage)
+
+    // Check if popup was closed without auth
+    const checkClosed = setInterval(() => {
+      if (authWindow && authWindow.closed) {
+        clearInterval(checkClosed)
+        window.removeEventListener('message', handleMessage)
+        if (teamsAuthState === 'authenticating') {
+          setTeamsAuthState('idle')
+        }
+      }
+    }, 1000)
 
     // Timeout after 2 minutes
     setTimeout(() => {
-      clearInterval(checkAuth)
+      clearInterval(checkClosed)
+      window.removeEventListener('message', handleMessage)
       if (teamsAuthState === 'authenticating') {
         setTeamsAuthState('error')
         addImportLog('error', 'Autenticação expirou. Tente novamente.')
