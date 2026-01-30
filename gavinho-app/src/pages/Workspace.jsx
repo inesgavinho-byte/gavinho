@@ -1923,9 +1923,10 @@ export default function Workspace() {
   const startTeamsAuth = () => {
     setTeamsAuthState('authenticating')
 
-    // Clear any previous OAuth data
-    sessionStorage.removeItem('teams_oauth_token')
-    sessionStorage.removeItem('teams_oauth_error')
+    // Clear any previous OAuth data from localStorage
+    localStorage.removeItem('teams_oauth_token')
+    localStorage.removeItem('teams_oauth_error')
+    localStorage.removeItem('teams_oauth_timestamp')
 
     // Build OAuth URL
     const authUrl = new URL(`${MS_GRAPH_CONFIG.authority}/oauth2/v2.0/authorize`)
@@ -1942,7 +1943,7 @@ export default function Workspace() {
     const left = window.screenX + (window.outerWidth - width) / 2
     const top = window.screenY + (window.outerHeight - height) / 2
 
-    const authWindow = window.open(
+    window.open(
       authUrl.toString(),
       'Microsoft Login',
       `width=${width},height=${height},left=${left},top=${top}`
@@ -1954,7 +1955,11 @@ export default function Workspace() {
     const handleAuthSuccess = (token) => {
       if (authCompleted) return
       authCompleted = true
-      sessionStorage.removeItem('teams_oauth_token')
+      // Clean up localStorage
+      localStorage.removeItem('teams_oauth_token')
+      localStorage.removeItem('teams_oauth_timestamp')
+      window.removeEventListener('storage', handleStorageEvent)
+
       setTeamsAccessToken(token)
       setTeamsAuthState('authenticated')
       fetchTeamsUser(token)
@@ -1966,61 +1971,40 @@ export default function Workspace() {
     const handleAuthError = (error) => {
       if (authCompleted) return
       authCompleted = true
-      sessionStorage.removeItem('teams_oauth_error')
+      localStorage.removeItem('teams_oauth_error')
+      localStorage.removeItem('teams_oauth_timestamp')
+      window.removeEventListener('storage', handleStorageEvent)
+
       setTeamsAuthState('error')
       addImportLog('error', error || 'Erro de autenticação')
     }
 
-    // Listen for postMessage from popup
-    const handleMessage = (event) => {
-      if (event.data.type === 'teams_auth_success' && event.data.token) {
-        window.removeEventListener('message', handleMessage)
-        handleAuthSuccess(event.data.token)
-      } else if (event.data.type === 'teams_auth_error') {
-        window.removeEventListener('message', handleMessage)
-        handleAuthError(event.data.error)
+    // Listen for storage events (fired when localStorage changes in another window)
+    const handleStorageEvent = (event) => {
+      if (event.key === 'teams_oauth_token' && event.newValue) {
+        handleAuthSuccess(event.newValue)
+      } else if (event.key === 'teams_oauth_error' && event.newValue) {
+        handleAuthError(event.newValue)
       }
     }
-    window.addEventListener('message', handleMessage)
+    window.addEventListener('storage', handleStorageEvent)
 
-    // Poll sessionStorage as fallback (for when postMessage doesn't work)
+    // Also poll localStorage as backup (storage event might not fire in same window)
     const checkStorage = setInterval(() => {
-      const token = sessionStorage.getItem('teams_oauth_token')
-      const error = sessionStorage.getItem('teams_oauth_error')
+      if (authCompleted) {
+        clearInterval(checkStorage)
+        return
+      }
+
+      const token = localStorage.getItem('teams_oauth_token')
+      const error = localStorage.getItem('teams_oauth_error')
 
       if (token) {
         clearInterval(checkStorage)
-        window.removeEventListener('message', handleMessage)
         handleAuthSuccess(token)
       } else if (error) {
         clearInterval(checkStorage)
-        window.removeEventListener('message', handleMessage)
         handleAuthError(error)
-      }
-    }, 500)
-
-    // Check if popup was closed without auth
-    const checkClosed = setInterval(() => {
-      try {
-        if (authWindow && authWindow.closed) {
-          // Give a bit more time for sessionStorage to be written
-          setTimeout(() => {
-            if (!authCompleted) {
-              const token = sessionStorage.getItem('teams_oauth_token')
-              if (token) {
-                handleAuthSuccess(token)
-              } else {
-                clearInterval(checkStorage)
-                clearInterval(checkClosed)
-                window.removeEventListener('message', handleMessage)
-                setTeamsAuthState('idle')
-              }
-            }
-          }, 1000)
-          clearInterval(checkClosed)
-        }
-      } catch (e) {
-        // COOP might block this, ignore
       }
     }, 1000)
 
@@ -2028,8 +2012,7 @@ export default function Workspace() {
     setTimeout(() => {
       if (!authCompleted) {
         clearInterval(checkStorage)
-        clearInterval(checkClosed)
-        window.removeEventListener('message', handleMessage)
+        window.removeEventListener('storage', handleStorageEvent)
         setTeamsAuthState('error')
         addImportLog('error', 'Autenticação expirou. Tente novamente.')
       }

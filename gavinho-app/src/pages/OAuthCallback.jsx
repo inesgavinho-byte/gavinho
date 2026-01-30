@@ -11,25 +11,18 @@ export default function OAuthCallback() {
       const token = params.get('access_token')
 
       if (token) {
-        // Store token in sessionStorage
-        sessionStorage.setItem('teams_oauth_token', token)
+        // Use localStorage to trigger storage event in parent window
+        // This works even with COOP restrictions
+        localStorage.setItem('teams_oauth_token', token)
+        localStorage.setItem('teams_oauth_timestamp', Date.now().toString())
         setStatus('Autenticação concluída! A fechar...')
-
-        // Try to notify parent window
-        if (window.opener) {
-          try {
-            window.opener.postMessage({ type: 'teams_auth_success', token }, '*')
-          } catch (e) {
-            console.log('PostMessage failed, using sessionStorage')
-          }
-        }
 
         // Close popup after a short delay
         setTimeout(() => {
           window.close()
-          // If window.close() doesn't work (e.g., not opened by script), show message
+          // If window.close() doesn't work, show message
           setStatus('Autenticação concluída! Pode fechar esta janela.')
-        }, 1000)
+        }, 1500)
         return
       }
     }
@@ -37,16 +30,9 @@ export default function OAuthCallback() {
     if (hash && hash.includes('error')) {
       const params = new URLSearchParams(hash.substring(1))
       const error = params.get('error_description') || params.get('error')
-      sessionStorage.setItem('teams_oauth_error', error || 'Erro desconhecido')
+      localStorage.setItem('teams_oauth_error', error || 'Erro desconhecido')
+      localStorage.setItem('teams_oauth_timestamp', Date.now().toString())
       setStatus('Erro na autenticação: ' + (error || 'Erro desconhecido'))
-
-      if (window.opener) {
-        try {
-          window.opener.postMessage({ type: 'teams_auth_error', error }, '*')
-        } catch (e) {
-          console.log('PostMessage failed')
-        }
-      }
 
       setTimeout(() => {
         window.close()

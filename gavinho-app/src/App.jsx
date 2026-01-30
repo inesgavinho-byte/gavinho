@@ -43,35 +43,30 @@ import ObraApp from './pages/ObraApp'
 import GestaoObras from './pages/GestaoObras'
 import OAuthCallback from './pages/OAuthCallback'
 
-// OAuth Callback Handler - runs before anything else
+// OAuth Callback Handler - runs before anything else (handles legacy routes)
 function OAuthCallbackHandler({ children }) {
   const [handled, setHandled] = useState(false)
 
   useEffect(() => {
-    // Check if we have OAuth response in hash (works for both popup and redirect)
+    // Check if we have OAuth response in hash (for legacy/fallback handling)
     const hash = window.location.hash
     if (hash && hash.includes('access_token')) {
       const params = new URLSearchParams(hash.substring(1))
       const token = params.get('access_token')
 
       if (token) {
-        // Store token in sessionStorage for the parent to read
-        sessionStorage.setItem('teams_oauth_token', token)
+        // Store in localStorage - triggers storage event in parent window
+        localStorage.setItem('teams_oauth_token', token)
+        localStorage.setItem('teams_oauth_timestamp', Date.now().toString())
 
-        // Try postMessage if we're in a popup
+        // If in popup, close after a delay
         if (window.opener) {
-          try {
-            window.opener.postMessage({ type: 'teams_auth_success', token }, '*')
-          } catch (e) {
-            console.log('PostMessage failed, using sessionStorage fallback')
-          }
-          // Delay before closing to ensure message is sent
           setTimeout(() => {
             window.close()
-          }, 500)
+          }, 1500)
           return
         } else {
-          // Not in popup - clear hash and continue (token is in sessionStorage)
+          // Not in popup - clear hash
           window.history.replaceState(null, '', window.location.pathname)
         }
       }
@@ -80,17 +75,13 @@ function OAuthCallbackHandler({ children }) {
     if (hash && hash.includes('error')) {
       const params = new URLSearchParams(hash.substring(1))
       const error = params.get('error_description') || params.get('error')
-      sessionStorage.setItem('teams_oauth_error', error)
+      localStorage.setItem('teams_oauth_error', error)
+      localStorage.setItem('teams_oauth_timestamp', Date.now().toString())
 
       if (window.opener) {
-        try {
-          window.opener.postMessage({ type: 'teams_auth_error', error }, '*')
-        } catch (e) {
-          console.log('PostMessage failed, using sessionStorage fallback')
-        }
         setTimeout(() => {
           window.close()
-        }, 500)
+        }, 1500)
         return
       }
     }
