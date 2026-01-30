@@ -15,8 +15,47 @@ import {
   FileImage, SlidersHorizontal,
   Bold, Italic, Code, List, ListOrdered,
   Forward, CheckCheck, Keyboard, Upload, ExternalLink,
-  Grip, FileCode
+  Grip, FileCode,
+  // New icons for additional features
+  MessageCircle, UserPlus, PhoneCall, VideoIcon, BellRing,
+  Moon, Coffee, Plane, Home, Lock, Archive, BarChart3,
+  Tag, Download, Mail, Webhook, Bot, Sparkles, AlarmClock,
+  CalendarPlus, XCircle, Eye, EyeOff, Mic, MicOff,
+  Monitor, Globe, FileDown, Zap
 } from 'lucide-react'
+
+// Status options for users
+const USER_STATUS_OPTIONS = [
+  { id: 'available', label: 'Disponível', icon: 'CheckCircle2', color: '#22c55e' },
+  { id: 'busy', label: 'Ocupado', icon: 'XCircle', color: '#ef4444' },
+  { id: 'away', label: 'Ausente', icon: 'Clock', color: '#f59e0b' },
+  { id: 'dnd', label: 'Não incomodar', icon: 'BellOff', color: '#ef4444' },
+  { id: 'meeting', label: 'Em reunião', icon: 'Video', color: '#8b5cf6' },
+  { id: 'lunch', label: 'Almoço', icon: 'Coffee', color: '#f97316' },
+  { id: 'vacation', label: 'Férias', icon: 'Plane', color: '#06b6d4' },
+  { id: 'wfh', label: 'A trabalhar de casa', icon: 'Home', color: '#10b981' }
+]
+
+// Message tags/labels
+const MESSAGE_TAGS = [
+  { id: 'urgent', label: 'Urgente', color: '#ef4444' },
+  { id: 'important', label: 'Importante', color: '#f59e0b' },
+  { id: 'followup', label: 'Follow-up', color: '#8b5cf6' },
+  { id: 'decision', label: 'Decisão', color: '#3b82f6' },
+  { id: 'info', label: 'Informação', color: '#06b6d4' },
+  { id: 'action', label: 'Ação necessária', color: '#ec4899' }
+]
+
+// Reminder options
+const REMINDER_OPTIONS = [
+  { id: '30min', label: 'Em 30 minutos', minutes: 30 },
+  { id: '1h', label: 'Em 1 hora', minutes: 60 },
+  { id: '2h', label: 'Em 2 horas', minutes: 120 },
+  { id: '4h', label: 'Em 4 horas', minutes: 240 },
+  { id: 'tomorrow', label: 'Amanhã de manhã', minutes: 'tomorrow' },
+  { id: 'nextweek', label: 'Próxima semana', minutes: 'nextweek' },
+  { id: 'custom', label: 'Personalizado...', minutes: 'custom' }
+]
 
 // Estrutura de equipas GAVINHO (baseado no Teams)
 const EQUIPAS_GAVINHO = [
@@ -250,6 +289,104 @@ export default function Workspace() {
       equipa: 'GAVINHO Sign...'
     }
   ])
+
+  // ========== NEW FEATURES STATE ==========
+
+  // Direct Messages (DM)
+  const [showDMPanel, setShowDMPanel] = useState(false)
+  const [directMessages, setDirectMessages] = useState([])
+  const [activeDM, setActiveDM] = useState(null)
+  const [dmMessages, setDmMessages] = useState({})
+  const [showNewDMModal, setShowNewDMModal] = useState(false)
+
+  // Video/Audio Calls
+  const [showCallModal, setShowCallModal] = useState(false)
+  const [activeCall, setActiveCall] = useState(null)
+  const [callType, setCallType] = useState(null) // 'video' or 'audio'
+  const [isMuted, setIsMuted] = useState(false)
+  const [isVideoOff, setIsVideoOff] = useState(false)
+  const [isScreenSharing, setIsScreenSharing] = useState(false)
+
+  // Message Reminders
+  const [showReminderModal, setShowReminderModal] = useState(false)
+  const [reminderMessage, setReminderMessage] = useState(null)
+  const [reminders, setReminders] = useState([])
+  const [customReminderDate, setCustomReminderDate] = useState('')
+
+  // Calendar Integration
+  const [showScheduleMeetingModal, setShowScheduleMeetingModal] = useState(false)
+  const [meetingDetails, setMeetingDetails] = useState({
+    title: '',
+    date: '',
+    time: '',
+    duration: '30',
+    participants: [],
+    description: ''
+  })
+
+  // AI Bot/Assistant
+  const [showAIAssistant, setShowAIAssistant] = useState(false)
+  const [aiMessages, setAiMessages] = useState([])
+  const [aiInput, setAiInput] = useState('')
+  const [aiLoading, setAiLoading] = useState(false)
+
+  // Private Channels
+  const [privateChannels, setPrivateChannels] = useState([])
+  const [showCreatePrivateChannel, setShowCreatePrivateChannel] = useState(false)
+  const [newPrivateChannel, setNewPrivateChannel] = useState({ name: '', members: [] })
+
+  // Archive Channels
+  const [archivedChannels, setArchivedChannels] = useState([])
+  const [showArchivedChannels, setShowArchivedChannels] = useState(false)
+
+  // Channel Analytics
+  const [showAnalytics, setShowAnalytics] = useState(false)
+  const [channelAnalytics, setChannelAnalytics] = useState({
+    totalMessages: 0,
+    messagesThisWeek: 0,
+    activeUsers: 0,
+    topContributors: [],
+    activityByDay: [],
+    popularTopics: []
+  })
+
+  // Tags/Labels
+  const [messageTags, setMessageTags] = useState({})
+  const [showTagSelector, setShowTagSelector] = useState(null)
+  const [filterByTag, setFilterByTag] = useState(null)
+
+  // User Status
+  const [userStatus, setUserStatus] = useState('available')
+  const [customStatusMessage, setCustomStatusMessage] = useState('')
+  const [showStatusMenu, setShowStatusMenu] = useState(false)
+
+  // Do Not Disturb
+  const [dndEnabled, setDndEnabled] = useState(false)
+  const [dndSchedule, setDndSchedule] = useState({ start: '22:00', end: '08:00' })
+  const [showDndSettings, setShowDndSettings] = useState(false)
+
+  // User Profile Card
+  const [showProfileCard, setShowProfileCard] = useState(null)
+  const [expandedProfile, setExpandedProfile] = useState(null)
+
+  // Desktop Notifications
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false)
+  const [notificationPermission, setNotificationPermission] = useState('default')
+
+  // Export Conversation
+  const [showExportModal, setShowExportModal] = useState(false)
+  const [exportFormat, setExportFormat] = useState('pdf')
+  const [exportDateRange, setExportDateRange] = useState({ from: '', to: '' })
+
+  // Webhooks
+  const [webhooks, setWebhooks] = useState([])
+  const [showWebhookSettings, setShowWebhookSettings] = useState(false)
+  const [newWebhook, setNewWebhook] = useState({ url: '', events: [] })
+
+  // Email Sync
+  const [emailSyncEnabled, setEmailSyncEnabled] = useState(false)
+  const [emailDigestFrequency, setEmailDigestFrequency] = useState('daily')
+  const [showEmailSettings, setShowEmailSettings] = useState(false)
 
   const fileInputRef = useRef(null)
   const messagesEndRef = useRef(null)
@@ -1360,6 +1497,376 @@ export default function Workspace() {
     return icons[iconName] || Hash
   }
 
+  // ========== DIRECT MESSAGES (DM) ==========
+  const startDM = (user) => {
+    const existingDM = directMessages.find(dm =>
+      dm.participants.some(p => p.id === user.id)
+    )
+    if (existingDM) {
+      setActiveDM(existingDM)
+    } else {
+      const newDM = {
+        id: `dm-${Date.now()}`,
+        participants: [user],
+        lastMessage: null,
+        unread: 0,
+        created_at: new Date().toISOString()
+      }
+      setDirectMessages(prev => [...prev, newDM])
+      setActiveDM(newDM)
+    }
+    setShowDMPanel(true)
+    setShowNewDMModal(false)
+  }
+
+  const sendDMMessage = (dmId, content) => {
+    if (!content.trim()) return
+    const newMsg = {
+      id: `msg-${Date.now()}`,
+      content,
+      sender: profile,
+      timestamp: new Date().toISOString()
+    }
+    setDmMessages(prev => ({
+      ...prev,
+      [dmId]: [...(prev[dmId] || []), newMsg]
+    }))
+    setDirectMessages(prev => prev.map(dm =>
+      dm.id === dmId ? { ...dm, lastMessage: newMsg } : dm
+    ))
+  }
+
+  // ========== VIDEO/AUDIO CALLS ==========
+  const startCall = (type, participants) => {
+    setCallType(type)
+    setActiveCall({
+      id: `call-${Date.now()}`,
+      type,
+      participants,
+      startTime: new Date(),
+      status: 'connecting'
+    })
+    setShowCallModal(true)
+  }
+
+  const endCall = () => {
+    setActiveCall(null)
+    setShowCallModal(false)
+    setIsMuted(false)
+    setIsVideoOff(false)
+    setIsScreenSharing(false)
+  }
+
+  const toggleMute = () => setIsMuted(!isMuted)
+  const toggleVideo = () => setIsVideoOff(!isVideoOff)
+  const toggleScreenShare = () => setIsScreenSharing(!isScreenSharing)
+
+  // ========== MESSAGE REMINDERS ==========
+  const setMessageReminder = (message, option) => {
+    let reminderTime
+    const now = new Date()
+
+    if (option.minutes === 'tomorrow') {
+      reminderTime = new Date(now)
+      reminderTime.setDate(reminderTime.getDate() + 1)
+      reminderTime.setHours(9, 0, 0, 0)
+    } else if (option.minutes === 'nextweek') {
+      reminderTime = new Date(now)
+      reminderTime.setDate(reminderTime.getDate() + 7)
+      reminderTime.setHours(9, 0, 0, 0)
+    } else if (option.minutes === 'custom') {
+      setReminderMessage(message)
+      setShowReminderModal(true)
+      return
+    } else {
+      reminderTime = new Date(now.getTime() + option.minutes * 60000)
+    }
+
+    const reminder = {
+      id: `reminder-${Date.now()}`,
+      message,
+      reminderTime: reminderTime.toISOString(),
+      created: now.toISOString()
+    }
+    setReminders(prev => [...prev, reminder])
+    setShowMessageMenu(null)
+    alert(`Lembrete definido para ${reminderTime.toLocaleString('pt-PT')}`)
+  }
+
+  const deleteReminder = (reminderId) => {
+    setReminders(prev => prev.filter(r => r.id !== reminderId))
+  }
+
+  // ========== CALENDAR INTEGRATION ==========
+  const scheduleMeetingFromChat = (message = null) => {
+    if (message) {
+      setMeetingDetails(prev => ({
+        ...prev,
+        description: message.conteudo?.substring(0, 200) || '',
+        title: `Reunião: ${canalAtivo?.codigo || 'Chat'}`
+      }))
+    }
+    setShowScheduleMeetingModal(true)
+    setShowMessageMenu(null)
+  }
+
+  const createMeeting = () => {
+    // In production, would integrate with Google Calendar/Outlook
+    console.log('Creating meeting:', meetingDetails)
+    alert(`Reunião "${meetingDetails.title}" agendada para ${meetingDetails.date} às ${meetingDetails.time}`)
+    setShowScheduleMeetingModal(false)
+    setMeetingDetails({ title: '', date: '', time: '', duration: '30', participants: [], description: '' })
+  }
+
+  // ========== AI ASSISTANT ==========
+  const sendAIMessage = async () => {
+    if (!aiInput.trim()) return
+
+    const userMessage = { role: 'user', content: aiInput, timestamp: new Date().toISOString() }
+    setAiMessages(prev => [...prev, userMessage])
+    setAiInput('')
+    setAiLoading(true)
+
+    // Simulate AI response (in production, would call AI API)
+    setTimeout(() => {
+      const aiResponse = {
+        role: 'assistant',
+        content: getAIResponse(aiInput),
+        timestamp: new Date().toISOString()
+      }
+      setAiMessages(prev => [...prev, aiResponse])
+      setAiLoading(false)
+    }, 1000)
+  }
+
+  const getAIResponse = (query) => {
+    const lowerQuery = query.toLowerCase()
+    if (lowerQuery.includes('ajuda') || lowerQuery.includes('help')) {
+      return 'Posso ajudar-te com:\n• Resumir conversas\n• Encontrar mensagens\n• Criar tarefas\n• Agendar reuniões\n• Responder a perguntas sobre projetos'
+    }
+    if (lowerQuery.includes('resumo') || lowerQuery.includes('resumir')) {
+      return `📋 Resumo do canal ${canalAtivo?.codigo || 'atual'}:\n\n• ${posts.length} mensagens no total\n• Tópicos ativos: ${getCurrentChannelTopics().length}\n• Última atividade: ${formatTime(posts[posts.length - 1]?.created_at || new Date().toISOString())}`
+    }
+    if (lowerQuery.includes('tarefa') || lowerQuery.includes('task')) {
+      return 'Para criar uma tarefa a partir de uma mensagem, clica nos três pontos (⋯) da mensagem e seleciona "Criar tarefa".'
+    }
+    return 'Entendi! Posso ajudar-te com informações sobre este projeto, resumos de conversas, ou criar tarefas. O que precisas?'
+  }
+
+  // ========== PRIVATE CHANNELS ==========
+  const createPrivateChannel = () => {
+    if (!newPrivateChannel.name.trim()) return
+
+    const channel = {
+      id: `private-${Date.now()}`,
+      nome: newPrivateChannel.name,
+      members: newPrivateChannel.members,
+      isPrivate: true,
+      created_at: new Date().toISOString(),
+      createdBy: profile?.id
+    }
+    setPrivateChannels(prev => [...prev, channel])
+    setShowCreatePrivateChannel(false)
+    setNewPrivateChannel({ name: '', members: [] })
+  }
+
+  // ========== ARCHIVE CHANNELS ==========
+  const archiveChannel = (channelId) => {
+    const channel = canais.find(c => c.id === channelId)
+    if (channel && window.confirm(`Arquivar canal ${channel.codigo}?`)) {
+      setArchivedChannels(prev => [...prev, { ...channel, archivedAt: new Date().toISOString() }])
+      setCanais(prev => prev.filter(c => c.id !== channelId))
+      if (canalAtivo?.id === channelId) {
+        setCanalAtivo(canais[0] || null)
+      }
+    }
+  }
+
+  const restoreChannel = (channelId) => {
+    const channel = archivedChannels.find(c => c.id === channelId)
+    if (channel) {
+      setCanais(prev => [...prev, channel])
+      setArchivedChannels(prev => prev.filter(c => c.id !== channelId))
+    }
+  }
+
+  // ========== CHANNEL ANALYTICS ==========
+  const loadChannelAnalytics = () => {
+    // In production, would fetch from database
+    const mockAnalytics = {
+      totalMessages: posts.length + Math.floor(Math.random() * 100),
+      messagesThisWeek: Math.floor(Math.random() * 30) + 10,
+      activeUsers: membros.slice(0, 5).length,
+      topContributors: membros.slice(0, 5).map(m => ({
+        ...m,
+        messageCount: Math.floor(Math.random() * 20) + 1
+      })),
+      activityByDay: [
+        { day: 'Seg', count: Math.floor(Math.random() * 15) + 5 },
+        { day: 'Ter', count: Math.floor(Math.random() * 15) + 5 },
+        { day: 'Qua', count: Math.floor(Math.random() * 15) + 5 },
+        { day: 'Qui', count: Math.floor(Math.random() * 15) + 5 },
+        { day: 'Sex', count: Math.floor(Math.random() * 15) + 5 }
+      ],
+      popularTopics: getCurrentChannelTopics().slice(0, 3)
+    }
+    setChannelAnalytics(mockAnalytics)
+    setShowAnalytics(true)
+  }
+
+  // ========== TAGS/LABELS ==========
+  const addTagToMessage = (messageId, tagId) => {
+    setMessageTags(prev => ({
+      ...prev,
+      [messageId]: [...(prev[messageId] || []), tagId]
+    }))
+    setShowTagSelector(null)
+  }
+
+  const removeTagFromMessage = (messageId, tagId) => {
+    setMessageTags(prev => ({
+      ...prev,
+      [messageId]: (prev[messageId] || []).filter(t => t !== tagId)
+    }))
+  }
+
+  const getMessageTags = (messageId) => {
+    return (messageTags[messageId] || []).map(tagId =>
+      MESSAGE_TAGS.find(t => t.id === tagId)
+    ).filter(Boolean)
+  }
+
+  // ========== USER STATUS ==========
+  const updateUserStatus = (statusId, customMessage = '') => {
+    setUserStatus(statusId)
+    setCustomStatusMessage(customMessage)
+    setShowStatusMenu(false)
+    // In production, would sync to database
+  }
+
+  const getStatusInfo = (statusId) => {
+    return USER_STATUS_OPTIONS.find(s => s.id === statusId) || USER_STATUS_OPTIONS[0]
+  }
+
+  // ========== DO NOT DISTURB ==========
+  const toggleDND = () => {
+    setDndEnabled(!dndEnabled)
+    if (!dndEnabled) {
+      setUserStatus('dnd')
+    } else {
+      setUserStatus('available')
+    }
+  }
+
+  const isInDNDPeriod = () => {
+    if (!dndEnabled) return false
+    const now = new Date()
+    const [startH, startM] = dndSchedule.start.split(':').map(Number)
+    const [endH, endM] = dndSchedule.end.split(':').map(Number)
+    const currentMinutes = now.getHours() * 60 + now.getMinutes()
+    const startMinutes = startH * 60 + startM
+    const endMinutes = endH * 60 + endM
+
+    if (startMinutes > endMinutes) {
+      return currentMinutes >= startMinutes || currentMinutes < endMinutes
+    }
+    return currentMinutes >= startMinutes && currentMinutes < endMinutes
+  }
+
+  // ========== USER PROFILE CARD ==========
+  const openProfileCard = (user) => {
+    setExpandedProfile({
+      ...user,
+      status: 'available',
+      email: user.email || `${user.nome?.toLowerCase().replace(/\s/g, '.')}@gavinho.pt`,
+      phone: '+351 912 345 678',
+      department: user.funcao || 'Equipa',
+      location: 'Lisboa, Portugal',
+      projects: canais.slice(0, 3).map(c => c.codigo)
+    })
+    setShowProfileCard(user.id)
+  }
+
+  // ========== DESKTOP NOTIFICATIONS ==========
+  const requestNotificationPermission = async () => {
+    if ('Notification' in window) {
+      const permission = await Notification.requestPermission()
+      setNotificationPermission(permission)
+      setNotificationsEnabled(permission === 'granted')
+    }
+  }
+
+  const sendDesktopNotification = (title, body, icon) => {
+    if (notificationsEnabled && !isInDNDPeriod()) {
+      new Notification(title, { body, icon: icon || '/favicon.ico' })
+    }
+  }
+
+  // ========== EXPORT CONVERSATION ==========
+  const exportConversation = () => {
+    const content = posts.map(p =>
+      `[${formatDateTime(p.created_at)}] ${p.autor?.nome}: ${p.conteudo}`
+    ).join('\n\n')
+
+    if (exportFormat === 'txt') {
+      const blob = new Blob([content], { type: 'text/plain' })
+      downloadBlob(blob, `${canalAtivo?.codigo || 'chat'}_export.txt`)
+    } else {
+      // For PDF, create a simple HTML-based export
+      const htmlContent = `
+        <html><head><title>Exportação - ${canalAtivo?.codigo}</title>
+        <style>body{font-family:Arial;padding:40px;}h1{color:#3D3D3D;}.msg{margin:20px 0;padding:15px;border-left:3px solid #7A8B6E;}.time{color:#888;font-size:12px;}.author{font-weight:bold;}</style></head>
+        <body><h1>${canalAtivo?.codigo} - ${canalAtivo?.nome}</h1>
+        ${posts.map(p => `<div class="msg"><div class="time">${formatDateTime(p.created_at)}</div><div class="author">${p.autor?.nome}</div><div>${p.conteudo}</div></div>`).join('')}
+        </body></html>
+      `
+      const blob = new Blob([htmlContent], { type: 'text/html' })
+      downloadBlob(blob, `${canalAtivo?.codigo || 'chat'}_export.html`)
+    }
+    setShowExportModal(false)
+  }
+
+  const downloadBlob = (blob, filename) => {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  // ========== WEBHOOKS ==========
+  const addWebhook = () => {
+    if (!newWebhook.url.trim()) return
+    const webhook = {
+      id: `webhook-${Date.now()}`,
+      ...newWebhook,
+      created_at: new Date().toISOString(),
+      active: true
+    }
+    setWebhooks(prev => [...prev, webhook])
+    setNewWebhook({ url: '', events: [] })
+  }
+
+  const deleteWebhook = (webhookId) => {
+    setWebhooks(prev => prev.filter(w => w.id !== webhookId))
+  }
+
+  const triggerWebhook = (event, data) => {
+    webhooks.filter(w => w.active && w.events.includes(event)).forEach(webhook => {
+      // In production, would POST to webhook.url
+      console.log('Triggering webhook:', webhook.url, event, data)
+    })
+  }
+
+  // ========== EMAIL SYNC ==========
+  const toggleEmailSync = () => {
+    setEmailSyncEnabled(!emailSyncEnabled)
+    if (!emailSyncEnabled) {
+      alert('Sincronização de email ativada. Receberás resumos diários das conversas.')
+    }
+  }
+
   if (loading) {
     return (
       <div className="fade-in" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
@@ -2207,35 +2714,38 @@ export default function Workspace() {
 
               <div style={{ width: '1px', height: '24px', background: 'var(--stone)', margin: '0 8px' }} />
 
-              {[
-                { icon: Video, title: 'Iniciar reunião' },
-                { icon: Phone, title: 'Chamada de voz' },
-                { icon: Users, title: 'Ver membros' },
-                { icon: Pin, title: 'Mensagens fixadas' },
-                { icon: Settings, title: 'Definições' }
-              ].map((action, idx) => (
-                <button
-                  key={idx}
-                  title={action.title}
-                  style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '6px',
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: 'var(--brown-light)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'background 0.15s'
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'var(--stone)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                >
-                  <action.icon size={18} />
-                </button>
-              ))}
+              {/* Video Call */}
+              <button onClick={() => startCall('video', membros.slice(0, 3))} title="Iniciar reunião" style={{ width: '36px', height: '36px', borderRadius: '6px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--brown-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Video size={18} />
+              </button>
+              {/* Voice Call */}
+              <button onClick={() => startCall('audio', membros.slice(0, 3))} title="Chamada de voz" style={{ width: '36px', height: '36px', borderRadius: '6px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--brown-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Phone size={18} />
+              </button>
+              {/* DM */}
+              <button onClick={() => setShowDMPanel(true)} title="Mensagens diretas" style={{ width: '36px', height: '36px', borderRadius: '6px', background: showDMPanel ? 'var(--stone)' : 'transparent', border: 'none', cursor: 'pointer', color: 'var(--brown-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <MessageCircle size={18} />
+              </button>
+              {/* AI Assistant */}
+              <button onClick={() => setShowAIAssistant(true)} title="Assistente IA" style={{ width: '36px', height: '36px', borderRadius: '6px', background: showAIAssistant ? 'var(--stone)' : 'transparent', border: 'none', cursor: 'pointer', color: 'var(--brown-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Sparkles size={18} />
+              </button>
+              {/* Analytics */}
+              <button onClick={loadChannelAnalytics} title="Analytics" style={{ width: '36px', height: '36px', borderRadius: '6px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--brown-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <BarChart3 size={18} />
+              </button>
+              {/* Export */}
+              <button onClick={() => setShowExportModal(true)} title="Exportar conversa" style={{ width: '36px', height: '36px', borderRadius: '6px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--brown-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <FileDown size={18} />
+              </button>
+              {/* Schedule Meeting */}
+              <button onClick={() => scheduleMeetingFromChat()} title="Agendar reunião" style={{ width: '36px', height: '36px', borderRadius: '6px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--brown-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <CalendarPlus size={18} />
+              </button>
+              {/* Settings */}
+              <button title="Definições" style={{ width: '36px', height: '36px', borderRadius: '6px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--brown-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Settings size={18} />
+              </button>
             </div>
           </div>
         )}
@@ -4632,6 +5142,311 @@ export default function Workspace() {
                   <Forward size={14} style={{ color: 'var(--brown-light)' }} />
                 </button>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========== DM PANEL ========== */}
+      {showDMPanel && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          right: 0,
+          bottom: 0,
+          width: '400px',
+          background: 'var(--white)',
+          borderLeft: '1px solid var(--stone)',
+          boxShadow: '-4px 0 20px rgba(0,0,0,0.1)',
+          zIndex: 1500,
+          display: 'flex',
+          flexDirection: 'column'
+        }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--stone)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--brown)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <MessageCircle size={20} style={{ color: 'var(--accent-olive)' }} />
+              Mensagens Diretas
+            </h3>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => setShowNewDMModal(true)} style={{ padding: '6px', borderRadius: '6px', background: 'var(--accent-olive)', border: 'none', cursor: 'pointer', color: 'white' }}>
+                <UserPlus size={16} />
+              </button>
+              <button onClick={() => setShowDMPanel(false)} style={{ padding: '6px', borderRadius: '6px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--brown-light)' }}>
+                <X size={18} />
+              </button>
+            </div>
+          </div>
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            {directMessages.length === 0 ? (
+              <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--brown-light)' }}>
+                <MessageCircle size={48} style={{ opacity: 0.3, marginBottom: '12px' }} />
+                <p>Sem mensagens diretas</p>
+                <button onClick={() => setShowNewDMModal(true)} style={{ marginTop: '12px', padding: '8px 16px', borderRadius: '8px', background: 'var(--accent-olive)', border: 'none', cursor: 'pointer', color: 'white', fontSize: '13px' }}>
+                  Iniciar Conversa
+                </button>
+              </div>
+            ) : (
+              directMessages.map(dm => (
+                <div key={dm.id} onClick={() => setActiveDM(dm)} style={{ padding: '12px 16px', borderBottom: '1px solid var(--stone)', cursor: 'pointer', background: activeDM?.id === dm.id ? 'var(--cream)' : 'transparent' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--blush) 0%, var(--blush-dark) 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 600 }}>
+                      {getInitials(dm.participants[0]?.nome)}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--brown)' }}>{dm.participants[0]?.nome}</div>
+                      <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>{dm.lastMessage?.content?.substring(0, 30) || 'Nova conversa'}</div>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ========== NEW DM MODAL ========== */}
+      {showNewDMModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }} onClick={() => setShowNewDMModal(false)}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--white)', borderRadius: '16px', padding: '24px', width: '400px', maxHeight: '500px' }}>
+            <h3 style={{ margin: '0 0 20px 0', fontSize: '18px', fontWeight: 700 }}>Nova Mensagem</h3>
+            <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
+              {membros.map(m => (
+                <button key={m.id} onClick={() => startDM(m)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', border: 'none', background: 'transparent', cursor: 'pointer', borderRadius: '8px', textAlign: 'left' }} onMouseEnter={e => e.currentTarget.style.background = 'var(--cream)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--blush)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 600 }}>{getInitials(m.nome)}</div>
+                  <div><div style={{ fontWeight: 500 }}>{m.nome}</div><div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>{m.funcao}</div></div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========== CALL MODAL ========== */}
+      {showCallModal && activeCall && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.9)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 3000 }}>
+          <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+            <div style={{ width: '120px', height: '120px', borderRadius: '50%', background: 'var(--accent-olive)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', fontSize: '36px', color: 'white' }}>
+              {callType === 'video' ? <Video size={48} /> : <Phone size={48} />}
+            </div>
+            <h2 style={{ color: 'white', marginBottom: '8px' }}>{activeCall.participants?.[0]?.nome || canalAtivo?.codigo}</h2>
+            <p style={{ color: 'rgba(255,255,255,0.7)' }}>{activeCall.status === 'connecting' ? 'A ligar...' : 'Em chamada'}</p>
+          </div>
+          <div style={{ display: 'flex', gap: '16px' }}>
+            <button onClick={toggleMute} style={{ width: '56px', height: '56px', borderRadius: '50%', background: isMuted ? 'var(--error)' : 'rgba(255,255,255,0.2)', border: 'none', cursor: 'pointer', color: 'white' }}>
+              {isMuted ? <MicOff size={24} /> : <Mic size={24} />}
+            </button>
+            {callType === 'video' && (
+              <button onClick={toggleVideo} style={{ width: '56px', height: '56px', borderRadius: '50%', background: isVideoOff ? 'var(--error)' : 'rgba(255,255,255,0.2)', border: 'none', cursor: 'pointer', color: 'white' }}>
+                {isVideoOff ? <EyeOff size={24} /> : <Video size={24} />}
+              </button>
+            )}
+            <button onClick={toggleScreenShare} style={{ width: '56px', height: '56px', borderRadius: '50%', background: isScreenSharing ? 'var(--accent-olive)' : 'rgba(255,255,255,0.2)', border: 'none', cursor: 'pointer', color: 'white' }}>
+              <Monitor size={24} />
+            </button>
+            <button onClick={endCall} style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'var(--error)', border: 'none', cursor: 'pointer', color: 'white' }}>
+              <Phone size={24} style={{ transform: 'rotate(135deg)' }} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ========== AI ASSISTANT PANEL ========== */}
+      {showAIAssistant && (
+        <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: '380px', background: 'var(--white)', borderLeft: '1px solid var(--stone)', boxShadow: '-4px 0 20px rgba(0,0,0,0.1)', zIndex: 1500, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--stone)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' }}>
+            <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'white', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Sparkles size={20} /> Assistente IA
+            </h3>
+            <button onClick={() => setShowAIAssistant(false)} style={{ padding: '6px', borderRadius: '6px', background: 'rgba(255,255,255,0.2)', border: 'none', cursor: 'pointer', color: 'white' }}>
+              <X size={18} />
+            </button>
+          </div>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {aiMessages.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '20px', color: 'var(--brown-light)' }}>
+                <Bot size={48} style={{ opacity: 0.5, marginBottom: '12px' }} />
+                <p style={{ fontSize: '14px' }}>Olá! Sou o assistente IA do Workspace.</p>
+                <p style={{ fontSize: '12px' }}>Posso ajudar-te a resumir conversas, encontrar informação ou responder a questões.</p>
+              </div>
+            )}
+            {aiMessages.map((msg, i) => (
+              <div key={i} style={{ alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '85%', padding: '12px 16px', borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px', background: msg.role === 'user' ? 'var(--accent-olive)' : 'var(--cream)', color: msg.role === 'user' ? 'white' : 'var(--brown)', fontSize: '14px', whiteSpace: 'pre-wrap' }}>
+                {msg.content}
+              </div>
+            ))}
+            {aiLoading && <div style={{ alignSelf: 'flex-start', padding: '12px', color: 'var(--brown-light)' }}>A pensar...</div>}
+          </div>
+          <div style={{ padding: '16px', borderTop: '1px solid var(--stone)', display: 'flex', gap: '8px' }}>
+            <input value={aiInput} onChange={e => setAiInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendAIMessage()} placeholder="Pergunta algo..." style={{ flex: 1, padding: '12px 16px', border: '1px solid var(--stone)', borderRadius: '24px', fontSize: '14px', outline: 'none' }} />
+            <button onClick={sendAIMessage} style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', border: 'none', cursor: 'pointer', color: 'white' }}>
+              <Send size={18} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ========== SCHEDULE MEETING MODAL ========== */}
+      {showScheduleMeetingModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }} onClick={() => setShowScheduleMeetingModal(false)}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--white)', borderRadius: '16px', padding: '24px', width: '450px' }}>
+            <h3 style={{ margin: '0 0 20px 0', fontSize: '18px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <CalendarPlus size={20} style={{ color: 'var(--accent-olive)' }} /> Agendar Reunião
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <input value={meetingDetails.title} onChange={e => setMeetingDetails(p => ({ ...p, title: e.target.value }))} placeholder="Título da reunião" style={{ padding: '12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '14px' }} />
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <input type="date" value={meetingDetails.date} onChange={e => setMeetingDetails(p => ({ ...p, date: e.target.value }))} style={{ flex: 1, padding: '12px', border: '1px solid var(--stone)', borderRadius: '8px' }} />
+                <input type="time" value={meetingDetails.time} onChange={e => setMeetingDetails(p => ({ ...p, time: e.target.value }))} style={{ width: '120px', padding: '12px', border: '1px solid var(--stone)', borderRadius: '8px' }} />
+              </div>
+              <select value={meetingDetails.duration} onChange={e => setMeetingDetails(p => ({ ...p, duration: e.target.value }))} style={{ padding: '12px', border: '1px solid var(--stone)', borderRadius: '8px' }}>
+                <option value="15">15 minutos</option>
+                <option value="30">30 minutos</option>
+                <option value="60">1 hora</option>
+                <option value="90">1h 30min</option>
+                <option value="120">2 horas</option>
+              </select>
+              <textarea value={meetingDetails.description} onChange={e => setMeetingDetails(p => ({ ...p, description: e.target.value }))} placeholder="Descrição" rows={3} style={{ padding: '12px', border: '1px solid var(--stone)', borderRadius: '8px', resize: 'none' }} />
+              <button onClick={createMeeting} style={{ padding: '12px', background: 'var(--accent-olive)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
+                Agendar Reunião
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========== ANALYTICS MODAL ========== */}
+      {showAnalytics && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }} onClick={() => setShowAnalytics(false)}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--white)', borderRadius: '16px', padding: '24px', width: '600px', maxHeight: '80vh', overflow: 'auto' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <BarChart3 size={20} style={{ color: 'var(--accent-olive)' }} /> Analytics: {canalAtivo?.codigo}
+              </h3>
+              <button onClick={() => setShowAnalytics(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} /></button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '24px' }}>
+              <div style={{ padding: '20px', background: 'var(--cream)', borderRadius: '12px', textAlign: 'center' }}>
+                <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--accent-olive)' }}>{channelAnalytics.totalMessages}</div>
+                <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>Total mensagens</div>
+              </div>
+              <div style={{ padding: '20px', background: 'var(--cream)', borderRadius: '12px', textAlign: 'center' }}>
+                <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--warning)' }}>{channelAnalytics.messagesThisWeek}</div>
+                <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>Esta semana</div>
+              </div>
+              <div style={{ padding: '20px', background: 'var(--cream)', borderRadius: '12px', textAlign: 'center' }}>
+                <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--info)' }}>{channelAnalytics.activeUsers}</div>
+                <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>Utilizadores ativos</div>
+              </div>
+            </div>
+            <h4 style={{ fontSize: '14px', fontWeight: 600, marginBottom: '12px' }}>Top Contribuidores</h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px' }}>
+              {channelAnalytics.topContributors.map((c, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 12px', background: 'var(--off-white)', borderRadius: '8px' }}>
+                  <span style={{ fontWeight: 600, color: 'var(--accent-olive)' }}>#{i + 1}</span>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--blush)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 600 }}>{getInitials(c.nome)}</div>
+                  <span style={{ flex: 1 }}>{c.nome}</span>
+                  <span style={{ fontWeight: 600, color: 'var(--brown-light)' }}>{c.messageCount} msgs</span>
+                </div>
+              ))}
+            </div>
+            <h4 style={{ fontSize: '14px', fontWeight: 600, marginBottom: '12px' }}>Atividade por Dia</h4>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', height: '100px', marginBottom: '20px' }}>
+              {channelAnalytics.activityByDay.map((d, i) => (
+                <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                  <div style={{ width: '100%', height: `${d.count * 5}px`, background: 'var(--accent-olive)', borderRadius: '4px 4px 0 0', minHeight: '10px' }} />
+                  <span style={{ fontSize: '11px', color: 'var(--brown-light)' }}>{d.day}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========== EXPORT MODAL ========== */}
+      {showExportModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }} onClick={() => setShowExportModal(false)}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--white)', borderRadius: '16px', padding: '24px', width: '400px' }}>
+            <h3 style={{ margin: '0 0 20px 0', fontSize: '18px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <FileDown size={20} style={{ color: 'var(--accent-olive)' }} /> Exportar Conversa
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--brown-light)', display: 'block', marginBottom: '8px' }}>Formato</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {['txt', 'html'].map(fmt => (
+                    <button key={fmt} onClick={() => setExportFormat(fmt)} style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid', borderColor: exportFormat === fmt ? 'var(--accent-olive)' : 'var(--stone)', background: exportFormat === fmt ? 'var(--success-bg)' : 'transparent', cursor: 'pointer', fontWeight: exportFormat === fmt ? 600 : 400 }}>
+                      {fmt.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <button onClick={exportConversation} style={{ padding: '14px', background: 'var(--accent-olive)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                <Download size={18} /> Exportar {posts.length} mensagens
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========== STATUS MENU ========== */}
+      {showStatusMenu && (
+        <div style={{ position: 'fixed', top: 60, left: 280, background: 'var(--white)', borderRadius: '12px', boxShadow: 'var(--shadow-lg)', padding: '8px', width: '220px', zIndex: 2000 }}>
+          <div style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 600, color: 'var(--brown-light)', textTransform: 'uppercase' }}>Estado</div>
+          {USER_STATUS_OPTIONS.map(status => (
+            <button key={status.id} onClick={() => updateUserStatus(status.id)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', border: 'none', background: userStatus === status.id ? 'var(--cream)' : 'transparent', cursor: 'pointer', borderRadius: '6px', textAlign: 'left' }}>
+              <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: status.color }} />
+              <span style={{ fontSize: '13px', color: 'var(--brown)' }}>{status.label}</span>
+            </button>
+          ))}
+          <div style={{ borderTop: '1px solid var(--stone)', margin: '8px 0' }} />
+          <button onClick={() => { setShowDndSettings(true); setShowStatusMenu(false) }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', border: 'none', background: 'transparent', cursor: 'pointer', borderRadius: '6px' }}>
+            <Moon size={16} style={{ color: 'var(--brown-light)' }} />
+            <span style={{ fontSize: '13px' }}>Não incomodar</span>
+          </button>
+        </div>
+      )}
+
+      {/* ========== PROFILE CARD MODAL ========== */}
+      {showProfileCard && expandedProfile && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }} onClick={() => setShowProfileCard(null)}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--white)', borderRadius: '16px', width: '380px', overflow: 'hidden' }}>
+            <div style={{ height: '100px', background: 'linear-gradient(135deg, var(--accent-olive) 0%, var(--accent-olive-dark) 100%)' }} />
+            <div style={{ padding: '0 24px 24px', marginTop: '-50px' }}>
+              <div style={{ width: '100px', height: '100px', borderRadius: '50%', background: 'var(--blush)', border: '4px solid var(--white)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', fontWeight: 700, color: 'var(--brown-dark)', marginBottom: '16px' }}>
+                {getInitials(expandedProfile.nome)}
+              </div>
+              <h3 style={{ margin: '0 0 4px 0', fontSize: '20px', fontWeight: 700 }}>{expandedProfile.nome}</h3>
+              <p style={{ margin: '0 0 16px 0', color: 'var(--brown-light)' }}>{expandedProfile.department}</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <Mail size={16} style={{ color: 'var(--brown-light)' }} />
+                  <span style={{ fontSize: '14px' }}>{expandedProfile.email}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <Phone size={16} style={{ color: 'var(--brown-light)' }} />
+                  <span style={{ fontSize: '14px' }}>{expandedProfile.phone}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <Globe size={16} style={{ color: 'var(--brown-light)' }} />
+                  <span style={{ fontSize: '14px' }}>{expandedProfile.location}</span>
+                </div>
+              </div>
+              <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--stone)' }}>
+                <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--brown-light)', marginBottom: '8px' }}>Projetos</div>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  {expandedProfile.projects.map((p, i) => (
+                    <span key={i} style={{ padding: '4px 10px', background: 'var(--cream)', borderRadius: '12px', fontSize: '12px', fontWeight: 500 }}>{p}</span>
+                  ))}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '8px', marginTop: '20px' }}>
+                <button onClick={() => { startDM(expandedProfile); setShowProfileCard(null) }} style={{ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', background: 'var(--accent-olive)', color: 'white', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                  <MessageCircle size={16} /> Mensagem
+                </button>
+                <button onClick={() => startCall('video', [expandedProfile])} style={{ padding: '10px 16px', borderRadius: '8px', border: '1px solid var(--stone)', background: 'transparent', cursor: 'pointer' }}>
+                  <Video size={16} />
+                </button>
+              </div>
             </div>
           </div>
         </div>
