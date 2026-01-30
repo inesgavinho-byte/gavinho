@@ -11,7 +11,7 @@ import {
   Video, Phone, ScreenShare, Calendar, Star, Filter,
   ArrowUp, ArrowDown, Clock, CheckCircle2, AlertCircle,
   ThumbsUp, Laugh, Frown, PartyPopper, Fire, Eye,
-  Link2, Copy, Check
+  Link2, Copy, Check, Edit, Trash2, CornerUpLeft, Quote
 } from 'lucide-react'
 
 // Estrutura de equipas GAVINHO (baseado no Teams)
@@ -98,6 +98,12 @@ export default function ChatColaborativo() {
   const [showMentions, setShowMentions] = useState(false)
   const [mentionQuery, setMentionQuery] = useState('')
   const [mentionStartIndex, setMentionStartIndex] = useState(-1)
+
+  // Edit/Delete/Reply
+  const [editingMessage, setEditingMessage] = useState(null)
+  const [editingContent, setEditingContent] = useState('')
+  const [replyingTo, setReplyingTo] = useState(null)
+  const [showMessageMenu, setShowMessageMenu] = useState(null)
 
   // Upload
   const [selectedFiles, setSelectedFiles] = useState([])
@@ -375,12 +381,18 @@ export default function ChatColaborativo() {
         created_at: new Date().toISOString(),
         reacoes: [],
         replyCount: 0,
-        attachments: attachments.length > 0 ? attachments : undefined
+        attachments: attachments.length > 0 ? attachments : undefined,
+        replyTo: replyingTo ? {
+          id: replyingTo.id,
+          autor: replyingTo.autor,
+          conteudo: replyingTo.conteudo?.substring(0, 100) + (replyingTo.conteudo?.length > 100 ? '...' : '')
+        } : undefined
       }
 
       setPosts(prev => [...prev, newPost])
       setMessageInput('')
       setSelectedFiles([])
+      setReplyingTo(null)
 
       // Em produção, inserir na base de dados
       // await supabase.from('chat_mensagens').insert({...})
@@ -612,6 +624,64 @@ export default function ChatColaborativo() {
   const filteredMembros = mentionQuery
     ? membros.filter(m => m.nome?.toLowerCase().includes(mentionQuery))
     : membros.slice(0, 8)
+
+  // Start editing a message
+  const startEditMessage = (post) => {
+    setEditingMessage(post)
+    setEditingContent(post.conteudo)
+    setShowMessageMenu(null)
+  }
+
+  // Save edited message
+  const saveEditMessage = () => {
+    if (!editingMessage || !editingContent.trim()) return
+
+    setPosts(prev => prev.map(p =>
+      p.id === editingMessage.id
+        ? { ...p, conteudo: editingContent, editado: true, editado_em: new Date().toISOString() }
+        : p
+    ))
+
+    // Em produção, atualizar na base de dados
+    // await supabase.from('chat_mensagens').update({ conteudo: editingContent, editado: true }).eq('id', editingMessage.id)
+
+    setEditingMessage(null)
+    setEditingContent('')
+  }
+
+  // Cancel editing
+  const cancelEditMessage = () => {
+    setEditingMessage(null)
+    setEditingContent('')
+  }
+
+  // Delete message
+  const deleteMessage = (postId) => {
+    if (!window.confirm('Tens a certeza que queres eliminar esta mensagem?')) return
+
+    setPosts(prev => prev.filter(p => p.id !== postId))
+    setShowMessageMenu(null)
+
+    // Em produção, marcar como eliminado na base de dados
+    // await supabase.from('chat_mensagens').update({ eliminado: true }).eq('id', postId)
+  }
+
+  // Start replying to a message
+  const startReplyTo = (post) => {
+    setReplyingTo(post)
+    setShowMessageMenu(null)
+    setTimeout(() => messageInputRef.current?.focus(), 0)
+  }
+
+  // Cancel reply
+  const cancelReply = () => {
+    setReplyingTo(null)
+  }
+
+  // Check if current user owns the message
+  const isOwnMessage = (post) => {
+    return post.autor?.id === profile?.id || post.autor?.nome === profile?.nome
+  }
 
   const filteredPosts = searchQuery
     ? posts.filter(p =>
@@ -1106,7 +1176,7 @@ export default function ChatColaborativo() {
                               </div>
 
                               {/* Message actions */}
-                              <div style={{ display: 'flex', gap: '2px', opacity: 0 }} className="message-actions">
+                              <div style={{ display: 'flex', gap: '2px', opacity: 0, position: 'relative' }} className="message-actions">
                                 {REACTIONS.slice(0, 4).map(reaction => (
                                   <button
                                     key={reaction.name}
@@ -1124,8 +1194,10 @@ export default function ChatColaborativo() {
                                     {reaction.emoji}
                                   </button>
                                 ))}
+                                {/* Reply button */}
                                 <button
-                                  onClick={() => openThread(post)}
+                                  onClick={() => startReplyTo(post)}
+                                  title="Responder"
                                   style={{
                                     width: '28px',
                                     height: '28px',
@@ -1136,34 +1208,245 @@ export default function ChatColaborativo() {
                                     color: 'var(--brown-light)'
                                   }}
                                 >
-                                  <Reply size={16} />
+                                  <CornerUpLeft size={16} />
                                 </button>
-                                <button style={{
-                                  width: '28px',
-                                  height: '28px',
-                                  borderRadius: '4px',
-                                  background: 'transparent',
-                                  border: 'none',
-                                  cursor: 'pointer',
-                                  color: 'var(--brown-light)'
-                                }}>
-                                  <MoreHorizontal size={16} />
+                                {/* Thread button */}
+                                <button
+                                  onClick={() => openThread(post)}
+                                  title="Abrir conversa"
+                                  style={{
+                                    width: '28px',
+                                    height: '28px',
+                                    borderRadius: '4px',
+                                    background: 'transparent',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    color: 'var(--brown-light)'
+                                  }}
+                                >
+                                  <MessageSquare size={16} />
                                 </button>
+                                {/* More options menu */}
+                                <div style={{ position: 'relative' }}>
+                                  <button
+                                    onClick={() => setShowMessageMenu(showMessageMenu === post.id ? null : post.id)}
+                                    style={{
+                                      width: '28px',
+                                      height: '28px',
+                                      borderRadius: '4px',
+                                      background: showMessageMenu === post.id ? 'var(--stone)' : 'transparent',
+                                      border: 'none',
+                                      cursor: 'pointer',
+                                      color: 'var(--brown-light)'
+                                    }}
+                                  >
+                                    <MoreHorizontal size={16} />
+                                  </button>
+
+                                  {/* Context menu */}
+                                  {showMessageMenu === post.id && (
+                                    <div style={{
+                                      position: 'absolute',
+                                      top: '100%',
+                                      right: '0',
+                                      marginTop: '4px',
+                                      background: 'var(--white)',
+                                      borderRadius: '8px',
+                                      boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+                                      border: '1px solid var(--stone)',
+                                      minWidth: '160px',
+                                      zIndex: 1000,
+                                      overflow: 'hidden'
+                                    }}>
+                                      <button
+                                        onClick={() => startReplyTo(post)}
+                                        style={{
+                                          width: '100%',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '10px',
+                                          padding: '10px 14px',
+                                          border: 'none',
+                                          background: 'transparent',
+                                          cursor: 'pointer',
+                                          fontSize: '13px',
+                                          color: 'var(--brown)',
+                                          textAlign: 'left'
+                                        }}
+                                        onMouseEnter={e => e.currentTarget.style.background = 'var(--cream)'}
+                                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                      >
+                                        <CornerUpLeft size={16} />
+                                        Responder
+                                      </button>
+                                      <button
+                                        onClick={() => openThread(post)}
+                                        style={{
+                                          width: '100%',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '10px',
+                                          padding: '10px 14px',
+                                          border: 'none',
+                                          background: 'transparent',
+                                          cursor: 'pointer',
+                                          fontSize: '13px',
+                                          color: 'var(--brown)',
+                                          textAlign: 'left'
+                                        }}
+                                        onMouseEnter={e => e.currentTarget.style.background = 'var(--cream)'}
+                                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                      >
+                                        <MessageSquare size={16} />
+                                        Abrir conversa
+                                      </button>
+                                      {isOwnMessage(post) && (
+                                        <>
+                                          <div style={{ height: '1px', background: 'var(--stone)', margin: '4px 0' }} />
+                                          <button
+                                            onClick={() => startEditMessage(post)}
+                                            style={{
+                                              width: '100%',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              gap: '10px',
+                                              padding: '10px 14px',
+                                              border: 'none',
+                                              background: 'transparent',
+                                              cursor: 'pointer',
+                                              fontSize: '13px',
+                                              color: 'var(--brown)',
+                                              textAlign: 'left'
+                                            }}
+                                            onMouseEnter={e => e.currentTarget.style.background = 'var(--cream)'}
+                                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                          >
+                                            <Edit size={16} />
+                                            Editar
+                                          </button>
+                                          <button
+                                            onClick={() => deleteMessage(post.id)}
+                                            style={{
+                                              width: '100%',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              gap: '10px',
+                                              padding: '10px 14px',
+                                              border: 'none',
+                                              background: 'transparent',
+                                              cursor: 'pointer',
+                                              fontSize: '13px',
+                                              color: 'var(--error)',
+                                              textAlign: 'left'
+                                            }}
+                                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(220,53,69,0.1)'}
+                                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                          >
+                                            <Trash2 size={16} />
+                                            Eliminar
+                                          </button>
+                                        </>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           )}
 
                           {/* Content */}
                           <div style={{ paddingLeft: showAuthor ? '52px' : '0' }}>
-                            <p style={{
-                              fontSize: '14px',
-                              color: 'var(--brown)',
-                              margin: 0,
-                              lineHeight: 1.6,
-                              whiteSpace: 'pre-wrap'
-                            }}>
-                              {post.conteudo}
-                            </p>
+                            {/* Reply quote if this message is replying to another */}
+                            {post.replyTo && (
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'flex-start',
+                                gap: '8px',
+                                padding: '8px 12px',
+                                background: 'var(--cream)',
+                                borderRadius: '8px',
+                                borderLeft: '3px solid var(--accent-olive)',
+                                marginBottom: '8px'
+                              }}>
+                                <Quote size={14} style={{ color: 'var(--brown-light)', flexShrink: 0, marginTop: '2px' }} />
+                                <div>
+                                  <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--brown-light)', marginBottom: '2px' }}>
+                                    {post.replyTo.autor?.nome}
+                                  </div>
+                                  <div style={{ fontSize: '12px', color: 'var(--brown)', opacity: 0.8 }}>
+                                    {post.replyTo.conteudo?.substring(0, 100)}{post.replyTo.conteudo?.length > 100 ? '...' : ''}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Editing mode */}
+                            {editingMessage?.id === post.id ? (
+                              <div>
+                                <textarea
+                                  value={editingContent}
+                                  onChange={e => setEditingContent(e.target.value)}
+                                  style={{
+                                    width: '100%',
+                                    padding: '10px 12px',
+                                    border: '2px solid var(--accent-olive)',
+                                    borderRadius: '8px',
+                                    fontSize: '14px',
+                                    resize: 'vertical',
+                                    minHeight: '60px',
+                                    outline: 'none'
+                                  }}
+                                  autoFocus
+                                />
+                                <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                                  <button
+                                    onClick={saveEditMessage}
+                                    style={{
+                                      padding: '6px 14px',
+                                      background: 'var(--accent-olive)',
+                                      color: 'white',
+                                      border: 'none',
+                                      borderRadius: '6px',
+                                      fontSize: '12px',
+                                      fontWeight: 500,
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    Guardar
+                                  </button>
+                                  <button
+                                    onClick={cancelEditMessage}
+                                    style={{
+                                      padding: '6px 14px',
+                                      background: 'var(--stone)',
+                                      color: 'var(--brown)',
+                                      border: 'none',
+                                      borderRadius: '6px',
+                                      fontSize: '12px',
+                                      fontWeight: 500,
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    Cancelar
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <p style={{
+                                fontSize: '14px',
+                                color: 'var(--brown)',
+                                margin: 0,
+                                lineHeight: 1.6,
+                                whiteSpace: 'pre-wrap'
+                              }}>
+                                {post.conteudo}
+                                {post.editado && (
+                                  <span style={{ fontSize: '11px', color: 'var(--brown-light)', marginLeft: '6px' }}>
+                                    (editado)
+                                  </span>
+                                )}
+                              </p>
+                            )}
 
                             {/* Image */}
                             {post.imagem_url && (
@@ -1299,6 +1582,55 @@ export default function ChatColaborativo() {
                   borderTop: '1px solid var(--stone)',
                   background: 'var(--white)'
                 }}>
+                  {/* Reply-to quote */}
+                  {replyingTo && (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '12px',
+                      padding: '12px 14px',
+                      background: 'var(--cream)',
+                      borderRadius: '10px',
+                      borderLeft: '4px solid var(--accent-olive)',
+                      marginBottom: '12px'
+                    }}>
+                      <CornerUpLeft size={18} style={{ color: 'var(--accent-olive)', flexShrink: 0, marginTop: '2px' }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent-olive)', marginBottom: '4px' }}>
+                          A responder a {replyingTo.autor?.nome}
+                        </div>
+                        <div style={{
+                          fontSize: '13px',
+                          color: 'var(--brown)',
+                          opacity: 0.8,
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                        }}>
+                          {replyingTo.conteudo?.substring(0, 150)}{replyingTo.conteudo?.length > 150 ? '...' : ''}
+                        </div>
+                      </div>
+                      <button
+                        onClick={cancelReply}
+                        style={{
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '6px',
+                          background: 'var(--stone)',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: 'var(--brown-light)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0
+                        }}
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  )}
+
                   {/* Selected files preview */}
                   {selectedFiles.length > 0 && (
                     <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
