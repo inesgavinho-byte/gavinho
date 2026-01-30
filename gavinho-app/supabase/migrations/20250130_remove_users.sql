@@ -81,7 +81,7 @@ DELETE FROM chat_push_subscriptions WHERE utilizador_id IN (
 
 -- Marcar utilizadores como inativos (soft delete - mais seguro)
 UPDATE utilizadores
-SET activo = false,
+SET ativo = false,
     updated_at = NOW()
 WHERE email IN (
     'alana.oliveira@by-gavinho.com',
