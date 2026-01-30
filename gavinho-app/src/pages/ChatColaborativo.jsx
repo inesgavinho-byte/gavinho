@@ -26,6 +26,16 @@ const EQUIPAS_GAVINHO = [
   { id: 'signature', nome: 'GAVINHO Signature', cor: '#10b981', inicial: 'GS', descricao: 'Projetos Premium' }
 ]
 
+// Tópicos padrão para cada canal/projeto
+const DEFAULT_TOPICS = [
+  { id: 'geral', nome: 'Geral', icon: 'MessageSquare', cor: '#6b7280' },
+  { id: 'estudo-previo', nome: 'Estudo Prévio', icon: 'FileText', cor: '#8b5cf6' },
+  { id: 'projeto-execucao', nome: 'Projeto de Execução', icon: 'Building2', cor: '#3b82f6' },
+  { id: 'central-entregas', nome: 'Central de Entregas', icon: 'FolderOpen', cor: '#10b981' },
+  { id: 'obra', nome: 'Acompanhamento Obra', icon: 'Grip', cor: '#f59e0b' },
+  { id: 'cliente', nome: 'Cliente', icon: 'Users', cor: '#ec4899' }
+]
+
 // Reações disponíveis (estilo Teams)
 const REACTIONS = [
   { emoji: '👍', name: 'like' },
@@ -78,6 +88,12 @@ export default function ChatColaborativo() {
   // Canais (projetos dentro de cada equipa)
   const [canais, setCanais] = useState([])
   const [canalAtivo, setCanalAtivo] = useState(null)
+
+  // Tópicos dentro do canal
+  const [channelTopics, setChannelTopics] = useState({})
+  const [activeTopic, setActiveTopic] = useState('geral')
+  const [showAddTopic, setShowAddTopic] = useState(false)
+  const [newTopicName, setNewTopicName] = useState('')
 
   // Tabs do canal
   const [activeTab, setActiveTab] = useState('publicacoes')
@@ -173,6 +189,68 @@ export default function ChatColaborativo() {
 
   // Keyboard shortcuts help
   const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false)
+
+  // Activity Log
+  const [showActivityLog, setShowActivityLog] = useState(false)
+  const [activityFilter, setActivityFilter] = useState('all') // all, mentions, unread
+  const [activityLog, setActivityLog] = useState([
+    // Mock data - in production would come from database
+    {
+      id: '1',
+      type: 'mention',
+      canal: { id: 'c1', codigo: 'GA00469', nome: 'MYRIAD_imagens' },
+      autor: { id: 'u1', nome: 'Raquel Sonobe GAVINHO', avatar_url: null },
+      preview: 'Archviz e 1 responderam à...',
+      conteudo: 'Ainda não carreguei. Farei isso amanhã',
+      created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+      unread: true,
+      equipa: 'GAVINHO HOSP.'
+    },
+    {
+      id: '2',
+      type: 'reply',
+      canal: { id: 'c2', codigo: 'GA00466', nome: 'PENTHOUSE SI' },
+      autor: { id: 'u2', nome: 'Leonardo Ribeiro GAVINHO', avatar_url: null },
+      preview: 'Design & Build PM responde...',
+      conteudo: 'ponto de situação: ajustes na planta geral...',
+      created_at: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+      unread: true,
+      equipa: 'GAVINHO Signature'
+    },
+    {
+      id: '3',
+      type: 'message',
+      canal: { id: 'c3', codigo: 'GA00469', nome: 'MYRIAD' },
+      autor: { id: 'u3', nome: 'Carolina Cipriano GAVINHO', avatar_url: null },
+      preview: 'Design & Build PM e 1...',
+      conteudo: 'Ponto de situação: estive a organizar as...',
+      created_at: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+      unread: false,
+      equipa: 'GAVINHO HOSP.'
+    },
+    {
+      id: '4',
+      type: 'mention',
+      canal: { id: 'c1', codigo: 'GA00469', nome: 'MYRIAD_imagens' },
+      autor: { id: 'u1', nome: 'Raquel Sonobe GAVINHO', avatar_url: null },
+      preview: 'Archviz mencionou-o(a)',
+      conteudo: 'IGF GAVINHO GroupCarolina Cipriano G...',
+      created_at: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
+      unread: false,
+      equipa: 'GAVINHO HOSP.'
+    },
+    {
+      id: '5',
+      type: 'file',
+      canal: { id: 'c4', codigo: 'GA00464', nome: 'APARTMENT IG_imagens' },
+      autor: { id: 'u4', nome: 'Nathalia Bampi GAVINHO', avatar_url: null },
+      preview: 'Archviz e 2 responderam à...',
+      conteudo: 'Enviou um ficheiro',
+      created_at: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
+      unread: false,
+      equipa: 'GAVINHO Sign...'
+    }
+  ])
 
   const fileInputRef = useRef(null)
   const messagesEndRef = useRef(null)
@@ -440,6 +518,8 @@ export default function ChatColaborativo() {
         reacoes: [],
         replyCount: 0,
         attachments: attachments.length > 0 ? attachments : undefined,
+        topic: activeTopic,
+        canal_id: canalAtivo?.id,
         replyTo: replyingTo ? {
           id: replyingTo.id,
           autor: replyingTo.autor,
@@ -865,7 +945,7 @@ export default function ChatColaborativo() {
     setShowAdvancedSearch(false)
   }
 
-  const filteredPosts = applyFilters(posts)
+  const filteredPosts = getPostsForTopic(applyFilters(posts))
 
   // ========== RICH TEXT FORMATTING ==========
   const applyFormatting = (format) => {
@@ -1182,6 +1262,105 @@ export default function ChatColaborativo() {
     { keys: ['?'], description: 'Atalhos de teclado' }
   ]
 
+  // ========== ACTIVITY LOG ==========
+  // Filter activity log
+  const getFilteredActivity = () => {
+    switch (activityFilter) {
+      case 'mentions':
+        return activityLog.filter(a => a.type === 'mention')
+      case 'unread':
+        return activityLog.filter(a => a.unread)
+      default:
+        return activityLog
+    }
+  }
+
+  // Mark activity as read
+  const markActivityAsRead = (activityId) => {
+    setActivityLog(prev => prev.map(a =>
+      a.id === activityId ? { ...a, unread: false } : a
+    ))
+  }
+
+  // Mark all as read
+  const markAllActivityAsRead = () => {
+    setActivityLog(prev => prev.map(a => ({ ...a, unread: false })))
+  }
+
+  // Navigate to activity source
+  const navigateToActivity = (activity) => {
+    const canal = canais.find(c => c.codigo === activity.canal.codigo)
+    if (canal) {
+      selectCanal(canal)
+    }
+    markActivityAsRead(activity.id)
+    setShowActivityLog(false)
+  }
+
+  // Get unread activity count
+  const getUnreadActivityCount = () => {
+    return activityLog.filter(a => a.unread).length
+  }
+
+  // Get mention count
+  const getMentionCount = () => {
+    return activityLog.filter(a => a.type === 'mention' && a.unread).length
+  }
+
+  // ========== TOPICS MANAGEMENT ==========
+  // Get topics for current channel
+  const getCurrentChannelTopics = () => {
+    if (!canalAtivo) return DEFAULT_TOPICS
+    return channelTopics[canalAtivo.id] || DEFAULT_TOPICS
+  }
+
+  // Add custom topic to channel
+  const addCustomTopic = () => {
+    if (!newTopicName.trim() || !canalAtivo) return
+
+    const newTopic = {
+      id: `custom-${Date.now()}`,
+      nome: newTopicName.trim(),
+      icon: 'Hash',
+      cor: '#6b7280',
+      custom: true
+    }
+
+    setChannelTopics(prev => ({
+      ...prev,
+      [canalAtivo.id]: [...(prev[canalAtivo.id] || DEFAULT_TOPICS), newTopic]
+    }))
+
+    setNewTopicName('')
+    setShowAddTopic(false)
+  }
+
+  // Remove custom topic
+  const removeCustomTopic = (topicId) => {
+    if (!canalAtivo) return
+    setChannelTopics(prev => ({
+      ...prev,
+      [canalAtivo.id]: (prev[canalAtivo.id] || DEFAULT_TOPICS).filter(t => t.id !== topicId)
+    }))
+    if (activeTopic === topicId) {
+      setActiveTopic('geral')
+    }
+  }
+
+  // Filter posts by topic
+  const getPostsForTopic = (postsToFilter) => {
+    if (activeTopic === 'geral') return postsToFilter
+    return postsToFilter.filter(p => p.topic === activeTopic)
+  }
+
+  // Get topic icon component
+  const getTopicIcon = (iconName) => {
+    const icons = {
+      MessageSquare, FileText, Building2, FolderOpen, Grip, Users, Hash
+    }
+    return icons[iconName] || Hash
+  }
+
   if (loading) {
     return (
       <div className="fade-in" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
@@ -1240,6 +1419,46 @@ export default function ChatColaborativo() {
             )}
           </div>
           <div style={{ display: 'flex', gap: '4px' }}>
+            {/* Activity button */}
+            <button
+              onClick={() => setShowActivityLog(!showActivityLog)}
+              title="Atividade"
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '6px',
+                background: showActivityLog ? 'var(--accent-olive)' : 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                color: showActivityLog ? 'white' : 'var(--brown-light)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                position: 'relative'
+              }}
+            >
+              <Bell size={18} />
+              {getUnreadActivityCount() > 0 && (
+                <span style={{
+                  position: 'absolute',
+                  top: '-2px',
+                  right: '-2px',
+                  minWidth: '16px',
+                  height: '16px',
+                  borderRadius: '8px',
+                  background: 'var(--error)',
+                  color: 'white',
+                  fontSize: '9px',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '0 4px'
+                }}>
+                  {getUnreadActivityCount()}
+                </span>
+              )}
+            </button>
             {/* Saved messages button */}
             <button
               onClick={() => setShowSavedMessages(!showSavedMessages)}
@@ -1530,6 +1749,226 @@ export default function ChatColaborativo() {
           })}
         </div>
       </div>
+
+      {/* ========== ACTIVITY LOG PANEL ========== */}
+      {showActivityLog && (
+        <div style={{
+          width: '360px',
+          background: 'var(--white)',
+          borderRight: '1px solid var(--stone)',
+          display: 'flex',
+          flexDirection: 'column',
+          flexShrink: 0
+        }}>
+          {/* Activity Header */}
+          <div style={{
+            padding: '16px 20px',
+            borderBottom: '1px solid var(--stone)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Bell size={20} style={{ color: 'var(--accent-olive)' }} />
+              <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--brown)', margin: 0 }}>
+                Atividade
+              </h3>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {getUnreadActivityCount() > 0 && (
+                <button
+                  onClick={markAllActivityAsRead}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '4px',
+                    background: 'var(--cream)',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '11px',
+                    color: 'var(--brown-light)'
+                  }}
+                >
+                  Marcar como lido
+                </button>
+              )}
+              <button
+                onClick={() => setShowActivityLog(false)}
+                style={{
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '6px',
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--brown-light)'
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+          </div>
+
+          {/* Activity Filters */}
+          <div style={{
+            display: 'flex',
+            gap: '4px',
+            padding: '12px 16px',
+            borderBottom: '1px solid var(--stone)'
+          }}>
+            {[
+              { id: 'all', label: 'Não lido' },
+              { id: 'mentions', label: '@Menções' },
+              { id: 'unread', label: 'Menções de etiqueta' }
+            ].map(filter => (
+              <button
+                key={filter.id}
+                onClick={() => setActivityFilter(filter.id)}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '14px',
+                  background: activityFilter === filter.id ? 'var(--brown)' : 'var(--cream)',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: activityFilter === filter.id ? 600 : 400,
+                  color: activityFilter === filter.id ? 'white' : 'var(--brown)'
+                }}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Activity List */}
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            {getFilteredActivity().length === 0 ? (
+              <div style={{
+                textAlign: 'center',
+                padding: '40px 20px',
+                color: 'var(--brown-light)'
+              }}>
+                <Bell size={40} style={{ opacity: 0.3, marginBottom: '12px' }} />
+                <p style={{ margin: 0, fontSize: '13px' }}>
+                  Sem notificações
+                </p>
+              </div>
+            ) : (
+              getFilteredActivity().map(activity => (
+                <div
+                  key={activity.id}
+                  onClick={() => navigateToActivity(activity)}
+                  style={{
+                    display: 'flex',
+                    gap: '12px',
+                    padding: '14px 16px',
+                    cursor: 'pointer',
+                    borderBottom: '1px solid var(--stone)',
+                    background: activity.unread
+                      ? activity.type === 'mention'
+                        ? 'rgba(139, 155, 123, 0.12)'
+                        : 'var(--cream)'
+                      : 'transparent',
+                    borderLeft: activity.type === 'mention' && activity.unread
+                      ? '3px solid var(--accent-olive)'
+                      : '3px solid transparent'
+                  }}
+                >
+                  {/* Avatar */}
+                  <div style={{ position: 'relative', flexShrink: 0 }}>
+                    <div style={{
+                      width: '44px',
+                      height: '44px',
+                      borderRadius: '50%',
+                      background: 'linear-gradient(135deg, var(--blush) 0%, var(--blush-dark) 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      color: 'var(--brown-dark)'
+                    }}>
+                      {getInitials(activity.autor?.nome)}
+                    </div>
+                    {activity.type === 'mention' && (
+                      <div style={{
+                        position: 'absolute',
+                        bottom: '-2px',
+                        right: '-2px',
+                        width: '18px',
+                        height: '18px',
+                        borderRadius: '50%',
+                        background: 'var(--error)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        border: '2px solid var(--white)'
+                      }}>
+                        <AtSign size={10} style={{ color: 'white' }} />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Content */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
+                      <div>
+                        <div style={{
+                          fontSize: '13px',
+                          fontWeight: activity.unread ? 700 : 500,
+                          color: 'var(--brown)',
+                          marginBottom: '2px'
+                        }}>
+                          {activity.autor.nome}
+                        </div>
+                        <div style={{
+                          fontSize: '12px',
+                          color: 'var(--brown-light)',
+                          marginBottom: '4px'
+                        }}>
+                          {activity.preview}
+                        </div>
+                      </div>
+                      <span style={{
+                        fontSize: '11px',
+                        color: 'var(--brown-light)',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {formatDateTime(activity.created_at).split(' ')[0]}
+                      </span>
+                    </div>
+
+                    <p style={{
+                      margin: '0 0 6px 0',
+                      fontSize: '12px',
+                      color: activity.unread ? 'var(--brown)' : 'var(--brown-light)',
+                      lineHeight: 1.4,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}>
+                      {activity.conteudo}
+                    </p>
+
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontSize: '11px',
+                      color: 'var(--brown-light)'
+                    }}>
+                      <span style={{ opacity: 0.7 }}>{activity.equipa}</span>
+                      <span style={{ opacity: 0.5 }}>›</span>
+                      <span style={{ fontFamily: 'monospace', color: 'var(--gold)' }}>
+                        {activity.canal.codigo}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ========== SAVED MESSAGES PANEL ========== */}
       {showSavedMessages && (
@@ -1921,6 +2360,139 @@ export default function ChatColaborativo() {
                     Limpar
                   </button>
                 )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Topics Bar */}
+        {canalAtivo && activeTab === 'publicacoes' && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '10px 24px',
+            background: 'var(--off-white)',
+            borderBottom: '1px solid var(--stone)',
+            overflowX: 'auto'
+          }}>
+            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--brown-light)', marginRight: '4px' }}>
+              Tópicos:
+            </span>
+            {getCurrentChannelTopics().map(topic => {
+              const IconComponent = getTopicIcon(topic.icon)
+              const isActive = activeTopic === topic.id
+              return (
+                <button
+                  key={topic.id}
+                  onClick={() => setActiveTopic(topic.id)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 12px',
+                    borderRadius: '16px',
+                    background: isActive ? topic.cor : 'var(--white)',
+                    border: isActive ? 'none' : '1px solid var(--stone)',
+                    cursor: 'pointer',
+                    color: isActive ? 'white' : 'var(--brown)',
+                    fontSize: '12px',
+                    fontWeight: isActive ? 600 : 400,
+                    whiteSpace: 'nowrap',
+                    transition: 'all 0.15s'
+                  }}
+                >
+                  <IconComponent size={14} />
+                  {topic.nome}
+                  {topic.custom && isActive && (
+                    <X
+                      size={12}
+                      style={{ marginLeft: '4px', cursor: 'pointer' }}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        removeCustomTopic(topic.id)
+                      }}
+                    />
+                  )}
+                </button>
+              )
+            })}
+
+            {/* Add Topic Button */}
+            {!showAddTopic ? (
+              <button
+                onClick={() => setShowAddTopic(true)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '6px 10px',
+                  borderRadius: '16px',
+                  background: 'transparent',
+                  border: '1px dashed var(--stone)',
+                  cursor: 'pointer',
+                  color: 'var(--brown-light)',
+                  fontSize: '12px'
+                }}
+              >
+                <Plus size={14} />
+                Tópico
+              </button>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <input
+                  type="text"
+                  value={newTopicName}
+                  onChange={(e) => setNewTopicName(e.target.value)}
+                  placeholder="Nome do tópico..."
+                  style={{
+                    padding: '6px 10px',
+                    border: '1px solid var(--accent-olive)',
+                    borderRadius: '16px',
+                    fontSize: '12px',
+                    width: '120px',
+                    outline: 'none'
+                  }}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') addCustomTopic()
+                    if (e.key === 'Escape') setShowAddTopic(false)
+                  }}
+                />
+                <button
+                  onClick={addCustomTopic}
+                  style={{
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '50%',
+                    background: 'var(--accent-olive)',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: 'white',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <Check size={14} />
+                </button>
+                <button
+                  onClick={() => setShowAddTopic(false)}
+                  style={{
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '50%',
+                    background: 'var(--stone)',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: 'var(--brown-light)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <X size={14} />
+                </button>
               </div>
             )}
           </div>

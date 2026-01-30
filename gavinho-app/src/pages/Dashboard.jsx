@@ -1,18 +1,26 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { 
-  FolderKanban, 
-  Users, 
-  TrendingUp, 
+import {
+  FolderKanban,
+  Users,
+  TrendingUp,
   AlertTriangle,
   Clock,
   CheckCircle2,
-  Euro
+  Euro,
+  MessageSquare,
+  Hash,
+  ArrowRight,
+  Paperclip,
+  AtSign,
+  Image as ImageIcon
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 
 export default function Dashboard() {
   const navigate = useNavigate()
+  const { profile } = useAuth()
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({
     totalProjetos: 0,
@@ -25,6 +33,61 @@ export default function Dashboard() {
   })
   const [recentProjects, setRecentProjects] = useState([])
   const [projectsByPhase, setProjectsByPhase] = useState([])
+
+  // Recent activity from chat channels
+  const [recentActivity, setRecentActivity] = useState([
+    // Mock data - in production would come from chat_mensagens table
+    {
+      id: '1',
+      type: 'message',
+      projeto: { codigo: 'GA00469', nome: 'MYRIAD_imagens' },
+      autor: { nome: 'Raquel Sonobe', avatar_url: null },
+      conteudo: 'Ainda não carreguei. Farei isso amanhã',
+      created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+      hasAttachment: false,
+      hasMention: false
+    },
+    {
+      id: '2',
+      type: 'message',
+      projeto: { codigo: 'GA00466', nome: 'PENTHOUSE SI' },
+      autor: { nome: 'Leonardo Ribeiro', avatar_url: null },
+      conteudo: 'Ponto de situação: ajustes na planta geral conforme feedback do cliente',
+      created_at: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+      hasAttachment: true,
+      hasMention: false
+    },
+    {
+      id: '3',
+      type: 'mention',
+      projeto: { codigo: 'GA00469', nome: 'MYRIAD_imagens' },
+      autor: { nome: 'Raquel Sonobe', avatar_url: null },
+      conteudo: '@Archviz mencionou-o(a): IGF GAVINHO Group Carolina Cipriano...',
+      created_at: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+      hasAttachment: false,
+      hasMention: true
+    },
+    {
+      id: '4',
+      type: 'message',
+      projeto: { codigo: 'GA00464', nome: 'APARTMENT IG' },
+      autor: { nome: 'Nathalia Bampi', avatar_url: null },
+      conteudo: 'Enviou um ficheiro',
+      created_at: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
+      hasAttachment: true,
+      hasMention: false
+    },
+    {
+      id: '5',
+      type: 'message',
+      projeto: { codigo: 'GA00461', nome: 'FPM' },
+      autor: { nome: 'Ana Miranda', avatar_url: null },
+      conteudo: 'Oi, Inês. Finalizei os ajustes que eu acrescentei...',
+      created_at: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
+      hasAttachment: false,
+      hasMention: false
+    }
+  ])
 
   // Buscar dados do Supabase
   useEffect(() => {
@@ -119,6 +182,28 @@ export default function Dashboard() {
       'Entrega': '#4A4845'
     }
     return colors[fase] || '#C3BAAF'
+  }
+
+  // Format relative time for activity
+  const formatRelativeTime = (dateString) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffMs = now - date
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+
+    if (diffMins < 1) return 'Agora'
+    if (diffMins < 60) return `${diffMins}min`
+    if (diffHours < 24) return `${diffHours}h`
+    if (diffDays < 7) return `${diffDays}d`
+    return date.toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' })
+  }
+
+  // Get initials for avatar
+  const getInitials = (name) => {
+    if (!name) return '?'
+    return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
   }
 
   // Loading state
@@ -382,6 +467,134 @@ export default function Dashboard() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Recent Activity from Chat */}
+      <div className="card mt-xl">
+        <div className="card-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <MessageSquare size={20} style={{ color: 'var(--accent-olive)' }} />
+            <h3 className="card-title">Últimos Desenvolvimentos</h3>
+          </div>
+          <button className="btn btn-ghost btn-sm" onClick={() => navigate('/chat')}>
+            Ver todos <ArrowRight size={14} style={{ marginLeft: '4px' }} />
+          </button>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+          {recentActivity.map((activity, idx) => (
+            <div
+              key={activity.id}
+              onClick={() => navigate(`/chat?canal=${activity.projeto.codigo}`)}
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '14px',
+                padding: '14px 16px',
+                cursor: 'pointer',
+                borderBottom: idx < recentActivity.length - 1 ? '1px solid var(--stone)' : 'none',
+                background: activity.hasMention ? 'rgba(139, 155, 123, 0.08)' : 'transparent',
+                transition: 'background 0.15s'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = activity.hasMention ? 'rgba(139, 155, 123, 0.15)' : 'var(--cream)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = activity.hasMention ? 'rgba(139, 155, 123, 0.08)' : 'transparent'}
+            >
+              {/* Avatar */}
+              <div style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, var(--blush) 0%, var(--blush-dark) 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '13px',
+                fontWeight: 600,
+                color: 'var(--brown-dark)',
+                flexShrink: 0
+              }}>
+                {getInitials(activity.autor.nome)}
+              </div>
+
+              {/* Content */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <span style={{ fontWeight: 600, fontSize: '14px', color: 'var(--brown)' }}>
+                    {activity.autor.nome}
+                  </span>
+                  {activity.hasMention && (
+                    <span style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '2px 8px',
+                      background: 'var(--accent-olive)',
+                      color: 'white',
+                      borderRadius: '10px',
+                      fontSize: '10px',
+                      fontWeight: 600
+                    }}>
+                      <AtSign size={10} />
+                      Menção
+                    </span>
+                  )}
+                  <span style={{ fontSize: '12px', color: 'var(--brown-light)' }}>
+                    {formatRelativeTime(activity.created_at)}
+                  </span>
+                </div>
+
+                <p style={{
+                  margin: '0 0 6px 0',
+                  fontSize: '13px',
+                  color: 'var(--brown)',
+                  lineHeight: 1.4,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
+                }}>
+                  {activity.conteudo}
+                </p>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Hash size={12} style={{ color: 'var(--brown-light)' }} />
+                  <span style={{
+                    fontSize: '11px',
+                    color: 'var(--gold)',
+                    fontWeight: 600,
+                    fontFamily: 'monospace'
+                  }}>
+                    {activity.projeto.codigo}
+                  </span>
+                  <span style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
+                    {activity.projeto.nome}
+                  </span>
+                  {activity.hasAttachment && (
+                    <span style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      fontSize: '11px',
+                      color: 'var(--brown-light)'
+                    }}>
+                      <Paperclip size={11} />
+                      Anexo
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Arrow */}
+              <ArrowRight size={16} style={{ color: 'var(--brown-light)', flexShrink: 0, marginTop: '12px' }} />
+            </div>
+          ))}
+        </div>
+
+        {recentActivity.length === 0 && (
+          <div style={{ padding: '40px', textAlign: 'center', color: 'var(--brown-light)' }}>
+            <MessageSquare size={40} style={{ opacity: 0.3, marginBottom: '12px' }} />
+            <p style={{ margin: 0 }}>Sem atividade recente</p>
+          </div>
+        )}
       </div>
     </div>
   )
