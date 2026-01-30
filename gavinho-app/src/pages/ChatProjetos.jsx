@@ -10,6 +10,14 @@ import {
 
 const REACTION_EMOJIS = ['👍', '❤️', '😄', '🎉', '😮', '😢', '🔥', '👀']
 
+const EMOJI_CATEGORIES = {
+  'Frequentes': ['👍', '❤️', '😄', '🎉', '😮', '😢', '🔥', '👀', '✅', '👏'],
+  'Caras': ['😀', '😃', '😄', '😁', '😅', '😂', '🤣', '😊', '😇', '🙂', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🤫', '🤔', '🤐', '🤨', '😐', '😑', '😶', '😏', '😒', '🙄', '😬', '🤥', '😌', '😔', '😪', '🤤', '😴', '😷', '🤒', '🤕', '🤢', '🤮', '🤧', '🥵', '🥶', '😵', '🤯', '🤠', '🥳', '😎', '🤓', '🧐'],
+  'Gestos': ['👋', '🤚', '🖐️', '✋', '🖖', '👌', '🤌', '🤏', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👍', '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '👐', '🤲', '🤝', '🙏', '💪', '🦾', '🖤'],
+  'Objetos': ['💼', '📁', '📂', '📅', '📆', '📇', '📈', '📉', '📊', '📋', '📌', '📍', '📎', '📏', '📐', '✂️', '📝', '✏️', '🔍', '🔎', '🔏', '🔐', '🔑', '🔒', '🔓', '💡', '📧', '📨', '📩', '📪', '📫', '📬', '📭', '📮', '🗳️'],
+  'Símbolos': ['✅', '❌', '❓', '❔', '❕', '❗', '💯', '🔴', '🟠', '🟡', '🟢', '🔵', '🟣', '⚫', '⚪', '🟤', '▶️', '⏸️', '⏹️', '⏺️', '⏭️', '⏮️', '⏩', '⏪', '🔀', '🔁', '🔂', '🔃', '🔄', '➕', '➖', '➗', '✖️', '♾️', '💲', '💱']
+}
+
 const CANAL_ICONS = [
   { id: 'hash', icon: Hash, label: 'Geral' },
   { id: 'megaphone', icon: Megaphone, label: 'Anúncios' },
@@ -29,17 +37,27 @@ export default function ChatProjetos() {
   const [mensagens, setMensagens] = useState([])
   const [loading, setLoading] = useState(true)
   const [membrosEquipa, setMembrosEquipa] = useState([])
-  
+  const [unreadCounts, setUnreadCounts] = useState({}) // {topicoId: count}
+  const [typingUsers, setTypingUsers] = useState([]) // Quem está a escrever
+  const [presencaMap, setPresencaMap] = useState({}) // {utilizadorId: 'online'|'away'|'offline'}
+  const typingTimeoutRef = useRef(null)
+  const presenceIntervalRef = useRef(null)
+
   const [novaMensagem, setNovaMensagem] = useState('')
   const [replyTo, setReplyTo] = useState(null)
+  const [editingMessage, setEditingMessage] = useState(null) // Mensagem a editar
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+  const [emojiCategory, setEmojiCategory] = useState('Frequentes')
   const [showMentions, setShowMentions] = useState(false)
   const [mentionFilter, setMentionFilter] = useState('')
   const [uploading, setUploading] = useState(false)
   
   const [showNovoCanal, setShowNovoCanal] = useState(false)
   const [showNovoTopico, setShowNovoTopico] = useState(false)
+  const [showSearch, setShowSearch] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState([])
+  const [searching, setSearching] = useState(false)
   
   const [novoCanal, setNovoCanal] = useState({ nome: '', descricao: '', tipo: 'publico', icone: 'hash' })
   const [novoTopico, setNovoTopico] = useState({ titulo: '', descricao: '' })
@@ -50,6 +68,14 @@ export default function ChatProjetos() {
 
   useEffect(() => {
     loadProjetos()
+
+    // Iniciar presença
+    updateMyPresence()
+    presenceIntervalRef.current = setInterval(updateMyPresence, 60000) // A cada minuto
+
+    return () => {
+      clearInterval(presenceIntervalRef.current)
+    }
   }, [])
 
   useEffect(() => {
@@ -58,6 +84,15 @@ export default function ChatProjetos() {
       loadMembrosEquipa(projetoAtivo.id)
     }
   }, [projetoAtivo])
+
+  // Carregar presença quando membros mudam
+  useEffect(() => {
+    if (membrosEquipa.length > 0) {
+      loadPresencaEquipa()
+      const interval = setInterval(loadPresencaEquipa, 30000) // A cada 30s
+      return () => clearInterval(interval)
+    }
+  }, [membrosEquipa])
 
   useEffect(() => {
     if (canalAtivo) {
@@ -68,8 +103,15 @@ export default function ChatProjetos() {
   useEffect(() => {
     if (topicoAtivo) {
       loadMensagens(topicoAtivo.id)
-      const unsubscribe = subscribeToMessages(topicoAtivo.id)
-      return unsubscribe
+      markAsRead(topicoAtivo.id)
+      loadTypingUsers(topicoAtivo.id)
+      const unsubMessages = subscribeToMessages(topicoAtivo.id)
+      const unsubTyping = subscribeToTyping(topicoAtivo.id)
+      return () => {
+        unsubMessages?.()
+        unsubTyping?.()
+        stopTyping()
+      }
     }
   }, [topicoAtivo])
 
@@ -161,11 +203,13 @@ export default function ChatProjetos() {
         .eq('fechado', false)
         .order('fixado', { ascending: false })
         .order('updated_at', { ascending: false })
-      
+
       if (error) throw error
       setTopicos(data || [])
-      
-      if (data && data.length > 0) {
+
+      // Carregar contagem de não lidas
+      if (data?.length > 0) {
+        loadUnreadCounts(data.map(t => t.id))
         setTopicoAtivo(data[0])
       } else {
         setTopicoAtivo(null)
@@ -203,13 +247,248 @@ export default function ChatProjetos() {
         .from('projeto_equipa')
         .select('utilizador:utilizador_id(id, nome, avatar_url)')
         .eq('projeto_id', projetoId)
-      
+
       if (equipaData) {
         setMembrosEquipa(equipaData.map(e => e.utilizador).filter(Boolean))
       }
     } catch (err) {
       console.error('Erro ao carregar equipa:', err)
     }
+  }
+
+  // Carregar contagem de mensagens não lidas por tópico
+  const loadUnreadCounts = async (topicosIds) => {
+    if (!profile?.id || !topicosIds.length) return
+
+    try {
+      const { data: leituras } = await supabase
+        .from('chat_leituras')
+        .select('topico_id, ultima_leitura_at')
+        .eq('utilizador_id', profile.id)
+        .in('topico_id', topicosIds)
+
+      const leiturasMap = {}
+      leituras?.forEach(l => { leiturasMap[l.topico_id] = l.ultima_leitura_at })
+
+      const counts = {}
+      for (const topicoId of topicosIds) {
+        const ultimaLeitura = leiturasMap[topicoId]
+        let query = supabase
+          .from('chat_mensagens')
+          .select('id', { count: 'exact', head: true })
+          .eq('topico_id', topicoId)
+          .eq('eliminado', false)
+          .neq('autor_id', profile.id)
+
+        if (ultimaLeitura) {
+          query = query.gt('created_at', ultimaLeitura)
+        }
+
+        const { count } = await query
+        if (count > 0) counts[topicoId] = count
+      }
+
+      setUnreadCounts(counts)
+    } catch (err) {
+      console.error('Erro ao carregar não lidas:', err)
+    }
+  }
+
+  // Marcar tópico como lido
+  const markAsRead = async (topicoId) => {
+    if (!profile?.id || !topicoId) return
+
+    try {
+      await supabase
+        .from('chat_leituras')
+        .upsert({
+          topico_id: topicoId,
+          utilizador_id: profile.id,
+          ultima_leitura_at: new Date().toISOString()
+        }, { onConflict: 'topico_id,utilizador_id' })
+
+      setUnreadCounts(prev => {
+        const updated = { ...prev }
+        delete updated[topicoId]
+        return updated
+      })
+    } catch (err) {
+      console.error('Erro ao marcar como lido:', err)
+    }
+  }
+
+  // Enviar typing indicator
+  const sendTyping = async () => {
+    if (!profile?.id || !topicoAtivo) return
+
+    try {
+      await supabase.from('chat_typing').upsert({
+        topico_id: topicoAtivo.id,
+        utilizador_id: profile.id,
+        started_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 5000).toISOString()
+      }, { onConflict: 'topico_id,utilizador_id' })
+    } catch (err) {
+      // Silenciar erros de typing
+    }
+  }
+
+  // Parar typing indicator
+  const stopTyping = async () => {
+    if (!profile?.id || !topicoAtivo) return
+
+    try {
+      await supabase
+        .from('chat_typing')
+        .delete()
+        .eq('topico_id', topicoAtivo.id)
+        .eq('utilizador_id', profile.id)
+    } catch (err) {
+      // Silenciar erros
+    }
+  }
+
+  // Carregar quem está a escrever
+  const loadTypingUsers = async (topicoId) => {
+    if (!topicoId) return
+
+    try {
+      const { data } = await supabase
+        .from('chat_typing')
+        .select('utilizador:utilizador_id(id, nome)')
+        .eq('topico_id', topicoId)
+        .gt('expires_at', new Date().toISOString())
+        .neq('utilizador_id', profile?.id)
+
+      setTypingUsers(data?.map(t => t.utilizador).filter(Boolean) || [])
+    } catch (err) {
+      setTypingUsers([])
+    }
+  }
+
+  // Subscrever a typing updates
+  const subscribeToTyping = (topicoId) => {
+    const channel = supabase
+      .channel(`typing_${topicoId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'chat_typing',
+        filter: `topico_id=eq.${topicoId}`
+      }, () => {
+        loadTypingUsers(topicoId)
+      })
+      .subscribe()
+
+    return () => supabase.removeChannel(channel)
+  }
+
+  // Atualizar própria presença
+  const updateMyPresence = async () => {
+    if (!profile?.id) return
+
+    try {
+      await supabase.from('chat_presenca').upsert({
+        utilizador_id: profile.id,
+        estado: 'online',
+        ultima_actividade: new Date().toISOString(),
+        dispositivo: 'web'
+      }, { onConflict: 'utilizador_id' })
+    } catch (err) {
+      // Silenciar erros
+    }
+  }
+
+  // Carregar presença dos membros da equipa
+  const loadPresencaEquipa = async () => {
+    if (!membrosEquipa.length) return
+
+    try {
+      const { data } = await supabase
+        .from('chat_presenca')
+        .select('utilizador_id, estado, ultima_actividade')
+        .in('utilizador_id', membrosEquipa.map(m => m.id))
+
+      const map = {}
+      data?.forEach(p => {
+        // Considerar offline se última atividade > 15min
+        const lastActive = new Date(p.ultima_actividade)
+        const diffMinutes = (Date.now() - lastActive.getTime()) / 60000
+
+        if (diffMinutes > 15) {
+          map[p.utilizador_id] = 'offline'
+        } else if (diffMinutes > 5) {
+          map[p.utilizador_id] = 'away'
+        } else {
+          map[p.utilizador_id] = p.estado
+        }
+      })
+
+      setPresencaMap(map)
+    } catch (err) {
+      // Silenciar erros
+    }
+  }
+
+  // Cor do indicador de presença
+  const getPresenceColor = (userId) => {
+    const estado = presencaMap[userId]
+    if (estado === 'online') return '#22c55e' // Verde
+    if (estado === 'away') return '#eab308' // Amarelo
+    return '#9ca3af' // Cinza
+  }
+
+  // Pesquisar mensagens
+  const handleSearch = async (query) => {
+    if (!query.trim() || !projetoAtivo) {
+      setSearchResults([])
+      return
+    }
+
+    setSearching(true)
+    try {
+      const { data, error } = await supabase
+        .from('chat_mensagens')
+        .select(`
+          id, conteudo, created_at,
+          autor:autor_id(nome, avatar_url),
+          topico:topico_id(id, titulo, canal:canal_id(id, nome, projeto_id))
+        `)
+        .ilike('conteudo', `%${query}%`)
+        .eq('eliminado', false)
+        .order('created_at', { ascending: false })
+        .limit(50)
+
+      // Filtrar pelo projeto atual
+      const filtered = data?.filter(m => m.topico?.canal?.projeto_id === projetoAtivo.id) || []
+      setSearchResults(filtered)
+    } catch (err) {
+      console.error('Erro na pesquisa:', err)
+      setSearchResults([])
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  // Navegar para mensagem do resultado
+  const goToSearchResult = async (result) => {
+    // Encontrar o canal e tópico
+    const canal = canais.find(c => c.id === result.topico?.canal?.id)
+    if (canal && canal.id !== canalAtivo?.id) {
+      setCanalAtivo(canal)
+    }
+
+    // Esperar um pouco para o tópico carregar
+    setTimeout(() => {
+      const topico = topicos.find(t => t.id === result.topico?.id)
+      if (topico) {
+        setTopicoAtivo(topico)
+      }
+    }, 100)
+
+    setShowSearch(false)
+    setSearchQuery('')
+    setSearchResults([])
   }
 
   const handleCriarCanal = async () => {
@@ -388,17 +667,53 @@ export default function ChatProjetos() {
 
   const handleEliminarMensagem = async (mensagem) => {
     if (!confirm('Eliminar esta mensagem?')) return
-    
+
     try {
       await supabase
         .from('chat_mensagens')
-        .update({ eliminado: true, eliminado_at: new Date().toISOString() })
+        .update({
+          eliminado: true,
+          eliminado_at: new Date().toISOString(),
+          eliminado_por: profile?.id
+        })
         .eq('id', mensagem.id)
-      
+
       loadMensagens(topicoAtivo.id)
     } catch (err) {
       alert('Erro ao eliminar: ' + err.message)
     }
+  }
+
+  // Iniciar edição de mensagem
+  const startEditMessage = (mensagem) => {
+    setEditingMessage(mensagem)
+    setNovaMensagem(mensagem.conteudo)
+    setReplyTo(null)
+    inputRef.current?.focus()
+  }
+
+  // Guardar edição de mensagem
+  const handleEditMessage = async () => {
+    if (!novaMensagem.trim() || !editingMessage) return
+
+    try {
+      await supabase
+        .from('chat_mensagens')
+        .update({ conteudo: novaMensagem.trim() })
+        .eq('id', editingMessage.id)
+
+      setEditingMessage(null)
+      setNovaMensagem('')
+      loadMensagens(topicoAtivo.id)
+    } catch (err) {
+      alert('Erro ao editar: ' + err.message)
+    }
+  }
+
+  // Cancelar edição
+  const cancelEdit = () => {
+    setEditingMessage(null)
+    setNovaMensagem('')
   }
 
   const insertMention = (user) => {
@@ -417,7 +732,14 @@ export default function ChatProjetos() {
   const handleInputChange = (e) => {
     const value = e.target.value
     setNovaMensagem(value)
-    
+
+    // Typing indicator - enviar quando escreve
+    if (value.trim()) {
+      sendTyping()
+      clearTimeout(typingTimeoutRef.current)
+      typingTimeoutRef.current = setTimeout(stopTyping, 3000)
+    }
+
     const lastAt = value.lastIndexOf('@')
     if (lastAt >= 0 && lastAt === value.length - 1) {
       setShowMentions(true)
@@ -622,23 +944,38 @@ export default function ChatProjetos() {
                                       background: topicoAtivo?.id === topico.id ? 'rgba(201, 168, 130, 0.2)' : 'transparent',
                                       border: 'none',
                                       borderLeft: topicoAtivo?.id === topico.id ? '2px solid #C9A882' : '2px solid transparent',
-                                      color: topicoAtivo?.id === topico.id ? 'white' : 'rgba(255,255,255,0.4)',
+                                      color: topicoAtivo?.id === topico.id ? 'white' : unreadCounts[topico.id] ? 'white' : 'rgba(255,255,255,0.4)',
                                       cursor: 'pointer',
                                       fontSize: '11px',
                                       textAlign: 'left',
                                       position: 'relative',
-                                      zIndex: 1
+                                      zIndex: 1,
+                                      fontWeight: unreadCounts[topico.id] ? 600 : 400
                                     }}
                                   >
                                     {topico.fixado && <Pin size={9} style={{ color: '#C9A882' }} />}
-                                    <span style={{ 
-                                      overflow: 'hidden', 
-                                      textOverflow: 'ellipsis', 
+                                    <span style={{
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
                                       whiteSpace: 'nowrap',
                                       flex: 1
                                     }}>
                                       {topico.titulo}
                                     </span>
+                                    {unreadCounts[topico.id] > 0 && (
+                                      <span style={{
+                                        background: '#ef4444',
+                                        color: 'white',
+                                        fontSize: '9px',
+                                        fontWeight: 600,
+                                        padding: '1px 5px',
+                                        borderRadius: '10px',
+                                        minWidth: '16px',
+                                        textAlign: 'center'
+                                      }}>
+                                        {unreadCounts[topico.id] > 99 ? '99+' : unreadCounts[topico.id]}
+                                      </span>
+                                    )}
                                   </button>
                                 ))}
                               </div>
@@ -751,11 +1088,12 @@ export default function ChatProjetos() {
                 >
                   <Users size={18} />
                 </button>
-                <button 
-                  style={{ 
-                    background: 'none', 
-                    border: 'none', 
-                    cursor: 'pointer', 
+                <button
+                  onClick={() => setShowSearch(true)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
                     color: 'var(--brown-light)',
                     padding: '6px',
                     borderRadius: '6px'
@@ -841,21 +1179,33 @@ export default function ChatProjetos() {
                     className="message-hover"
                     >
                       {showAuthor ? (
-                        <div style={{
-                          width: '36px',
-                          height: '36px',
-                          borderRadius: '50%',
-                          background: msg.autor?.avatar_url ? `url(${msg.autor.avatar_url})` : 'var(--gold)',
-                          backgroundSize: 'cover',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: 'white',
-                          fontWeight: 600,
-                          fontSize: '14px',
-                          flexShrink: 0
-                        }}>
-                          {!msg.autor?.avatar_url && msg.autor?.nome?.charAt(0)}
+                        <div style={{ position: 'relative', flexShrink: 0 }}>
+                          <div style={{
+                            width: '36px',
+                            height: '36px',
+                            borderRadius: '50%',
+                            background: msg.autor?.avatar_url ? `url(${msg.autor.avatar_url})` : 'var(--gold)',
+                            backgroundSize: 'cover',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'white',
+                            fontWeight: 600,
+                            fontSize: '14px'
+                          }}>
+                            {!msg.autor?.avatar_url && msg.autor?.nome?.charAt(0)}
+                          </div>
+                          {/* Indicador de presença */}
+                          <div style={{
+                            position: 'absolute',
+                            bottom: 0,
+                            right: 0,
+                            width: '10px',
+                            height: '10px',
+                            borderRadius: '50%',
+                            background: getPresenceColor(msg.autor_id),
+                            border: '2px solid white'
+                          }} />
                         </div>
                       ) : (
                         <div style={{ width: '36px' }} />
@@ -973,12 +1323,20 @@ export default function ChatProjetos() {
                           <Reply size={14} />
                         </button>
                         {isOwn && (
-                          <button
-                            onClick={() => handleEliminarMensagem(msg)}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#ef4444' }}
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                          <>
+                            <button
+                              onClick={() => startEditMessage(msg)}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--brown-light)' }}
+                            >
+                              <Edit size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleEliminarMensagem(msg)}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#ef4444' }}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </>
                         )}
                       </div>
                     </div>
@@ -991,7 +1349,59 @@ export default function ChatProjetos() {
 
           {topicoAtivo && (
             <div style={{ padding: '12px 20px', borderTop: '1px solid var(--stone)', position: 'relative' }}>
-              {replyTo && (
+              {/* Typing indicator */}
+              {typingUsers.length > 0 && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '6px 12px',
+                  fontSize: '12px',
+                  color: 'var(--brown-light)',
+                  marginBottom: '8px'
+                }}>
+                  <span style={{ display: 'flex', gap: '2px' }}>
+                    <span className="typing-dot" style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--gold)', animation: 'typingBounce 1s infinite' }} />
+                    <span className="typing-dot" style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--gold)', animation: 'typingBounce 1s infinite 0.2s' }} />
+                    <span className="typing-dot" style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--gold)', animation: 'typingBounce 1s infinite 0.4s' }} />
+                  </span>
+                  <span>
+                    {typingUsers.length === 1
+                      ? `${typingUsers[0].nome} está a escrever...`
+                      : typingUsers.length === 2
+                        ? `${typingUsers[0].nome} e ${typingUsers[1].nome} estão a escrever...`
+                        : `${typingUsers[0].nome} e mais ${typingUsers.length - 1} estão a escrever...`
+                    }
+                  </span>
+                </div>
+              )}
+
+              {/* Indicador de edição */}
+              {editingMessage && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '8px 12px',
+                  background: '#fef3c7',
+                  borderRadius: '8px 8px 0 0',
+                  borderLeft: '3px solid #f59e0b',
+                  marginBottom: '-1px'
+                }}>
+                  <div style={{ fontSize: '12px', color: '#92400e' }}>
+                    <Edit size={12} style={{ marginRight: '6px' }} />
+                    A editar mensagem
+                  </div>
+                  <button
+                    onClick={cancelEdit}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#92400e' }}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+
+              {replyTo && !editingMessage && (
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -1103,10 +1513,13 @@ export default function ChatProjetos() {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault()
-                      handleEnviarMensagem()
+                      editingMessage ? handleEditMessage() : handleEnviarMensagem()
+                    }
+                    if (e.key === 'Escape' && editingMessage) {
+                      cancelEdit()
                     }
                   }}
-                  placeholder={`Mensagem em #${topicoAtivo.titulo}...`}
+                  placeholder={editingMessage ? 'Editar mensagem...' : `Mensagem em #${topicoAtivo.titulo}...`}
                   style={{
                     flex: 1,
                     border: 'none',
@@ -1142,32 +1555,69 @@ export default function ChatProjetos() {
                       right: 0,
                       background: 'white',
                       border: '1px solid var(--stone)',
-                      borderRadius: '8px',
-                      padding: '8px',
+                      borderRadius: '12px',
                       boxShadow: 'var(--shadow-lg)',
-                      display: 'flex',
-                      gap: '4px',
                       marginBottom: '8px',
-                      zIndex: 10
+                      zIndex: 10,
+                      width: '320px'
                     }}>
-                      {REACTION_EMOJIS.map(emoji => (
-                        <button
-                          key={emoji}
-                          onClick={() => {
-                            setNovaMensagem(prev => prev + emoji)
-                            setShowEmojiPicker(false)
-                          }}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
-                            padding: '4px',
-                            fontSize: '18px'
-                          }}
-                        >
-                          {emoji}
-                        </button>
-                      ))}
+                      {/* Categorias */}
+                      <div style={{
+                        display: 'flex',
+                        borderBottom: '1px solid var(--stone)',
+                        padding: '4px'
+                      }}>
+                        {Object.keys(EMOJI_CATEGORIES).map(cat => (
+                          <button
+                            key={cat}
+                            onClick={() => setEmojiCategory(cat)}
+                            style={{
+                              flex: 1,
+                              padding: '6px 4px',
+                              background: emojiCategory === cat ? 'var(--cream)' : 'transparent',
+                              border: 'none',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              fontSize: '11px',
+                              color: emojiCategory === cat ? 'var(--brown)' : 'var(--brown-light)',
+                              fontWeight: emojiCategory === cat ? 600 : 400
+                            }}
+                          >
+                            {cat}
+                          </button>
+                        ))}
+                      </div>
+                      {/* Emojis */}
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(10, 1fr)',
+                        gap: '2px',
+                        padding: '8px',
+                        maxHeight: '200px',
+                        overflowY: 'auto'
+                      }}>
+                        {EMOJI_CATEGORIES[emojiCategory].map((emoji, idx) => (
+                          <button
+                            key={`${emoji}-${idx}`}
+                            onClick={() => {
+                              setNovaMensagem(prev => prev + emoji)
+                              setShowEmojiPicker(false)
+                            }}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              padding: '4px',
+                              fontSize: '20px',
+                              borderRadius: '4px',
+                              transition: 'background 0.15s'
+                            }}
+                            className="hover-bg"
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1190,10 +1640,10 @@ export default function ChatProjetos() {
                 </button>
                 
                 <button
-                  onClick={handleEnviarMensagem}
+                  onClick={editingMessage ? handleEditMessage : handleEnviarMensagem}
                   disabled={!novaMensagem.trim()}
                   style={{
-                    background: novaMensagem.trim() ? 'var(--brown)' : 'var(--stone)',
+                    background: novaMensagem.trim() ? (editingMessage ? '#f59e0b' : 'var(--brown)') : 'var(--stone)',
                     border: 'none',
                     borderRadius: '6px',
                     padding: '8px',
@@ -1201,7 +1651,7 @@ export default function ChatProjetos() {
                     color: 'white'
                   }}
                 >
-                  <Send size={16} />
+                  {editingMessage ? <Check size={16} /> : <Send size={16} />}
                 </button>
               </div>
             </div>
@@ -1478,6 +1928,92 @@ export default function ChatProjetos() {
           </div>
         )}
 
+        {/* Modal Pesquisa */}
+        {showSearch && (
+          <div className="modal-overlay" onClick={() => setShowSearch(false)}>
+            <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px', maxHeight: '80vh', borderRadius: '16px' }}>
+              <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--stone)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <Search size={20} style={{ color: 'var(--brown-light)' }} />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value)
+                      handleSearch(e.target.value)
+                    }}
+                    placeholder="Pesquisar mensagens..."
+                    autoFocus
+                    style={{
+                      flex: 1,
+                      border: 'none',
+                      outline: 'none',
+                      fontSize: '16px',
+                      background: 'transparent'
+                    }}
+                  />
+                  <button
+                    onClick={() => setShowSearch(false)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--brown-light)' }}
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ padding: '12px 0', maxHeight: '60vh', overflowY: 'auto' }}>
+                {searching ? (
+                  <div style={{ padding: '40px', textAlign: 'center', color: 'var(--brown-light)' }}>
+                    A pesquisar...
+                  </div>
+                ) : searchResults.length === 0 ? (
+                  <div style={{ padding: '40px', textAlign: 'center', color: 'var(--brown-light)' }}>
+                    {searchQuery ? 'Sem resultados' : 'Escreve para pesquisar'}
+                  </div>
+                ) : (
+                  searchResults.map(result => (
+                    <button
+                      key={result.id}
+                      onClick={() => goToSearchResult(result)}
+                      style={{
+                        width: '100%',
+                        display: 'block',
+                        padding: '12px 24px',
+                        background: 'none',
+                        border: 'none',
+                        textAlign: 'left',
+                        cursor: 'pointer'
+                      }}
+                      className="hover-bg"
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                        <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--brown)' }}>
+                          {result.autor?.nome}
+                        </span>
+                        <span style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
+                          em #{result.topico?.canal?.nome} › {result.topico?.titulo}
+                        </span>
+                      </div>
+                      <div style={{
+                        fontSize: '13px',
+                        color: 'var(--brown)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {result.conteudo}
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--brown-light)', marginTop: '4px' }}>
+                        {formatDate(result.created_at)}
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         <style>{`
           .message-hover:hover {
             background: var(--cream);
@@ -1488,6 +2024,10 @@ export default function ChatProjetos() {
           }
           .hover-bg:hover {
             background: var(--cream);
+          }
+          @keyframes typingBounce {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-4px); }
           }
         `}</style>
       </div>
