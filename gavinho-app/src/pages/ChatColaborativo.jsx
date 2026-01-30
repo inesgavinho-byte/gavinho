@@ -11,7 +11,9 @@ import {
   Video, Phone, ScreenShare, Calendar, Star, Filter,
   ArrowUp, ArrowDown, Clock, CheckCircle2, AlertCircle,
   ThumbsUp, Laugh, Frown, PartyPopper, Fire, Eye,
-  Link2, Copy, Check, Edit, Trash2, CornerUpLeft, Quote
+  Link2, Copy, Check, Edit, Trash2, CornerUpLeft, Quote,
+  BookmarkCheck, Volume2, VolumeX, User, CalendarDays,
+  FileImage, AtSignIcon, LinkIcon, SlidersHorizontal
 } from 'lucide-react'
 
 // Estrutura de equipas GAVINHO (baseado no Teams)
@@ -115,6 +117,25 @@ export default function ChatColaborativo() {
   // Notifications
   const [mutedChannels, setMutedChannels] = useState([])
   const [pinnedMessages, setPinnedMessages] = useState([])
+  const [soundEnabled, setSoundEnabled] = useState(true)
+
+  // Saved Messages (Bookmarks)
+  const [savedMessages, setSavedMessages] = useState([])
+  const [showSavedMessages, setShowSavedMessages] = useState(false)
+
+  // Filters
+  const [activeFilter, setActiveFilter] = useState('all')
+  const [showFilters, setShowFilters] = useState(false)
+
+  // Advanced Search
+  const [showAdvancedSearch, setShowAdvancedSearch] = useState(false)
+  const [searchFilters, setSearchFilters] = useState({
+    author: '',
+    dateFrom: '',
+    dateTo: '',
+    hasAttachments: false,
+    hasMentions: false
+  })
 
   const fileInputRef = useRef(null)
   const messagesEndRef = useRef(null)
@@ -683,7 +704,131 @@ export default function ChatColaborativo() {
     return post.autor?.id === profile?.id || post.autor?.nome === profile?.nome
   }
 
-  const filteredPosts = searchQuery
+  // Toggle saved message (bookmark)
+  const toggleSaveMessage = (post) => {
+    const isSaved = savedMessages.some(m => m.id === post.id)
+    if (isSaved) {
+      setSavedMessages(prev => prev.filter(m => m.id !== post.id))
+    } else {
+      setSavedMessages(prev => [...prev, { ...post, savedAt: new Date().toISOString() }])
+    }
+    setShowMessageMenu(null)
+  }
+
+  // Check if message is saved
+  const isMessageSaved = (postId) => {
+    return savedMessages.some(m => m.id === postId)
+  }
+
+  // Play notification sound
+  const playNotificationSound = () => {
+    if (!soundEnabled) return
+    try {
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+      const oscillator = audioContext.createOscillator()
+      const gainNode = audioContext.createGain()
+
+      oscillator.connect(gainNode)
+      gainNode.connect(audioContext.destination)
+
+      oscillator.frequency.value = 800
+      oscillator.type = 'sine'
+      gainNode.gain.setValueAtTime(0.1, audioContext.currentTime)
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3)
+
+      oscillator.start(audioContext.currentTime)
+      oscillator.stop(audioContext.currentTime + 0.3)
+    } catch (e) {
+      console.log('Audio not supported')
+    }
+  }
+
+  // Get total unread count
+  const getTotalUnreadCount = () => {
+    return canais.reduce((sum, c) => sum + (c.unreadCount || 0), 0)
+  }
+
+  // Filter options
+  const FILTER_OPTIONS = [
+    { id: 'all', label: 'Todas', icon: MessageSquare },
+    { id: 'attachments', label: 'Com anexos', icon: FileText },
+    { id: 'images', label: 'Com imagens', icon: FileImage },
+    { id: 'mentions', label: 'Menções', icon: AtSign },
+    { id: 'saved', label: 'Guardadas', icon: Bookmark }
+  ]
+
+  // Apply filters to posts
+  const applyFilters = (postsToFilter) => {
+    let result = postsToFilter
+
+    // Text search
+    if (searchQuery) {
+      result = result.filter(p =>
+        p.conteudo?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.autor?.nome?.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    }
+
+    // Category filter
+    switch (activeFilter) {
+      case 'attachments':
+        result = result.filter(p => p.attachments?.length > 0)
+        break
+      case 'images':
+        result = result.filter(p => p.imagem_url || p.attachments?.some(a => a.type === 'image'))
+        break
+      case 'mentions':
+        result = result.filter(p => p.conteudo?.includes('@'))
+        break
+      case 'saved':
+        result = result.filter(p => isMessageSaved(p.id))
+        break
+    }
+
+    // Advanced search filters
+    if (searchFilters.author) {
+      result = result.filter(p =>
+        p.autor?.nome?.toLowerCase().includes(searchFilters.author.toLowerCase())
+      )
+    }
+
+    if (searchFilters.dateFrom) {
+      const fromDate = new Date(searchFilters.dateFrom)
+      result = result.filter(p => new Date(p.created_at) >= fromDate)
+    }
+
+    if (searchFilters.dateTo) {
+      const toDate = new Date(searchFilters.dateTo)
+      toDate.setHours(23, 59, 59)
+      result = result.filter(p => new Date(p.created_at) <= toDate)
+    }
+
+    if (searchFilters.hasAttachments) {
+      result = result.filter(p => p.attachments?.length > 0 || p.imagem_url)
+    }
+
+    if (searchFilters.hasMentions) {
+      result = result.filter(p => p.conteudo?.includes('@'))
+    }
+
+    return result
+  }
+
+  // Reset all filters
+  const resetFilters = () => {
+    setActiveFilter('all')
+    setSearchQuery('')
+    setSearchFilters({
+      author: '',
+      dateFrom: '',
+      dateTo: '',
+      hasAttachments: false,
+      hasMentions: false
+    })
+    setShowAdvancedSearch(false)
+  }
+
+  const filteredPosts = applyFilters(posts)
     ? posts.filter(p =>
         p.conteudo?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         p.autor?.nome?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -724,12 +869,72 @@ export default function ChatColaborativo() {
           alignItems: 'center',
           justifyContent: 'space-between'
         }}>
-          <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--brown)', margin: 0 }}>
-            Equipas
-          </h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--brown)', margin: 0 }}>
+              Equipas
+            </h2>
+            {/* Total unread badge */}
+            {getTotalUnreadCount() > 0 && (
+              <span style={{
+                minWidth: '22px',
+                height: '22px',
+                borderRadius: '11px',
+                background: 'var(--error)',
+                color: 'white',
+                fontSize: '11px',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '0 6px'
+              }}>
+                {getTotalUnreadCount()}
+              </span>
+            )}
+          </div>
           <div style={{ display: 'flex', gap: '4px' }}>
+            {/* Saved messages button */}
+            <button
+              onClick={() => setShowSavedMessages(!showSavedMessages)}
+              title="Mensagens guardadas"
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '6px',
+                background: showSavedMessages ? 'var(--accent-olive)' : 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                color: showSavedMessages ? 'white' : 'var(--brown-light)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                position: 'relative'
+              }}
+            >
+              <Bookmark size={18} />
+              {savedMessages.length > 0 && (
+                <span style={{
+                  position: 'absolute',
+                  top: '-2px',
+                  right: '-2px',
+                  width: '16px',
+                  height: '16px',
+                  borderRadius: '50%',
+                  background: 'var(--warning)',
+                  color: 'white',
+                  fontSize: '9px',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  {savedMessages.length}
+                </span>
+              )}
+            </button>
             <button
               onClick={() => setShowSearch(!showSearch)}
+              title="Pesquisar"
               style={{
                 width: '32px',
                 height: '32px',
@@ -745,19 +950,24 @@ export default function ChatColaborativo() {
             >
               <Search size={18} />
             </button>
-            <button style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '6px',
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              color: 'var(--brown-light)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <Filter size={18} />
+            {/* Sound toggle */}
+            <button
+              onClick={() => setSoundEnabled(!soundEnabled)}
+              title={soundEnabled ? 'Desativar sons' : 'Ativar sons'}
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '6px',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                color: soundEnabled ? 'var(--accent-olive)' : 'var(--brown-light)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
             </button>
           </div>
         </div>
@@ -928,6 +1138,139 @@ export default function ChatColaborativo() {
         </div>
       </div>
 
+      {/* ========== SAVED MESSAGES PANEL ========== */}
+      {showSavedMessages && (
+        <div style={{
+          width: '320px',
+          background: 'var(--white)',
+          borderRight: '1px solid var(--stone)',
+          display: 'flex',
+          flexDirection: 'column',
+          flexShrink: 0
+        }}>
+          <div style={{
+            padding: '16px 20px',
+            borderBottom: '1px solid var(--stone)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <BookmarkCheck size={20} style={{ color: 'var(--accent-olive)' }} />
+              <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--brown)', margin: 0 }}>
+                Mensagens Guardadas
+              </h3>
+            </div>
+            <button
+              onClick={() => setShowSavedMessages(false)}
+              style={{
+                width: '28px',
+                height: '28px',
+                borderRadius: '6px',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                color: 'var(--brown-light)'
+              }}
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
+            {savedMessages.length === 0 ? (
+              <div style={{
+                textAlign: 'center',
+                padding: '40px 20px',
+                color: 'var(--brown-light)'
+              }}>
+                <Bookmark size={40} style={{ opacity: 0.3, marginBottom: '12px' }} />
+                <p style={{ margin: 0, fontSize: '13px' }}>
+                  Nenhuma mensagem guardada
+                </p>
+                <p style={{ margin: '8px 0 0', fontSize: '12px', opacity: 0.7 }}>
+                  Clica no ícone de bookmark nas mensagens para guardar
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {savedMessages.map(msg => (
+                  <div
+                    key={msg.id}
+                    style={{
+                      padding: '12px',
+                      background: 'var(--cream)',
+                      borderRadius: '10px',
+                      cursor: 'pointer'
+                    }}
+                    onClick={() => {
+                      // Navigate to the message's channel
+                      const msgCanal = canais.find(c => c.id === msg.canal_id)
+                      if (msgCanal) selectCanal(msgCanal)
+                      setShowSavedMessages(false)
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                      <div style={{
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, var(--blush) 0%, var(--blush-dark) 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '10px',
+                        fontWeight: 600,
+                        color: 'var(--brown-dark)'
+                      }}>
+                        {getInitials(msg.autor?.nome)}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--brown)' }}>
+                          {msg.autor?.nome}
+                        </div>
+                        <div style={{ fontSize: '10px', color: 'var(--brown-light)' }}>
+                          {formatDateTime(msg.created_at)}
+                        </div>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          toggleSaveMessage(msg)
+                        }}
+                        style={{
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '4px',
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: 'var(--warning)'
+                        }}
+                      >
+                        <BookmarkCheck size={14} />
+                      </button>
+                    </div>
+                    <p style={{
+                      margin: 0,
+                      fontSize: '12px',
+                      color: 'var(--brown)',
+                      lineHeight: 1.4,
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden'
+                    }}>
+                      {msg.conteudo}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ========== ÁREA PRINCIPAL ========== */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
@@ -1044,37 +1387,236 @@ export default function ChatColaborativo() {
             gap: '0',
             borderBottom: '1px solid var(--stone)',
             padding: '0 24px',
-            background: 'var(--white)'
+            background: 'var(--white)',
+            justifyContent: 'space-between',
+            alignItems: 'center'
           }}>
-            {[
-              { id: 'publicacoes', label: 'Publicações', icon: MessageSquare },
-              { id: 'ficheiros', label: 'Ficheiros', icon: FileText },
-              { id: 'wiki', label: 'Wiki', icon: StickyNote },
-              { id: 'tarefas', label: 'Tarefas', icon: CheckSquare }
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+            <div style={{ display: 'flex' }}>
+              {[
+                { id: 'publicacoes', label: 'Publicações', icon: MessageSquare },
+                { id: 'ficheiros', label: 'Ficheiros', icon: FileText },
+                { id: 'wiki', label: 'Wiki', icon: StickyNote },
+                { id: 'tarefas', label: 'Tarefas', icon: CheckSquare }
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '14px 20px',
+                    background: 'transparent',
+                    border: 'none',
+                    borderBottom: activeTab === tab.id ? '2px solid var(--accent-olive)' : '2px solid transparent',
+                    cursor: 'pointer',
+                    color: activeTab === tab.id ? 'var(--brown)' : 'var(--brown-light)',
+                    fontWeight: activeTab === tab.id ? 600 : 500,
+                    fontSize: '13px',
+                    marginBottom: '-1px',
+                    transition: 'color 0.15s'
+                  }}
+                >
+                  <tab.icon size={16} />
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Filters */}
+            {activeTab === 'publicacoes' && (
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', paddingRight: '8px' }}>
+                {/* Quick filters */}
+                <div style={{ display: 'flex', gap: '4px', position: 'relative' }}>
+                  {FILTER_OPTIONS.map(filter => (
+                    <button
+                      key={filter.id}
+                      onClick={() => setActiveFilter(filter.id)}
+                      title={filter.label}
+                      style={{
+                        padding: '6px 10px',
+                        borderRadius: '6px',
+                        background: activeFilter === filter.id ? 'var(--accent-olive)' : 'var(--cream)',
+                        border: activeFilter === filter.id ? 'none' : '1px solid var(--stone)',
+                        cursor: 'pointer',
+                        color: activeFilter === filter.id ? 'white' : 'var(--brown-light)',
+                        fontSize: '11px',
+                        fontWeight: 500,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        transition: 'all 0.15s'
+                      }}
+                    >
+                      <filter.icon size={12} />
+                      {filter.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Advanced search toggle */}
+                <button
+                  onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
+                  title="Pesquisa avançada"
+                  style={{
+                    padding: '6px 10px',
+                    borderRadius: '6px',
+                    background: showAdvancedSearch ? 'var(--brown)' : 'transparent',
+                    border: '1px solid var(--stone)',
+                    cursor: 'pointer',
+                    color: showAdvancedSearch ? 'white' : 'var(--brown-light)',
+                    fontSize: '11px',
+                    fontWeight: 500,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <SlidersHorizontal size={12} />
+                  Avançada
+                </button>
+
+                {/* Reset filters */}
+                {(activeFilter !== 'all' || searchQuery || showAdvancedSearch) && (
+                  <button
+                    onClick={resetFilters}
+                    style={{
+                      padding: '6px 10px',
+                      borderRadius: '6px',
+                      background: 'var(--error)',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: 'white',
+                      fontSize: '11px',
+                      fontWeight: 500,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <X size={12} />
+                    Limpar
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Advanced Search Panel */}
+        {showAdvancedSearch && activeTab === 'publicacoes' && canalAtivo && (
+          <div style={{
+            padding: '16px 24px',
+            background: 'var(--cream)',
+            borderBottom: '1px solid var(--stone)',
+            display: 'flex',
+            gap: '16px',
+            alignItems: 'flex-end',
+            flexWrap: 'wrap'
+          }}>
+            {/* Author search */}
+            <div style={{ minWidth: '180px' }}>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--brown-light)', marginBottom: '6px' }}>
+                <User size={12} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
+                Autor
+              </label>
+              <input
+                type="text"
+                placeholder="Nome do autor..."
+                value={searchFilters.author}
+                onChange={e => setSearchFilters(prev => ({ ...prev, author: e.target.value }))}
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '14px 20px',
-                  background: 'transparent',
-                  border: 'none',
-                  borderBottom: activeTab === tab.id ? '2px solid var(--accent-olive)' : '2px solid transparent',
-                  cursor: 'pointer',
-                  color: activeTab === tab.id ? 'var(--brown)' : 'var(--brown-light)',
-                  fontWeight: activeTab === tab.id ? 600 : 500,
-                  fontSize: '13px',
-                  marginBottom: '-1px',
-                  transition: 'color 0.15s'
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid var(--stone)',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  background: 'var(--white)',
+                  outline: 'none'
                 }}
-              >
-                <tab.icon size={16} />
-                {tab.label}
-              </button>
-            ))}
+              />
+            </div>
+
+            {/* Date from */}
+            <div style={{ minWidth: '140px' }}>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--brown-light)', marginBottom: '6px' }}>
+                <CalendarDays size={12} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
+                De
+              </label>
+              <input
+                type="date"
+                value={searchFilters.dateFrom}
+                onChange={e => setSearchFilters(prev => ({ ...prev, dateFrom: e.target.value }))}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid var(--stone)',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  background: 'var(--white)',
+                  outline: 'none'
+                }}
+              />
+            </div>
+
+            {/* Date to */}
+            <div style={{ minWidth: '140px' }}>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--brown-light)', marginBottom: '6px' }}>
+                <CalendarDays size={12} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
+                Até
+              </label>
+              <input
+                type="date"
+                value={searchFilters.dateTo}
+                onChange={e => setSearchFilters(prev => ({ ...prev, dateTo: e.target.value }))}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid var(--stone)',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  background: 'var(--white)',
+                  outline: 'none'
+                }}
+              />
+            </div>
+
+            {/* Checkboxes */}
+            <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--brown)', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={searchFilters.hasAttachments}
+                  onChange={e => setSearchFilters(prev => ({ ...prev, hasAttachments: e.target.checked }))}
+                  style={{ accentColor: 'var(--accent-olive)' }}
+                />
+                <Paperclip size={14} />
+                Com anexos
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--brown)', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={searchFilters.hasMentions}
+                  onChange={e => setSearchFilters(prev => ({ ...prev, hasMentions: e.target.checked }))}
+                  style={{ accentColor: 'var(--accent-olive)' }}
+                />
+                <AtSign size={14} />
+                Com menções
+              </label>
+            </div>
+
+            {/* Results count */}
+            <div style={{
+              marginLeft: 'auto',
+              fontSize: '12px',
+              color: 'var(--brown-light)',
+              background: 'var(--white)',
+              padding: '8px 12px',
+              borderRadius: '6px',
+              fontWeight: 500
+            }}>
+              {filteredPosts.length} {filteredPosts.length === 1 ? 'resultado' : 'resultados'}
+            </div>
           </div>
         )}
 
@@ -1226,6 +1768,22 @@ export default function ChatColaborativo() {
                                 >
                                   <MessageSquare size={16} />
                                 </button>
+                                {/* Bookmark button */}
+                                <button
+                                  onClick={() => toggleSaveMessage(post)}
+                                  title={isMessageSaved(post.id) ? 'Remover dos guardados' : 'Guardar mensagem'}
+                                  style={{
+                                    width: '28px',
+                                    height: '28px',
+                                    borderRadius: '4px',
+                                    background: isMessageSaved(post.id) ? 'rgba(201, 168, 130, 0.2)' : 'transparent',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    color: isMessageSaved(post.id) ? 'var(--warning)' : 'var(--brown-light)'
+                                  }}
+                                >
+                                  {isMessageSaved(post.id) ? <BookmarkCheck size={16} /> : <Bookmark size={16} />}
+                                </button>
                                 {/* More options menu */}
                                 <div style={{ position: 'relative' }}>
                                   <button
@@ -1299,6 +1857,27 @@ export default function ChatColaborativo() {
                                       >
                                         <MessageSquare size={16} />
                                         Abrir conversa
+                                      </button>
+                                      <button
+                                        onClick={() => toggleSaveMessage(post)}
+                                        style={{
+                                          width: '100%',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '10px',
+                                          padding: '10px 14px',
+                                          border: 'none',
+                                          background: 'transparent',
+                                          cursor: 'pointer',
+                                          fontSize: '13px',
+                                          color: isMessageSaved(post.id) ? 'var(--warning)' : 'var(--brown)',
+                                          textAlign: 'left'
+                                        }}
+                                        onMouseEnter={e => e.currentTarget.style.background = 'var(--cream)'}
+                                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                      >
+                                        {isMessageSaved(post.id) ? <BookmarkCheck size={16} /> : <Bookmark size={16} />}
+                                        {isMessageSaved(post.id) ? 'Remover guardado' : 'Guardar'}
                                       </button>
                                       {isOwnMessage(post) && (
                                         <>
