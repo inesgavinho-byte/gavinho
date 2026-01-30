@@ -31,6 +31,34 @@ const REACTIONS = [
   { emoji: '🎉', name: 'celebrate' }
 ]
 
+// Emojis organizados por categoria
+const EMOJI_CATEGORIES = [
+  {
+    name: 'Frequentes',
+    emojis: ['👍', '❤️', '😄', '🎉', '👏', '🙏', '💪', '✅', '🔥', '⭐']
+  },
+  {
+    name: 'Caras',
+    emojis: ['😀', '😃', '😄', '😁', '😅', '😂', '🤣', '😊', '😇', '🙂', '😉', '😌', '😍', '🥰', '😘', '😋', '😛', '🤔', '🤨', '😐', '😑', '😶', '🙄', '😏', '😮', '😲', '😳', '🥺', '😢', '😭', '😤', '😠', '🤯', '😱', '🥴', '😴']
+  },
+  {
+    name: 'Gestos',
+    emojis: ['👋', '🤚', '✋', '🖐️', '👌', '🤌', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '👇', '☝️', '👍', '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '🤝', '🙏', '💪']
+  },
+  {
+    name: 'Objetos',
+    emojis: ['💼', '📁', '📂', '📄', '📝', '✏️', '📌', '📎', '🔗', '📧', '📨', '💻', '🖥️', '📱', '📷', '🎨', '🏠', '🏢', '🏗️', '🔨', '🔧', '📐', '📏', '🗓️', '⏰', '💡', '🔑', '🔒']
+  },
+  {
+    name: 'Símbolos',
+    emojis: ['✅', '❌', '⭕', '❗', '❓', '💯', '🔴', '🟠', '🟡', '🟢', '🔵', '🟣', '⚪', '⚫', '▶️', '⏸️', '⏹️', '🔄', '➡️', '⬅️', '⬆️', '⬇️', '↗️', '↘️', '🔔', '🔕']
+  },
+  {
+    name: 'Celebração',
+    emojis: ['🎉', '🎊', '🎈', '🎁', '🏆', '🥇', '🥈', '🥉', '🏅', '🎯', '🌟', '✨', '💫', '🔥', '💥', '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '💕', '💖', '💗']
+  }
+]
+
 export default function ChatColaborativo() {
   const { profile, getUserInitials } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -61,9 +89,15 @@ export default function ChatColaborativo() {
   // Input
   const [messageInput, setMessageInput] = useState('')
   const [replyInput, setReplyInput] = useState('')
-  const [showEmojiPicker, setShowEmojiPicker] = useState(null)
-  const [mentioning, setMentioning] = useState(false)
+
+  // Emoji Picker
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+  const [emojiCategory, setEmojiCategory] = useState('Frequentes')
+
+  // Mention Autocomplete
+  const [showMentions, setShowMentions] = useState(false)
   const [mentionQuery, setMentionQuery] = useState('')
+  const [mentionStartIndex, setMentionStartIndex] = useState(-1)
 
   // Upload
   const [selectedFiles, setSelectedFiles] = useState([])
@@ -512,6 +546,72 @@ export default function ChatColaborativo() {
     if (!nome) return 'U'
     return nome.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
   }
+
+  // Insert emoji at cursor position
+  const insertEmoji = (emoji) => {
+    const input = messageInputRef.current
+    if (input) {
+      const start = input.selectionStart
+      const end = input.selectionEnd
+      const newValue = messageInput.substring(0, start) + emoji + messageInput.substring(end)
+      setMessageInput(newValue)
+      // Set cursor position after emoji
+      setTimeout(() => {
+        input.selectionStart = input.selectionEnd = start + emoji.length
+        input.focus()
+      }, 0)
+    } else {
+      setMessageInput(prev => prev + emoji)
+    }
+    setShowEmojiPicker(false)
+  }
+
+  // Handle message input change with mention detection
+  const handleMessageChange = (e) => {
+    const value = e.target.value
+    const cursorPos = e.target.selectionStart
+    setMessageInput(value)
+
+    // Check for @ mention
+    const textBeforeCursor = value.substring(0, cursorPos)
+    const atIndex = textBeforeCursor.lastIndexOf('@')
+
+    if (atIndex !== -1) {
+      const textAfterAt = textBeforeCursor.substring(atIndex + 1)
+      // Only show mentions if @ is at start or after a space, and no space after @
+      const charBeforeAt = atIndex > 0 ? value[atIndex - 1] : ' '
+      if ((charBeforeAt === ' ' || charBeforeAt === '\n' || atIndex === 0) && !textAfterAt.includes(' ')) {
+        setMentionQuery(textAfterAt.toLowerCase())
+        setMentionStartIndex(atIndex)
+        setShowMentions(true)
+        return
+      }
+    }
+    setShowMentions(false)
+    setMentionQuery('')
+  }
+
+  // Insert mention
+  const insertMention = (membro) => {
+    if (mentionStartIndex === -1) return
+
+    const beforeMention = messageInput.substring(0, mentionStartIndex)
+    const afterMention = messageInput.substring(mentionStartIndex + mentionQuery.length + 1)
+    const newValue = `${beforeMention}@${membro.nome} ${afterMention}`
+
+    setMessageInput(newValue)
+    setShowMentions(false)
+    setMentionQuery('')
+    setMentionStartIndex(-1)
+
+    // Focus back on input
+    setTimeout(() => messageInputRef.current?.focus(), 0)
+  }
+
+  // Filter members for mention autocomplete
+  const filteredMembros = mentionQuery
+    ? membros.filter(m => m.nome?.toLowerCase().includes(mentionQuery))
+    : membros.slice(0, 8)
 
   const filteredPosts = searchQuery
     ? posts.filter(p =>
@@ -1292,60 +1392,250 @@ export default function ChatColaborativo() {
                       >
                         <Paperclip size={20} />
                       </button>
-                      <button style={{
-                        width: '36px',
-                        height: '36px',
-                        borderRadius: '8px',
-                        background: 'transparent',
-                        border: 'none',
-                        cursor: 'pointer',
-                        color: 'var(--brown-light)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}>
-                        <Smile size={20} />
-                      </button>
-                      <button style={{
-                        width: '36px',
-                        height: '36px',
-                        borderRadius: '8px',
-                        background: 'transparent',
-                        border: 'none',
-                        cursor: 'pointer',
-                        color: 'var(--brown-light)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}>
+                      {/* Emoji Picker Button */}
+                      <div style={{ position: 'relative' }}>
+                        <button
+                          onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                          style={{
+                            width: '36px',
+                            height: '36px',
+                            borderRadius: '8px',
+                            background: showEmojiPicker ? 'var(--stone)' : 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: showEmojiPicker ? 'var(--brown)' : 'var(--brown-light)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          <Smile size={20} />
+                        </button>
+
+                        {/* Emoji Picker Popup */}
+                        {showEmojiPicker && (
+                          <div style={{
+                            position: 'absolute',
+                            bottom: '48px',
+                            left: '0',
+                            width: '320px',
+                            maxHeight: '350px',
+                            background: 'var(--white)',
+                            borderRadius: '12px',
+                            boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
+                            border: '1px solid var(--stone)',
+                            zIndex: 1000,
+                            overflow: 'hidden'
+                          }}>
+                            {/* Category tabs */}
+                            <div style={{
+                              display: 'flex',
+                              gap: '2px',
+                              padding: '8px',
+                              borderBottom: '1px solid var(--stone)',
+                              overflowX: 'auto',
+                              background: 'var(--off-white)'
+                            }}>
+                              {EMOJI_CATEGORIES.map(cat => (
+                                <button
+                                  key={cat.name}
+                                  onClick={() => setEmojiCategory(cat.name)}
+                                  style={{
+                                    padding: '6px 10px',
+                                    borderRadius: '6px',
+                                    border: 'none',
+                                    background: emojiCategory === cat.name ? 'var(--white)' : 'transparent',
+                                    cursor: 'pointer',
+                                    fontSize: '11px',
+                                    fontWeight: emojiCategory === cat.name ? 600 : 400,
+                                    color: emojiCategory === cat.name ? 'var(--brown)' : 'var(--brown-light)',
+                                    whiteSpace: 'nowrap',
+                                    boxShadow: emojiCategory === cat.name ? 'var(--shadow-sm)' : 'none'
+                                  }}
+                                >
+                                  {cat.name}
+                                </button>
+                              ))}
+                            </div>
+
+                            {/* Emoji grid */}
+                            <div style={{
+                              padding: '8px',
+                              maxHeight: '280px',
+                              overflowY: 'auto'
+                            }}>
+                              <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(8, 1fr)',
+                                gap: '4px'
+                              }}>
+                                {EMOJI_CATEGORIES.find(c => c.name === emojiCategory)?.emojis.map((emoji, idx) => (
+                                  <button
+                                    key={idx}
+                                    onClick={() => insertEmoji(emoji)}
+                                    style={{
+                                      width: '36px',
+                                      height: '36px',
+                                      border: 'none',
+                                      background: 'transparent',
+                                      borderRadius: '6px',
+                                      cursor: 'pointer',
+                                      fontSize: '20px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      transition: 'background 0.1s'
+                                    }}
+                                    onMouseEnter={e => e.currentTarget.style.background = 'var(--cream)'}
+                                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                  >
+                                    {emoji}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Mention Button */}
+                      <button
+                        onClick={() => {
+                          const input = messageInputRef.current
+                          if (input) {
+                            const pos = input.selectionStart
+                            const newValue = messageInput.substring(0, pos) + '@' + messageInput.substring(pos)
+                            setMessageInput(newValue)
+                            setMentionStartIndex(pos)
+                            setMentionQuery('')
+                            setShowMentions(true)
+                            setTimeout(() => {
+                              input.selectionStart = input.selectionEnd = pos + 1
+                              input.focus()
+                            }, 0)
+                          }
+                        }}
+                        style={{
+                          width: '36px',
+                          height: '36px',
+                          borderRadius: '8px',
+                          background: showMentions ? 'var(--stone)' : 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: showMentions ? 'var(--brown)' : 'var(--brown-light)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                      >
                         <AtSign size={20} />
                       </button>
                     </div>
 
-                    <textarea
-                      ref={messageInputRef}
-                      value={messageInput}
-                      onChange={e => setMessageInput(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault()
-                          handleSendMessage()
-                        }
-                      }}
-                      placeholder="Escreve uma mensagem..."
-                      style={{
-                        flex: 1,
-                        border: 'none',
-                        background: 'transparent',
-                        resize: 'none',
-                        fontSize: '14px',
-                        lineHeight: 1.5,
-                        outline: 'none',
-                        minHeight: '24px',
-                        maxHeight: '120px'
-                      }}
-                      rows={1}
-                    />
+                    {/* Input area with mention autocomplete */}
+                    <div style={{ flex: 1, position: 'relative' }}>
+                      {/* Mention Autocomplete Dropdown */}
+                      {showMentions && filteredMembros.length > 0 && (
+                        <div style={{
+                          position: 'absolute',
+                          bottom: '100%',
+                          left: '0',
+                          right: '0',
+                          marginBottom: '8px',
+                          background: 'var(--white)',
+                          borderRadius: '10px',
+                          boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                          border: '1px solid var(--stone)',
+                          maxHeight: '200px',
+                          overflowY: 'auto',
+                          zIndex: 1000
+                        }}>
+                          <div style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 600, color: 'var(--brown-light)', borderBottom: '1px solid var(--stone)' }}>
+                            Mencionar alguém
+                          </div>
+                          {filteredMembros.map(membro => (
+                            <button
+                              key={membro.id}
+                              onClick={() => insertMention(membro)}
+                              style={{
+                                width: '100%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px',
+                                padding: '10px 12px',
+                                border: 'none',
+                                background: 'transparent',
+                                cursor: 'pointer',
+                                textAlign: 'left',
+                                transition: 'background 0.1s'
+                              }}
+                              onMouseEnter={e => e.currentTarget.style.background = 'var(--cream)'}
+                              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                            >
+                              <div style={{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '50%',
+                                background: membro.avatar_url
+                                  ? `url(${membro.avatar_url}) center/cover`
+                                  : 'linear-gradient(135deg, var(--blush) 0%, var(--blush-dark) 100%)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '11px',
+                                fontWeight: 600,
+                                color: 'var(--brown-dark)'
+                              }}>
+                                {!membro.avatar_url && getInitials(membro.nome)}
+                              </div>
+                              <div>
+                                <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--brown)' }}>
+                                  {membro.nome}
+                                </div>
+                                {membro.funcao && (
+                                  <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
+                                    {membro.funcao}
+                                  </div>
+                                )}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      <textarea
+                        ref={messageInputRef}
+                        value={messageInput}
+                        onChange={handleMessageChange}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' && !e.shiftKey && !showMentions) {
+                            e.preventDefault()
+                            handleSendMessage()
+                          }
+                          if (e.key === 'Escape') {
+                            setShowEmojiPicker(false)
+                            setShowMentions(false)
+                          }
+                        }}
+                        onBlur={() => {
+                          // Delay to allow click on mention item
+                          setTimeout(() => setShowMentions(false), 150)
+                        }}
+                        placeholder="Escreve uma mensagem... Use @ para mencionar"
+                        style={{
+                          width: '100%',
+                          border: 'none',
+                          background: 'transparent',
+                          resize: 'none',
+                          fontSize: '14px',
+                          lineHeight: 1.5,
+                          outline: 'none',
+                          minHeight: '24px',
+                          maxHeight: '120px'
+                        }}
+                        rows={1}
+                      />
+                    </div>
 
                     <button
                       onClick={handleSendMessage}
