@@ -13,10 +13,10 @@ import {
   ThumbsUp, Laugh, Frown, PartyPopper, Fire, Eye,
   Link2, Copy, Check, Edit, Trash2, CornerUpLeft, Quote,
   BookmarkCheck, Volume2, VolumeX, User, CalendarDays,
-  FileImage, AtSignIcon, LinkIcon, SlidersHorizontal,
-  Bold, Italic, Code, List, ListOrdered, Link as LinkIcon2,
-  Forward, CheckCheck, Circle, Keyboard, Upload, ExternalLink,
-  Grip, Type, Code2, FileCode
+  FileImage, SlidersHorizontal,
+  Bold, Italic, Code, List, ListOrdered,
+  Forward, CheckCheck, Keyboard, Upload, ExternalLink,
+  Grip, FileCode
 } from 'lucide-react'
 
 // Estrutura de equipas GAVINHO (baseado no Teams)
