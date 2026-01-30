@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import { AuthProvider } from './contexts/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import Layout from './components/Layout'
@@ -41,9 +42,51 @@ import MQT from './pages/MQT'
 import ObraApp from './pages/ObraApp'
 import GestaoObras from './pages/GestaoObras'
 
+// OAuth Callback Handler - runs before anything else
+function OAuthCallbackHandler({ children }) {
+  const [handled, setHandled] = useState(false)
+
+  useEffect(() => {
+    // Check if we're in a popup and have OAuth response in hash
+    if (window.opener && window.location.hash) {
+      const hash = window.location.hash.substring(1)
+
+      if (hash.includes('access_token')) {
+        const params = new URLSearchParams(hash)
+        const token = params.get('access_token')
+        if (token) {
+          // Send token to parent window and close
+          window.opener.postMessage({ type: 'teams_auth_success', token }, window.location.origin)
+          window.close()
+          return
+        }
+      }
+
+      if (hash.includes('error')) {
+        const params = new URLSearchParams(hash)
+        const error = params.get('error_description') || params.get('error')
+        window.opener.postMessage({ type: 'teams_auth_error', error }, window.location.origin)
+        window.close()
+        return
+      }
+    }
+    setHandled(true)
+  }, [])
+
+  // Don't render children until we've checked for OAuth callback
+  if (!handled && window.opener && window.location.hash) {
+    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
+      <p>A autenticar...</p>
+    </div>
+  }
+
+  return children
+}
+
 function App() {
   return (
-    <BrowserRouter>
+    <OAuthCallbackHandler>
+      <BrowserRouter>
       <AuthProvider>
         <Routes>
           {/* Public Routes */}
@@ -105,6 +148,7 @@ function App() {
         </Routes>
       </AuthProvider>
     </BrowserRouter>
+    </OAuthCallbackHandler>
   )
 }
 
