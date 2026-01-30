@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { Mail, Lock, Eye, EyeOff, AlertCircle, Loader2 } from 'lucide-react'
@@ -7,16 +7,33 @@ export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [rememberMe, setRememberMe] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  
+
   const { signInWithEmail, signInWithGoogle } = useAuth()
   const navigate = useNavigate()
+
+  // Load saved email on mount
+  useEffect(() => {
+    const savedEmail = localStorage.getItem('gavinho_remembered_email')
+    if (savedEmail) {
+      setEmail(savedEmail)
+      setRememberMe(true)
+    }
+  }, [])
 
   const handleEmailLogin = async (e) => {
     e.preventDefault()
     setError('')
     setLoading(true)
+
+    // Save or remove email based on remember me
+    if (rememberMe) {
+      localStorage.setItem('gavinho_remembered_email', email)
+    } else {
+      localStorage.removeItem('gavinho_remembered_email')
+    }
 
     try {
       await signInWithEmail(email, password)
@@ -165,12 +182,14 @@ export default function Login() {
                 />
                 <input
                   type="email"
+                  name="email"
+                  autoComplete="email"
                   className="input"
                   placeholder="seu.email@gavinhogroup.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  style={{ 
+                  style={{
                     paddingLeft: '44px',
                     height: '48px',
                     borderRadius: '12px'
@@ -204,12 +223,14 @@ export default function Login() {
                 />
                 <input
                   type={showPassword ? 'text' : 'password'}
+                  name="password"
+                  autoComplete="current-password"
                   className="input"
                   placeholder="A sua password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  style={{ 
+                  style={{
                     paddingLeft: '44px',
                     paddingRight: '44px',
                     height: '48px',
@@ -234,8 +255,22 @@ export default function Login() {
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
-              <div style={{ textAlign: 'right', marginTop: '8px' }}>
-                <Link 
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    style={{
+                      width: '16px',
+                      height: '16px',
+                      accentColor: 'var(--brown)',
+                      cursor: 'pointer'
+                    }}
+                  />
+                  <span style={{ fontSize: '13px', color: 'var(--brown-light)' }}>Lembrar-me</span>
+                </label>
+                <Link
                   to="/forgot-password"
                   style={{
                     fontSize: '13px',
