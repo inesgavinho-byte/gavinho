@@ -41,6 +41,7 @@ import DecisoesPagina from './pages/DecisoesPagina'
 import MQT from './pages/MQT'
 import ObraApp from './pages/ObraApp'
 import GestaoObras from './pages/GestaoObras'
+import GestaoProjetoPage from './pages/GestaoProjetoPage'
 import OAuthCallback from './pages/OAuthCallback'
 
 // OAuth Callback Handler - ONLY for MS Teams OAuth on specific routes
@@ -131,6 +132,7 @@ function App() {
           }>
             <Route index element={<Dashboard />} />
             <Route path="dashboard-projetos" element={<DashboardProjetos />} />
+            <Route path="gestao-projeto" element={<GestaoProjetoPage />} />
             <Route path="gestao" element={<DashboardAdmin />} />
             <Route path="projetos" element={<Projetos />} />
             <Route path="projetos/:id" element={<ProjetoDetalhe />} />

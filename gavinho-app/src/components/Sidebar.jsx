@@ -46,9 +46,10 @@ const navigation = [
   {
     section: 'Módulo Projetos',
     items: [
-      { name: 'Dashboard Projetos', href: '/dashboard-projetos', icon: LayoutDashboard },
+      { name: 'Gestão de Projeto', href: '/gestao-projeto', icon: LayoutDashboard, highlight: true },
+      { name: 'Dashboard Projetos', href: '/dashboard-projetos', icon: PieChart },
       { name: 'Projetos', href: '/projetos', icon: FolderKanban },
-      { name: 'Workspace', href: '/workspace', icon: Layers, highlight: true },
+      { name: 'Workspace', href: '/workspace', icon: Layers },
       {
         name: 'Planning',
         href: '/planning',
