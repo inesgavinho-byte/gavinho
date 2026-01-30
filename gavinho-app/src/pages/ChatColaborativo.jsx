@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import {
@@ -9,7 +10,8 @@ import {
   Smile, Pin, Bookmark, Bell, BellOff, Settings,
   Video, Phone, ScreenShare, Calendar, Star, Filter,
   ArrowUp, ArrowDown, Clock, CheckCircle2, AlertCircle,
-  ThumbsUp, Laugh, Frown, PartyPopper, Fire, Eye
+  ThumbsUp, Laugh, Frown, PartyPopper, Fire, Eye,
+  Link2, Copy, Check
 } from 'lucide-react'
 
 // Estrutura de equipas GAVINHO (baseado no Teams)
@@ -31,7 +33,9 @@ const REACTIONS = [
 
 export default function ChatColaborativo() {
   const { profile, getUserInitials } = useAuth()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [loading, setLoading] = useState(true)
+  const [linkCopied, setLinkCopied] = useState(false)
 
   // Estrutura Teams
   const [equipas, setEquipas] = useState(EQUIPAS_GAVINHO)
@@ -123,6 +127,25 @@ export default function ChatColaborativo() {
 
         setCanais(canaisComEquipa)
 
+        // Check URL for canal parameter
+        const canalParam = searchParams.get('canal')
+        const tabParam = searchParams.get('tab')
+
+        if (canalParam) {
+          // Find canal by codigo or id
+          const canalFromUrl = canaisComEquipa.find(c =>
+            c.codigo === canalParam || c.id === canalParam
+          )
+          if (canalFromUrl) {
+            setEquipaAtiva(canalFromUrl.equipa)
+            setEquipasExpanded({ [canalFromUrl.equipa]: true })
+            setCanalAtivo(canalFromUrl)
+            if (tabParam) setActiveTab(tabParam)
+            return
+          }
+        }
+
+        // Default: select first canal
         if (canaisComEquipa.length > 0) {
           const primeiraEquipa = canaisComEquipa[0].equipa
           setEquipaAtiva(primeiraEquipa)
@@ -459,6 +482,27 @@ export default function ChatColaborativo() {
     setEquipaAtiva(equipaId)
   }
 
+  // Select canal and update URL
+  const selectCanal = (canal) => {
+    setCanalAtivo(canal)
+    setActiveThread(null)
+    setSearchParams({ canal: canal.codigo })
+  }
+
+  // Copy direct link to clipboard
+  const copyChannelLink = () => {
+    const url = `${window.location.origin}/chat?canal=${canalAtivo.codigo}`
+    navigator.clipboard.writeText(url).then(() => {
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 2000)
+    })
+  }
+
+  // Get direct link for a canal
+  const getChannelLink = (canal) => {
+    return `${window.location.origin}/chat?canal=${canal.codigo}`
+  }
+
   const openThread = (post) => {
     setActiveThread(post)
     loadThreadReplies(post.id)
@@ -664,10 +708,7 @@ export default function ChatColaborativo() {
                       return (
                         <button
                           key={canal.id}
-                          onClick={() => {
-                            setCanalAtivo(canal)
-                            setActiveThread(null)
-                          }}
+                          onClick={() => selectCanal(canal)}
                           style={{
                             width: '100%',
                             display: 'flex',
@@ -767,7 +808,32 @@ export default function ChatColaborativo() {
             </div>
 
             {/* Actions */}
-            <div style={{ display: 'flex', gap: '4px' }}>
+            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+              {/* Copy Link Button */}
+              <button
+                onClick={copyChannelLink}
+                title={linkCopied ? 'Link copiado!' : 'Copiar link do canal'}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  background: linkCopied ? 'var(--success)' : 'var(--cream)',
+                  border: linkCopied ? '1px solid var(--success)' : '1px solid var(--stone)',
+                  cursor: 'pointer',
+                  color: linkCopied ? 'white' : 'var(--brown)',
+                  fontSize: '12px',
+                  fontWeight: 500,
+                  transition: 'all 0.2s'
+                }}
+              >
+                {linkCopied ? <Check size={14} /> : <Link2 size={14} />}
+                {linkCopied ? 'Copiado!' : 'Copiar Link'}
+              </button>
+
+              <div style={{ width: '1px', height: '24px', background: 'var(--stone)', margin: '0 8px' }} />
+
               {[
                 { icon: Video, title: 'Iniciar reunião' },
                 { icon: Phone, title: 'Chamada de voz' },
