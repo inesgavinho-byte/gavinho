@@ -3579,7 +3579,7 @@ export default function Workspace() {
                           justifyContent: 'center'
                         }}
                       >
-                        <LinkIcon2 size={16} />
+                        <Link2 size={16} />
                       </button>
                       <div style={{ flex: 1 }} />
                       <button
