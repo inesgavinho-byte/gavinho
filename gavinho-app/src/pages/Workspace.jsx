@@ -1923,6 +1923,10 @@ export default function Workspace() {
   const startTeamsAuth = () => {
     setTeamsAuthState('authenticating')
 
+    // Clear any previous OAuth data
+    sessionStorage.removeItem('teams_oauth_token')
+    sessionStorage.removeItem('teams_oauth_error')
+
     // Build OAuth URL
     const authUrl = new URL(`${MS_GRAPH_CONFIG.authority}/oauth2/v2.0/authorize`)
     authUrl.searchParams.set('client_id', MS_GRAPH_CONFIG.clientId)
@@ -1944,41 +1948,88 @@ export default function Workspace() {
       `width=${width},height=${height},left=${left},top=${top}`
     )
 
+    let authCompleted = false
+
+    // Function to handle successful auth
+    const handleAuthSuccess = (token) => {
+      if (authCompleted) return
+      authCompleted = true
+      sessionStorage.removeItem('teams_oauth_token')
+      setTeamsAccessToken(token)
+      setTeamsAuthState('authenticated')
+      fetchTeamsUser(token)
+      fetchAvailableTeams(token)
+      setImportStep(2)
+    }
+
+    // Function to handle auth error
+    const handleAuthError = (error) => {
+      if (authCompleted) return
+      authCompleted = true
+      sessionStorage.removeItem('teams_oauth_error')
+      setTeamsAuthState('error')
+      addImportLog('error', error || 'Erro de autenticação')
+    }
+
     // Listen for postMessage from popup
     const handleMessage = (event) => {
-      if (event.origin !== window.location.origin) return
-
       if (event.data.type === 'teams_auth_success' && event.data.token) {
         window.removeEventListener('message', handleMessage)
-        setTeamsAccessToken(event.data.token)
-        setTeamsAuthState('authenticated')
-        fetchTeamsUser(event.data.token)
-        fetchAvailableTeams(event.data.token)
-        setImportStep(2)
+        handleAuthSuccess(event.data.token)
       } else if (event.data.type === 'teams_auth_error') {
         window.removeEventListener('message', handleMessage)
-        setTeamsAuthState('error')
-        addImportLog('error', event.data.error || 'Erro de autenticação')
+        handleAuthError(event.data.error)
       }
     }
     window.addEventListener('message', handleMessage)
 
+    // Poll sessionStorage as fallback (for when postMessage doesn't work)
+    const checkStorage = setInterval(() => {
+      const token = sessionStorage.getItem('teams_oauth_token')
+      const error = sessionStorage.getItem('teams_oauth_error')
+
+      if (token) {
+        clearInterval(checkStorage)
+        window.removeEventListener('message', handleMessage)
+        handleAuthSuccess(token)
+      } else if (error) {
+        clearInterval(checkStorage)
+        window.removeEventListener('message', handleMessage)
+        handleAuthError(error)
+      }
+    }, 500)
+
     // Check if popup was closed without auth
     const checkClosed = setInterval(() => {
-      if (authWindow && authWindow.closed) {
-        clearInterval(checkClosed)
-        window.removeEventListener('message', handleMessage)
-        if (teamsAuthState === 'authenticating') {
-          setTeamsAuthState('idle')
+      try {
+        if (authWindow && authWindow.closed) {
+          // Give a bit more time for sessionStorage to be written
+          setTimeout(() => {
+            if (!authCompleted) {
+              const token = sessionStorage.getItem('teams_oauth_token')
+              if (token) {
+                handleAuthSuccess(token)
+              } else {
+                clearInterval(checkStorage)
+                clearInterval(checkClosed)
+                window.removeEventListener('message', handleMessage)
+                setTeamsAuthState('idle')
+              }
+            }
+          }, 1000)
+          clearInterval(checkClosed)
         }
+      } catch (e) {
+        // COOP might block this, ignore
       }
     }, 1000)
 
     // Timeout after 2 minutes
     setTimeout(() => {
-      clearInterval(checkClosed)
-      window.removeEventListener('message', handleMessage)
-      if (teamsAuthState === 'authenticating') {
+      if (!authCompleted) {
+        clearInterval(checkStorage)
+        clearInterval(checkClosed)
+        window.removeEventListener('message', handleMessage)
         setTeamsAuthState('error')
         addImportLog('error', 'Autenticação expirou. Tente novamente.')
       }

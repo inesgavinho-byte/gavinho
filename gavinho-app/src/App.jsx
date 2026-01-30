@@ -47,34 +47,58 @@ function OAuthCallbackHandler({ children }) {
   const [handled, setHandled] = useState(false)
 
   useEffect(() => {
-    // Check if we're in a popup and have OAuth response in hash
-    if (window.opener && window.location.hash) {
-      const hash = window.location.hash.substring(1)
+    // Check if we have OAuth response in hash (works for both popup and redirect)
+    const hash = window.location.hash
+    if (hash && hash.includes('access_token')) {
+      const params = new URLSearchParams(hash.substring(1))
+      const token = params.get('access_token')
 
-      if (hash.includes('access_token')) {
-        const params = new URLSearchParams(hash)
-        const token = params.get('access_token')
-        if (token) {
-          // Send token to parent window and close
-          window.opener.postMessage({ type: 'teams_auth_success', token }, window.location.origin)
-          window.close()
+      if (token) {
+        // Store token in sessionStorage for the parent to read
+        sessionStorage.setItem('teams_oauth_token', token)
+
+        // Try postMessage if we're in a popup
+        if (window.opener) {
+          try {
+            window.opener.postMessage({ type: 'teams_auth_success', token }, '*')
+          } catch (e) {
+            console.log('PostMessage failed, using sessionStorage fallback')
+          }
+          // Delay before closing to ensure message is sent
+          setTimeout(() => {
+            window.close()
+          }, 500)
           return
+        } else {
+          // Not in popup - clear hash and continue (token is in sessionStorage)
+          window.history.replaceState(null, '', window.location.pathname)
         }
       }
+    }
 
-      if (hash.includes('error')) {
-        const params = new URLSearchParams(hash)
-        const error = params.get('error_description') || params.get('error')
-        window.opener.postMessage({ type: 'teams_auth_error', error }, window.location.origin)
-        window.close()
+    if (hash && hash.includes('error')) {
+      const params = new URLSearchParams(hash.substring(1))
+      const error = params.get('error_description') || params.get('error')
+      sessionStorage.setItem('teams_oauth_error', error)
+
+      if (window.opener) {
+        try {
+          window.opener.postMessage({ type: 'teams_auth_error', error }, '*')
+        } catch (e) {
+          console.log('PostMessage failed, using sessionStorage fallback')
+        }
+        setTimeout(() => {
+          window.close()
+        }, 500)
         return
       }
     }
+
     setHandled(true)
   }, [])
 
   // Don't render children until we've checked for OAuth callback
-  if (!handled && window.opener && window.location.hash) {
+  if (!handled && window.location.hash && (window.location.hash.includes('access_token') || window.location.hash.includes('error'))) {
     return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
       <p>A autenticar...</p>
     </div>
