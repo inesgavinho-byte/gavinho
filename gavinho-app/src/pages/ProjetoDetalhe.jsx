@@ -59,7 +59,9 @@ import {
   ChevronDown,
   ChevronUp,
   Pencil,
-  MessageSquare
+  MessageSquare,
+  Link2,
+  Type
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -74,6 +76,7 @@ import DesignReview from '../components/DesignReview'
 import RecebidosEspecialidades from '../components/RecebidosEspecialidades'
 import ViabilidadeModule from '../components/viabilidade/ViabilidadeModule'
 import Moleskine from '../components/Moleskine'
+import MoleskineDigital from '../components/MoleskineDigital'
 import ProjetoChatIA from '../components/projeto/ProjetoChatIA'
 
 // Dados de exemplo baseados nos JSONs fornecidos
@@ -786,6 +789,7 @@ export default function ProjetoDetalhe() {
   const [editingRender, setEditingRender] = useState(null)
   const [lightboxImage, setLightboxImage] = useState(null) // Para lightbox
   const [moleskineRender, setMoleskineRender] = useState(null) // Para Moleskine (anotação de renders)
+  const [showMoleskineDigital, setShowMoleskineDigital] = useState(false) // Para Moleskine Digital (caderno independente)
   const [renderAnnotations, setRenderAnnotations] = useState({}) // Mapa de render_id -> annotation count
   const [isDragging, setIsDragging] = useState(false) // Para drag & drop
   const [renderForm, setRenderForm] = useState({
@@ -4102,160 +4106,124 @@ export default function ProjetoDetalhe() {
             </div>
           )}
 
-          {/* Sub-tab Moleskine */}
+          {/* Sub-tab Moleskine - Caderno Digital */}
           {activeArchvizSection === 'moleskine' && (
-            <div className="card">
-              <div className="flex items-center justify-between" style={{ marginBottom: '24px' }}>
-                <div>
-                  <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
-                    Moleskine - Anotações em Renders
-                  </h3>
-                  <p style={{ fontSize: '13px', color: 'var(--brown-light)', marginTop: '4px' }}>
-                    Selecione um render para adicionar anotações, correções e feedback visual
-                  </p>
-                </div>
-                <span style={{
-                  padding: '8px 16px',
-                  background: 'var(--olive-gray)',
-                  color: 'white',
-                  borderRadius: '20px',
-                  fontSize: '13px',
-                  fontWeight: 600
-                }}>
-                  {Object.keys(renderAnnotations).length} com anotações
-                </span>
+            <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
+              <div style={{
+                width: '80px',
+                height: '80px',
+                borderRadius: '20px',
+                background: 'linear-gradient(135deg, #8B8670 0%, #5F5C59 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 24px'
+              }}>
+                <BookOpen size={40} style={{ color: 'white' }} />
               </div>
 
-              {renders.length > 0 ? (
-                <div className="grid grid-3" style={{ gap: '16px' }}>
-                  {renders.map((render) => (
-                    <div
-                      key={render.id}
-                      onClick={() => setMoleskineRender(render)}
-                      style={{
-                        position: 'relative',
-                        aspectRatio: '16/10',
-                        background: render.imagem_url ? `url(${render.imagem_url}) center/cover` : 'var(--cream)',
-                        borderRadius: '12px',
-                        overflow: 'hidden',
-                        border: renderAnnotations[render.id] ? '3px solid var(--olive-gray)' : '1px solid var(--stone)',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      {!render.imagem_url && (
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                          <Image size={32} style={{ color: 'var(--brown-light)', opacity: 0.4 }} />
-                        </div>
-                      )}
+              <h3 style={{
+                fontSize: '24px',
+                fontWeight: 600,
+                color: 'var(--brown)',
+                fontFamily: "'Cormorant Garamond', Georgia, serif",
+                marginBottom: '12px'
+              }}>
+                Moleskine Digital
+              </h3>
 
-                      {/* Badge de anotações */}
-                      {renderAnnotations[render.id] > 0 && (
-                        <div style={{
-                          position: 'absolute',
-                          top: '8px',
-                          right: '8px',
-                          padding: '4px 10px',
-                          background: 'var(--olive-gray)',
-                          color: 'white',
-                          borderRadius: '12px',
-                          fontSize: '11px',
-                          fontWeight: 600,
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px'
-                        }}>
-                          <Pencil size={12} />
-                          {renderAnnotations[render.id]}
-                        </div>
-                      )}
+              <p style={{
+                fontSize: '14px',
+                color: 'var(--brown-light)',
+                maxWidth: '500px',
+                margin: '0 auto 32px',
+                lineHeight: 1.6
+              }}>
+                O seu caderno digital para o projeto. Desenhe, escreva, adicione imagens e links livremente.
+                Importe renders do projeto ou carregue qualquer imagem como referência.
+              </p>
 
-                      {/* Versão */}
-                      <div style={{
-                        position: 'absolute',
-                        top: '8px',
-                        left: '8px',
-                        padding: '4px 8px',
-                        background: 'rgba(0,0,0,0.6)',
-                        color: 'white',
-                        borderRadius: '6px',
-                        fontSize: '10px',
-                        fontWeight: 500
-                      }}>
-                        v{render.versao}
-                      </div>
-
-                      {/* Info overlay */}
-                      <div style={{
-                        position: 'absolute',
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-                        padding: '12px',
-                        background: 'linear-gradient(transparent, rgba(0,0,0,0.8))',
-                        color: 'white'
-                      }}>
-                        <div style={{ fontSize: '13px', fontWeight: 600 }}>{render.compartimento}</div>
-                        <div style={{ fontSize: '11px', opacity: 0.8, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span>{render.data_upload ? new Date(render.data_upload).toLocaleDateString('pt-PT') : ''}</span>
-                          {!renderAnnotations[render.id] && (
-                            <span style={{
-                              padding: '2px 6px',
-                              background: 'rgba(255,255,255,0.2)',
-                              borderRadius: '4px',
-                              fontSize: '10px'
-                            }}>
-                              Sem anotações
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Hover overlay */}
-                      <div style={{
-                        position: 'absolute',
-                        inset: 0,
-                        background: 'rgba(139, 134, 112, 0.3)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        opacity: 0,
-                        transition: 'opacity 0.2s'
-                      }}
-                      className="moleskine-hover-overlay"
-                      >
-                        <div style={{
-                          padding: '12px 20px',
-                          background: 'var(--olive-gray)',
-                          color: 'white',
-                          borderRadius: '8px',
-                          fontSize: '13px',
-                          fontWeight: 600,
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px'
-                        }}>
-                          <Pencil size={16} />
-                          Abrir Moleskine
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
+              <div style={{
+                display: 'flex',
+                gap: '16px',
+                justifyContent: 'center',
+                flexWrap: 'wrap',
+                marginBottom: '32px'
+              }}>
                 <div style={{
-                  padding: '48px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '8px 16px',
                   background: 'var(--cream)',
-                  borderRadius: '12px',
-                  textAlign: 'center'
+                  borderRadius: '20px',
+                  fontSize: '13px',
+                  color: 'var(--brown)'
                 }}>
-                  <Pencil size={48} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '16px' }} />
-                  <h4 style={{ color: 'var(--brown)', marginBottom: '8px' }}>Nenhum Render Disponível</h4>
-                  <p style={{ color: 'var(--brown-light)', fontSize: '13px' }}>
-                    Adicione renders em "Imagens Processo" para poder criar anotações no Moleskine.
-                  </p>
+                  <Pencil size={16} />
+                  Desenho livre
                 </div>
-              )}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '8px 16px',
+                  background: 'var(--cream)',
+                  borderRadius: '20px',
+                  fontSize: '13px',
+                  color: 'var(--brown)'
+                }}>
+                  <Image size={16} />
+                  Upload de imagens
+                </div>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '8px 16px',
+                  background: 'var(--cream)',
+                  borderRadius: '20px',
+                  fontSize: '13px',
+                  color: 'var(--brown)'
+                }}>
+                  <Type size={16} />
+                  Texto e notas
+                </div>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '8px 16px',
+                  background: 'var(--cream)',
+                  borderRadius: '20px',
+                  fontSize: '13px',
+                  color: 'var(--brown)'
+                }}>
+                  <Link2 size={16} />
+                  Links
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowMoleskineDigital(true)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  padding: '16px 32px',
+                  background: 'var(--olive-gray)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontSize: '16px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <BookOpen size={20} />
+                Abrir Moleskine
+              </button>
             </div>
           )}
         </div>
@@ -5668,6 +5636,15 @@ export default function ProjetoDetalhe() {
               }
             }
           }}
+        />
+      )}
+
+      {/* Moleskine Digital - Caderno digital independente */}
+      {showMoleskineDigital && (
+        <MoleskineDigital
+          projectId={project?.id}
+          projectName={project?.nome}
+          onClose={() => setShowMoleskineDigital(false)}
         />
       )}
     </div>
