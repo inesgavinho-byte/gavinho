@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { getStroke } from 'perfect-freehand'
+import * as pdfjsLib from 'pdfjs-dist'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import {
@@ -31,8 +32,14 @@ import {
   Grid3X3,
   Maximize2,
   BookOpen,
-  Layers
+  Layers,
+  PanelLeftClose,
+  PanelLeft,
+  FilePlus
 } from 'lucide-react'
+
+// Configurar PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
 
 // Cores disponíveis
 const STROKE_COLORS = [
@@ -159,6 +166,9 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
   const [showRenderPicker, setShowRenderPicker] = useState(false)
   const [projectRenders, setProjectRenders] = useState([])
   const [loadingRenders, setLoadingRenders] = useState(false)
+  const [showThumbnails, setShowThumbnails] = useState(true) // Painel de miniaturas
+  const [loadingPdf, setLoadingPdf] = useState(false) // Estado de carregamento PDF
+  const pdfInputRef = useRef(null) // Ref para input de PDF
 
   // Current page shortcut
   const currentPage = pages[currentPageIndex] || createBlankPage()
@@ -616,6 +626,69 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
     }
   }
 
+  // Handle PDF import
+  const handlePdfImport = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setLoadingPdf(true)
+    try {
+      const arrayBuffer = await file.arrayBuffer()
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+      const numPages = pdf.numPages
+
+      const newPages = []
+
+      for (let i = 1; i <= numPages; i++) {
+        const page = await pdf.getPage(i)
+        const viewport = page.getViewport({ scale: 2 }) // Alta resolução
+
+        // Criar canvas para renderizar página
+        const canvas = document.createElement('canvas')
+        const context = canvas.getContext('2d')
+        canvas.width = viewport.width
+        canvas.height = viewport.height
+
+        await page.render({
+          canvasContext: context,
+          viewport: viewport,
+        }).promise
+
+        // Converter para data URL
+        const imageUrl = canvas.toDataURL('image/png')
+
+        // Criar nova página com a imagem do PDF como fundo
+        newPages.push({
+          id: generateId(),
+          elements: [],
+          background: '#FFFFFF',
+          backgroundImage: imageUrl,
+          pdfPage: i,
+          pdfName: file.name,
+          createdAt: new Date().toISOString()
+        })
+      }
+
+      // Adicionar todas as páginas do PDF
+      setPages(prev => [...prev, ...newPages])
+      setCurrentPageIndex(pages.length) // Ir para a primeira página do PDF
+      setHasUnsavedChanges(true)
+
+      // Inicializar histórico para novas páginas
+      newPages.forEach(page => {
+        setPageHistory(prev => ({ ...prev, [page.id]: [[]] }))
+        setHistoryIndex(prev => ({ ...prev, [page.id]: 0 }))
+      })
+
+    } catch (err) {
+      console.error('Erro ao importar PDF:', err)
+      alert('Erro ao importar PDF. Verifique se o ficheiro é válido.')
+    } finally {
+      setLoadingPdf(false)
+      e.target.value = ''
+    }
+  }
+
   // Add render from project
   const addRenderToPage = (render) => {
     const containerRect = containerRef.current?.getBoundingClientRect()
@@ -861,6 +934,20 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <button
+            onClick={() => pdfInputRef.current?.click()}
+            disabled={loadingPdf}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '8px 12px', borderRadius: 6,
+              border: '1px solid #E0DED8', background: '#FFFFFF',
+              color: '#5F5C59', fontSize: 13, cursor: loadingPdf ? 'wait' : 'pointer',
+              opacity: loadingPdf ? 0.7 : 1,
+            }}
+          >
+            {loadingPdf ? <Loader2 size={16} className="animate-spin" /> : <FilePlus size={16} />}
+            Importar PDF
+          </button>
+          <button
             onClick={() => {
               loadProjectRenders()
               setShowRenderPicker(true)
@@ -974,7 +1061,127 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
               color: '#5F5C59', cursor: 'pointer' }}>
             <RotateCw size={20} />
           </button>
+
+          <div style={{ height: 1, background: '#E0DED8', margin: '8px 0' }} />
+
+          {/* Toggle Thumbnails */}
+          <button onClick={() => setShowThumbnails(!showThumbnails)} title={showThumbnails ? 'Esconder Páginas' : 'Mostrar Páginas'}
+            style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              borderRadius: 8, border: 'none', background: showThumbnails ? '#E0DED8' : 'transparent',
+              color: '#5F5C59', cursor: 'pointer' }}>
+            {showThumbnails ? <PanelLeftClose size={20} /> : <PanelLeft size={20} />}
+          </button>
         </div>
+
+        {/* Thumbnails Panel - GoodNotes style */}
+        {showThumbnails && (
+          <div style={{
+            width: 180, background: '#F9F9F7', borderRight: '1px solid #E0DED8',
+            display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          }}>
+            {/* Panel Header */}
+            <div style={{
+              padding: '12px 16px', borderBottom: '1px solid #E0DED8',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#5F5C59' }}>Páginas</span>
+              <span style={{ fontSize: 12, color: '#8B8670' }}>{pages.length}</span>
+            </div>
+
+            {/* Thumbnails List */}
+            <div style={{
+              flex: 1, overflowY: 'auto', padding: '12px',
+              display: 'flex', flexDirection: 'column', gap: 12,
+            }}>
+              {pages.map((page, idx) => (
+                <div
+                  key={page.id}
+                  onClick={() => setCurrentPageIndex(idx)}
+                  style={{
+                    cursor: 'pointer', borderRadius: 8, overflow: 'hidden',
+                    border: idx === currentPageIndex ? '2px solid #8B8670' : '2px solid transparent',
+                    background: '#FFFFFF', boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {/* Thumbnail Preview */}
+                  <div style={{
+                    width: '100%', aspectRatio: '16/10', position: 'relative',
+                    background: page.background || '#FFFFFF', overflow: 'hidden',
+                  }}>
+                    {page.backgroundImage ? (
+                      <img src={page.backgroundImage} alt="" style={{
+                        width: '100%', height: '100%', objectFit: 'cover',
+                      }} />
+                    ) : (
+                      <div style={{
+                        width: '100%', height: '100%',
+                        backgroundImage: 'linear-gradient(#f0f0f0 1px, transparent 1px), linear-gradient(90deg, #f0f0f0 1px, transparent 1px)',
+                        backgroundSize: '10px 10px',
+                      }} />
+                    )}
+                    {/* Mini preview of elements */}
+                    <svg style={{
+                      position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+                      pointerEvents: 'none',
+                    }} viewBox={`0 0 ${canvasWidth} ${canvasHeight}`} preserveAspectRatio="xMidYMid meet">
+                      {page.elements.slice(0, 50).map(el => {
+                        if (el.type === TOOLS.PEN || el.type === TOOLS.HIGHLIGHTER) {
+                          if (!el.points || el.points.length < 2) return null
+                          const pathData = el.points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p[0]} ${p[1]}`).join(' ')
+                          return <path key={el.id} d={pathData} stroke={el.color} strokeWidth={el.width * 2} fill="none" opacity={el.type === TOOLS.HIGHLIGHTER ? 0.3 : 1} />
+                        }
+                        if (el.type === TOOLS.RECTANGLE) {
+                          return <rect key={el.id} x={Math.min(el.x1, el.x2)} y={Math.min(el.y1, el.y2)}
+                            width={Math.abs(el.x2 - el.x1)} height={Math.abs(el.y2 - el.y1)}
+                            fill="none" stroke={el.color} strokeWidth={el.width * 2} />
+                        }
+                        if (el.type === 'image') {
+                          return <rect key={el.id} x={el.x} y={el.y} width={el.width} height={el.height}
+                            fill="#E0E7FF" stroke="#4338CA" strokeWidth={4} />
+                        }
+                        return null
+                      })}
+                    </svg>
+                  </div>
+                  {/* Page Info */}
+                  <div style={{
+                    padding: '8px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    background: idx === currentPageIndex ? '#F2F0E7' : '#FFFFFF',
+                  }}>
+                    <span style={{ fontSize: 12, fontWeight: idx === currentPageIndex ? 600 : 400, color: '#5F5C59' }}>
+                      {idx + 1}
+                    </span>
+                    {page.pdfName && (
+                      <span style={{ fontSize: 10, color: '#8B8670', maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        PDF p.{page.pdfPage}
+                      </span>
+                    )}
+                    {!page.pdfName && page.elements.length > 0 && (
+                      <span style={{ fontSize: 10, color: '#8B8670' }}>
+                        {page.elements.length} elem.
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Add Page Button */}
+            <div style={{ padding: '12px', borderTop: '1px solid #E0DED8' }}>
+              <button onClick={addNewPage}
+                style={{
+                  width: '100%', padding: '10px', borderRadius: 8,
+                  border: '2px dashed #E0DED8', background: 'transparent',
+                  color: '#8B8670', fontSize: 13, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                }}>
+                <Plus size={16} />
+                Nova Página
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Canvas Area */}
         <div
@@ -1006,15 +1213,34 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
               width: canvasWidth, height: canvasHeight,
               background: currentPage.background || '#FFFFFF',
               boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+              position: 'relative',
             }}>
-              <svg width={canvasWidth} height={canvasHeight}>
-                {/* Grid pattern */}
-                <defs>
-                  <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#f0f0f0" strokeWidth="1"/>
-                  </pattern>
-                </defs>
-                <rect width="100%" height="100%" fill="url(#grid)" />
+              {/* Background image (PDF) */}
+              {currentPage.backgroundImage && (
+                <img
+                  src={currentPage.backgroundImage}
+                  alt="Fundo"
+                  style={{
+                    position: 'absolute',
+                    top: 0, left: 0,
+                    width: '100%', height: '100%',
+                    objectFit: 'contain',
+                    pointerEvents: 'none',
+                  }}
+                />
+              )}
+              <svg width={canvasWidth} height={canvasHeight} style={{ position: 'relative', zIndex: 1 }}>
+                {/* Grid pattern (only show if no background image) */}
+                {!currentPage.backgroundImage && (
+                  <>
+                    <defs>
+                      <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+                        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#f0f0f0" strokeWidth="1"/>
+                      </pattern>
+                    </defs>
+                    <rect width="100%" height="100%" fill="url(#grid)" />
+                  </>
+                )}
 
                 {currentPage.elements.map(renderElement)}
                 {currentElement && renderElement(currentElement)}
@@ -1183,12 +1409,19 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
           </div>
         </div>
 
-        {/* Hidden file input */}
+        {/* Hidden file inputs */}
         <input
           ref={fileInputRef}
           type="file"
           accept="image/*"
           onChange={handleImageUpload}
+          hidden
+        />
+        <input
+          ref={pdfInputRef}
+          type="file"
+          accept=".pdf,application/pdf"
+          onChange={handlePdfImport}
           hidden
         />
       </div>
