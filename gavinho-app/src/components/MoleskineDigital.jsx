@@ -138,9 +138,9 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
   const [isPanning, setIsPanning] = useState(false)
   const [panStart, setPanStart] = useState({ x: 0, y: 0 })
 
-  // Canvas dimensions (A4-like proportions)
-  const canvasWidth = 1200
-  const canvasHeight = 1600
+  // Canvas dimensions (horizontal/landscape)
+  const canvasWidth = 1600
+  const canvasHeight = 1000
 
   // Text input state
   const [textInput, setTextInput] = useState('')
