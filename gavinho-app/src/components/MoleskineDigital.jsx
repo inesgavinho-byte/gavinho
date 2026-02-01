@@ -35,7 +35,9 @@ import {
   Layers,
   PanelLeftClose,
   PanelLeft,
-  FilePlus
+  FilePlus,
+  Minus,
+  GripVertical
 } from 'lucide-react'
 
 // Configurar PDF.js worker
@@ -56,6 +58,7 @@ const TOOLS = {
   SELECT: 'select',
   PEN: 'pen',
   HIGHLIGHTER: 'highlighter',
+  LINE: 'line',
   RECTANGLE: 'rectangle',
   CIRCLE: 'circle',
   ARROW: 'arrow',
@@ -158,6 +161,17 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
   const [linkInput, setLinkInput] = useState({ url: '', label: '' })
   const [linkPosition, setLinkPosition] = useState(null)
   const [isAddingLink, setIsAddingLink] = useState(false)
+
+  // Selection state
+  const [selectedElement, setSelectedElement] = useState(null)
+  const [isDragging, setIsDragging] = useState(false)
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
+  const [isResizing, setIsResizing] = useState(false)
+  const [resizeHandle, setResizeHandle] = useState(null) // 'nw', 'ne', 'sw', 'se'
+  const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 })
+
+  // Floating toolbar state
+  const [showFloatingToolbar, setShowFloatingToolbar] = useState(true)
 
   // UI state
   const [isSaving, setIsSaving] = useState(false)
@@ -403,8 +417,41 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
       return
     }
 
+    // Select mode - check for element selection or resize handles
+    if (activeTool === TOOLS.SELECT) {
+      // Check if clicking on resize handle of selected element
+      if (selectedElement && selectedElement.type === 'image') {
+        const handle = getResizeHandleAtPoint(selectedElement, x, y)
+        if (handle) {
+          setIsResizing(true)
+          setResizeHandle(handle)
+          setResizeStart({
+            x: selectedElement.x,
+            y: selectedElement.y,
+            width: selectedElement.width,
+            height: selectedElement.height,
+            mouseX: x,
+            mouseY: y
+          })
+          return
+        }
+      }
+
+      // Check if clicking on an element to select it
+      const hitElement = findElementAtPoint(x, y)
+      if (hitElement) {
+        setSelectedElement(hitElement)
+        setIsDragging(true)
+        setDragStart({ x: x - (hitElement.x || hitElement.x1 || 0), y: y - (hitElement.y || hitElement.y1 || 0) })
+      } else {
+        setSelectedElement(null)
+      }
+      return
+    }
+
     // Text mode
     if (activeTool === TOOLS.TEXT) {
+      setSelectedElement(null)
       setTextPosition({ x, y })
       setIsAddingText(true)
       return
@@ -412,6 +459,7 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
 
     // Link mode
     if (activeTool === TOOLS.LINK) {
+      setSelectedElement(null)
       setLinkPosition({ x, y })
       setIsAddingLink(true)
       return
@@ -419,6 +467,7 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
 
     // Image mode
     if (activeTool === TOOLS.IMAGE) {
+      setSelectedElement(null)
       fileInputRef.current?.click()
       return
     }
@@ -429,9 +478,13 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
       if (hitElement) {
         const newElements = currentPage.elements.filter(el => el.id !== hitElement.id)
         updatePageElements(newElements)
+        if (selectedElement?.id === hitElement.id) setSelectedElement(null)
       }
       return
     }
+
+    // Clear selection when drawing
+    setSelectedElement(null)
 
     // Start drawing
     setIsDrawing(true)
@@ -444,7 +497,7 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
         width: strokeWidth,
         points: [[x, y, e.pressure || 0.5]],
       })
-    } else if ([TOOLS.RECTANGLE, TOOLS.CIRCLE, TOOLS.ARROW].includes(activeTool)) {
+    } else if ([TOOLS.LINE, TOOLS.RECTANGLE, TOOLS.CIRCLE, TOOLS.ARROW].includes(activeTool)) {
       setCurrentElement({
         id: generateId(),
         type: activeTool,
@@ -458,6 +511,24 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
     }
   }
 
+  // Get resize handle at point
+  const getResizeHandleAtPoint = (element, x, y) => {
+    if (!element || element.type !== 'image') return null
+    const handleSize = 12 / scale
+    const handles = {
+      nw: { x: element.x, y: element.y },
+      ne: { x: element.x + element.width, y: element.y },
+      sw: { x: element.x, y: element.y + element.height },
+      se: { x: element.x + element.width, y: element.y + element.height },
+    }
+    for (const [key, pos] of Object.entries(handles)) {
+      if (Math.abs(x - pos.x) < handleSize && Math.abs(y - pos.y) < handleSize) {
+        return key
+      }
+    }
+    return null
+  }
+
   // Handle pointer move
   const handlePointerMove = (e) => {
     if (isPanning) {
@@ -468,9 +539,81 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
       return
     }
 
-    if (!isDrawing || !currentElement) return
-
     const { x, y } = getCanvasCoords(e)
+
+    // Handle resizing
+    if (isResizing && selectedElement && resizeHandle) {
+      const dx = x - resizeStart.mouseX
+      const dy = y - resizeStart.mouseY
+      let newX = resizeStart.x
+      let newY = resizeStart.y
+      let newWidth = resizeStart.width
+      let newHeight = resizeStart.height
+
+      // Maintain aspect ratio with shift key (optional)
+      const aspectRatio = resizeStart.width / resizeStart.height
+
+      if (resizeHandle.includes('e')) {
+        newWidth = Math.max(50, resizeStart.width + dx)
+      }
+      if (resizeHandle.includes('w')) {
+        newWidth = Math.max(50, resizeStart.width - dx)
+        newX = resizeStart.x + (resizeStart.width - newWidth)
+      }
+      if (resizeHandle.includes('s')) {
+        newHeight = Math.max(50, resizeStart.height + dy)
+      }
+      if (resizeHandle.includes('n')) {
+        newHeight = Math.max(50, resizeStart.height - dy)
+        newY = resizeStart.y + (resizeStart.height - newHeight)
+      }
+
+      // Update element in page
+      const updatedElements = currentPage.elements.map(el =>
+        el.id === selectedElement.id
+          ? { ...el, x: newX, y: newY, width: newWidth, height: newHeight }
+          : el
+      )
+      updatePageElements(updatedElements)
+      setSelectedElement({ ...selectedElement, x: newX, y: newY, width: newWidth, height: newHeight })
+      return
+    }
+
+    // Handle dragging selected element
+    if (isDragging && selectedElement) {
+      const newX = x - dragStart.x
+      const newY = y - dragStart.y
+
+      const updatedElements = currentPage.elements.map(el => {
+        if (el.id !== selectedElement.id) return el
+
+        if (el.type === 'image' || el.type === TOOLS.TEXT || el.type === TOOLS.LINK) {
+          return { ...el, x: newX, y: newY }
+        } else if (el.points) {
+          // Move freehand strokes
+          const offsetX = newX - (el.x || el.points[0]?.[0] || 0)
+          const offsetY = newY - (el.y || el.points[0]?.[1] || 0)
+          return {
+            ...el,
+            points: el.points.map(([px, py, pressure]) => [px + offsetX - (dragStart.x - (el.points[0]?.[0] || 0)), py + offsetY - (dragStart.y - (el.points[0]?.[1] || 0)), pressure])
+          }
+        } else if (el.x1 !== undefined) {
+          // Move shapes
+          const dx = newX - (el.x1 || 0)
+          const dy = newY - (el.y1 || 0)
+          return { ...el, x1: newX, y1: newY, x2: el.x2 + dx, y2: el.y2 + dy }
+        }
+        return el
+      })
+      updatePageElements(updatedElements)
+
+      // Update selected element reference
+      const updated = updatedElements.find(el => el.id === selectedElement.id)
+      if (updated) setSelectedElement(updated)
+      return
+    }
+
+    if (!isDrawing || !currentElement) return
 
     if (activeTool === TOOLS.PEN || activeTool === TOOLS.HIGHLIGHTER) {
       setCurrentElement(prev => ({
@@ -490,6 +633,19 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
   const handlePointerUp = () => {
     if (isPanning) {
       setIsPanning(false)
+      return
+    }
+
+    // End resizing
+    if (isResizing) {
+      setIsResizing(false)
+      setResizeHandle(null)
+      return
+    }
+
+    // End dragging
+    if (isDragging) {
+      setIsDragging(false)
       return
     }
 
@@ -733,7 +889,7 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
         if (x >= el.x && x <= el.x + textWidth && y >= el.y - textHeight && y <= el.y) {
           return el
         }
-      } else if (el.type === TOOLS.RECTANGLE) {
+      } else if (el.type === TOOLS.RECTANGLE || el.type === TOOLS.CIRCLE) {
         const minX = Math.min(el.x1, el.x2)
         const maxX = Math.max(el.x1, el.x2)
         const minY = Math.min(el.y1, el.y2)
@@ -741,6 +897,18 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
         if (x >= minX - threshold && x <= maxX + threshold &&
             y >= minY - threshold && y <= maxY + threshold) {
           return el
+        }
+      } else if (el.type === TOOLS.LINE || el.type === TOOLS.ARROW) {
+        // Check distance to line segment
+        const lineLength = Math.sqrt((el.x2 - el.x1) ** 2 + (el.y2 - el.y1) ** 2)
+        if (lineLength > 0) {
+          const t = Math.max(0, Math.min(1,
+            ((x - el.x1) * (el.x2 - el.x1) + (y - el.y1) * (el.y2 - el.y1)) / (lineLength ** 2)
+          ))
+          const nearestX = el.x1 + t * (el.x2 - el.x1)
+          const nearestY = el.y1 + t * (el.y2 - el.y1)
+          const dist = Math.sqrt((x - nearestX) ** 2 + (y - nearestY) ** 2)
+          if (dist < threshold + el.width) return el
         }
       }
     }
@@ -790,6 +958,21 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
           d={getSvgPathFromStroke(stroke)}
           fill={el.color}
           opacity={0.3}
+        />
+      )
+    }
+
+    if (el.type === TOOLS.LINE) {
+      return (
+        <line
+          key={key}
+          x1={el.x1}
+          y1={el.y1}
+          x2={el.x2}
+          y2={el.y2}
+          stroke={el.color}
+          strokeWidth={el.width}
+          strokeLinecap="round"
         />
       )
     }
@@ -999,6 +1182,7 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
           <ToolButton tool={TOOLS.SELECT} icon={MousePointer2} label="Selecionar" />
           <ToolButton tool={TOOLS.PEN} icon={Pencil} label="Caneta" />
           <ToolButton tool={TOOLS.HIGHLIGHTER} icon={Highlighter} label="Marcador" />
+          <ToolButton tool={TOOLS.LINE} icon={Minus} label="Linha" />
           <ToolButton tool={TOOLS.RECTANGLE} icon={Square} label="Retângulo" />
           <ToolButton tool={TOOLS.CIRCLE} icon={Circle} label="Círculo" />
           <ToolButton tool={TOOLS.ARROW} icon={ArrowUpRight} label="Seta" />
@@ -1244,9 +1428,161 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
 
                 {currentPage.elements.map(renderElement)}
                 {currentElement && renderElement(currentElement)}
+
+                {/* Selection highlight and resize handles */}
+                {selectedElement && activeTool === TOOLS.SELECT && (
+                  <>
+                    {/* Selection box */}
+                    {selectedElement.type === 'image' && (
+                      <>
+                        <rect
+                          x={selectedElement.x - 2}
+                          y={selectedElement.y - 2}
+                          width={selectedElement.width + 4}
+                          height={selectedElement.height + 4}
+                          fill="none"
+                          stroke="#4338CA"
+                          strokeWidth={2}
+                          strokeDasharray="5,5"
+                        />
+                        {/* Resize handles */}
+                        {['nw', 'ne', 'sw', 'se'].map(handle => {
+                          const hx = handle.includes('e') ? selectedElement.x + selectedElement.width : selectedElement.x
+                          const hy = handle.includes('s') ? selectedElement.y + selectedElement.height : selectedElement.y
+                          return (
+                            <rect
+                              key={handle}
+                              x={hx - 6}
+                              y={hy - 6}
+                              width={12}
+                              height={12}
+                              fill="#FFFFFF"
+                              stroke="#4338CA"
+                              strokeWidth={2}
+                              style={{ cursor: `${handle}-resize` }}
+                            />
+                          )
+                        })}
+                      </>
+                    )}
+                    {/* Selection for other elements */}
+                    {selectedElement.type !== 'image' && selectedElement.x1 !== undefined && (
+                      <rect
+                        x={Math.min(selectedElement.x1, selectedElement.x2) - 4}
+                        y={Math.min(selectedElement.y1, selectedElement.y2) - 4}
+                        width={Math.abs(selectedElement.x2 - selectedElement.x1) + 8}
+                        height={Math.abs(selectedElement.y2 - selectedElement.y1) + 8}
+                        fill="none"
+                        stroke="#4338CA"
+                        strokeWidth={2}
+                        strokeDasharray="5,5"
+                      />
+                    )}
+                    {selectedElement.type === TOOLS.TEXT && (
+                      <rect
+                        x={selectedElement.x - 4}
+                        y={selectedElement.y - (selectedElement.fontSize || 20) - 4}
+                        width={(selectedElement.text?.length || 1) * 12 + 8}
+                        height={(selectedElement.fontSize || 20) + 8}
+                        fill="none"
+                        stroke="#4338CA"
+                        strokeWidth={2}
+                        strokeDasharray="5,5"
+                      />
+                    )}
+                  </>
+                )}
               </svg>
             </div>
           </div>
+
+          {/* Floating Toolbar */}
+          {showFloatingToolbar && (
+            <div style={{
+              position: 'absolute', top: 20, left: '50%', transform: 'translateX(-50%)',
+              display: 'flex', gap: 4, alignItems: 'center',
+              background: 'rgba(255,255,255,0.95)', padding: '8px 12px', borderRadius: 12,
+              boxShadow: '0 4px 20px rgba(0,0,0,0.15)', backdropFilter: 'blur(8px)',
+            }}>
+              {/* Quick tool selection */}
+              <button onClick={() => setActiveTool(TOOLS.PEN)} title="Caneta"
+                style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  borderRadius: 6, border: 'none', background: activeTool === TOOLS.PEN ? '#E0DED8' : 'transparent',
+                  cursor: 'pointer' }}>
+                <Pencil size={18} color={activeTool === TOOLS.PEN ? '#5F5C59' : '#8B8670'} />
+              </button>
+              <button onClick={() => setActiveTool(TOOLS.HIGHLIGHTER)} title="Marcador"
+                style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  borderRadius: 6, border: 'none', background: activeTool === TOOLS.HIGHLIGHTER ? '#E0DED8' : 'transparent',
+                  cursor: 'pointer' }}>
+                <Highlighter size={18} color={activeTool === TOOLS.HIGHLIGHTER ? '#5F5C59' : '#8B8670'} />
+              </button>
+              <button onClick={() => setActiveTool(TOOLS.ERASER)} title="Borracha"
+                style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  borderRadius: 6, border: 'none', background: activeTool === TOOLS.ERASER ? '#E0DED8' : 'transparent',
+                  cursor: 'pointer' }}>
+                <Eraser size={18} color={activeTool === TOOLS.ERASER ? '#5F5C59' : '#8B8670'} />
+              </button>
+
+              <div style={{ width: 1, height: 24, background: '#E0DED8', margin: '0 4px' }} />
+
+              {/* Quick colors */}
+              {STROKE_COLORS.slice(0, 5).map(c => (
+                <button
+                  key={c.id}
+                  onClick={() => setStrokeColor(c.color)}
+                  title={c.name}
+                  style={{
+                    width: 24, height: 24, borderRadius: '50%',
+                    border: strokeColor === c.color ? '2px solid #5F5C59' : '2px solid #E0DED8',
+                    background: c.color, cursor: 'pointer',
+                  }}
+                />
+              ))}
+
+              <div style={{ width: 1, height: 24, background: '#E0DED8', margin: '0 4px' }} />
+
+              {/* Quick stroke widths */}
+              {[2, 4, 8].map(w => (
+                <button
+                  key={w}
+                  onClick={() => setStrokeWidth(w)}
+                  style={{
+                    width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    borderRadius: 4, border: 'none',
+                    background: strokeWidth === w ? '#E0DED8' : 'transparent',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <div style={{ width: 16, height: w, borderRadius: w / 2, background: strokeColor }} />
+                </button>
+              ))}
+
+              <div style={{ width: 1, height: 24, background: '#E0DED8', margin: '0 4px' }} />
+
+              {/* Close floating toolbar */}
+              <button onClick={() => setShowFloatingToolbar(false)} title="Esconder"
+                style={{ width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  borderRadius: 4, border: 'none', background: 'transparent', cursor: 'pointer' }}>
+                <X size={14} color="#8B8670" />
+              </button>
+            </div>
+          )}
+
+          {/* Show floating toolbar button */}
+          {!showFloatingToolbar && (
+            <button
+              onClick={() => setShowFloatingToolbar(true)}
+              style={{
+                position: 'absolute', top: 20, left: '50%', transform: 'translateX(-50%)',
+                padding: '8px 16px', borderRadius: 8, border: '1px solid #E0DED8',
+                background: 'rgba(255,255,255,0.95)', fontSize: 12, color: '#5F5C59',
+                cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+              }}
+            >
+              Mostrar Toolbar
+            </button>
+          )}
 
           {/* Text Input Modal */}
           {isAddingText && textPosition && (
