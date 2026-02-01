@@ -298,6 +298,89 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
     })
   }, [])
 
+  // Auto-center when changing pages
+  useEffect(() => {
+    // Small delay to ensure container is ready
+    const timer = setTimeout(() => {
+      fitToScreen()
+    }, 50)
+    return () => clearTimeout(timer)
+  }, [currentPageIndex, fitToScreen])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Don't trigger if typing in an input
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
+
+      // Page navigation
+      if (e.key === 'ArrowLeft' && !e.ctrlKey && !e.metaKey) {
+        if (currentPageIndex > 0) {
+          setCurrentPageIndex(prev => prev - 1)
+        }
+      }
+      if (e.key === 'ArrowRight' && !e.ctrlKey && !e.metaKey) {
+        if (currentPageIndex < pages.length - 1) {
+          setCurrentPageIndex(prev => prev + 1)
+        }
+      }
+
+      // Zoom shortcuts
+      if ((e.ctrlKey || e.metaKey) && e.key === '=') {
+        e.preventDefault()
+        setScale(s => Math.min(3, s + 0.25))
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === '-') {
+        e.preventDefault()
+        setScale(s => Math.max(0.2, s - 0.25))
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === '0') {
+        e.preventDefault()
+        fitToScreen()
+      }
+
+      // Tool shortcuts
+      if (e.key === 'v' || e.key === 'V') setActiveTool(TOOLS.SELECT)
+      if (e.key === 'p' || e.key === 'P') setActiveTool(TOOLS.PEN)
+      if (e.key === 'h' || e.key === 'H') setActiveTool(TOOLS.HIGHLIGHTER)
+      if (e.key === 'l' || e.key === 'L') setActiveTool(TOOLS.LINE)
+      if (e.key === 'e' || e.key === 'E') setActiveTool(TOOLS.ERASER)
+      if (e.key === ' ') {
+        e.preventDefault()
+        setActiveTool(TOOLS.PAN)
+      }
+
+      // Delete selected element
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedElement) {
+        e.preventDefault()
+        const newElements = currentPage.elements.filter(el => el.id !== selectedElement.id)
+        updatePageElements(newElements)
+        setSelectedElement(null)
+      }
+
+      // Escape to deselect
+      if (e.key === 'Escape') {
+        setSelectedElement(null)
+        setIsAddingText(false)
+        setIsAddingLink(false)
+      }
+    }
+
+    const handleKeyUp = (e) => {
+      // Return to previous tool after space (pan)
+      if (e.key === ' ') {
+        setActiveTool(TOOLS.PEN)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('keyup', handleKeyUp)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('keyup', handleKeyUp)
+    }
+  }, [currentPageIndex, pages.length, selectedElement, currentPage, fitToScreen])
+
   // Fit on mount and resize
   useEffect(() => {
     fitToScreen()
@@ -1720,24 +1803,52 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
           {/* Zoom Controls */}
           <div style={{
             position: 'absolute', bottom: 20, right: 20,
-            display: 'flex', gap: 8, alignItems: 'center',
+            display: 'flex', gap: 6, alignItems: 'center',
             background: '#F2F0E7', padding: '8px 12px', borderRadius: 8,
             boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
           }}>
-            <button onClick={() => setScale(s => Math.max(0.2, s - 0.25))}
+            <button onClick={() => setScale(s => Math.max(0.25, s - 0.25))}
               style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
                 borderRadius: 4, border: '1px solid #E0DED8', background: '#FFFFFF', cursor: 'pointer' }}>
               <ZoomOut size={16} />
             </button>
-            <span style={{ fontSize: 13, fontWeight: 500, minWidth: 50, textAlign: 'center' }}>
-              {Math.round(scale * 100)}%
-            </span>
+
+            {/* Preset zoom levels */}
+            <div style={{ display: 'flex', gap: 2 }}>
+              {[0.5, 0.75, 1, 1.5, 2].map(level => (
+                <button
+                  key={level}
+                  onClick={() => {
+                    setScale(level)
+                    // Center after zoom change
+                    if (containerRef.current) {
+                      setOffset({
+                        x: (containerRef.current.clientWidth - canvasWidth * level) / 2,
+                        y: (containerRef.current.clientHeight - canvasHeight * level) / 2
+                      })
+                    }
+                  }}
+                  style={{
+                    padding: '4px 8px', borderRadius: 4, border: 'none',
+                    background: Math.abs(scale - level) < 0.05 ? '#8B8670' : 'transparent',
+                    color: Math.abs(scale - level) < 0.05 ? '#FFFFFF' : '#5F5C59',
+                    fontSize: 11, fontWeight: 500, cursor: 'pointer',
+                  }}
+                >
+                  {level * 100}%
+                </button>
+              ))}
+            </div>
+
             <button onClick={() => setScale(s => Math.min(3, s + 0.25))}
               style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
                 borderRadius: 4, border: '1px solid #E0DED8', background: '#FFFFFF', cursor: 'pointer' }}>
               <ZoomIn size={16} />
             </button>
-            <button onClick={fitToScreen} title="Ajustar"
+
+            <div style={{ width: 1, height: 20, background: '#E0DED8' }} />
+
+            <button onClick={fitToScreen} title="Ajustar à janela (⌘0)"
               style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
                 borderRadius: 4, border: '1px solid #E0DED8', background: '#FFFFFF', cursor: 'pointer' }}>
               <Maximize2 size={16} />
