@@ -5,7 +5,7 @@
 -- Create projeto_moodboards table
 CREATE TABLE IF NOT EXISTS projeto_moodboards (
   id TEXT PRIMARY KEY DEFAULT ('mb_' || replace(gen_random_uuid()::text, '-', '')),
-  projeto_id TEXT NOT NULL REFERENCES projetos(id) ON DELETE CASCADE,
+  projeto_id UUID NOT NULL REFERENCES projetos(id) ON DELETE CASCADE,
 
   -- Moodboard info
   titulo TEXT NOT NULL,
