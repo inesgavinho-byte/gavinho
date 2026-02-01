@@ -686,12 +686,20 @@ export default function ProjetoDetalhe() {
   // Carregar renders do projeto
   const fetchRenders = async (projetoId) => {
     try {
+      console.log('=== FETCH RENDERS ===')
+      console.log('Projeto ID:', projetoId)
+
       const { data, error } = await supabase
         .from('projeto_renders')
         .select('*')
         .eq('projeto_id', projetoId)
         .order('compartimento')
         .order('versao', { ascending: false })
+
+      console.log('Renders encontrados:', data?.length || 0)
+      console.log('Renders data:', data)
+      console.log('Renders error:', error)
+
       if (error) throw error
       setRenders(data || [])
 
@@ -1419,6 +1427,10 @@ export default function ProjetoDetalhe() {
       return
     }
 
+    console.log('=== SAVE RENDER ===')
+    console.log('Project ID:', project.id)
+    console.log('Render Form:', renderForm)
+
     try {
       const renderData = {
         projeto_id: project.id,
@@ -1427,9 +1439,10 @@ export default function ProjetoDetalhe() {
         descricao: renderForm.descricao,
         is_final: renderForm.is_final,
         imagem_url: renderForm.imagem_url,
-        data_upload: renderForm.data_upload,
         created_at: new Date().toISOString()
       }
+
+      console.log('Render Data to save:', renderData)
 
       if (editingRender) {
         // Atualizar render existente
@@ -1438,6 +1451,7 @@ export default function ProjetoDetalhe() {
           .update(renderData)
           .eq('id', editingRender.id)
 
+        console.log('Update error:', error)
         if (error) throw error
 
         setRenders(prev => prev.map(r =>
@@ -1451,14 +1465,14 @@ export default function ProjetoDetalhe() {
           .select()
           .single()
 
+        console.log('Insert result:', { data, error })
+
         if (error) {
-          // Se tabela não existe, guardar localmente
-          console.warn('Tabela projeto_renders não existe, guardando localmente')
-          const newRender = { ...renderData, id: Date.now() }
-          setRenders(prev => [...prev, newRender])
-        } else {
-          setRenders(prev => [...prev, data])
+          console.error('ERRO AO INSERIR RENDER:', error)
+          alert('Erro ao guardar render: ' + error.message)
+          return
         }
+        setRenders(prev => [...prev, data])
       }
 
       setShowRenderModal(false)
