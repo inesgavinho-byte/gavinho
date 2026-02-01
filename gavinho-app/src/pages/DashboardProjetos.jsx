@@ -161,13 +161,48 @@ export default function DashboardProjetos() {
     const concluidos = projetosData.filter(p => p.fase === 'Entrega' || p.fase === 'Casa Viva').length
     const pendentes = tarefasData.filter(t => t.status === 'pendente').length
 
-    // Timeline status
+    // Timeline status - calcular baseado no status real e timeline
     let onTrack = 0, atRisk = 0, delayed = 0
+    const today = new Date()
     activeProjetos.forEach(p => {
+      // Usar status se definido explicitamente
+      if (p.status === 'blocked') {
+        delayed++
+        return
+      }
+      if (p.status === 'at_risk') {
+        atRisk++
+        return
+      }
+      if (p.status === 'on_track') {
+        onTrack++
+        return
+      }
+
+      // Calcular automaticamente baseado no timeline e progresso
+      const dataFim = p.data_prevista_conclusao ? new Date(p.data_prevista_conclusao) : null
+      const dataInicio = p.data_inicio ? new Date(p.data_inicio) : null
       const progress = p.progresso || 0
-      if (progress >= 50) onTrack++
-      else if (progress >= 25) atRisk++
-      else onTrack++
+
+      if (dataFim && dataInicio) {
+        const totalDays = (dataFim - dataInicio) / (1000 * 60 * 60 * 24)
+        const elapsedDays = (today - dataInicio) / (1000 * 60 * 60 * 24)
+        const expectedProgress = totalDays > 0 ? Math.min(100, (elapsedDays / totalDays) * 100) : 0
+
+        // Se estamos atrasados mais de 20% do esperado
+        if (progress < expectedProgress - 20) {
+          delayed++
+        } else if (progress < expectedProgress - 10) {
+          atRisk++
+        } else {
+          onTrack++
+        }
+      } else {
+        // Sem datas, usar progresso como indicador
+        if (progress >= 25) onTrack++
+        else if (progress > 0) atRisk++
+        else delayed++
+      }
     })
 
     // Phase distribution
@@ -187,10 +222,35 @@ export default function DashboardProjetos() {
 
     setPhaseDistribution(distribution)
 
-    // Project health
+    // Project health - calcular baseado em multiplos fatores
     const healthScores = activeProjetos.slice(0, 6).map(p => {
       const progress = p.progresso || 0
-      let health = progress >= 80 ? 'excellent' : progress >= 60 ? 'good' : progress >= 40 ? 'attention' : 'risk'
+      const dataFim = p.data_prevista_conclusao ? new Date(p.data_prevista_conclusao) : null
+      const dataInicio = p.data_inicio ? new Date(p.data_inicio) : null
+
+      let health = 'good'
+
+      // Verificar status explicito primeiro
+      if (p.status === 'blocked') {
+        health = 'risk'
+      } else if (p.status === 'at_risk') {
+        health = 'attention'
+      } else if (dataFim && dataInicio) {
+        // Calcular saude baseado no timeline
+        const totalDays = (dataFim - dataInicio) / (1000 * 60 * 60 * 24)
+        const elapsedDays = (today - dataInicio) / (1000 * 60 * 60 * 24)
+        const expectedProgress = totalDays > 0 ? Math.min(100, (elapsedDays / totalDays) * 100) : 0
+        const progressDiff = progress - expectedProgress
+
+        if (progressDiff >= 10) health = 'excellent'
+        else if (progressDiff >= -5) health = 'good'
+        else if (progressDiff >= -15) health = 'attention'
+        else health = 'risk'
+      } else {
+        // Sem datas, usar apenas progresso
+        health = progress >= 80 ? 'excellent' : progress >= 60 ? 'good' : progress >= 40 ? 'attention' : 'risk'
+      }
+
       return { id: p.id, codigo: p.codigo, nome: p.nome, fase: p.fase || 'Conceito', progresso: progress, health: HEALTH_STATUS[health] }
     })
     setProjectHealth(healthScores)

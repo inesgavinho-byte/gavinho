@@ -42,15 +42,80 @@ export default function Projetos() {
     orcamento_atual: ''
   })
 
-  // Carregar projetos e clientes
+  // Calcular status automatico baseado no timeline
+  const calcularStatusAutomatico = (projeto) => {
+    // Se ja tem status definido explicitamente, usar esse
+    if (projeto.status && projeto.status !== '') {
+      return projeto.status
+    }
+
+    const today = new Date()
+    const dataFim = projeto.data_prevista_conclusao ? new Date(projeto.data_prevista_conclusao) : null
+    const dataInicio = projeto.data_inicio ? new Date(projeto.data_inicio) : null
+    const progress = projeto.progresso || 0
+
+    if (!dataFim || !dataInicio) {
+      return progress >= 25 ? 'on_track' : progress > 0 ? 'at_risk' : 'on_track'
+    }
+
+    const totalDays = (dataFim - dataInicio) / (1000 * 60 * 60 * 24)
+    const elapsedDays = (today - dataInicio) / (1000 * 60 * 60 * 24)
+    const expectedProgress = totalDays > 0 ? Math.min(100, (elapsedDays / totalDays) * 100) : 0
+
+    if (progress < expectedProgress - 20) return 'blocked'
+    if (progress < expectedProgress - 10) return 'at_risk'
+    return 'on_track'
+  }
+
+  // Carregar projetos, clientes e calcular metricas
   const loadData = async () => {
     try {
-      const [projRes, cliRes] = await Promise.all([
+      const [projRes, cliRes, entregRes, pagRes] = await Promise.all([
         supabase.from('projetos').select('*').order('codigo', { ascending: true }),
-        supabase.from('clientes').select('id, nome').order('nome')
+        supabase.from('clientes').select('id, nome').order('nome'),
+        supabase.from('projeto_entregaveis').select('projeto_id, status'),
+        supabase.from('projeto_pagamentos').select('projeto_id, valor, estado')
       ])
 
-      setProjects(projRes.data || [])
+      const projetos = projRes.data || []
+      const entregaveis = entregRes.data || []
+      const pagamentos = pagRes.data || []
+
+      // Calcular progresso e financeiro para cada projeto
+      const projetosComMetricas = projetos.map(p => {
+        // Calcular progresso dos entregaveis
+        const projEntregaveis = entregaveis.filter(e => e.projeto_id === p.id)
+        let progressoCalculado = p.progresso || 0
+        if (projEntregaveis.length > 0) {
+          const concluidos = projEntregaveis.filter(e =>
+            e.status === 'concluido' || e.status === 'aprovado'
+          ).length
+          progressoCalculado = Math.round((concluidos / projEntregaveis.length) * 100)
+        }
+
+        // Calcular financeiro
+        const projPagamentos = pagamentos.filter(pg => pg.projeto_id === p.id)
+        const valorPago = projPagamentos
+          .filter(pg => pg.estado === 'pago')
+          .reduce((sum, pg) => sum + (parseFloat(pg.valor) || 0), 0)
+
+        // Calcular status automatico
+        const statusCalculado = calcularStatusAutomatico({ ...p, progresso: progressoCalculado })
+
+        return {
+          ...p,
+          progresso: progressoCalculado,
+          progresso_manual: p.progresso,
+          status_calculado: statusCalculado,
+          valor_pago: valorPago,
+          entregaveis_total: projEntregaveis.length,
+          entregaveis_concluidos: projEntregaveis.filter(e =>
+            e.status === 'concluido' || e.status === 'aprovado'
+          ).length
+        }
+      })
+
+      setProjects(projetosComMetricas)
       setClientes(cliRes.data || [])
     } catch (err) {
       console.error('Erro ao carregar dados:', err)
@@ -59,27 +124,36 @@ export default function Projetos() {
     }
   }
 
-  // Carregar dados inicialmente e configurar realtime subscription
+  // Carregar dados inicialmente e configurar realtime subscriptions
   useEffect(() => {
     loadData()
 
-    // Supabase Realtime subscription para sincronizar alterações
+    // Supabase Realtime subscription para sincronizar alteracoes
+    // Escutar projetos, entregaveis e pagamentos para recalcular metricas
     const channel = supabase
-      .channel('projetos-changes')
+      .channel('projetos-sync')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'projetos' },
-        (payload) => {
-          console.log('Projetos alterado:', payload)
-          if (payload.eventType === 'INSERT') {
-            setProjects(prev => [...prev, payload.new])
-          } else if (payload.eventType === 'UPDATE') {
-            setProjects(prev => prev.map(p =>
-              p.id === payload.new.id ? payload.new : p
-            ))
-          } else if (payload.eventType === 'DELETE') {
-            setProjects(prev => prev.filter(p => p.id !== payload.old.id))
-          }
+        () => {
+          console.log('Projetos alterado - recarregando...')
+          loadData()
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'projeto_entregaveis' },
+        () => {
+          console.log('Entregaveis alterado - recalculando metricas...')
+          loadData()
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'projeto_pagamentos' },
+        () => {
+          console.log('Pagamentos alterado - recalculando metricas...')
+          loadData()
         }
       )
       .subscribe()
@@ -497,29 +571,46 @@ export default function Projetos() {
                   </span>
                 </div>
 
-                {/* Progress Bar - simples sem percentagem visível */}
-                <div style={{
-                  width: '100%',
-                  height: '3px',
-                  background: 'var(--stone)',
-                  borderRadius: '2px',
-                  overflow: 'hidden',
-                  marginTop: '4px'
-                }}>
+                {/* Progress Bar com percentagem */}
+                <div style={{ marginTop: '8px' }}>
                   <div style={{
-                    width: `${p.progresso || 0}%`,
-                    height: '100%',
-                    background: getStatusColor(p.status),
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '4px'
+                  }}>
+                    <span style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
+                      {p.entregaveis_total > 0
+                        ? `${p.entregaveis_concluidos}/${p.entregaveis_total} entregaveis`
+                        : 'Sem entregaveis'}
+                    </span>
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--brown)' }}>
+                      {p.progresso || 0}%
+                    </span>
+                  </div>
+                  <div style={{
+                    width: '100%',
+                    height: '4px',
+                    background: 'var(--stone)',
                     borderRadius: '2px',
-                    transition: 'width 0.3s ease'
-                  }} />
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{
+                      width: `${p.progresso || 0}%`,
+                      height: '100%',
+                      background: getStatusColor(p.status_calculado || p.status),
+                      borderRadius: '2px',
+                      transition: 'width 0.3s ease'
+                    }} />
+                  </div>
                 </div>
 
-                {/* Footer: Status */}
+                {/* Footer: Status + Financeiro */}
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
-                  marginTop: '4px'
+                  justifyContent: 'space-between',
+                  marginTop: '8px'
                 }}>
                   <span style={{
                     display: 'flex',
@@ -532,10 +623,15 @@ export default function Projetos() {
                       width: '6px',
                       height: '6px',
                       borderRadius: '50%',
-                      background: getStatusColor(p.status)
+                      background: getStatusColor(p.status_calculado || p.status)
                     }} />
-                    {getStatusLabel(p.status)}
+                    {getStatusLabel(p.status_calculado || p.status)}
                   </span>
+                  {p.orcamento_atual > 0 && (
+                    <span style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
+                      {formatCurrency(p.valor_pago || 0)} / {formatCurrency(p.orcamento_atual)}
+                    </span>
+                  )}
                 </div>
               </div>
             )
@@ -554,11 +650,12 @@ export default function Projetos() {
                     <td><span style={{ fontWeight: 600, color: 'var(--warning)', fontFamily: 'monospace' }}>{p.codigo}</span></td>
                     <td style={{ fontWeight: 500 }}>{p.nome}</td>
                     <td><span style={{ padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 600, background: `${getFaseColor(p.fase)}20`, color: getFaseColor(p.fase) }}>{p.fase}</span></td>
-                    <td><span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ width: '8px', height: '8px', borderRadius: '50%', background: getStatusColor(p.status) }} />{getStatusLabel(p.status)}</span></td>
+                    <td><span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ width: '8px', height: '8px', borderRadius: '50%', background: getStatusColor(p.status_calculado || p.status) }} />{getStatusLabel(p.status_calculado || p.status)}</span></td>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div style={{ width: '60px', height: '6px', background: 'var(--stone)', borderRadius: '3px', overflow: 'hidden' }}><div style={{ width: `${p.progresso || 0}%`, height: '100%', background: getStatusColor(p.status), borderRadius: '3px' }} /></div>
+                        <div style={{ width: '60px', height: '6px', background: 'var(--stone)', borderRadius: '3px', overflow: 'hidden' }}><div style={{ width: `${p.progresso || 0}%`, height: '100%', background: getStatusColor(p.status_calculado || p.status), borderRadius: '3px' }} /></div>
                         <span style={{ fontSize: '12px' }}>{p.progresso || 0}%</span>
+                        {p.entregaveis_total > 0 && <span style={{ fontSize: '10px', color: 'var(--brown-light)' }}>({p.entregaveis_concluidos}/{p.entregaveis_total})</span>}
                       </div>
                     </td>
                     <td>
