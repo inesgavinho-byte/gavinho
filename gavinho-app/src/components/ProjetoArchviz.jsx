@@ -178,6 +178,9 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
       setLoading(true)
       setLoadError(null)
 
+      console.log('=== CARREGANDO RENDERS ===')
+      console.log('Projeto ID:', projeto.id)
+
       // Query renders
       const { data: rendersData, error: rendersError } = await supabase
         .from('projeto_renders')
@@ -185,6 +188,10 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
         .eq('projeto_id', projeto.id)
         .order('compartimento')
         .order('vista')
+
+      console.log('Renders encontrados:', rendersData?.length || 0)
+      console.log('Renders data:', rendersData)
+      console.log('Renders error:', rendersError)
 
       if (rendersError) throw rendersError
 
@@ -198,6 +205,9 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
           .select('id, render_id, versao, url, is_final, created_at')
           .in('render_id', renderIds)
           .order('versao', { ascending: false })
+
+        console.log('Versões encontradas:', versoes?.length || 0)
+        console.log('Versões error:', versoesError)
 
         if (versoesError) throw versoesError
         versoesData = versoes || []
@@ -218,6 +228,9 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
         acc[key].push(render)
         return acc
       }, {})
+
+      console.log('Renders agrupados:', Object.keys(grouped).length, 'compartimentos')
+      console.log('=== FIM CARREGAMENTO ===')
 
       setRenders(grouped)
 
@@ -288,57 +301,86 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
       return
     }
 
+    console.log('=== INICIANDO UPLOAD RENDER ===')
+    console.log('Projeto ID:', projeto.id)
+    console.log('Compartimento:', compartimento)
+    console.log('Vista:', newRender.vista || 'Vista Principal')
+    console.log('User ID:', userId)
+    console.log('User Name:', userName)
+
     setUploading(true)
     try {
       // Upload file to storage
       const fileExt = newRender.arquivo.name.split('.').pop()
       const fileName = `${projeto.id}/${Date.now()}.${fileExt}`
+      console.log('1. Uploading file:', fileName)
 
-      const { error: uploadError } = await supabase.storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
         .from('renders')
         .upload(fileName, newRender.arquivo)
 
+      console.log('1. Upload result:', { uploadData, uploadError })
       if (uploadError) throw uploadError
 
       // Get public URL
       const { data: urlData } = supabase.storage
         .from('renders')
         .getPublicUrl(fileName)
+      console.log('2. Public URL:', urlData.publicUrl)
 
       // Create render record
+      console.log('3. Inserting into projeto_renders...')
+      const insertData = {
+        projeto_id: projeto.id,
+        compartimento: compartimento,
+        vista: newRender.vista || 'Vista Principal',
+        created_by: userId,
+        created_by_name: userName
+      }
+      console.log('3. Insert data:', insertData)
+
       const { data: renderData, error: renderError } = await supabase
         .from('projeto_renders')
-        .insert([{
-          projeto_id: projeto.id,
-          compartimento: compartimento,
-          vista: newRender.vista || 'Vista Principal',
-          created_by: userId,
-          created_by_name: userName
-        }])
+        .insert([insertData])
         .select()
         .single()
 
+      console.log('3. projeto_renders result:', { renderData, renderError })
       if (renderError) throw renderError
 
       // Create first version
-      const { error: versaoError } = await supabase
-        .from('projeto_render_versoes')
-        .insert([{
-          render_id: renderData.id,
-          versao: 1,
-          url: urlData.publicUrl,
-          uploaded_by: userId,
-          uploaded_by_name: userName
-        }])
+      console.log('4. Inserting into projeto_render_versoes...')
+      const versaoData = {
+        render_id: renderData.id,
+        versao: 1,
+        url: urlData.publicUrl,
+        uploaded_by: userId,
+        uploaded_by_name: userName
+      }
+      console.log('4. Versao data:', versaoData)
 
+      const { data: versaoResult, error: versaoError } = await supabase
+        .from('projeto_render_versoes')
+        .insert([versaoData])
+        .select()
+
+      console.log('4. projeto_render_versoes result:', { versaoResult, versaoError })
       if (versaoError) throw versaoError
+
+      console.log('=== UPLOAD COMPLETO COM SUCESSO ===')
+      console.log('Render ID criado:', renderData.id)
 
       // Reset and reload
       setNewRender({ compartimento: '', novoCompartimento: '', vista: '', arquivo: null })
       setShowAddModal(false)
       loadRenders()
     } catch (err) {
-      console.error('Erro ao adicionar render:', err)
+      console.error('=== ERRO NO UPLOAD ===')
+      console.error('Erro completo:', err)
+      console.error('Mensagem:', err.message)
+      console.error('Detalhes:', err.details)
+      console.error('Hint:', err.hint)
+      console.error('Code:', err.code)
       alert('Erro ao adicionar render: ' + err.message)
     } finally {
       setUploading(false)
