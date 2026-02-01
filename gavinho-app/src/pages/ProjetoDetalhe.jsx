@@ -86,8 +86,19 @@ import {
   TIPOLOGIAS,
   SUBTIPOS,
   FASES,
-  STATUS_OPTIONS
+  STATUS_OPTIONS,
+  TIPOS_INTERVENIENTES
 } from '../constants/projectConstants'
+
+// Importar componentes de modais
+import {
+  DeleteConfirmModal,
+  FaseContratualModal,
+  EquipaModal,
+  IntervenienteModal,
+  RenderModal,
+  ImageLightbox
+} from '../components/projeto/modals'
 
 // NOTA: sampleProjectData é usado apenas para demonstração
 // Em produção, todos os dados devem vir da base de dados
@@ -369,20 +380,7 @@ export default function ProjetoDetalhe() {
     }
   }
 
-  // Tipos de intervenientes
-  const TIPOS_INTERVENIENTES = [
-    'Dono de Obra',
-    'Cliente',
-    'Representante Dono de Obra',
-    'Autor Licenciamento Arquitectura',
-    'Arquitectura Paisagista',
-    'Especialidade Estruturas',
-    'Especialidades',
-    'Especialidade Acústica',
-    'Especialidade Térmica',
-    'Especialidade Segurança',
-    'Outro'
-  ]
+  // TIPOS_INTERVENIENTES agora importado de ../constants/projectConstants
 
   // Carregar intervenientes do projeto
   const fetchIntervenientes = async (projetoId) => {
@@ -2115,337 +2113,24 @@ export default function ProjetoDetalhe() {
       )}
 
       {/* Modal Adicionar/Editar Interveniente */}
-      {showIntervenienteModal && (
-        <div className="modal-overlay" onClick={() => setShowIntervenienteModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '650px', width: '95%' }}>
-            <div className="modal-header" style={{ borderBottom: '1px solid var(--stone)', paddingBottom: '16px' }}>
-              <div>
-                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--brown)' }}>
-                  {editingInterveniente ? 'Editar Interveniente' : 'Adicionar Interveniente'}
-                </h3>
-                <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--brown-light)' }}>
-                  Registe os intervenientes externos do projeto
-                </p>
-              </div>
-              <button className="modal-close" onClick={() => setShowIntervenienteModal(false)}>
-                <X size={20} />
-              </button>
-            </div>
-            <div className="modal-body" style={{ padding: '24px' }}>
-              {/* Tipo e Entidade */}
-              <div style={{
-                background: 'var(--cream)',
-                padding: '20px',
-                borderRadius: '12px',
-                marginBottom: '20px'
-              }}>
-                <h4 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--brown)', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  Identificação
-                </h4>
-                <div className="form-group" style={{ marginBottom: '16px' }}>
-                  <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--brown)', marginBottom: '6px', display: 'block' }}>
-                    Tipo de Interveniente *
-                  </label>
-                  <select
-                    value={intervenienteForm.tipo}
-                    onChange={(e) => setIntervenienteForm(prev => ({ ...prev, tipo: e.target.value }))}
-                    style={{
-                      width: '100%',
-                      padding: '12px 14px',
-                      border: '1px solid var(--stone)',
-                      borderRadius: '8px',
-                      fontSize: '14px',
-                      background: 'var(--white)',
-                      color: 'var(--brown)'
-                    }}
-                  >
-                    <option value="">Selecionar tipo...</option>
-                    {TIPOS_INTERVENIENTES.map(tipo => (
-                      <option key={tipo} value={tipo}>{tipo}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--brown)', marginBottom: '6px', display: 'block' }}>
-                      Entidade / Empresa
-                    </label>
-                    <input
-                      type="text"
-                      value={intervenienteForm.entidade}
-                      onChange={(e) => setIntervenienteForm(prev => ({ ...prev, entidade: e.target.value }))}
-                      style={{
-                        width: '100%',
-                        padding: '12px 14px',
-                        border: '1px solid var(--stone)',
-                        borderRadius: '8px',
-                        fontSize: '14px'
-                      }}
-                      placeholder="Nome da empresa ou entidade"
-                    />
-                  </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--brown)', marginBottom: '6px', display: 'block' }}>
-                      Contacto Geral
-                    </label>
-                    <input
-                      type="text"
-                      value={intervenienteForm.contacto_geral}
-                      onChange={(e) => setIntervenienteForm(prev => ({ ...prev, contacto_geral: e.target.value }))}
-                      style={{
-                        width: '100%',
-                        padding: '12px 14px',
-                        border: '1px solid var(--stone)',
-                        borderRadius: '8px',
-                        fontSize: '14px'
-                      }}
-                      placeholder="email@empresa.pt ou telefone"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Responsável Principal */}
-              <div style={{
-                background: 'var(--cream)',
-                padding: '20px',
-                borderRadius: '12px',
-                marginBottom: '20px'
-              }}>
-                <h4 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--brown)', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  Responsável Principal
-                </h4>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--brown)', marginBottom: '6px', display: 'block' }}>
-                      Nome
-                    </label>
-                    <input
-                      type="text"
-                      value={intervenienteForm.responsavel_nome}
-                      onChange={(e) => setIntervenienteForm(prev => ({ ...prev, responsavel_nome: e.target.value }))}
-                      style={{
-                        width: '100%',
-                        padding: '12px 14px',
-                        border: '1px solid var(--stone)',
-                        borderRadius: '8px',
-                        fontSize: '14px'
-                      }}
-                      placeholder="Nome do responsável"
-                    />
-                  </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--brown)', marginBottom: '6px', display: 'block' }}>
-                      Email
-                    </label>
-                    <input
-                      type="email"
-                      value={intervenienteForm.responsavel_email}
-                      onChange={(e) => setIntervenienteForm(prev => ({ ...prev, responsavel_email: e.target.value }))}
-                      style={{
-                        width: '100%',
-                        padding: '12px 14px',
-                        border: '1px solid var(--stone)',
-                        borderRadius: '8px',
-                        fontSize: '14px'
-                      }}
-                      placeholder="email@exemplo.pt"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Responsável Secundário */}
-              <div style={{
-                background: 'var(--cream)',
-                padding: '20px',
-                borderRadius: '12px'
-              }}>
-                <h4 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--brown)', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  Responsável Secundário <span style={{ fontWeight: 400, textTransform: 'none' }}>(opcional)</span>
-                </h4>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--brown)', marginBottom: '6px', display: 'block' }}>
-                      Nome
-                    </label>
-                    <input
-                      type="text"
-                      value={intervenienteForm.responsavel_secundario_nome}
-                      onChange={(e) => setIntervenienteForm(prev => ({ ...prev, responsavel_secundario_nome: e.target.value }))}
-                      style={{
-                        width: '100%',
-                        padding: '12px 14px',
-                        border: '1px solid var(--stone)',
-                        borderRadius: '8px',
-                        fontSize: '14px'
-                      }}
-                      placeholder="Nome do responsável"
-                    />
-                  </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--brown)', marginBottom: '6px', display: 'block' }}>
-                      Email
-                    </label>
-                    <input
-                      type="email"
-                      value={intervenienteForm.responsavel_secundario_email}
-                      onChange={(e) => setIntervenienteForm(prev => ({ ...prev, responsavel_secundario_email: e.target.value }))}
-                      style={{
-                        width: '100%',
-                        padding: '12px 14px',
-                        border: '1px solid var(--stone)',
-                        borderRadius: '8px',
-                        fontSize: '14px'
-                      }}
-                      placeholder="email@exemplo.pt"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="modal-footer" style={{ borderTop: '1px solid var(--stone)', padding: '16px 24px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-              <button
-                className="btn btn-secondary"
-                onClick={() => setShowIntervenienteModal(false)}
-                style={{ padding: '10px 20px' }}
-              >
-                Cancelar
-              </button>
-              <button
-                className="btn btn-primary"
-                onClick={handleSaveInterveniente}
-                disabled={!intervenienteForm.tipo}
-                style={{ padding: '10px 24px' }}
-              >
-                {editingInterveniente ? 'Guardar Alterações' : 'Adicionar'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <IntervenienteModal
+        isOpen={showIntervenienteModal}
+        onClose={() => setShowIntervenienteModal(false)}
+        onSave={handleSaveInterveniente}
+        intervenienteForm={intervenienteForm}
+        setIntervenienteForm={setIntervenienteForm}
+        editingInterveniente={editingInterveniente}
+      />
 
       {/* Modal Adicionar/Editar Fase Contratual */}
-      {showFaseModal && (
-        <div className="modal-overlay" onClick={() => setShowFaseModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px' }}>
-            <div className="modal-header">
-              <h3>{editingFase ? 'Editar Fase' : 'Adicionar Fase Contratual'}</h3>
-              <button className="modal-close" onClick={() => setShowFaseModal(false)}>
-                <X size={20} />
-              </button>
-            </div>
-            <div className="modal-body">
-              <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: '16px' }}>
-                <div className="form-group">
-                  <label>Nº Fase *</label>
-                  <input
-                    type="number"
-                    value={faseForm.numero}
-                    onChange={(e) => setFaseForm(prev => ({ ...prev, numero: e.target.value }))}
-                    className="form-control"
-                    min="1"
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Nome da Fase *</label>
-                  <input
-                    type="text"
-                    value={faseForm.nome}
-                    onChange={(e) => setFaseForm(prev => ({ ...prev, nome: e.target.value }))}
-                    className="form-control"
-                    placeholder="Ex: Estudos de Layout/Revisão do Projeto de Arquitetura"
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <div className="form-group">
-                  <label>Data Início</label>
-                  <input
-                    type="date"
-                    value={faseForm.data_inicio}
-                    onChange={(e) => setFaseForm(prev => ({ ...prev, data_inicio: e.target.value }))}
-                    className="form-control"
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Nº Dias da Fase</label>
-                  <input
-                    type="text"
-                    value={faseForm.num_dias}
-                    onChange={(e) => setFaseForm(prev => ({ ...prev, num_dias: e.target.value }))}
-                    className="form-control"
-                    placeholder="Ex: 40 ou 60 dias úteis após entrega do PB"
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <div className="form-group">
-                  <label>Conclusão Prevista</label>
-                  <input
-                    type="text"
-                    value={faseForm.conclusao_prevista}
-                    onChange={(e) => setFaseForm(prev => ({ ...prev, conclusao_prevista: e.target.value }))}
-                    className="form-control"
-                    placeholder="Ex: Março 2025 ou Final de Outubro 2025"
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Data Entrega</label>
-                  <input
-                    type="date"
-                    value={faseForm.data_entrega}
-                    onChange={(e) => setFaseForm(prev => ({ ...prev, data_entrega: e.target.value }))}
-                    className="form-control"
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <div className="form-group">
-                  <label>Estado</label>
-                  <select
-                    value={faseForm.estado}
-                    onChange={(e) => setFaseForm(prev => ({ ...prev, estado: e.target.value }))}
-                    className="form-control"
-                  >
-                    <option value="nao_iniciado">Não iniciado</option>
-                    <option value="em_curso">Em curso</option>
-                    <option value="concluido">Concluído</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Avaliação Performance</label>
-                  <select
-                    value={faseForm.avaliacao}
-                    onChange={(e) => setFaseForm(prev => ({ ...prev, avaliacao: e.target.value }))}
-                    className="form-control"
-                  >
-                    <option value="">—</option>
-                    <option value="on_time">On Time</option>
-                    <option value="delayed">Delayed</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setShowFaseModal(false)}>
-                Cancelar
-              </button>
-              <button
-                className="btn btn-primary"
-                onClick={handleSaveFase}
-                disabled={!faseForm.nome}
-              >
-                {editingFase ? 'Guardar Alterações' : 'Adicionar Fase'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <FaseContratualModal
+        isOpen={showFaseModal}
+        onClose={() => setShowFaseModal(false)}
+        onSave={handleSaveFase}
+        faseForm={faseForm}
+        setFaseForm={setFaseForm}
+        editingFase={editingFase}
+      />
 
       {/* Tab Fases & Entregas */}
       {activeTab === 'fases' && (
@@ -3901,273 +3586,21 @@ export default function ProjetoDetalhe() {
       )}
 
       {/* MODAL: Adicionar/Editar Render */}
-      {showRenderModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}
-          onClick={() => setShowRenderModal(false)}
-        >
-          <div
-            style={{
-              background: 'var(--white)',
-              borderRadius: '16px',
-              width: '100%',
-              maxWidth: '500px',
-              maxHeight: '90vh',
-              overflow: 'auto',
-              margin: '20px'
-            }}
-            onClick={e => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '20px 24px',
-              borderBottom: '1px solid var(--stone)'
-            }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--brown)' }}>
-                {editingRender ? 'Editar Render' : 'Adicionar Render'}
-              </h2>
-              <button
-                onClick={() => setShowRenderModal(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--brown-light)' }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Form */}
-            <div style={{ padding: '24px' }}>
-              {/* Compartimento */}
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '8px', color: 'var(--brown)' }}>
-                  Compartimento *
-                </label>
-                <input
-                  type="text"
-                  list="compartimentos-list"
-                  value={renderForm.compartimento}
-                  onChange={(e) => handleRenderCompartimentoChange(e.target.value)}
-                  placeholder="Selecionar ou escrever nome..."
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: '1px solid var(--stone)',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    background: 'var(--white)',
-                    color: 'var(--brown)'
-                  }}
-                />
-                <datalist id="compartimentos-list">
-                  {COMPARTIMENTOS.map(comp => (
-                    <option key={comp} value={comp} />
-                  ))}
-                </datalist>
-                <p style={{ fontSize: '11px', color: 'var(--brown-light)', marginTop: '6px' }}>
-                  Selecione da lista ou escreva um nome personalizado
-                </p>
-              </div>
-
-              {/* Versão (auto) */}
-              {renderForm.compartimento && (
-                <div style={{
-                  marginBottom: '20px',
-                  padding: '12px 16px',
-                  background: 'var(--cream)',
-                  borderRadius: '8px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between'
-                }}>
-                  <span style={{ fontSize: '13px', color: 'var(--brown-light)' }}>
-                    Versão automática
-                  </span>
-                  <span style={{
-                    fontSize: '16px',
-                    fontWeight: 700,
-                    color: 'var(--brown)',
-                    background: 'var(--white)',
-                    padding: '4px 12px',
-                    borderRadius: '6px'
-                  }}>
-                    v{editingRender ? renderForm.versao : getNextVersion(renderForm.compartimento)}
-                  </span>
-                </div>
-              )}
-
-              {/* Imagem Upload com Drag & Drop */}
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '8px', color: 'var(--brown)' }}>
-                  Imagem do Render
-                </label>
-                <div
-                  style={{
-                    position: 'relative',
-                    aspectRatio: '16/10',
-                    background: renderForm.imagem_url ? `url(${renderForm.imagem_url}) center/cover` : 'var(--cream)',
-                    borderRadius: '12px',
-                    border: isDragging ? '3px dashed var(--info)' : '2px dashed var(--stone)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    overflow: 'hidden',
-                    transition: 'all 0.2s',
-                    transform: isDragging ? 'scale(1.02)' : 'scale(1)'
-                  }}
-                  onClick={() => document.getElementById('render-image-input').click()}
-                  onDragOver={handleRenderDragOver}
-                  onDragLeave={handleRenderDragLeave}
-                  onDrop={handleRenderDrop}
-                >
-                  {!renderForm.imagem_url && (
-                    <>
-                      <Upload size={32} style={{ color: isDragging ? 'var(--info)' : 'var(--brown-light)', opacity: isDragging ? 1 : 0.5, marginBottom: '8px' }} />
-                      <span style={{ fontSize: '13px', color: isDragging ? 'var(--info)' : 'var(--brown-light)', fontWeight: isDragging ? 600 : 400 }}>
-                        {isDragging ? 'Largue a imagem aqui' : 'Arraste ou clique para fazer upload'}
-                      </span>
-                    </>
-                  )}
-                  {renderForm.imagem_url && (
-                    <div style={{
-                      position: 'absolute',
-                      bottom: '8px',
-                      right: '8px',
-                      padding: '6px 12px',
-                      background: 'rgba(0,0,0,0.7)',
-                      color: 'white',
-                      borderRadius: '6px',
-                      fontSize: '11px'
-                    }}>
-                      Arraste ou clique para alterar
-                    </div>
-                  )}
-                </div>
-                <input
-                  id="render-image-input"
-                  type="file"
-                  accept="image/*"
-                  style={{ display: 'none' }}
-                  onChange={handleRenderImageUpload}
-                />
-              </div>
-
-              {/* Data de Carregamento */}
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '8px', color: 'var(--brown)' }}>
-                  Data de Carregamento
-                </label>
-                <input
-                  type="date"
-                  value={renderForm.data_upload}
-                  onChange={(e) => setRenderForm(prev => ({ ...prev, data_upload: e.target.value }))}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: '1px solid var(--stone)',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    background: 'var(--white)',
-                    color: 'var(--brown)'
-                  }}
-                />
-                <p style={{ fontSize: '11px', color: 'var(--brown-light)', marginTop: '6px' }}>
-                  Altere a data para registar histórico de imagens anteriores
-                </p>
-              </div>
-
-              {/* Descrição */}
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '8px', color: 'var(--brown)' }}>
-                  Descrição (opcional)
-                </label>
-                <textarea
-                  value={renderForm.descricao}
-                  onChange={(e) => setRenderForm(prev => ({ ...prev, descricao: e.target.value }))}
-                  placeholder="Notas sobre este render..."
-                  rows={3}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: '1px solid var(--stone)',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    resize: 'vertical',
-                    boxSizing: 'border-box'
-                  }}
-                />
-              </div>
-
-              {/* Marcar como Final */}
-              <div style={{
-                marginBottom: '20px',
-                padding: '16px',
-                background: renderForm.is_final ? 'rgba(var(--success-rgb), 0.1)' : 'var(--cream)',
-                borderRadius: '12px',
-                border: renderForm.is_final ? '2px solid var(--success)' : '1px solid var(--stone)'
-              }}>
-                <label style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  cursor: 'pointer'
-                }}>
-                  <input
-                    type="checkbox"
-                    checked={renderForm.is_final}
-                    onChange={(e) => setRenderForm(prev => ({ ...prev, is_final: e.target.checked }))}
-                    style={{
-                      width: '20px',
-                      height: '20px',
-                      accentColor: 'var(--success)'
-                    }}
-                  />
-                  <div>
-                    <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--brown)', display: 'block' }}>
-                      Marcar como Imagem Final
-                    </span>
-                    <span style={{ fontSize: '12px', color: 'var(--brown-light)' }}>
-                      Esta imagem aparecerá nas entregas ao cliente
-                    </span>
-                  </div>
-                </label>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div style={{
-              display: 'flex',
-              gap: '12px',
-              justifyContent: 'flex-end',
-              padding: '16px 24px',
-              borderTop: '1px solid var(--stone)',
-              background: 'var(--cream)'
-            }}>
-              <button onClick={() => setShowRenderModal(false)} className="btn btn-outline">
-                Cancelar
-              </button>
-              <button
-                onClick={handleSaveRender}
-                className="btn btn-primary"
-                disabled={!renderForm.compartimento}
-              >
-                {editingRender ? 'Guardar Alterações' : 'Adicionar Render'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <RenderModal
+        isOpen={showRenderModal}
+        onClose={() => setShowRenderModal(false)}
+        onSave={handleSaveRender}
+        renderForm={renderForm}
+        setRenderForm={setRenderForm}
+        editingRender={editingRender}
+        isDragging={isDragging}
+        getNextVersion={getNextVersion}
+        onCompartimentoChange={handleRenderCompartimentoChange}
+        onDragOver={handleRenderDragOver}
+        onDragLeave={handleRenderDragLeave}
+        onDrop={handleRenderDrop}
+        onImageUpload={handleRenderImageUpload}
+      />
 
       {/* MODAL: Editar Projeto */}
       {showEditModal && (
@@ -4644,320 +4077,29 @@ export default function ProjetoDetalhe() {
       )}
 
       {/* Modal Adicionar Membro à Equipa */}
-      {showEquipaModal && (
-        <div 
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1100
-          }}
-          onClick={() => setShowEquipaModal(false)}
-        >
-          <div 
-            style={{
-              background: 'var(--white)',
-              borderRadius: '16px',
-              width: '100%',
-              maxWidth: '500px',
-              maxHeight: '80vh',
-              overflow: 'auto',
-              margin: '20px'
-            }}
-            onClick={e => e.stopPropagation()}
-          >
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center',
-              padding: '20px 24px', 
-              borderBottom: '1px solid var(--stone)' 
-            }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 600, margin: 0 }}>Adicionar à Equipa</h2>
-              <button 
-                onClick={() => setShowEquipaModal(false)} 
-                style={{ background: 'none', border: 'none', cursor: 'pointer' }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-            
-            <div style={{ padding: '16px 24px' }}>
-              <p style={{ fontSize: '13px', color: 'var(--brown-light)', marginBottom: '16px' }}>
-                Selecione um colaborador para adicionar ao projeto
-              </p>
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '400px', overflow: 'auto' }}>
-                {utilizadores
-                  .filter(u => !equipaProjeto.some(e => e.utilizador_id === u.id))
-                  .map(u => (
-                    <div 
-                      key={u.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '12px',
-                        background: 'var(--cream)',
-                        borderRadius: '8px',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{
-                          width: '36px',
-                          height: '36px',
-                          borderRadius: '50%',
-                          background: 'var(--brown)',
-                          color: 'white',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '12px',
-                          fontWeight: 600
-                        }}>
-                          {u.nome?.substring(0, 2).toUpperCase()}
-                        </div>
-                        <div>
-                          <div style={{ fontWeight: 500, fontSize: '14px' }}>{u.nome}</div>
-                          <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>
-                            {u.cargo || 'Sem cargo'} • {u.departamento || 'Sem departamento'}
-                          </div>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => {
-                          const funcao = prompt('Função no projeto:', u.cargo || 'Membro')
-                          if (funcao !== null) {
-                            handleAddMembro(u.id, funcao || 'Membro')
-                          }
-                        }}
-                        style={{
-                          padding: '6px 12px',
-                          background: 'var(--brown)',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '6px',
-                          fontSize: '12px',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        Adicionar
-                      </button>
-                    </div>
-                  ))}
-                  
-                {utilizadores.filter(u => !equipaProjeto.some(e => e.utilizador_id === u.id)).length === 0 && (
-                  <p style={{ textAlign: 'center', color: 'var(--brown-light)', padding: '24px' }}>
-                    Todos os colaboradores já estão na equipa
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <EquipaModal
+        isOpen={showEquipaModal}
+        onClose={() => setShowEquipaModal(false)}
+        utilizadores={utilizadores}
+        equipaProjeto={equipaProjeto}
+        onAddMembro={handleAddMembro}
+      />
 
       {/* Modal de confirmação de eliminação */}
-      {showDeleteConfirm && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 9999
-        }}>
-          <div style={{
-            background: 'white',
-            borderRadius: '16px',
-            padding: '24px',
-            maxWidth: '400px',
-            width: '90%'
-          }}>
-            <h3 style={{ margin: '0 0 16px', color: 'var(--brown)' }}>Eliminar Projeto</h3>
-            <p style={{ margin: '0 0 24px', color: 'var(--brown-light)', fontSize: '14px' }}>
-              Tem a certeza que deseja eliminar o projeto <strong>{project?.nome}</strong>? Esta ação não pode ser revertida.
-            </p>
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                style={{
-                  padding: '10px 20px',
-                  background: 'var(--stone)',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                  color: 'var(--brown)'
-                }}
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={confirmDelete}
-                style={{
-                  padding: '10px 20px',
-                  background: 'var(--error)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  cursor: 'pointer'
-                }}
-              >
-                Eliminar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteConfirmModal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={confirmDelete}
+        projectName={project?.nome}
+      />
 
       {/* Lightbox para visualizar imagens em grande */}
-      {lightboxImage && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.95)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 10000,
-            cursor: 'zoom-out'
-          }}
-          onClick={() => setLightboxImage(null)}
-        >
-          {/* Header */}
-          <div style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            padding: '16px 24px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            background: 'linear-gradient(rgba(0,0,0,0.8), transparent)'
-          }}>
-            <div style={{ color: 'white' }}>
-              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>{lightboxImage.compartimento}</h3>
-              <span style={{ fontSize: '12px', opacity: 0.7 }}>
-                v{lightboxImage.versao} • {lightboxImage.data_upload ? new Date(lightboxImage.data_upload).toLocaleDateString('pt-PT') : ''}
-              </span>
-            </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                onClick={(e) => { e.stopPropagation(); setMoleskineRender(lightboxImage); setLightboxImage(null) }}
-                style={{
-                  padding: '8px 16px',
-                  background: '#8B8670',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-              >
-                <Pencil size={14} /> Moleskine
-              </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); openEditRenderModal(lightboxImage); setLightboxImage(null) }}
-                style={{
-                  padding: '8px 16px',
-                  background: 'rgba(255,255,255,0.2)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-              >
-                <Edit size={14} /> Editar
-              </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); setLightboxImage(null) }}
-                style={{
-                  padding: '8px',
-                  background: 'rgba(255,255,255,0.2)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer'
-                }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-          </div>
-
-          {/* Imagem */}
-          <img
-            src={lightboxImage.imagem_url}
-            alt={lightboxImage.compartimento}
-            style={{
-              maxWidth: '95vw',
-              maxHeight: '85vh',
-              objectFit: 'contain',
-              borderRadius: '8px'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          />
-
-          {/* Descrição (se existir) */}
-          {lightboxImage.descricao && (
-            <div style={{
-              position: 'absolute',
-              bottom: '24px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              padding: '12px 24px',
-              background: 'rgba(0,0,0,0.7)',
-              color: 'white',
-              borderRadius: '8px',
-              maxWidth: '80vw',
-              textAlign: 'center',
-              fontSize: '13px'
-            }}>
-              {lightboxImage.descricao}
-            </div>
-          )}
-
-          {/* Badge Final */}
-          {lightboxImage.is_final && (
-            <div style={{
-              position: 'absolute',
-              bottom: '24px',
-              right: '24px',
-              padding: '8px 16px',
-              background: 'var(--success)',
-              color: 'white',
-              borderRadius: '8px',
-              fontSize: '12px',
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}>
-              <CheckCircle size={14} /> Imagem Final
-            </div>
-          )}
-        </div>
-      )}
+      <ImageLightbox
+        image={lightboxImage}
+        onClose={() => setLightboxImage(null)}
+        onEditRender={(img) => { openEditRenderModal(img); setLightboxImage(null) }}
+        onOpenMoleskine={(img) => { setMoleskineRender(img); setLightboxImage(null) }}
+      />
 
       {/* Moleskine - Ferramenta de anotação de renders */}
       {moleskineRender && (

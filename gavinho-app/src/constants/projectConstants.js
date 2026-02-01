@@ -83,3 +83,18 @@ export const formatDate = (date) => {
   if (!date) return '-'
   return new Date(date).toLocaleDateString('pt-PT')
 }
+
+// Tipos de intervenientes
+export const TIPOS_INTERVENIENTES = [
+  'Dono de Obra',
+  'Cliente',
+  'Representante Dono de Obra',
+  'Autor Licenciamento Arquitectura',
+  'Arquitectura Paisagista',
+  'Especialidade Estruturas',
+  'Especialidades',
+  'Especialidade Acústica',
+  'Especialidade Térmica',
+  'Especialidade Segurança',
+  'Outro'
+]
