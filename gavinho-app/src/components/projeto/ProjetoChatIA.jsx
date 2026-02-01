@@ -2,10 +2,12 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
-import { MessageSquare, Plus, Settings, Sparkles, Loader2, Archive, Pin, MoreVertical, Trash2, Edit2 } from 'lucide-react'
+import { MessageSquare, Plus, Settings, Sparkles, Loader2, Archive, Pin, MoreVertical, Trash2, Edit2, AlertCircle, Zap } from 'lucide-react'
 import ChatMessages from './ChatMessages'
 import ChatInput from './ChatInput'
 import SkillsManager from './SkillsManager'
+import { useToast } from '../ui/Toast'
+import { SkeletonText, SkeletonAvatar } from '../ui/Skeleton'
 
 export default function ProjetoChatIA({ projetoId, projeto }) {
   const [chats, setChats] = useState([])
@@ -15,8 +17,10 @@ export default function ProjetoChatIA({ projetoId, projeto }) {
   const [sending, setSending] = useState(false)
   const [showSkills, setShowSkills] = useState(false)
   const [showChatMenu, setShowChatMenu] = useState(null)
+  const [sessionStats, setSessionStats] = useState({ tokens: 0, cost: 0 })
 
   const messagesEndRef = useRef(null)
+  const toast = useToast()
 
   // Carregar chats do projecto
   useEffect(() => {
@@ -37,22 +41,27 @@ export default function ProjetoChatIA({ projetoId, projeto }) {
 
   const fetchChats = async () => {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('projeto_chats')
-      .select('*')
-      .eq('projeto_id', projetoId)
-      .order('fixado', { ascending: false })
-      .order('updated_at', { ascending: false })
+    try {
+      const { data, error } = await supabase
+        .from('projeto_chats')
+        .select('*')
+        .eq('projeto_id', projetoId)
+        .order('fixado', { ascending: false })
+        .order('updated_at', { ascending: false })
 
-    if (error) {
-      console.error('Erro ao carregar chats:', error)
-    }
-
-    if (!error && data) {
-      setChats(data)
-      if (data.length > 0 && !activeChat) {
-        setActiveChat(data[0])
+      if (error) {
+        throw error
       }
+
+      if (data) {
+        setChats(data)
+        if (data.length > 0 && !activeChat) {
+          setActiveChat(data[0])
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao carregar chats:', error)
+      toast.error('Erro ao carregar', 'Não foi possível carregar os chats.')
     }
     setLoading(false)
   }
@@ -173,6 +182,16 @@ export default function ProjetoChatIA({ projetoId, projeto }) {
 
       if (response.error) throw response.error
 
+      // Atualizar estatísticas da sessão
+      if (response.data?.usage) {
+        const { input_tokens, output_tokens } = response.data.usage
+        const cost = (input_tokens * 0.000003) + (output_tokens * 0.000015)
+        setSessionStats(prev => ({
+          tokens: prev.tokens + input_tokens + output_tokens,
+          cost: prev.cost + cost
+        }))
+      }
+
       // Recarregar mensagens para ter os dados correctos
       await fetchMessages(activeChat.id)
 
@@ -180,7 +199,10 @@ export default function ProjetoChatIA({ projetoId, projeto }) {
       console.error('Erro ao enviar mensagem:', error)
       // Remover mensagens temporarias em caso de erro
       setMessages(prev => prev.filter(m => !m.id.startsWith('temp-')))
-      alert('Erro ao enviar mensagem. Tenta novamente.')
+      toast.error(
+        'Erro ao enviar',
+        error.message || 'Não foi possível processar a mensagem. Tenta novamente.'
+      )
     }
 
     setSending(false)
@@ -188,9 +210,29 @@ export default function ProjetoChatIA({ projetoId, projeto }) {
 
   if (loading) {
     return (
-      <div style={styles.loadingContainer}>
-        <Loader2 size={24} style={{ animation: 'spin 1s linear infinite' }} />
-        <span>A carregar...</span>
+      <div style={styles.container}>
+        {/* Skeleton Sidebar */}
+        <div style={styles.sidebar}>
+          <div style={styles.sidebarHeader}>
+            <SkeletonText lines={1} style={{ width: '100px' }} />
+          </div>
+          <div style={{ padding: '8px' }}>
+            {[1, 2, 3].map(i => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', marginBottom: '4px' }}>
+                <SkeletonText lines={1} style={{ flex: 1 }} />
+              </div>
+            ))}
+          </div>
+        </div>
+        {/* Skeleton Main */}
+        <div style={styles.main}>
+          <div style={styles.chatHeader}>
+            <SkeletonText lines={2} style={{ width: '200px' }} />
+          </div>
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Loader2 size={24} style={{ animation: 'spin 1s linear infinite', color: '#8B8670' }} />
+          </div>
+        </div>
       </div>
     )
   }
@@ -333,9 +375,19 @@ export default function ProjetoChatIA({ projetoId, projeto }) {
                   {activeChat.estado === 'arquivado' && ' • Arquivado'}
                 </span>
               </div>
-              <button style={styles.settingsButton} title="Definicoes do chat">
-                <Settings size={18} />
-              </button>
+              <div style={styles.headerRight}>
+                {/* Session Stats */}
+                {sessionStats.tokens > 0 && (
+                  <div style={styles.sessionStats} title="Tokens e custo desta sessão">
+                    <Zap size={14} />
+                    <span>{sessionStats.tokens.toLocaleString()} tokens</span>
+                    <span style={styles.sessionCost}>~€{sessionStats.cost.toFixed(4)}</span>
+                  </div>
+                )}
+                <button style={styles.settingsButton} title="Definições do chat">
+                  <Settings size={18} />
+                </button>
+              </div>
             </div>
 
             {/* Mensagens */}
@@ -570,6 +622,27 @@ const styles = {
   chatHeaderMeta: {
     fontSize: '12px',
     color: '#78716C',
+  },
+  headerRight: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  sessionStats: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '6px 10px',
+    backgroundColor: 'rgba(139, 134, 112, 0.08)',
+    borderRadius: '6px',
+    fontSize: '12px',
+    color: '#8B8670',
+  },
+  sessionCost: {
+    color: '#78716C',
+    fontWeight: 500,
+    paddingLeft: '6px',
+    borderLeft: '1px solid rgba(139, 134, 112, 0.2)',
   },
   settingsButton: {
     padding: '8px',
