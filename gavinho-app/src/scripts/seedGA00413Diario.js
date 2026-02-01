@@ -185,6 +185,8 @@ export const entradasDiarioGA00413 = [
 async function ensureEspecialidadeCategorias(supabase, addLog) {
   addLog('📂 Verificando categorias de especialidade...', 'info')
 
+  const failedCategories = []
+
   for (const cat of especialidadeCategorias) {
     const { data: existing } = await supabase
       .from('diario_categorias')
@@ -199,23 +201,28 @@ async function ensureEspecialidadeCategorias(supabase, addLog) {
 
       if (error) {
         addLog(`⚠️ Erro ao criar categoria ${cat.nome}: ${error.message}`, 'warning')
+        failedCategories.push({ name: cat.nome, error: error.message, data: cat })
       } else {
         addLog(`✅ Categoria criada: ${cat.nome}`, 'success')
       }
     }
   }
 
-  // Retornar mapa de categorias
+  // Retornar mapa de categorias (incluindo as que já existiam)
   const { data: categorias } = await supabase
     .from('diario_categorias')
     .select('id, nome')
 
-  return Object.fromEntries(categorias.map(c => [c.nome, c.id]))
+  const categoriasMap = categorias ? Object.fromEntries(categorias.map(c => [c.nome, c.id])) : {}
+
+  return { categoriasMap, failedCategories }
 }
 
 // Função para inserir as tags de estado
 async function ensureEstadoTags(supabase, addLog) {
   addLog('🏷️ Verificando tags de estado...', 'info')
+
+  const failedTags = []
 
   for (const tag of estadoTags) {
     const { data: existing } = await supabase
@@ -231,23 +238,28 @@ async function ensureEstadoTags(supabase, addLog) {
 
       if (error) {
         addLog(`⚠️ Erro ao criar tag ${tag.nome}: ${error.message}`, 'warning')
+        failedTags.push({ name: tag.nome, error: error.message, data: tag })
       } else {
         addLog(`✅ Tag criada: ${tag.nome}`, 'success')
       }
     }
   }
 
-  // Retornar mapa de tags
+  // Retornar mapa de tags (incluindo as que já existiam)
   const { data: tags } = await supabase
     .from('diario_tags')
     .select('id, nome')
 
-  return Object.fromEntries(tags.map(t => [t.nome, t.id]))
+  const tagsMap = tags ? Object.fromEntries(tags.map(t => [t.nome, t.id])) : {}
+
+  return { tagsMap, failedTags }
 }
 
 // Função principal para inserir as entradas do diário
 export async function seedGA00413Diario(supabase, addLog = console.log) {
   addLog('🚀 Iniciando importação do Diário de Bordo GA00413+414...', 'info')
+
+  const failedItems = []
 
   // 1. Encontrar o projeto GA00413+414
   addLog('🔍 Procurando projeto GA00413+414...', 'info')
@@ -260,16 +272,23 @@ export async function seedGA00413Diario(supabase, addLog = console.log) {
 
   if (projetoError || !projeto) {
     addLog('❌ Projeto GA00413+414 não encontrado!', 'error')
-    throw new Error('Projeto GA00413+414 não encontrado')
+    return {
+      inserted: 0,
+      errors: 1,
+      total: entradasDiarioGA00413.length,
+      failedItems: [{ name: 'Projeto GA00413+414', error: 'Projeto não encontrado na base de dados' }]
+    }
   }
 
   addLog(`✅ Projeto encontrado: ${projeto.nome} (ID: ${projeto.id})`, 'success')
 
   // 2. Garantir que as categorias existem
-  const categoriasMap = await ensureEspecialidadeCategorias(supabase, addLog)
+  const { categoriasMap, failedCategories } = await ensureEspecialidadeCategorias(supabase, addLog)
+  failedItems.push(...failedCategories)
 
   // 3. Garantir que as tags existem
-  const tagsMap = await ensureEstadoTags(supabase, addLog)
+  const { tagsMap, failedTags } = await ensureEstadoTags(supabase, addLog)
+  failedItems.push(...failedTags)
 
   // 4. Inserir as entradas do diário
   addLog(`📝 Inserindo ${entradasDiarioGA00413.length} entradas no diário...`, 'info')
@@ -279,12 +298,22 @@ export async function seedGA00413Diario(supabase, addLog = console.log) {
 
   for (const entrada of entradasDiarioGA00413) {
     // Criar título a partir da especialidade e estado
-    const titulo = entrada.estado === 'Decisão'
-      ? `[${entrada.especialidade}] ${entrada.descricao.substring(0, 100)}`
-      : `[${entrada.especialidade}] ${entrada.descricao.substring(0, 100)}`
+    const titulo = `[${entrada.especialidade}] ${entrada.descricao.substring(0, 100)}`
 
     const categoriaId = categoriasMap[entrada.especialidade]
     const tagId = tagsMap[entrada.estado]
+
+    // Skip se categoria não existe (em vez de falhar)
+    if (!categoriaId) {
+      addLog(`⚠️ Categoria "${entrada.especialidade}" não existe - a saltar entrada`, 'warning')
+      errors++
+      failedItems.push({
+        name: `${entrada.especialidade}: ${entrada.descricao.substring(0, 50)}...`,
+        error: `Categoria "${entrada.especialidade}" não encontrada`,
+        data: entrada
+      })
+      continue
+    }
 
     // Inserir entrada
     const { data: diarioEntry, error: insertError } = await supabase
@@ -302,19 +331,28 @@ export async function seedGA00413Diario(supabase, addLog = console.log) {
       .single()
 
     if (insertError) {
-      console.error('Erro ao inserir:', entrada.descricao.substring(0, 50), insertError)
+      addLog(`⚠️ Erro ao inserir: ${entrada.descricao.substring(0, 50)}...`, 'warning')
       errors++
+      failedItems.push({
+        name: `${entrada.especialidade}: ${entrada.descricao.substring(0, 50)}...`,
+        error: insertError.message,
+        data: entrada
+      })
       continue
     }
 
     // Associar tag
     if (diarioEntry && tagId) {
-      await supabase
+      const { error: tagError } = await supabase
         .from('projeto_diario_tags')
         .insert({
           diario_id: diarioEntry.id,
           tag_id: tagId
         })
+
+      if (tagError) {
+        addLog(`⚠️ Entrada criada mas tag não associada: ${tagError.message}`, 'warning')
+      }
     }
 
     inserted++
@@ -335,5 +373,10 @@ export async function seedGA00413Diario(supabase, addLog = console.log) {
     addLog(`   ${esp}: ${count} entradas`, 'info')
   }
 
-  return { inserted, errors, total: entradasDiarioGA00413.length }
+  return {
+    inserted,
+    errors,
+    total: entradasDiarioGA00413.length,
+    failedItems: failedItems.length > 0 ? failedItems : undefined
+  }
 }

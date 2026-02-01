@@ -1227,11 +1227,25 @@ export default function AdminSeed() {
 
     try {
       const result = await seedGA00413Diario(supabase, addLogWrapper)
-      setResult({ success: result.errors === 0 })
-      if (result.errors === 0) await registerSeedExecution('GA00413_diario', result)
+
+      // Set result with partial success support
+      setResult({
+        success: result.errors === 0,
+        successCount: result.inserted,
+        errorCount: result.errors,
+        failedItems: result.failedItems
+      })
+
+      // Only register as executed if fully successful
+      if (result.errors === 0) {
+        await registerSeedExecution('GA00413_diario', result)
+      } else if (result.inserted > 0) {
+        // Partial success - still register but mark as partial
+        await registerSeedExecution('GA00413_diario', { ...result, partial: true })
+      }
     } catch (err) {
       addLogWrapper(`💥 Erro: ${err.message}`, 'error')
-      setResult({ success: false, error: err.message })
+      setResult({ success: false, error: err.message, errorCount: 1 })
     } finally {
       setLoading(false)
     }
@@ -2440,26 +2454,139 @@ export default function AdminSeed() {
           </div>
 
           {result && (
-            <div style={{
-              marginTop: '16px',
-              padding: '12px 16px',
-              borderRadius: '8px',
-              background: result.success ? 'rgba(74, 222, 128, 0.1)' : 'rgba(248, 113, 113, 0.1)',
-              border: `1px solid ${result.success ? '#4ade80' : '#f87171'}`,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}>
-              {result.success ? (
-                <>
-                  <CheckCircle size={18} style={{ color: '#4ade80' }} />
-                  <span style={{ color: '#4ade80', fontWeight: 500 }}>Seed concluído com sucesso!</span>
-                </>
-              ) : (
-                <>
-                  <AlertCircle size={18} style={{ color: '#f87171' }} />
-                  <span style={{ color: '#f87171', fontWeight: 500 }}>Erro: {result.error}</span>
-                </>
+            <div style={{ marginTop: '16px' }}>
+              {/* Status principal */}
+              <div style={{
+                padding: '12px 16px',
+                borderRadius: '8px',
+                background: result.success
+                  ? 'rgba(74, 222, 128, 0.1)'
+                  : result.successCount > 0
+                    ? 'rgba(250, 204, 21, 0.1)'
+                    : 'rgba(248, 113, 113, 0.1)',
+                border: `1px solid ${result.success
+                  ? '#4ade80'
+                  : result.successCount > 0
+                    ? '#facc15'
+                    : '#f87171'}`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {result.success ? (
+                    <>
+                      <CheckCircle size={18} style={{ color: '#4ade80' }} />
+                      <span style={{ color: '#4ade80', fontWeight: 500 }}>Seed concluído com sucesso!</span>
+                    </>
+                  ) : result.successCount > 0 ? (
+                    <>
+                      <AlertTriangle size={18} style={{ color: '#facc15' }} />
+                      <span style={{ color: '#ca8a04', fontWeight: 500 }}>
+                        Parcialmente concluído: {result.successCount} inseridos, {result.errorCount} erros
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <AlertCircle size={18} style={{ color: '#f87171' }} />
+                      <span style={{ color: '#f87171', fontWeight: 500 }}>Erro: {result.error}</span>
+                    </>
+                  )}
+                </div>
+
+                {/* Stats rápidas */}
+                {(result.successCount > 0 || result.errorCount > 0) && (
+                  <div style={{ display: 'flex', gap: '16px', fontSize: '13px' }}>
+                    {result.successCount > 0 && (
+                      <span style={{ color: '#4ade80' }}>
+                        <CheckCircle size={14} style={{ marginRight: '4px', verticalAlign: 'middle' }} />
+                        {result.successCount}
+                      </span>
+                    )}
+                    {result.errorCount > 0 && (
+                      <span style={{ color: '#f87171' }}>
+                        <AlertCircle size={14} style={{ marginRight: '4px', verticalAlign: 'middle' }} />
+                        {result.errorCount}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Lista de itens com erro para tratamento manual */}
+              {result.failedItems && result.failedItems.length > 0 && (
+                <div style={{
+                  marginTop: '12px',
+                  padding: '16px',
+                  background: 'rgba(248, 113, 113, 0.05)',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(248, 113, 113, 0.2)'
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '12px'
+                  }}>
+                    <h4 style={{ fontSize: '14px', fontWeight: 600, color: '#dc2626' }}>
+                      Itens com erro ({result.failedItems.length})
+                    </h4>
+                    <button
+                      onClick={() => setResult(prev => ({ ...prev, failedItems: [] }))}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'var(--brown-light)',
+                        cursor: 'pointer',
+                        fontSize: '12px'
+                      }}
+                    >
+                      Limpar
+                    </button>
+                  </div>
+                  <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                    {result.failedItems.map((item, idx) => (
+                      <div key={idx} style={{
+                        padding: '10px 12px',
+                        background: 'white',
+                        borderRadius: '6px',
+                        marginBottom: '8px',
+                        fontSize: '13px',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                      }}>
+                        <div>
+                          <div style={{ color: 'var(--brown)', fontWeight: 500 }}>
+                            {item.name || item.titulo || item.nome || `Item ${idx + 1}`}
+                          </div>
+                          <div style={{ color: '#dc2626', fontSize: '11px', marginTop: '2px' }}>
+                            {item.error}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            // Copiar dados do item para clipboard para inserção manual
+                            navigator.clipboard.writeText(JSON.stringify(item.data || item, null, 2))
+                            alert('Dados copiados para clipboard')
+                          }}
+                          style={{
+                            padding: '4px 10px',
+                            background: 'var(--cream)',
+                            border: '1px solid var(--stone)',
+                            borderRadius: '4px',
+                            fontSize: '11px',
+                            cursor: 'pointer',
+                            color: 'var(--brown-light)'
+                          }}
+                        >
+                          Copiar
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           )}
