@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Plus, Search, Filter, LayoutGrid, List, MoreVertical, MapPin, Calendar, X,
@@ -68,34 +68,40 @@ export default function Projetos() {
   }
 
   // Carregar projetos, clientes e calcular metricas
+  // Otimizado: usa JOINs do Supabase em vez de queries separadas
   const loadData = async () => {
     try {
-      const [projRes, cliRes, entregRes, pagRes] = await Promise.all([
-        supabase.from('projetos').select('*').order('codigo', { ascending: true }),
-        supabase.from('clientes').select('id, nome').order('nome'),
-        supabase.from('projeto_entregaveis').select('projeto_id, status'),
-        supabase.from('projeto_pagamentos').select('projeto_id, valor, estado')
+      const [projRes, cliRes] = await Promise.all([
+        supabase
+          .from('projetos')
+          .select(`
+            *,
+            projeto_entregaveis(status),
+            projeto_pagamentos(valor, estado)
+          `)
+          .order('codigo', { ascending: true }),
+        supabase.from('clientes').select('id, nome').order('nome')
       ])
 
       const projetos = projRes.data || []
-      const entregaveis = entregRes.data || []
-      const pagamentos = pagRes.data || []
 
       // Calcular progresso e financeiro para cada projeto
+      // Dados ja vem relacionados - sem necessidade de filtrar
       const projetosComMetricas = projetos.map(p => {
+        const entregaveis = p.projeto_entregaveis || []
+        const pagamentos = p.projeto_pagamentos || []
+
         // Calcular progresso dos entregaveis
-        const projEntregaveis = entregaveis.filter(e => e.projeto_id === p.id)
         let progressoCalculado = p.progresso || 0
-        if (projEntregaveis.length > 0) {
-          const concluidos = projEntregaveis.filter(e =>
+        if (entregaveis.length > 0) {
+          const concluidos = entregaveis.filter(e =>
             e.status === 'concluido' || e.status === 'aprovado'
           ).length
-          progressoCalculado = Math.round((concluidos / projEntregaveis.length) * 100)
+          progressoCalculado = Math.round((concluidos / entregaveis.length) * 100)
         }
 
         // Calcular financeiro
-        const projPagamentos = pagamentos.filter(pg => pg.projeto_id === p.id)
-        const valorPago = projPagamentos
+        const valorPago = pagamentos
           .filter(pg => pg.estado === 'pago')
           .reduce((sum, pg) => sum + (parseFloat(pg.valor) || 0), 0)
 
@@ -104,12 +110,14 @@ export default function Projetos() {
 
         return {
           ...p,
+          projeto_entregaveis: undefined, // Remover dados aninhados
+          projeto_pagamentos: undefined,
           progresso: progressoCalculado,
           progresso_manual: p.progresso,
           status_calculado: statusCalculado,
           valor_pago: valorPago,
-          entregaveis_total: projEntregaveis.length,
-          entregaveis_concluidos: projEntregaveis.filter(e =>
+          entregaveis_total: entregaveis.length,
+          entregaveis_concluidos: entregaveis.filter(e =>
             e.status === 'concluido' || e.status === 'aprovado'
           ).length
         }
@@ -118,7 +126,7 @@ export default function Projetos() {
       setProjects(projetosComMetricas)
       setClientes(cliRes.data || [])
     } catch (err) {
-      console.error('Erro ao carregar dados:', err)
+      // Silent fail - will show empty state
     } finally {
       setLoading(false)
     }
@@ -135,26 +143,17 @@ export default function Projetos() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'projetos' },
-        () => {
-          console.log('Projetos alterado - recarregando...')
-          loadData()
-        }
+        () => loadData()
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'projeto_entregaveis' },
-        () => {
-          console.log('Entregaveis alterado - recalculando metricas...')
-          loadData()
-        }
+        () => loadData()
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'projeto_pagamentos' },
-        () => {
-          console.log('Pagamentos alterado - recalculando metricas...')
-          loadData()
-        }
+        () => loadData()
       )
       .subscribe()
 
@@ -164,15 +163,18 @@ export default function Projetos() {
     }
   }, [])
 
-  // Filtrar projetos
-  const filteredProjects = projects.filter(p => {
-    const matchesSearch = 
-      p.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.codigo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.cliente_nome?.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesFase = selectedFase === 'Todas' || p.fase === selectedFase
-    return matchesSearch && matchesFase
-  })
+  // Filtrar projetos - memoizado para evitar recalculos desnecessarios
+  const filteredProjects = useMemo(() => {
+    return projects.filter(p => {
+      const searchLower = searchTerm.toLowerCase()
+      const matchesSearch =
+        p.nome?.toLowerCase().includes(searchLower) ||
+        p.codigo?.toLowerCase().includes(searchLower) ||
+        p.cliente_nome?.toLowerCase().includes(searchLower)
+      const matchesFase = selectedFase === 'Todas' || p.fase === selectedFase
+      return matchesSearch && matchesFase
+    })
+  }, [projects, searchTerm, selectedFase])
 
   // Abrir modal para criar
   const handleNewProject = () => {

@@ -23,3 +23,6 @@ export { ToastProvider, useToast } from './Toast'
 // Theme System
 export { ThemeProvider, useTheme } from './ThemeProvider'
 export { default as ThemeToggle } from './ThemeToggle'
+
+// Modals
+export { ConfirmModal, useConfirmModal } from './ConfirmModal'
