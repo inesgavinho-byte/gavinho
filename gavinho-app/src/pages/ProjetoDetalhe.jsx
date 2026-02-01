@@ -80,8 +80,7 @@ import MoleskineDigital from '../components/MoleskineDigital'
 import ProjetoChatIA from '../components/projeto/ProjetoChatIA'
 import ProjetoAtas from '../components/ProjetoAtas'
 
-// Importar dados de amostra e constantes de ficheiros separados
-import { sampleProjectData, projectsMap } from '../data/sampleProjects'
+// Importar constantes de ficheiros separados
 import {
   COMPARTIMENTOS,
   TIPOLOGIAS,
@@ -104,11 +103,6 @@ import {
 
 // Importar componentes do dashboard
 import { DashboardTab } from '../components/projeto/dashboard'
-
-// NOTA: sampleProjectData é usado apenas para demonstração
-// Em produção, todos os dados devem vir da base de dados
-// Definir como false para desativar sample data completamente
-const useSampleData = false
 
 export default function ProjetoDetalhe() {
   const { id, tab: urlTab, subtab: urlSubtab } = useParams()
@@ -972,20 +966,33 @@ export default function ProjetoDetalhe() {
       try {
         setLoading(true)
         
-        // Determinar código do projeto
-        const projectCode = projectsMap[id] || id
-        
-        // Buscar projeto do Supabase
-        const { data: projetoData, error: projetoError } = await supabase
-          .from('projetos')
-          .select('*')
-          .eq('codigo', projectCode)
-          .single()
-        
+        // Buscar projeto do Supabase (por ID ou codigo)
+        let projetoData = null
+        let projetoError = null
+
+        // Tentar buscar por ID (UUID)
+        if (id.includes('-')) {
+          const result = await supabase
+            .from('projetos')
+            .select('*')
+            .eq('id', id)
+            .single()
+          projetoData = result.data
+          projetoError = result.error
+        } else {
+          // Tentar buscar por codigo
+          const result = await supabase
+            .from('projetos')
+            .select('*')
+            .eq('codigo', id)
+            .single()
+          projetoData = result.data
+          projetoError = result.error
+        }
+
         if (projetoError || !projetoData) {
-          // Fallback para dados locais
-          const localProject = sampleProjectData[projectCode] || sampleProjectData['GA00492']
-          setProject(localProject)
+          console.error('Projeto nao encontrado:', id)
+          setProject(null)
           setLoading(false)
           return
         }
@@ -1078,9 +1085,6 @@ export default function ProjetoDetalhe() {
           .reduce((sum, f) => sum + parseFloat(f.total), 0)
         const totalPendente = totalContratado - totalPago
         
-        // Verificar se temos dados locais para complementar
-        const localData = sampleProjectData[projectCode]
-        
         // Construir objeto do projeto
         const fullProject = {
           // Dados base do Supabase
@@ -1132,11 +1136,11 @@ export default function ProjetoDetalhe() {
             tipo: 'Particular'
           },
           
-          // Serviços com fases (do Supabase ou fallback local)
-          servicos: servicosData && servicosData.length > 0 ? servicosData : (localData?.servicos || []),
-          
-          // Pagamentos (do Supabase ou fallback local)
-          pagamentos: (pagamentosData && pagamentosData.length > 0 ? pagamentosData : (localData?.pagamentos || [])).map(p => ({
+          // Serviços com fases
+          servicos: servicosData || [],
+
+          // Pagamentos
+          pagamentos: (pagamentosData || []).map(p => ({
             prestacao: p.prestacao_numero || p.prestacao,
             descricao: p.descricao,
             data: p.data_limite || p.data,
@@ -1145,8 +1149,8 @@ export default function ProjetoDetalhe() {
             data_pagamento: p.data_pagamento
           })),
           
-          // Faturas (do Supabase ou fallback local)
-          faturas: (faturasData && faturasData.length > 0 ? faturasData : (localData?.faturas || [])).map(f => ({
+          // Faturas
+          faturas: (faturasData || []).map(f => ({
             numero: f.codigo || f.numero,
             descricao: f.descricao || f.referencia_cliente,
             data: f.data_emissao || f.data,
@@ -1172,17 +1176,17 @@ export default function ProjetoDetalhe() {
             taxa_iva: 23
           },
           
-          // Documentos (fallback local por agora)
-          documentos: localData?.documentos || [],
-          
-          // Equipa (fallback local por agora)
-          equipa: localData?.equipa || {
-            project_manager: 'Maria Gavinho',
+          // Documentos
+          documentos: [],
+
+          // Equipa
+          equipa: {
+            project_manager: null,
             designer: null,
             arquiteto: null
           }
         }
-        
+
         setProject(fullProject)
         setEscopoTrabalho(projetoData.escopo_trabalho || '')
 
@@ -1194,9 +1198,7 @@ export default function ProjetoDetalhe() {
 
       } catch (err) {
         console.error('Erro ao buscar projeto:', err)
-        // Fallback para dados locais
-        const projectCode = projectsMap[id] || id
-        setProject(sampleProjectData[projectCode] || sampleProjectData['GA00492'])
+        setProject(null)
       } finally {
         setLoading(false)
       }
@@ -1204,16 +1206,15 @@ export default function ProjetoDetalhe() {
     
     fetchProject()
 
-    // Supabase Realtime subscription para sincronizar alterações
+    // Supabase Realtime subscription para sincronizar alteracoes
     const channel = supabase
       .channel(`projeto-${id}-changes`)
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'projetos' },
         (payload) => {
-          // Verificar se é o projeto atual
-          const projectCode = projectsMap[id] || id
-          if (payload.new.codigo === projectCode) {
+          // Verificar se e o projeto atual (por ID ou codigo)
+          if (payload.new.id === id || payload.new.codigo === id) {
             console.log('Projeto atualizado:', payload.new)
             setProject(prev => prev ? { ...prev, ...payload.new } : payload.new)
           }
