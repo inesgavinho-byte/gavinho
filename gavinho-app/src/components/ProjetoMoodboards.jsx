@@ -274,158 +274,142 @@ export default function ProjetoMoodboards({ projeto, userId, userName }) {
         </button>
       </div>
 
-      <div className="moodboards-content">
-        {/* Sidebar with list */}
-        <div className="moodboards-sidebar">
-          {moodboards.length === 0 ? (
-            <div className="moodboards-empty">
-              <FileCode size={32} />
-              <p>Sem moodboards</p>
-              <span>Adicione ficheiros HTML para visualizar os conceitos do projeto</span>
-            </div>
-          ) : (
-            <div className="moodboards-list">
-              {moodboards.map(mb => (
-                <div
-                  key={mb.id}
-                  className={`moodboard-item ${selectedMoodboard?.id === mb.id ? 'active' : ''}`}
-                  onClick={() => handleSelectMoodboard(mb)}
-                >
-                  <div className="moodboard-item-icon">
-                    <FileCode size={20} />
-                  </div>
-                  <div className="moodboard-item-info">
-                    <h4>{mb.titulo}</h4>
-                    <span className="moodboard-item-meta">
-                      {getTipoLabel(mb.tipo)} · {formatFileSize(mb.file_size)}
+      {/* Moodboard Cards - Horizontal */}
+      {moodboards.length === 0 ? (
+        <div className="moodboards-empty-state">
+          <FileCode size={40} />
+          <h3>Sem moodboards</h3>
+          <p>Adicione ficheiros HTML para visualizar os conceitos do projeto</p>
+          <button className="btn btn-primary" onClick={() => setShowUploadModal(true)}>
+            <Plus size={16} />
+            Adicionar Moodboard
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="moodboards-cards">
+            {moodboards.map(mb => (
+              <div
+                key={mb.id}
+                className={`moodboard-card ${selectedMoodboard?.id === mb.id ? 'active' : ''}`}
+                onClick={() => handleSelectMoodboard(mb)}
+              >
+                <div className="moodboard-card-icon">
+                  <FileCode size={24} />
+                </div>
+                <div className="moodboard-card-info">
+                  <h4>{mb.titulo}</h4>
+                  <span>{getTipoLabel(mb.tipo)}</span>
+                </div>
+                <div className="moodboard-card-actions">
+                  <button
+                    className="btn-icon"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      openEdit(mb)
+                    }}
+                    title="Editar"
+                  >
+                    <Edit size={14} />
+                  </button>
+                  <button
+                    className="btn-icon btn-danger"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleDelete(mb)
+                    }}
+                    title="Eliminar"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Full Width Viewer */}
+          <div className="moodboards-viewer-full">
+            {selectedMoodboard ? (
+              <>
+                <div className="viewer-toolbar">
+                  <div className="viewer-info">
+                    <h3>{selectedMoodboard.titulo}</h3>
+                    {selectedMoodboard.descricao && (
+                      <p>{selectedMoodboard.descricao}</p>
+                    )}
+                    <span className="viewer-meta">
+                      <Calendar size={12} />
+                      {new Date(selectedMoodboard.created_at).toLocaleDateString('pt-PT')}
+                      <User size={12} />
+                      {selectedMoodboard.created_by_name || 'Desconhecido'}
                     </span>
                   </div>
-                  <div className="moodboard-item-actions">
-                    <button
-                      className="btn-icon"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        openEdit(mb)
-                      }}
-                      title="Editar"
-                    >
-                      <Edit size={14} />
-                    </button>
-                    <button
-                      className="btn-icon btn-danger"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleDelete(mb)
-                      }}
-                      title="Eliminar"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Viewer */}
-        <div className="moodboards-viewer">
-          {selectedMoodboard ? (
-            <>
-              <div className="viewer-toolbar">
-                <div className="viewer-info">
-                  <h3>{selectedMoodboard.titulo}</h3>
-                  {selectedMoodboard.descricao && (
-                    <p>{selectedMoodboard.descricao}</p>
-                  )}
-                </div>
-                <div className="viewer-actions">
-                  <button
-                    className="btn btn-ghost"
-                    onClick={() => loadHtmlContent(selectedMoodboard)}
-                    title="Recarregar"
-                    disabled={loadingHtml}
-                  >
-                    <RefreshCw size={16} className={loadingHtml ? 'spin' : ''} />
-                  </button>
-                  <a
-                    className="btn btn-ghost"
-                    href={selectedMoodboard.file_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title="Abrir em nova janela"
-                  >
-                    <ExternalLink size={16} />
-                  </a>
-                  <a
-                    className="btn btn-ghost"
-                    href={selectedMoodboard.file_url}
-                    download={`${selectedMoodboard.titulo}.html`}
-                    title="Download"
-                  >
-                    <Download size={16} />
-                  </a>
-                  <button
-                    className="btn btn-ghost"
-                    onClick={toggleFullscreen}
-                    title={isFullscreen ? 'Sair de ecrã inteiro' : 'Ecrã inteiro'}
-                  >
-                    {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-                  </button>
-                  {isFullscreen && (
+                  <div className="viewer-actions">
                     <button
                       className="btn btn-ghost"
-                      onClick={() => {
-                        setIsFullscreen(false)
-                        setSelectedMoodboard(null)
-                      }}
-                      title="Fechar"
+                      onClick={() => loadHtmlContent(selectedMoodboard)}
+                      title="Recarregar"
+                      disabled={loadingHtml}
                     >
-                      <X size={16} />
+                      <RefreshCw size={16} className={loadingHtml ? 'spin' : ''} />
                     </button>
+                    <a
+                      className="btn btn-ghost"
+                      href={selectedMoodboard.file_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Abrir em nova janela"
+                    >
+                      <ExternalLink size={16} />
+                    </a>
+                    <a
+                      className="btn btn-ghost"
+                      href={selectedMoodboard.file_url}
+                      download={`${selectedMoodboard.titulo}.html`}
+                      title="Download"
+                    >
+                      <Download size={16} />
+                    </a>
+                    <button
+                      className="btn btn-ghost"
+                      onClick={toggleFullscreen}
+                      title={isFullscreen ? 'Sair de ecrã inteiro' : 'Ecrã inteiro'}
+                    >
+                      {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                    </button>
+                  </div>
+                </div>
+                <div className="viewer-frame-container">
+                  {loadingHtml ? (
+                    <div className="viewer-loading">
+                      <Loader2 size={32} className="spin" />
+                      <p>A carregar moodboard...</p>
+                    </div>
+                  ) : htmlContent ? (
+                    <iframe
+                      ref={iframeRef}
+                      srcDoc={htmlContent}
+                      title={selectedMoodboard.titulo}
+                      className="viewer-iframe"
+                      sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+                    />
+                  ) : (
+                    <div className="viewer-loading">
+                      <Loader2 size={32} className="spin" />
+                    </div>
                   )}
                 </div>
+              </>
+            ) : (
+              <div className="viewer-placeholder">
+                <Eye size={48} />
+                <h3>Selecione um moodboard</h3>
+                <p>Clique num dos cards acima para visualizar</p>
               </div>
-              <div className="viewer-frame-container">
-                {loadingHtml ? (
-                  <div className="viewer-loading">
-                    <Loader2 size={32} className="spin" />
-                    <p>A carregar moodboard...</p>
-                  </div>
-                ) : htmlContent ? (
-                  <iframe
-                    ref={iframeRef}
-                    srcDoc={htmlContent}
-                    title={selectedMoodboard.titulo}
-                    className="viewer-iframe"
-                    sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
-                  />
-                ) : (
-                  <div className="viewer-loading">
-                    <Loader2 size={32} className="spin" />
-                  </div>
-                )}
-              </div>
-              <div className="viewer-footer">
-                <span>
-                  <Calendar size={12} />
-                  {new Date(selectedMoodboard.created_at).toLocaleDateString('pt-PT')}
-                </span>
-                <span>
-                  <User size={12} />
-                  {selectedMoodboard.created_by_name || 'Desconhecido'}
-                </span>
-              </div>
-            </>
-          ) : (
-            <div className="viewer-placeholder">
-              <Eye size={48} />
-              <h3>Selecione um moodboard</h3>
-              <p>Clique num moodboard da lista para visualizar</p>
-            </div>
-          )}
-        </div>
-      </div>
+            )}
+          </div>
+        </>
+      )}
 
       {/* Upload Modal */}
       {showUploadModal && (

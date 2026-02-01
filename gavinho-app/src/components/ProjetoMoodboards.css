@@ -1,4 +1,4 @@
-/* ProjetoMoodboards.css */
+/* ProjetoMoodboards.css - New Horizontal Layout */
 
 .moodboards-container {
   display: flex;
@@ -25,8 +25,6 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--stone, #e5e5e5);
 }
 
 .moodboards-title {
@@ -51,162 +49,133 @@
   color: var(--brown-light, #666);
 }
 
-/* Content Layout */
-.moodboards-content {
-  display: flex;
-  gap: 20px;
-  flex: 1;
-  min-height: 0;
-}
-
-/* Sidebar */
-.moodboards-sidebar {
-  width: 280px;
-  min-width: 280px;
-  background: var(--cream, #fafaf8);
-  border-radius: 8px;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.moodboards-empty {
+/* Empty State */
+.moodboards-empty-state {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 40px 20px;
+  padding: 80px 40px;
+  background: var(--cream, #fafaf8);
+  border-radius: 12px;
   text-align: center;
+}
+
+.moodboards-empty-state svg {
+  color: var(--brown-light, #666);
+  opacity: 0.3;
+  margin-bottom: 16px;
+}
+
+.moodboards-empty-state h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  color: var(--brown, #4a5d4a);
+}
+
+.moodboards-empty-state p {
+  margin: 0 0 20px;
+  font-size: 13px;
   color: var(--brown-light, #666);
 }
 
-.moodboards-empty svg {
-  opacity: 0.3;
-  margin-bottom: 12px;
+/* Horizontal Cards */
+.moodboards-cards {
+  display: flex;
+  gap: 12px;
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+  overflow-x: auto;
+  flex-shrink: 0;
 }
 
-.moodboards-empty p {
-  margin: 0 0 4px;
-  font-weight: 500;
-}
-
-.moodboards-empty span {
-  font-size: 12px;
-  opacity: 0.7;
-}
-
-/* Moodboard List */
-.moodboards-list {
-  overflow-y: auto;
-  flex: 1;
-}
-
-.moodboard-item {
+.moodboard-card {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
+  background: var(--cream, #fafaf8);
+  border: 2px solid transparent;
+  border-radius: 10px;
   cursor: pointer;
   transition: all 0.2s;
-  border-bottom: 1px solid var(--stone, #e5e5e5);
+  min-width: 200px;
+  flex-shrink: 0;
 }
 
-.moodboard-item:hover {
-  background: rgba(74, 93, 74, 0.05);
+.moodboard-card:hover {
+  background: white;
+  border-color: var(--stone, #e5e5e5);
 }
 
-.moodboard-item.active {
+.moodboard-card.active {
   background: var(--brown, #4a5d4a);
   color: white;
+  border-color: var(--brown, #4a5d4a);
 }
 
-.moodboard-item.active .moodboard-item-meta {
-  color: rgba(255, 255, 255, 0.7);
-}
-
-.moodboard-item-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 6px;
-  background: var(--stone, #e5e5e5);
+.moodboard-card-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.05);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
 
-.moodboard-item.active .moodboard-item-icon {
+.moodboard-card.active .moodboard-card-icon {
   background: rgba(255, 255, 255, 0.2);
 }
 
-.moodboard-item-info {
+.moodboard-card-info {
   flex: 1;
   min-width: 0;
 }
 
-.moodboard-item-info h4 {
+.moodboard-card-info h4 {
   margin: 0;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.moodboard-item-meta {
+.moodboard-card-info span {
   font-size: 11px;
-  color: var(--brown-light, #666);
+  opacity: 0.7;
 }
 
-.moodboard-item-actions {
+.moodboard-card-actions {
   display: flex;
   gap: 4px;
   opacity: 0;
   transition: opacity 0.2s;
 }
 
-.moodboard-item:hover .moodboard-item-actions {
+.moodboard-card:hover .moodboard-card-actions {
   opacity: 1;
 }
 
-.btn-icon {
-  padding: 4px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  border-radius: 4px;
-  color: var(--brown-light, #666);
-  transition: all 0.2s;
+.moodboard-card.active .moodboard-card-actions {
+  opacity: 1;
 }
 
-.btn-icon:hover {
-  background: rgba(0, 0, 0, 0.1);
-}
-
-.moodboard-item.active .btn-icon {
-  color: white;
-}
-
-.moodboard-item.active .btn-icon:hover {
-  background: rgba(255, 255, 255, 0.2);
-}
-
-.btn-icon.btn-danger:hover {
-  color: #ef4444;
-  background: rgba(239, 68, 68, 0.1);
-}
-
-/* Viewer */
-.moodboards-viewer {
+/* Full Width Viewer */
+.moodboards-viewer-full {
   flex: 1;
   background: white;
   border: 1px solid var(--stone, #e5e5e5);
-  border-radius: 8px;
+  border-radius: 12px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-height: 400px;
 }
 
+/* Viewer Placeholder */
 .viewer-placeholder {
   flex: 1;
   display: flex;
@@ -263,14 +232,15 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
+  padding: 12px 20px;
   background: var(--cream, #fafaf8);
   border-bottom: 1px solid var(--stone, #e5e5e5);
+  flex-shrink: 0;
 }
 
 .viewer-info h3 {
   margin: 0;
-  font-size: 14px;
+  font-size: 15px;
   color: var(--brown, #4a5d4a);
 }
 
@@ -280,20 +250,33 @@
   color: var(--brown-light, #666);
 }
 
+.viewer-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--brown-light, #666);
+}
+
+.viewer-meta svg {
+  opacity: 0.6;
+}
+
 .viewer-actions {
   display: flex;
   gap: 8px;
 }
 
 .viewer-actions .btn {
-  padding: 6px 10px;
+  padding: 8px 12px;
 }
 
 /* Iframe Container */
 .viewer-frame-container {
   flex: 1;
   position: relative;
-  background: #f0f0f0;
+  background: #f5f5f5;
 }
 
 .viewer-iframe {
@@ -306,37 +289,7 @@
   background: white;
 }
 
-/* Viewer Footer */
-.viewer-footer {
-  display: flex;
-  gap: 16px;
-  padding: 8px 16px;
-  background: var(--cream, #fafaf8);
-  border-top: 1px solid var(--stone, #e5e5e5);
-  font-size: 11px;
-  color: var(--brown-light, #666);
-}
-
-.viewer-footer span {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-/* Loading */
-.moodboards-loading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 60px;
-  color: var(--brown-light, #666);
-}
-
-.moodboards-loading svg {
-  margin-bottom: 12px;
-}
-
+/* Spin Animation */
 .spin {
   animation: spin 1s linear infinite;
 }
@@ -513,6 +466,7 @@
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
+  text-decoration: none;
 }
 
 .btn:disabled {
@@ -538,19 +492,54 @@
   background: var(--stone, #e5e5e5);
 }
 
+.btn-icon {
+  padding: 6px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 4px;
+  color: inherit;
+  opacity: 0.7;
+  transition: all 0.2s;
+}
+
+.btn-icon:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.btn-icon.btn-danger:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* Loading */
+.moodboards-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px;
+  color: var(--brown-light, #666);
+}
+
+.moodboards-loading svg {
+  margin-bottom: 12px;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
-  .moodboards-content {
-    flex-direction: column;
+  .moodboards-cards {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 12px;
   }
 
-  .moodboards-sidebar {
-    width: 100%;
-    min-width: 100%;
-    max-height: 200px;
+  .moodboard-card {
+    min-width: 180px;
   }
 
-  .moodboards-viewer {
-    min-height: 400px;
+  .moodboards-viewer-full {
+    min-height: 300px;
   }
 }
