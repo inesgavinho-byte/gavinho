@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef, useCallback, memo, useMemo } from 'react'
+import { useState, useEffect, useRef, memo, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
+import { useToast } from './ui/Toast'
 import {
-  Plus, Upload, Image, X, ChevronLeft, ChevronRight, Trash2,
-  Star, MessageSquare, Edit2, Eye, Download, Loader2, Send,
-  User, Calendar, Clock, Check, AlertCircle, HelpCircle,
-  Maximize2, ZoomIn, ZoomOut, RotateCcw, RefreshCw
+  Plus, Upload, Image, X, ChevronLeft, ChevronRight,
+  Star, MessageSquare, Eye, Loader2, Send,
+  User, AlertCircle, HelpCircle, RefreshCw
 } from 'lucide-react'
 
 // Image cache for prefetching
@@ -89,7 +89,7 @@ const LazyImage = memo(({ src, alt, className, onClick, useThumbnail = true }) =
         <div className="archviz-image-error">
           <AlertCircle size={24} />
           <span>Erro ao carregar</span>
-          <button className="btn btn-sm btn-ghost" onClick={handleRetry}>
+          <button className="btn btn-sm btn-ghost" onClick={handleRetry} aria-label="Tentar carregar imagem novamente">
             <RefreshCw size={14} /> Tentar novamente
           </button>
         </div>
@@ -120,6 +120,8 @@ const LazyImage = memo(({ src, alt, className, onClick, useThumbnail = true }) =
 })
 
 export default function ProjetoArchviz({ projeto, userId, userName }) {
+  const toast = useToast()
+
   // State
   const [renders, setRenders] = useState([])
   const [compartimentos, setCompartimentos] = useState([])
@@ -279,14 +281,14 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
 
     // Validate file type
     if (!ALLOWED_TYPES.includes(file.type)) {
-      alert('Tipo de ficheiro não suportado. Por favor use: JPEG, PNG, WebP ou GIF')
+      toast.warning('Tipo não suportado', 'Por favor use: JPEG, PNG, WebP ou GIF')
       e.target.value = ''
       return
     }
 
     // Validate file size
     if (file.size > MAX_FILE_SIZE) {
-      alert('Ficheiro demasiado grande. Tamanho máximo: 10MB')
+      toast.warning('Ficheiro grande', 'Tamanho máximo permitido: 10MB')
       e.target.value = ''
       return
     }
@@ -296,13 +298,13 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
 
   const handleAddRender = async () => {
     if (!newRender.arquivo) {
-      alert('Por favor selecione uma imagem')
+      toast.warning('Imagem obrigatória', 'Por favor selecione uma imagem')
       return
     }
 
     const compartimento = newRender.novoCompartimento || newRender.compartimento
     if (!compartimento) {
-      alert('Por favor selecione ou crie um compartimento')
+      toast.warning('Compartimento obrigatório', 'Por favor selecione ou crie um compartimento')
       return
     }
 
@@ -355,8 +357,9 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
       setNewRender({ compartimento: '', novoCompartimento: '', vista: '', arquivo: null })
       setShowAddModal(false)
       loadRenders()
+      toast.success('Render adicionado', 'O render foi adicionado com sucesso')
     } catch (err) {
-      alert('Erro ao adicionar render: ' + err.message)
+      toast.error('Erro ao adicionar', err.message)
     } finally {
       setUploading(false)
     }
@@ -368,13 +371,13 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
 
     // Validate file type
     if (!ALLOWED_TYPES.includes(file.type)) {
-      alert('Tipo de ficheiro não suportado. Por favor use: JPEG, PNG, WebP ou GIF')
+      toast.warning('Tipo não suportado', 'Por favor use: JPEG, PNG, WebP ou GIF')
       return
     }
 
     // Validate file size
     if (file.size > MAX_FILE_SIZE) {
-      alert('Ficheiro demasiado grande. Tamanho máximo: 10MB')
+      toast.warning('Ficheiro grande', 'Tamanho máximo permitido: 10MB')
       return
     }
 
@@ -418,8 +421,9 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
       if (versaoError) throw versaoError
 
       loadRenders()
+      toast.success('Versão adicionada', `Versão ${nextVersion} adicionada com sucesso`)
     } catch (err) {
-      alert('Erro ao adicionar versao: ' + err.message)
+      toast.error('Erro ao adicionar versão', err.message)
     } finally {
       setUploading(false)
     }
@@ -442,15 +446,16 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
 
       if (error) throw error
       loadRenders()
+      toast.success('Imagem final', 'Versão marcada como final')
     } catch (err) {
-      alert('Erro ao marcar como final: ' + err.message)
+      toast.error('Erro', err.message)
     }
   }
 
   // Submit duvida (question/definition request)
   const handleSubmitDuvida = async () => {
     if (!novaDuvida.titulo.trim() || !novaDuvida.descricao.trim()) {
-      alert('Por favor preencha o titulo e descricao')
+      toast.warning('Campos obrigatórios', 'Por favor preencha o título e descrição')
       return
     }
 
@@ -493,9 +498,9 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
 
       setNovaDuvida({ utilizador_id: '', titulo: '', entregavel_id: '', descricao: '', imagem: null })
       setShowDuvidaModal(false)
-      alert('Duvida submetida com sucesso!')
+      toast.success('Dúvida submetida', 'A sua dúvida foi enviada com sucesso')
     } catch (err) {
-      alert('Erro ao submeter duvida: ' + err.message)
+      toast.error('Erro ao submeter', err.message)
     } finally {
       setUploading(false)
     }
@@ -520,7 +525,7 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
       setNewComment('')
       loadComments(renderId)
     } catch (err) {
-      alert('Erro ao adicionar comentario: ' + err.message)
+      toast.error('Erro', err.message)
     }
   }
 
@@ -725,7 +730,7 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
 
                         {/* Hover overlay */}
                         <div className="archviz-overlay">
-                          <button className="archviz-action-btn" title="Ver">
+                          <button className="archviz-action-btn" title="Ver" aria-label="Ver imagem em tamanho completo">
                             <Eye size={18} />
                           </button>
                         </div>
@@ -768,6 +773,8 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
                                 loadComments(render.id)
                               }
                             }}
+                            aria-label={`Ver comentários (${comments[render.id]?.length || 0})`}
+                            aria-expanded={showComments === render.id}
                           >
                             <MessageSquare size={14} />
                             {comments[render.id]?.length || 0}
@@ -812,6 +819,7 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
                                 className="btn btn-sm btn-primary"
                                 onClick={() => handleAddComment(render.id)}
                                 disabled={!newComment.trim()}
+                                aria-label="Enviar comentário"
                               >
                                 <Send size={14} />
                               </button>
@@ -862,11 +870,11 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
 
       {/* Add Render Modal */}
       {showAddModal && (
-        <div className="archviz-modal-overlay" onClick={() => setShowAddModal(false)}>
+        <div className="archviz-modal-overlay" onClick={() => setShowAddModal(false)} role="dialog" aria-modal="true" aria-labelledby="add-render-title">
           <div className="archviz-modal" onClick={(e) => e.stopPropagation()}>
             <div className="archviz-modal-header">
-              <h3>Adicionar Render</h3>
-              <button className="archviz-modal-close" onClick={() => setShowAddModal(false)}>
+              <h3 id="add-render-title">Adicionar Render</h3>
+              <button className="archviz-modal-close" onClick={() => setShowAddModal(false)} aria-label="Fechar modal">
                 <X size={20} />
               </button>
             </div>
@@ -962,14 +970,14 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
 
       {/* Nova Duvida Modal */}
       {showDuvidaModal && (
-        <div className="archviz-modal-overlay" onClick={() => setShowDuvidaModal(false)}>
+        <div className="archviz-modal-overlay" onClick={() => setShowDuvidaModal(false)} role="dialog" aria-modal="true" aria-labelledby="duvida-modal-title">
           <div className="archviz-modal archviz-modal-duvida" onClick={(e) => e.stopPropagation()}>
             <div className="archviz-modal-header archviz-modal-header-duvida">
               <div className="archviz-modal-header-icon">
                 <HelpCircle size={24} />
               </div>
-              <h3>Nova Duvida</h3>
-              <button className="archviz-modal-close" onClick={() => setShowDuvidaModal(false)}>
+              <h3 id="duvida-modal-title">Nova Duvida</h3>
+              <button className="archviz-modal-close" onClick={() => setShowDuvidaModal(false)} aria-label="Fechar modal">
                 <X size={20} />
               </button>
             </div>
@@ -1042,6 +1050,7 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
                           e.stopPropagation()
                           setNovaDuvida(prev => ({ ...prev, imagem: null }))
                         }}
+                        aria-label="Remover imagem"
                       >
                         <X size={14} />
                       </button>
@@ -1085,19 +1094,20 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
 
       {/* Lightbox */}
       {lightboxImage && (
-        <div className="archviz-lightbox" onClick={closeLightbox}>
+        <div className="archviz-lightbox" onClick={closeLightbox} role="dialog" aria-modal="true" aria-label="Visualizador de imagens">
           <div className="archviz-lightbox-content" onClick={(e) => e.stopPropagation()}>
             {/* Navigation */}
             <button
               className="archviz-lightbox-nav archviz-lightbox-prev"
               onClick={() => navigateLightbox(-1)}
               disabled={lightboxIndex <= 0}
+              aria-label="Imagem anterior"
             >
               <ChevronLeft size={32} />
             </button>
 
             <div className="archviz-lightbox-image-container">
-              <img src={lightboxImage.url} alt="Render" />
+              <img src={lightboxImage.url} alt={`Render versão ${lightboxImage.versao}`} />
 
               {/* Image info */}
               <div className="archviz-lightbox-info">
@@ -1113,7 +1123,7 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
               </div>
 
               {/* Counter */}
-              <div className="archviz-lightbox-counter">
+              <div className="archviz-lightbox-counter" aria-live="polite">
                 {lightboxIndex + 1} / {allImages.length}
               </div>
             </div>
@@ -1122,12 +1132,13 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
               className="archviz-lightbox-nav archviz-lightbox-next"
               onClick={() => navigateLightbox(1)}
               disabled={lightboxIndex >= allImages.length - 1}
+              aria-label="Próxima imagem"
             >
               <ChevronRight size={32} />
             </button>
 
             {/* Close button */}
-            <button className="archviz-lightbox-close" onClick={closeLightbox}>
+            <button className="archviz-lightbox-close" onClick={closeLightbox} aria-label="Fechar visualizador">
               <X size={24} />
             </button>
           </div>
