@@ -79,6 +79,7 @@ import Moleskine from '../components/Moleskine'
 import MoleskineDigital from '../components/MoleskineDigital'
 import ProjetoChatIA from '../components/projeto/ProjetoChatIA'
 import ProjetoAtas from '../components/ProjetoAtas'
+import ProjetoMoodboards from '../components/ProjetoMoodboards'
 
 // Importar constantes de ficheiros separados
 import {
@@ -2447,11 +2448,11 @@ export default function ProjetoDetalhe() {
 
       {/* Tab Briefing & Conceito */}
       {activeTab === 'briefing' && (
-        <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
-          <Lightbulb size={48} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '16px' }} />
-          <h3 style={{ margin: '0 0 8px', color: 'var(--brown)' }}>Briefing & Conceito</h3>
-          <p style={{ color: 'var(--brown-light)', margin: 0 }}>Módulo de briefing e conceito em desenvolvimento</p>
-        </div>
+        <ProjetoMoodboards
+          projeto={project}
+          userId={user?.id}
+          userName={user?.email?.split('@')[0] || 'Utilizador'}
+        />
       )}
 
       {/* Tab Archviz com subtabs */}
