@@ -3,14 +3,14 @@
 // Atas de reuniao com editor rich text, print e PDF
 // =====================================================
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import {
   Plus, FileText, Edit2, Trash2, Save, X, Calendar, User, Clock,
   Loader2, Eye, Printer, Download, ChevronDown, ChevronUp, Users,
-  MapPin, CheckCircle, AlertCircle, Bold, Italic, Underline, List,
-  ListOrdered, AlignLeft, AlignCenter, AlignRight, Link2, Image,
-  MoreVertical, Copy, Archive, Send, CheckSquare, Square
+  MapPin, CheckCircle, Bold, Italic, Underline, List,
+  ListOrdered, AlignLeft, AlignCenter, AlignRight, Link2,
+  CheckSquare, Square, ClipboardList
 } from 'lucide-react'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
@@ -23,6 +23,115 @@ const statusConfig = {
   'arquivada': { label: 'Arquivada', color: 'var(--brown-light)', bg: 'var(--cream)' }
 }
 
+// Styled Input Component
+const StyledInput = ({ label, required, icon: Icon, ...props }) => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+    {label && (
+      <label style={{
+        fontSize: '12px',
+        fontWeight: 600,
+        color: 'var(--brown)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px'
+      }}>
+        {Icon && <Icon size={14} style={{ opacity: 0.7 }} />}
+        {label}
+        {required && <span style={{ color: 'var(--error)' }}>*</span>}
+      </label>
+    )}
+    <input
+      {...props}
+      style={{
+        padding: '12px 14px',
+        border: '1px solid var(--stone)',
+        borderRadius: '10px',
+        fontSize: '14px',
+        color: 'var(--brown)',
+        background: 'white',
+        outline: 'none',
+        transition: 'border-color 0.2s, box-shadow 0.2s',
+        width: '100%',
+        ...props.style
+      }}
+      onFocus={(e) => {
+        e.target.style.borderColor = 'var(--brown)'
+        e.target.style.boxShadow = '0 0 0 3px rgba(90, 74, 58, 0.1)'
+        props.onFocus?.(e)
+      }}
+      onBlur={(e) => {
+        e.target.style.borderColor = 'var(--stone)'
+        e.target.style.boxShadow = 'none'
+        props.onBlur?.(e)
+      }}
+    />
+  </div>
+)
+
+// Styled Select Component
+const StyledSelect = ({ label, required, children, ...props }) => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+    {label && (
+      <label style={{
+        fontSize: '12px',
+        fontWeight: 600,
+        color: 'var(--brown)'
+      }}>
+        {label}
+        {required && <span style={{ color: 'var(--error)' }}>*</span>}
+      </label>
+    )}
+    <select
+      {...props}
+      style={{
+        padding: '12px 14px',
+        border: '1px solid var(--stone)',
+        borderRadius: '10px',
+        fontSize: '14px',
+        color: 'var(--brown)',
+        background: 'white',
+        outline: 'none',
+        cursor: 'pointer',
+        width: '100%',
+        ...props.style
+      }}
+    >
+      {children}
+    </select>
+  </div>
+)
+
+// Section Header Component
+const SectionHeader = ({ icon: Icon, title, subtitle }) => (
+  <div style={{
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    marginBottom: '16px',
+    paddingBottom: '12px',
+    borderBottom: '1px solid var(--stone)'
+  }}>
+    {Icon && (
+      <div style={{
+        width: '36px',
+        height: '36px',
+        borderRadius: '10px',
+        background: 'var(--brown)',
+        color: 'white',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <Icon size={18} />
+      </div>
+    )}
+    <div>
+      <div style={{ fontWeight: 600, color: 'var(--brown)', fontSize: '15px' }}>{title}</div>
+      {subtitle && <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>{subtitle}</div>}
+    </div>
+  </div>
+)
+
 // Rich Text Editor Component
 function RichTextEditor({ value, onChange, placeholder }) {
   const editorRef = useRef(null)
@@ -34,8 +143,8 @@ function RichTextEditor({ value, onChange, placeholder }) {
     }
   }, [value])
 
-  const execCommand = (command, value = null) => {
-    document.execCommand(command, false, value)
+  const execCommand = (command, val = null) => {
+    document.execCommand(command, false, val)
     editorRef.current?.focus()
     handleInput()
   }
@@ -53,69 +162,99 @@ function RichTextEditor({ value, onChange, placeholder }) {
     }
   }
 
+  const ToolbarButton = ({ onClick, title, children, active }) => (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      style={{
+        padding: '8px',
+        border: 'none',
+        background: active ? 'var(--stone)' : 'transparent',
+        borderRadius: '6px',
+        cursor: 'pointer',
+        color: 'var(--brown)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        transition: 'background 0.15s'
+      }}
+      onMouseEnter={(e) => !active && (e.target.style.background = 'var(--cream)')}
+      onMouseLeave={(e) => !active && (e.target.style.background = 'transparent')}
+    >
+      {children}
+    </button>
+  )
+
+  const Divider = () => (
+    <div style={{ width: '1px', height: '24px', background: 'var(--stone)', margin: '0 4px' }} />
+  )
+
   return (
     <div style={{
-      border: `1px solid ${isFocused ? 'var(--brown)' : 'var(--stone)'}`,
-      borderRadius: '8px',
+      border: `2px solid ${isFocused ? 'var(--brown)' : 'var(--stone)'}`,
+      borderRadius: '12px',
       overflow: 'hidden',
-      transition: 'border-color 0.2s'
+      transition: 'border-color 0.2s',
+      boxShadow: isFocused ? '0 0 0 3px rgba(90, 74, 58, 0.1)' : 'none'
     }}>
       {/* Toolbar */}
       <div style={{
         display: 'flex',
-        gap: '4px',
+        alignItems: 'center',
+        gap: '2px',
         padding: '8px 12px',
         background: 'var(--cream)',
         borderBottom: '1px solid var(--stone)',
         flexWrap: 'wrap'
       }}>
-        <button type="button" onClick={() => execCommand('bold')} title="Negrito" style={toolbarBtnStyle}>
+        <ToolbarButton onClick={() => execCommand('bold')} title="Negrito (Ctrl+B)">
           <Bold size={16} />
-        </button>
-        <button type="button" onClick={() => execCommand('italic')} title="Italico" style={toolbarBtnStyle}>
+        </ToolbarButton>
+        <ToolbarButton onClick={() => execCommand('italic')} title="Italico (Ctrl+I)">
           <Italic size={16} />
-        </button>
-        <button type="button" onClick={() => execCommand('underline')} title="Sublinhado" style={toolbarBtnStyle}>
+        </ToolbarButton>
+        <ToolbarButton onClick={() => execCommand('underline')} title="Sublinhado (Ctrl+U)">
           <Underline size={16} />
-        </button>
-        <div style={{ width: '1px', background: 'var(--stone)', margin: '0 4px' }} />
-        <button type="button" onClick={() => execCommand('insertUnorderedList')} title="Lista" style={toolbarBtnStyle}>
+        </ToolbarButton>
+        <Divider />
+        <ToolbarButton onClick={() => execCommand('insertUnorderedList')} title="Lista">
           <List size={16} />
-        </button>
-        <button type="button" onClick={() => execCommand('insertOrderedList')} title="Lista Numerada" style={toolbarBtnStyle}>
+        </ToolbarButton>
+        <ToolbarButton onClick={() => execCommand('insertOrderedList')} title="Lista Numerada">
           <ListOrdered size={16} />
-        </button>
-        <div style={{ width: '1px', background: 'var(--stone)', margin: '0 4px' }} />
-        <button type="button" onClick={() => execCommand('justifyLeft')} title="Alinhar Esquerda" style={toolbarBtnStyle}>
+        </ToolbarButton>
+        <Divider />
+        <ToolbarButton onClick={() => execCommand('justifyLeft')} title="Alinhar Esquerda">
           <AlignLeft size={16} />
-        </button>
-        <button type="button" onClick={() => execCommand('justifyCenter')} title="Centrar" style={toolbarBtnStyle}>
+        </ToolbarButton>
+        <ToolbarButton onClick={() => execCommand('justifyCenter')} title="Centrar">
           <AlignCenter size={16} />
-        </button>
-        <button type="button" onClick={() => execCommand('justifyRight')} title="Alinhar Direita" style={toolbarBtnStyle}>
+        </ToolbarButton>
+        <ToolbarButton onClick={() => execCommand('justifyRight')} title="Alinhar Direita">
           <AlignRight size={16} />
-        </button>
-        <div style={{ width: '1px', background: 'var(--stone)', margin: '0 4px' }} />
-        <button type="button" onClick={insertLink} title="Inserir Link" style={toolbarBtnStyle}>
+        </ToolbarButton>
+        <Divider />
+        <ToolbarButton onClick={insertLink} title="Inserir Link">
           <Link2 size={16} />
-        </button>
-        <div style={{ width: '1px', background: 'var(--stone)', margin: '0 4px' }} />
+        </ToolbarButton>
+        <Divider />
         <select
           onChange={(e) => execCommand('formatBlock', e.target.value)}
           style={{
-            padding: '4px 8px',
-            border: 'none',
+            padding: '6px 10px',
+            border: '1px solid var(--stone)',
             background: 'white',
-            borderRadius: '4px',
-            fontSize: '12px',
+            borderRadius: '6px',
+            fontSize: '13px',
             color: 'var(--brown)',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            outline: 'none'
           }}
         >
           <option value="p">Normal</option>
-          <option value="h1">Titulo 1</option>
-          <option value="h2">Titulo 2</option>
-          <option value="h3">Titulo 3</option>
+          <option value="h2">Titulo</option>
+          <option value="h3">Subtitulo</option>
         </select>
       </div>
 
@@ -128,30 +267,17 @@ function RichTextEditor({ value, onChange, placeholder }) {
         onBlur={() => setIsFocused(false)}
         data-placeholder={placeholder}
         style={{
-          minHeight: '200px',
+          minHeight: '180px',
           padding: '16px',
           outline: 'none',
           fontSize: '14px',
-          lineHeight: '1.6',
+          lineHeight: '1.7',
           color: 'var(--brown)',
           background: 'white'
         }}
       />
     </div>
   )
-}
-
-const toolbarBtnStyle = {
-  padding: '6px',
-  border: 'none',
-  background: 'white',
-  borderRadius: '4px',
-  cursor: 'pointer',
-  color: 'var(--brown)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  transition: 'background 0.15s'
 }
 
 // Participantes Editor
@@ -172,91 +298,160 @@ function ParticipantesEditor({ participantes, onChange }) {
   }
 
   return (
-    <div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
-        {participantes.map((p, idx) => (
-          <div key={idx} style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '6px 12px',
-            background: 'var(--cream)',
-            borderRadius: '20px',
-            fontSize: '13px'
-          }}>
-            <User size={14} />
-            <span style={{ fontWeight: 500 }}>{p.nome}</span>
-            {p.cargo && <span style={{ color: 'var(--brown-light)' }}>({p.cargo})</span>}
-            <button
-              type="button"
-              onClick={() => removeParticipante(idx)}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-            >
-              <X size={14} color="var(--error)" />
-            </button>
-          </div>
-        ))}
+    <div style={{
+      background: 'var(--cream)',
+      borderRadius: '12px',
+      padding: '16px'
+    }}>
+      {participantes.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
+          {participantes.map((p, idx) => (
+            <div key={idx} style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '8px 14px',
+              background: 'white',
+              borderRadius: '24px',
+              fontSize: '13px',
+              border: '1px solid var(--stone)'
+            }}>
+              <div style={{
+                width: '28px',
+                height: '28px',
+                borderRadius: '50%',
+                background: 'var(--brown)',
+                color: 'white',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '11px',
+                fontWeight: 600
+              }}>
+                {p.nome.split(' ').map(n => n[0]).slice(0, 2).join('')}
+              </div>
+              <div>
+                <div style={{ fontWeight: 500, color: 'var(--brown)' }}>{p.nome}</div>
+                {(p.cargo || p.entidade) && (
+                  <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
+                    {[p.cargo, p.entidade].filter(Boolean).join(' • ')}
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => removeParticipante(idx)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  marginLeft: '4px',
+                  borderRadius: '4px',
+                  display: 'flex'
+                }}
+              >
+                <X size={14} color="var(--brown-light)" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showAdd ? (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '2fr 1fr 1fr auto auto',
+          gap: '8px',
+          alignItems: 'end'
+        }}>
+          <StyledInput
+            type="text"
+            placeholder="Nome do participante"
+            value={newParticipante.nome}
+            onChange={(e) => setNewParticipante({ ...newParticipante, nome: e.target.value })}
+            autoFocus
+          />
+          <StyledInput
+            type="text"
+            placeholder="Cargo"
+            value={newParticipante.cargo}
+            onChange={(e) => setNewParticipante({ ...newParticipante, cargo: e.target.value })}
+          />
+          <StyledInput
+            type="text"
+            placeholder="Entidade"
+            value={newParticipante.entidade}
+            onChange={(e) => setNewParticipante({ ...newParticipante, entidade: e.target.value })}
+            onKeyDown={(e) => e.key === 'Enter' && addParticipante()}
+          />
+          <button
+            type="button"
+            onClick={addParticipante}
+            style={{
+              padding: '12px 16px',
+              background: 'var(--brown)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '10px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontWeight: 500,
+              fontSize: '13px'
+            }}
+          >
+            <Plus size={16} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowAdd(false)}
+            style={{
+              padding: '12px 14px',
+              background: 'white',
+              color: 'var(--brown-light)',
+              border: '1px solid var(--stone)',
+              borderRadius: '10px',
+              cursor: 'pointer',
+              display: 'flex'
+            }}
+          >
+            <X size={16} />
+          </button>
+        </div>
+      ) : (
         <button
           type="button"
           onClick={() => setShowAdd(true)}
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '4px',
-            padding: '6px 12px',
-            background: 'transparent',
-            border: '1px dashed var(--stone)',
-            borderRadius: '20px',
+            gap: '8px',
+            padding: '12px 16px',
+            background: 'white',
+            border: '2px dashed var(--stone)',
+            borderRadius: '10px',
             fontSize: '13px',
             color: 'var(--brown-light)',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            width: '100%',
+            justifyContent: 'center',
+            fontWeight: 500,
+            transition: 'border-color 0.2s, color 0.2s'
+          }}
+          onMouseEnter={(e) => {
+            e.target.style.borderColor = 'var(--brown)'
+            e.target.style.color = 'var(--brown)'
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.borderColor = 'var(--stone)'
+            e.target.style.color = 'var(--brown-light)'
           }}
         >
-          <Plus size={14} />
-          Adicionar
+          <Plus size={16} />
+          Adicionar Participante
         </button>
-      </div>
-
-      {showAdd && (
-        <div style={{
-          display: 'flex',
-          gap: '8px',
-          padding: '12px',
-          background: 'var(--cream)',
-          borderRadius: '8px',
-          marginTop: '8px'
-        }}>
-          <input
-            type="text"
-            placeholder="Nome"
-            value={newParticipante.nome}
-            onChange={(e) => setNewParticipante({ ...newParticipante, nome: e.target.value })}
-            style={{ flex: 2 }}
-            className="form-input"
-          />
-          <input
-            type="text"
-            placeholder="Cargo"
-            value={newParticipante.cargo}
-            onChange={(e) => setNewParticipante({ ...newParticipante, cargo: e.target.value })}
-            style={{ flex: 1 }}
-            className="form-input"
-          />
-          <input
-            type="text"
-            placeholder="Entidade"
-            value={newParticipante.entidade}
-            onChange={(e) => setNewParticipante({ ...newParticipante, entidade: e.target.value })}
-            style={{ flex: 1 }}
-            className="form-input"
-          />
-          <button type="button" onClick={addParticipante} className="btn btn-primary" style={{ padding: '8px 16px' }}>
-            <Plus size={14} />
-          </button>
-          <button type="button" onClick={() => setShowAdd(false)} className="btn btn-secondary" style={{ padding: '8px 12px' }}>
-            <X size={14} />
-          </button>
-        </div>
       )}
     </div>
   )
@@ -284,84 +479,123 @@ function AcoesEditor({ acoes, onChange }) {
   }
 
   return (
-    <div>
-      {acoes.map((acao, idx) => (
-        <div key={idx} style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          gap: '12px',
-          padding: '12px',
-          background: acao.concluida ? 'rgba(122, 158, 122, 0.1)' : 'var(--cream)',
-          borderRadius: '8px',
-          marginBottom: '8px'
-        }}>
-          <button
-            type="button"
-            onClick={() => toggleConcluida(idx)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginTop: '2px' }}
-          >
-            {acao.concluida ? (
-              <CheckSquare size={18} color="var(--success)" />
-            ) : (
-              <Square size={18} color="var(--brown-light)" />
-            )}
-          </button>
-          <div style={{ flex: 1 }}>
-            <div style={{
-              fontWeight: 500,
-              color: 'var(--brown)',
-              textDecoration: acao.concluida ? 'line-through' : 'none'
+    <div style={{
+      background: 'var(--cream)',
+      borderRadius: '12px',
+      padding: '16px'
+    }}>
+      {acoes.length > 0 && (
+        <div style={{ marginBottom: '12px' }}>
+          {acoes.map((acao, idx) => (
+            <div key={idx} style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '12px',
+              padding: '14px',
+              background: acao.concluida ? 'rgba(122, 158, 122, 0.15)' : 'white',
+              borderRadius: '10px',
+              marginBottom: '8px',
+              border: '1px solid var(--stone)'
             }}>
-              {acao.descricao}
+              <button
+                type="button"
+                onClick={() => toggleConcluida(idx)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginTop: '2px' }}
+              >
+                {acao.concluida ? (
+                  <CheckSquare size={20} color="var(--success)" />
+                ) : (
+                  <Square size={20} color="var(--brown-light)" />
+                )}
+              </button>
+              <div style={{ flex: 1 }}>
+                <div style={{
+                  fontWeight: 500,
+                  color: 'var(--brown)',
+                  textDecoration: acao.concluida ? 'line-through' : 'none',
+                  opacity: acao.concluida ? 0.7 : 1
+                }}>
+                  {acao.descricao}
+                </div>
+                {(acao.responsavel || acao.prazo) && (
+                  <div style={{
+                    display: 'flex',
+                    gap: '16px',
+                    fontSize: '12px',
+                    color: 'var(--brown-light)',
+                    marginTop: '6px'
+                  }}>
+                    {acao.responsavel && (
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <User size={12} /> {acao.responsavel}
+                      </span>
+                    )}
+                    {acao.prazo && (
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Calendar size={12} /> {acao.prazo}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => removeAcao(idx)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  borderRadius: '4px'
+                }}
+              >
+                <Trash2 size={14} color="var(--error)" />
+              </button>
             </div>
-            <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginTop: '4px' }}>
-              {acao.responsavel && <span>Responsavel: {acao.responsavel}</span>}
-              {acao.responsavel && acao.prazo && <span> • </span>}
-              {acao.prazo && <span>Prazo: {acao.prazo}</span>}
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => removeAcao(idx)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
-          >
-            <Trash2 size={14} color="var(--error)" />
-          </button>
+          ))}
         </div>
-      ))}
+      )}
 
       <div style={{
         display: 'grid',
-        gridTemplateColumns: '1fr auto auto auto',
+        gridTemplateColumns: '1fr 140px 130px auto',
         gap: '8px',
-        padding: '12px',
-        background: 'var(--cream)',
-        borderRadius: '8px'
+        alignItems: 'end'
       }}>
-        <input
+        <StyledInput
           type="text"
           placeholder="Descricao da acao..."
           value={newAcao.descricao}
           onChange={(e) => setNewAcao({ ...newAcao, descricao: e.target.value })}
-          className="form-input"
           onKeyDown={(e) => e.key === 'Enter' && addAcao()}
         />
-        <input
+        <StyledInput
           type="text"
           placeholder="Responsavel"
           value={newAcao.responsavel}
           onChange={(e) => setNewAcao({ ...newAcao, responsavel: e.target.value })}
-          className="form-input"
-          style={{ width: '150px' }}
         />
-        <input
+        <StyledInput
           type="date"
           value={newAcao.prazo}
           onChange={(e) => setNewAcao({ ...newAcao, prazo: e.target.value })}
-          className="form-input"
         />
-        <button type="button" onClick={addAcao} className="btn btn-primary" style={{ padding: '8px 16px' }}>
-          <Plus size={14} />
+        <button
+          type="button"
+          onClick={addAcao}
+          style={{
+            padding: '12px 16px',
+            background: 'var(--brown)',
+            color: 'white',
+            border: 'none',
+            borderRadius: '10px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}
+        >
+          <Plus size={16} />
         </button>
       </div>
     </div>
@@ -484,7 +718,7 @@ function AtaPreview({ ata, projeto, onClose }) {
     }}>
       <div style={{
         background: 'white',
-        borderRadius: '12px',
+        borderRadius: '16px',
         width: '100%',
         maxWidth: '900px',
         maxHeight: '90vh',
@@ -501,48 +735,86 @@ function AtaPreview({ ata, projeto, onClose }) {
           borderBottom: '1px solid var(--stone)',
           background: 'var(--cream)'
         }}>
-          <span style={{ fontWeight: 600, color: 'var(--brown)' }}>
+          <span style={{ fontWeight: 600, color: 'var(--brown)', fontSize: '15px' }}>
             Pre-visualizacao da Ata
           </span>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <button onClick={handlePrint} className="btn btn-secondary" style={{ padding: '8px 16px' }}>
-              <Printer size={16} style={{ marginRight: '6px' }} />
+            <button
+              onClick={handlePrint}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 18px',
+                background: 'white',
+                border: '1px solid var(--stone)',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                color: 'var(--brown)',
+                fontWeight: 500,
+                fontSize: '13px'
+              }}
+            >
+              <Printer size={16} />
               Imprimir
             </button>
             <button
               onClick={handleExportPDF}
-              className="btn btn-primary"
-              style={{ padding: '8px 16px' }}
               disabled={exporting}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 18px',
+                background: 'var(--brown)',
+                border: 'none',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                color: 'white',
+                fontWeight: 500,
+                fontSize: '13px',
+                opacity: exporting ? 0.7 : 1
+              }}
             >
               {exporting ? (
-                <Loader2 size={16} className="spin" style={{ marginRight: '6px' }} />
+                <Loader2 size={16} className="spin" />
               ) : (
-                <Download size={16} style={{ marginRight: '6px' }} />
+                <Download size={16} />
               )}
               Guardar PDF
             </button>
-            <button onClick={onClose} className="btn btn-secondary" style={{ padding: '8px 12px' }}>
-              <X size={16} />
+            <button
+              onClick={onClose}
+              style={{
+                padding: '10px 12px',
+                background: 'white',
+                border: '1px solid var(--stone)',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                display: 'flex'
+              }}
+            >
+              <X size={16} color="var(--brown-light)" />
             </button>
           </div>
         </div>
 
         {/* Preview Content */}
-        <div style={{ flex: 1, overflow: 'auto', padding: '24px', background: '#f5f5f5' }}>
+        <div style={{ flex: 1, overflow: 'auto', padding: '24px', background: '#f0f0f0' }}>
           <div ref={printRef} style={{
             background: 'white',
-            padding: '40px',
+            padding: '48px',
             maxWidth: '800px',
             margin: '0 auto',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+            boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+            borderRadius: '4px'
           }}>
             {/* Header */}
-            <div className="header" style={{ textAlign: 'center', marginBottom: '30px', borderBottom: '2px solid #333', paddingBottom: '20px' }}>
-              <div className="logo" style={{ fontSize: '24px', fontWeight: 'bold', color: '#5a4a3a' }}>
+            <div style={{ textAlign: 'center', marginBottom: '30px', borderBottom: '2px solid #333', paddingBottom: '20px' }}>
+              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#5a4a3a' }}>
                 {projeto.cliente || 'GAVINHO ARQUITECTOS'}
               </div>
-              <div className="title" style={{ fontSize: '20px', marginTop: '10px' }}>
+              <div style={{ fontSize: '20px', marginTop: '10px' }}>
                 ATA DE REUNIAO N.º {ata.numero_ata}
               </div>
               <div style={{ fontSize: '14px', color: '#666', marginTop: '5px' }}>
@@ -551,7 +823,7 @@ function AtaPreview({ ata, projeto, onClose }) {
             </div>
 
             {/* Meta Info */}
-            <div className="meta" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '30px', fontSize: '14px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '30px', fontSize: '14px' }}>
               <div>
                 <div style={{ fontWeight: 'bold', color: '#666' }}>Data</div>
                 <div>{formatDate(ata.data_reuniao)}</div>
@@ -572,11 +844,11 @@ function AtaPreview({ ata, projeto, onClose }) {
 
             {/* Participantes */}
             {ata.participantes?.length > 0 && (
-              <div className="section" style={{ marginBottom: '25px' }}>
-                <div className="section-title" style={{ fontSize: '16px', fontWeight: 'bold', borderBottom: '1px solid #ddd', paddingBottom: '5px', marginBottom: '10px' }}>
+              <div style={{ marginBottom: '25px' }}>
+                <div style={{ fontSize: '16px', fontWeight: 'bold', borderBottom: '1px solid #ddd', paddingBottom: '5px', marginBottom: '10px' }}>
                   Participantes
                 </div>
-                <ul className="participants" style={{ listStyle: 'none' }}>
+                <ul style={{ listStyle: 'none', padding: 0 }}>
                   {ata.participantes.map((p, idx) => (
                     <li key={idx} style={{ padding: '5px 0', borderBottom: '1px dotted #ddd' }}>
                       <strong>{p.nome}</strong>
@@ -590,8 +862,8 @@ function AtaPreview({ ata, projeto, onClose }) {
 
             {/* Ordem do Dia */}
             {ata.ordem_dia?.length > 0 && (
-              <div className="section" style={{ marginBottom: '25px' }}>
-                <div className="section-title" style={{ fontSize: '16px', fontWeight: 'bold', borderBottom: '1px solid #ddd', paddingBottom: '5px', marginBottom: '10px' }}>
+              <div style={{ marginBottom: '25px' }}>
+                <div style={{ fontSize: '16px', fontWeight: 'bold', borderBottom: '1px solid #ddd', paddingBottom: '5px', marginBottom: '10px' }}>
                   Ordem do Dia
                 </div>
                 <ol style={{ paddingLeft: '20px' }}>
@@ -604,12 +876,11 @@ function AtaPreview({ ata, projeto, onClose }) {
 
             {/* Conteudo */}
             {ata.conteudo && (
-              <div className="section" style={{ marginBottom: '25px' }}>
-                <div className="section-title" style={{ fontSize: '16px', fontWeight: 'bold', borderBottom: '1px solid #ddd', paddingBottom: '5px', marginBottom: '10px' }}>
+              <div style={{ marginBottom: '25px' }}>
+                <div style={{ fontSize: '16px', fontWeight: 'bold', borderBottom: '1px solid #ddd', paddingBottom: '5px', marginBottom: '10px' }}>
                   Desenvolvimento
                 </div>
                 <div
-                  className="content"
                   style={{ fontSize: '14px', lineHeight: '1.8' }}
                   dangerouslySetInnerHTML={{ __html: ata.conteudo }}
                 />
@@ -618,8 +889,8 @@ function AtaPreview({ ata, projeto, onClose }) {
 
             {/* Decisoes */}
             {ata.decisoes?.length > 0 && (
-              <div className="section" style={{ marginBottom: '25px' }}>
-                <div className="section-title" style={{ fontSize: '16px', fontWeight: 'bold', borderBottom: '1px solid #ddd', paddingBottom: '5px', marginBottom: '10px' }}>
+              <div style={{ marginBottom: '25px' }}>
+                <div style={{ fontSize: '16px', fontWeight: 'bold', borderBottom: '1px solid #ddd', paddingBottom: '5px', marginBottom: '10px' }}>
                   Decisoes
                 </div>
                 <ul style={{ paddingLeft: '20px' }}>
@@ -635,15 +906,15 @@ function AtaPreview({ ata, projeto, onClose }) {
 
             {/* Acoes */}
             {ata.acoes?.length > 0 && (
-              <div className="section" style={{ marginBottom: '25px' }}>
-                <div className="section-title" style={{ fontSize: '16px', fontWeight: 'bold', borderBottom: '1px solid #ddd', paddingBottom: '5px', marginBottom: '10px' }}>
+              <div style={{ marginBottom: '25px' }}>
+                <div style={{ fontSize: '16px', fontWeight: 'bold', borderBottom: '1px solid #ddd', paddingBottom: '5px', marginBottom: '10px' }}>
                   Acoes a Realizar
                 </div>
-                <div className="actions" style={{ marginTop: '10px' }}>
+                <div style={{ marginTop: '10px' }}>
                   {ata.acoes.map((a, idx) => (
-                    <div key={idx} className="action" style={{ padding: '8px', background: '#f5f5f5', marginBottom: '5px', borderRadius: '4px' }}>
+                    <div key={idx} style={{ padding: '8px', background: '#f5f5f5', marginBottom: '5px', borderRadius: '4px' }}>
                       <div>{a.descricao}</div>
-                      <div className="action-status" style={{ color: '#666', fontSize: '12px' }}>
+                      <div style={{ color: '#666', fontSize: '12px' }}>
                         {a.responsavel && `Responsavel: ${a.responsavel}`}
                         {a.prazo && ` | Prazo: ${a.prazo}`}
                         {a.concluida && ' | Concluida'}
@@ -656,8 +927,8 @@ function AtaPreview({ ata, projeto, onClose }) {
 
             {/* Proxima Reuniao */}
             {ata.proxima_reuniao && (
-              <div className="section" style={{ marginBottom: '25px' }}>
-                <div className="section-title" style={{ fontSize: '16px', fontWeight: 'bold', borderBottom: '1px solid #ddd', paddingBottom: '5px', marginBottom: '10px' }}>
+              <div style={{ marginBottom: '25px' }}>
+                <div style={{ fontSize: '16px', fontWeight: 'bold', borderBottom: '1px solid #ddd', paddingBottom: '5px', marginBottom: '10px' }}>
                   Proxima Reuniao
                 </div>
                 <p>
@@ -669,14 +940,14 @@ function AtaPreview({ ata, projeto, onClose }) {
             )}
 
             {/* Assinaturas */}
-            <div className="signatures" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px', marginTop: '60px' }}>
-              <div className="signature" style={{ textAlign: 'center' }}>
-                <div className="signature-line" style={{ borderTop: '1px solid #333', marginTop: '60px', paddingTop: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px', marginTop: '60px' }}>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ borderTop: '1px solid #333', marginTop: '60px', paddingTop: '10px' }}>
                   Elaborado por
                 </div>
               </div>
-              <div className="signature" style={{ textAlign: 'center' }}>
-                <div className="signature-line" style={{ borderTop: '1px solid #333', marginTop: '60px', paddingTop: '10px' }}>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ borderTop: '1px solid #333', marginTop: '60px', paddingTop: '10px' }}>
                   Aprovado por
                 </div>
               </div>
@@ -884,12 +1155,37 @@ export default function ProjetoAtas({ projeto }) {
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between" style={{ marginBottom: '20px' }}>
-        <span style={{ fontSize: '13px', color: 'var(--brown-light)' }}>
-          Atas de reuniao deste projeto ({atas.length})
-        </span>
-        <button className="btn btn-primary" style={{ padding: '8px 16px' }} onClick={openNewModal}>
-          <Plus size={16} style={{ marginRight: '8px' }} />
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: '24px'
+      }}>
+        <div>
+          <div style={{ fontSize: '13px', color: 'var(--brown-light)' }}>
+            Atas de reuniao deste projeto
+          </div>
+          <div style={{ fontSize: '22px', fontWeight: 600, color: 'var(--brown)' }}>
+            {atas.length} {atas.length === 1 ? 'Ata' : 'Atas'}
+          </div>
+        </div>
+        <button
+          onClick={openNewModal}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '12px 20px',
+            background: 'var(--brown)',
+            color: 'white',
+            border: 'none',
+            borderRadius: '10px',
+            cursor: 'pointer',
+            fontWeight: 500,
+            fontSize: '14px'
+          }}
+        >
+          <Plus size={18} />
           Nova Ata
         </button>
       </div>
@@ -897,15 +1193,27 @@ export default function ProjetoAtas({ projeto }) {
       {/* Lista de Atas */}
       {atas.length === 0 ? (
         <div style={{
-          padding: '48px',
+          padding: '64px',
           background: 'var(--cream)',
-          borderRadius: '12px',
-          textAlign: 'center',
-          color: 'var(--brown-light)'
+          borderRadius: '16px',
+          textAlign: 'center'
         }}>
-          <FileText size={48} style={{ opacity: 0.3, marginBottom: '16px' }} />
-          <p>Nenhuma ata registada para este projeto.</p>
-          <p style={{ fontSize: '13px', marginTop: '8px' }}>
+          <div style={{
+            width: '80px',
+            height: '80px',
+            borderRadius: '20px',
+            background: 'white',
+            margin: '0 auto 20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <FileText size={40} style={{ color: 'var(--brown-light)', opacity: 0.5 }} />
+          </div>
+          <p style={{ color: 'var(--brown)', fontWeight: 500, fontSize: '16px', marginBottom: '8px' }}>
+            Nenhuma ata registada
+          </p>
+          <p style={{ color: 'var(--brown-light)', fontSize: '14px' }}>
             Clique em "Nova Ata" para criar a primeira ata de reuniao.
           </p>
         </div>
@@ -914,11 +1222,12 @@ export default function ProjetoAtas({ projeto }) {
           {atas.map((ata) => (
             <div
               key={ata.id}
-              className="card"
               style={{
-                padding: 0,
+                background: 'white',
+                borderRadius: '14px',
                 overflow: 'hidden',
-                border: expandedAta === ata.id ? '1px solid var(--brown)' : '1px solid var(--stone)'
+                border: expandedAta === ata.id ? '2px solid var(--brown)' : '1px solid var(--stone)',
+                transition: 'border-color 0.2s'
               }}
             >
               {/* Card Header */}
@@ -927,7 +1236,7 @@ export default function ProjetoAtas({ projeto }) {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  padding: '16px 20px',
+                  padding: '18px 20px',
                   cursor: 'pointer',
                   background: expandedAta === ata.id ? 'var(--cream)' : 'white'
                 }}
@@ -935,50 +1244,66 @@ export default function ProjetoAtas({ projeto }) {
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                   <div style={{
-                    width: '40px',
-                    height: '40px',
+                    width: '48px',
+                    height: '48px',
                     background: 'var(--brown)',
                     color: 'white',
-                    borderRadius: '8px',
+                    borderRadius: '12px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontWeight: 600,
-                    fontSize: '14px'
+                    fontWeight: 700,
+                    fontSize: '16px'
                   }}>
                     #{ata.numero_ata}
                   </div>
                   <div>
-                    <div style={{ fontWeight: 600, color: 'var(--brown)' }}>{ata.titulo}</div>
-                    <div style={{ fontSize: '12px', color: 'var(--brown-light)', display: 'flex', gap: '12px', marginTop: '4px' }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Calendar size={12} /> {formatDate(ata.data_reuniao)}
+                    <div style={{ fontWeight: 600, color: 'var(--brown)', fontSize: '15px' }}>{ata.titulo}</div>
+                    <div style={{
+                      display: 'flex',
+                      gap: '16px',
+                      fontSize: '13px',
+                      color: 'var(--brown-light)',
+                      marginTop: '4px'
+                    }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <Calendar size={13} /> {formatDate(ata.data_reuniao)}
                       </span>
                       {ata.local && (
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <MapPin size={12} /> {ata.local}
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <MapPin size={13} /> {ata.local}
                         </span>
                       )}
                       {ata.participantes?.length > 0 && (
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <Users size={12} /> {ata.participantes.length} participantes
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <Users size={13} /> {ata.participantes.length}
                         </span>
                       )}
                     </div>
                   </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <span style={{
-                    padding: '4px 10px',
-                    borderRadius: '12px',
-                    fontSize: '11px',
+                    padding: '6px 12px',
+                    borderRadius: '20px',
+                    fontSize: '12px',
                     fontWeight: 500,
                     background: statusConfig[ata.status]?.bg || 'var(--stone)',
                     color: statusConfig[ata.status]?.color || 'var(--brown-light)'
                   }}>
                     {statusConfig[ata.status]?.label || ata.status}
                   </span>
-                  {expandedAta === ata.id ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                  <div style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '8px',
+                    background: 'var(--cream)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    {expandedAta === ata.id ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                  </div>
                 </div>
               </div>
 
@@ -997,7 +1322,10 @@ export default function ProjetoAtas({ projeto }) {
                           color: 'var(--brown-light)',
                           maxHeight: '100px',
                           overflow: 'hidden',
-                          position: 'relative'
+                          position: 'relative',
+                          background: 'var(--cream)',
+                          padding: '12px',
+                          borderRadius: '8px'
                         }}
                         dangerouslySetInnerHTML={{ __html: ata.conteudo }}
                       />
@@ -1013,42 +1341,94 @@ export default function ProjetoAtas({ projeto }) {
                       {ata.acoes.filter(a => !a.concluida).slice(0, 3).map((a, idx) => (
                         <div key={idx} style={{
                           fontSize: '13px',
-                          padding: '8px',
+                          padding: '10px 12px',
                           background: 'var(--cream)',
-                          borderRadius: '6px',
-                          marginBottom: '4px'
+                          borderRadius: '8px',
+                          marginBottom: '6px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between'
                         }}>
-                          {a.descricao}
-                          {a.prazo && <span style={{ color: 'var(--warning)', marginLeft: '8px' }}>Prazo: {a.prazo}</span>}
+                          <span>{a.descricao}</span>
+                          {a.prazo && (
+                            <span style={{
+                              fontSize: '11px',
+                              padding: '4px 8px',
+                              background: 'rgba(201, 168, 130, 0.2)',
+                              color: 'var(--warning)',
+                              borderRadius: '4px',
+                              fontWeight: 500
+                            }}>
+                              {a.prazo}
+                            </span>
+                          )}
                         </div>
                       ))}
                     </div>
                   )}
 
                   {/* Actions */}
-                  <div style={{ display: 'flex', gap: '8px', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--stone)' }}>
+                  <div style={{
+                    display: 'flex',
+                    gap: '10px',
+                    marginTop: '20px',
+                    paddingTop: '16px',
+                    borderTop: '1px solid var(--stone)'
+                  }}>
                     <button
-                      className="btn btn-secondary"
-                      style={{ padding: '8px 16px', flex: 1 }}
                       onClick={(e) => { e.stopPropagation(); setPreviewAta(ata) }}
+                      style={{
+                        flex: 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        padding: '12px',
+                        background: 'var(--cream)',
+                        border: 'none',
+                        borderRadius: '10px',
+                        cursor: 'pointer',
+                        color: 'var(--brown)',
+                        fontWeight: 500,
+                        fontSize: '13px'
+                      }}
                     >
-                      <Eye size={14} style={{ marginRight: '6px' }} />
+                      <Eye size={16} />
                       Visualizar / Imprimir
                     </button>
                     <button
-                      className="btn btn-secondary"
-                      style={{ padding: '8px 16px', flex: 1 }}
                       onClick={(e) => { e.stopPropagation(); openEditModal(ata) }}
+                      style={{
+                        flex: 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        padding: '12px',
+                        background: 'var(--cream)',
+                        border: 'none',
+                        borderRadius: '10px',
+                        cursor: 'pointer',
+                        color: 'var(--brown)',
+                        fontWeight: 500,
+                        fontSize: '13px'
+                      }}
                     >
-                      <Edit2 size={14} style={{ marginRight: '6px' }} />
+                      <Edit2 size={16} />
                       Editar
                     </button>
                     <button
-                      className="btn btn-secondary"
-                      style={{ padding: '8px 12px', color: 'var(--error)' }}
                       onClick={(e) => { e.stopPropagation(); handleDelete(ata) }}
+                      style={{
+                        padding: '12px 16px',
+                        background: 'rgba(199, 83, 83, 0.1)',
+                        border: 'none',
+                        borderRadius: '10px',
+                        cursor: 'pointer',
+                        color: 'var(--error)'
+                      }}
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={16} />
                     </button>
                   </div>
                 </div>
@@ -1066,7 +1446,7 @@ export default function ProjetoAtas({ projeto }) {
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
+          background: 'rgba(0,0,0,0.6)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -1075,86 +1455,102 @@ export default function ProjetoAtas({ projeto }) {
         }}>
           <div style={{
             background: 'white',
-            borderRadius: '16px',
+            borderRadius: '20px',
             width: '100%',
             maxWidth: '900px',
             maxHeight: '90vh',
             overflow: 'hidden',
             display: 'flex',
-            flexDirection: 'column'
+            flexDirection: 'column',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
           }}>
             {/* Modal Header */}
             <div style={{
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              padding: '20px 24px',
-              borderBottom: '1px solid var(--stone)'
+              padding: '24px 28px',
+              borderBottom: '1px solid var(--stone)',
+              background: 'var(--cream)'
             }}>
-              <h3 style={{ margin: 0, color: 'var(--brown)' }}>
-                {editingAta ? 'Editar Ata' : 'Nova Ata de Reuniao'}
-              </h3>
+              <div>
+                <h3 style={{ margin: 0, color: 'var(--brown)', fontSize: '18px', fontWeight: 600 }}>
+                  {editingAta ? 'Editar Ata' : 'Nova Ata de Reuniao'}
+                </h3>
+                <p style={{ margin: '4px 0 0', color: 'var(--brown-light)', fontSize: '13px' }}>
+                  Preencha os dados da reuniao
+                </p>
+              </div>
               <button
                 onClick={() => setShowModal(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '8px' }}
+                style={{
+                  background: 'white',
+                  border: '1px solid var(--stone)',
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  padding: '10px',
+                  display: 'flex'
+                }}
               >
-                <X size={20} color="var(--brown-light)" />
+                <X size={18} color="var(--brown-light)" />
               </button>
             </div>
 
             {/* Modal Content */}
-            <div style={{ flex: 1, overflow: 'auto', padding: '24px' }}>
+            <div style={{ flex: 1, overflow: 'auto', padding: '28px' }}>
               {/* Info Basica */}
-              <div style={{ marginBottom: '24px' }}>
-                <h4 style={{ margin: '0 0 16px', color: 'var(--brown)', fontSize: '14px' }}>
-                  Informacoes da Reuniao
-                </h4>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  <div style={{ gridColumn: 'span 2' }}>
-                    <label className="form-label">Titulo *</label>
-                    <input
-                      type="text"
-                      value={formData.titulo}
-                      onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
-                      placeholder="Ex: Reuniao de Coordenacao de Projeto"
-                      className="form-input"
-                    />
-                  </div>
-                  <div>
-                    <label className="form-label">Data da Reuniao *</label>
-                    <input
+              <div style={{
+                background: 'var(--cream)',
+                borderRadius: '14px',
+                padding: '20px',
+                marginBottom: '24px'
+              }}>
+                <SectionHeader
+                  icon={Calendar}
+                  title="Informacoes da Reuniao"
+                  subtitle="Data, local e horario"
+                />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
+                  <StyledInput
+                    label="Titulo"
+                    required
+                    type="text"
+                    value={formData.titulo}
+                    onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
+                    placeholder="Ex: Reuniao de Coordenacao de Projeto"
+                  />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <StyledInput
+                      label="Data da Reuniao"
+                      required
+                      icon={Calendar}
                       type="date"
                       value={formData.data_reuniao}
                       onChange={(e) => setFormData({ ...formData, data_reuniao: e.target.value })}
-                      className="form-input"
                     />
-                  </div>
-                  <div>
-                    <label className="form-label">Local</label>
-                    <input
+                    <StyledInput
+                      label="Local"
+                      icon={MapPin}
                       type="text"
                       value={formData.local}
                       onChange={(e) => setFormData({ ...formData, local: e.target.value })}
                       placeholder="Ex: Escritorio, Teams, Obra..."
-                      className="form-input"
                     />
                   </div>
-                  <div>
-                    <label className="form-label">Hora Inicio</label>
-                    <input
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <StyledInput
+                      label="Hora Inicio"
+                      icon={Clock}
                       type="time"
                       value={formData.hora_inicio}
                       onChange={(e) => setFormData({ ...formData, hora_inicio: e.target.value })}
-                      className="form-input"
                     />
-                  </div>
-                  <div>
-                    <label className="form-label">Hora Fim</label>
-                    <input
+                    <StyledInput
+                      label="Hora Fim"
+                      icon={Clock}
                       type="time"
                       value={formData.hora_fim}
                       onChange={(e) => setFormData({ ...formData, hora_fim: e.target.value })}
-                      className="form-input"
                     />
                   </div>
                 </div>
@@ -1162,10 +1558,11 @@ export default function ProjetoAtas({ projeto }) {
 
               {/* Participantes */}
               <div style={{ marginBottom: '24px' }}>
-                <h4 style={{ margin: '0 0 16px', color: 'var(--brown)', fontSize: '14px' }}>
-                  <Users size={16} style={{ marginRight: '8px', verticalAlign: 'middle' }} />
-                  Participantes
-                </h4>
+                <SectionHeader
+                  icon={Users}
+                  title="Participantes"
+                  subtitle="Pessoas presentes na reuniao"
+                />
                 <ParticipantesEditor
                   participantes={formData.participantes}
                   onChange={(p) => setFormData({ ...formData, participantes: p })}
@@ -1174,50 +1571,97 @@ export default function ProjetoAtas({ projeto }) {
 
               {/* Ordem do Dia */}
               <div style={{ marginBottom: '24px' }}>
-                <h4 style={{ margin: '0 0 16px', color: 'var(--brown)', fontSize: '14px' }}>
-                  Ordem do Dia
-                </h4>
-                {formData.ordem_dia.map((item, idx) => (
-                  <div key={idx} style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '8px 12px',
-                    background: 'var(--cream)',
-                    borderRadius: '6px',
-                    marginBottom: '8px'
-                  }}>
-                    <span style={{ fontWeight: 500, color: 'var(--brown-light)' }}>{idx + 1}.</span>
-                    <span style={{ flex: 1 }}>{item}</span>
+                <SectionHeader
+                  icon={ClipboardList}
+                  title="Ordem do Dia"
+                  subtitle="Pontos a abordar na reuniao"
+                />
+                <div style={{
+                  background: 'var(--cream)',
+                  borderRadius: '12px',
+                  padding: '16px'
+                }}>
+                  {formData.ordem_dia.length > 0 && (
+                    <div style={{ marginBottom: '12px' }}>
+                      {formData.ordem_dia.map((item, idx) => (
+                        <div key={idx} style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                          padding: '12px 14px',
+                          background: 'white',
+                          borderRadius: '10px',
+                          marginBottom: '8px',
+                          border: '1px solid var(--stone)'
+                        }}>
+                          <span style={{
+                            width: '28px',
+                            height: '28px',
+                            borderRadius: '8px',
+                            background: 'var(--brown)',
+                            color: 'white',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '13px',
+                            fontWeight: 600
+                          }}>
+                            {idx + 1}
+                          </span>
+                          <span style={{ flex: 1, color: 'var(--brown)' }}>{item}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeOrdemDia(idx)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              padding: '4px'
+                            }}
+                          >
+                            <X size={16} color="var(--brown-light)" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <div style={{ flex: 1 }}>
+                      <StyledInput
+                        type="text"
+                        value={newOrdemDia}
+                        onChange={(e) => setNewOrdemDia(e.target.value)}
+                        placeholder="Adicionar ponto a ordem do dia..."
+                        onKeyDown={(e) => e.key === 'Enter' && addOrdemDia()}
+                      />
+                    </div>
                     <button
                       type="button"
-                      onClick={() => removeOrdemDia(idx)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                      onClick={addOrdemDia}
+                      style={{
+                        padding: '12px 18px',
+                        background: 'var(--brown)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '10px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
                     >
-                      <X size={14} color="var(--error)" />
+                      <Plus size={18} />
                     </button>
                   </div>
-                ))}
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <input
-                    type="text"
-                    value={newOrdemDia}
-                    onChange={(e) => setNewOrdemDia(e.target.value)}
-                    placeholder="Adicionar ponto a ordem do dia..."
-                    className="form-input"
-                    onKeyDown={(e) => e.key === 'Enter' && addOrdemDia()}
-                  />
-                  <button type="button" onClick={addOrdemDia} className="btn btn-secondary" style={{ padding: '8px 16px' }}>
-                    <Plus size={14} />
-                  </button>
                 </div>
               </div>
 
               {/* Conteudo / Desenvolvimento */}
               <div style={{ marginBottom: '24px' }}>
-                <h4 style={{ margin: '0 0 16px', color: 'var(--brown)', fontSize: '14px' }}>
-                  Desenvolvimento da Reuniao
-                </h4>
+                <SectionHeader
+                  icon={FileText}
+                  title="Desenvolvimento da Reuniao"
+                  subtitle="Descricao detalhada dos assuntos abordados"
+                />
                 <RichTextEditor
                   value={formData.conteudo}
                   onChange={(html) => setFormData({ ...formData, conteudo: html })}
@@ -1227,50 +1671,86 @@ export default function ProjetoAtas({ projeto }) {
 
               {/* Decisoes */}
               <div style={{ marginBottom: '24px' }}>
-                <h4 style={{ margin: '0 0 16px', color: 'var(--brown)', fontSize: '14px' }}>
-                  Decisoes Tomadas
-                </h4>
-                {formData.decisoes.map((d, idx) => (
-                  <div key={idx} style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '8px 12px',
-                    background: 'rgba(122, 158, 122, 0.1)',
-                    borderRadius: '6px',
-                    marginBottom: '8px'
-                  }}>
-                    <CheckCircle size={14} color="var(--success)" />
-                    <span style={{ flex: 1 }}>{typeof d === 'string' ? d : d.texto}</span>
+                <SectionHeader
+                  icon={CheckCircle}
+                  title="Decisoes Tomadas"
+                  subtitle="Decisoes acordadas durante a reuniao"
+                />
+                <div style={{
+                  background: 'rgba(122, 158, 122, 0.1)',
+                  borderRadius: '12px',
+                  padding: '16px'
+                }}>
+                  {formData.decisoes.length > 0 && (
+                    <div style={{ marginBottom: '12px' }}>
+                      {formData.decisoes.map((d, idx) => (
+                        <div key={idx} style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          padding: '12px 14px',
+                          background: 'white',
+                          borderRadius: '10px',
+                          marginBottom: '8px',
+                          border: '1px solid rgba(122, 158, 122, 0.3)'
+                        }}>
+                          <CheckCircle size={18} color="var(--success)" />
+                          <span style={{ flex: 1, color: 'var(--brown)' }}>
+                            {typeof d === 'string' ? d : d.texto}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => removeDecisao(idx)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              padding: '4px'
+                            }}
+                          >
+                            <X size={16} color="var(--brown-light)" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <div style={{ flex: 1 }}>
+                      <StyledInput
+                        type="text"
+                        value={newDecisao}
+                        onChange={(e) => setNewDecisao(e.target.value)}
+                        placeholder="Adicionar decisao..."
+                        onKeyDown={(e) => e.key === 'Enter' && addDecisao()}
+                      />
+                    </div>
                     <button
                       type="button"
-                      onClick={() => removeDecisao(idx)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                      onClick={addDecisao}
+                      style={{
+                        padding: '12px 18px',
+                        background: 'var(--success)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '10px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
                     >
-                      <X size={14} color="var(--error)" />
+                      <Plus size={18} />
                     </button>
                   </div>
-                ))}
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <input
-                    type="text"
-                    value={newDecisao}
-                    onChange={(e) => setNewDecisao(e.target.value)}
-                    placeholder="Adicionar decisao..."
-                    className="form-input"
-                    onKeyDown={(e) => e.key === 'Enter' && addDecisao()}
-                  />
-                  <button type="button" onClick={addDecisao} className="btn btn-secondary" style={{ padding: '8px 16px' }}>
-                    <Plus size={14} />
-                  </button>
                 </div>
               </div>
 
               {/* Acoes */}
               <div style={{ marginBottom: '24px' }}>
-                <h4 style={{ margin: '0 0 16px', color: 'var(--brown)', fontSize: '14px' }}>
-                  Acoes a Realizar
-                </h4>
+                <SectionHeader
+                  icon={CheckSquare}
+                  title="Acoes a Realizar"
+                  subtitle="Tarefas com responsavel e prazo"
+                />
                 <AcoesEditor
                   acoes={formData.acoes}
                   onChange={(a) => setFormData({ ...formData, acoes: a })}
@@ -1278,55 +1758,51 @@ export default function ProjetoAtas({ projeto }) {
               </div>
 
               {/* Proxima Reuniao */}
-              <div style={{ marginBottom: '24px' }}>
-                <h4 style={{ margin: '0 0 16px', color: 'var(--brown)', fontSize: '14px' }}>
-                  Proxima Reuniao
-                </h4>
+              <div style={{
+                background: 'var(--cream)',
+                borderRadius: '14px',
+                padding: '20px',
+                marginBottom: '24px'
+              }}>
+                <SectionHeader
+                  icon={Calendar}
+                  title="Proxima Reuniao"
+                  subtitle="Agendar proxima reuniao (opcional)"
+                />
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
-                  <div>
-                    <label className="form-label">Data</label>
-                    <input
-                      type="date"
-                      value={formData.proxima_reuniao}
-                      onChange={(e) => setFormData({ ...formData, proxima_reuniao: e.target.value })}
-                      className="form-input"
-                    />
-                  </div>
-                  <div>
-                    <label className="form-label">Local</label>
-                    <input
-                      type="text"
-                      value={formData.proxima_reuniao_local}
-                      onChange={(e) => setFormData({ ...formData, proxima_reuniao_local: e.target.value })}
-                      className="form-input"
-                    />
-                  </div>
-                  <div>
-                    <label className="form-label">Hora</label>
-                    <input
-                      type="time"
-                      value={formData.proxima_reuniao_hora}
-                      onChange={(e) => setFormData({ ...formData, proxima_reuniao_hora: e.target.value })}
-                      className="form-input"
-                    />
-                  </div>
+                  <StyledInput
+                    label="Data"
+                    type="date"
+                    value={formData.proxima_reuniao}
+                    onChange={(e) => setFormData({ ...formData, proxima_reuniao: e.target.value })}
+                  />
+                  <StyledInput
+                    label="Local"
+                    type="text"
+                    value={formData.proxima_reuniao_local}
+                    onChange={(e) => setFormData({ ...formData, proxima_reuniao_local: e.target.value })}
+                    placeholder="Local da reuniao"
+                  />
+                  <StyledInput
+                    label="Hora"
+                    type="time"
+                    value={formData.proxima_reuniao_hora}
+                    onChange={(e) => setFormData({ ...formData, proxima_reuniao_hora: e.target.value })}
+                  />
                 </div>
               </div>
 
               {/* Status */}
-              <div>
-                <label className="form-label">Status</label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                  className="form-input"
-                >
-                  <option value="rascunho">Rascunho</option>
-                  <option value="pendente_aprovacao">Pendente Aprovacao</option>
-                  <option value="aprovada">Aprovada</option>
-                  <option value="arquivada">Arquivada</option>
-                </select>
-              </div>
+              <StyledSelect
+                label="Status"
+                value={formData.status}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+              >
+                <option value="rascunho">Rascunho</option>
+                <option value="pendente_aprovacao">Pendente Aprovacao</option>
+                <option value="aprovada">Aprovada</option>
+                <option value="arquivada">Arquivada</option>
+              </StyledSelect>
             </div>
 
             {/* Modal Footer */}
@@ -1334,29 +1810,51 @@ export default function ProjetoAtas({ projeto }) {
               display: 'flex',
               justifyContent: 'flex-end',
               gap: '12px',
-              padding: '16px 24px',
+              padding: '20px 28px',
               borderTop: '1px solid var(--stone)',
               background: 'var(--cream)'
             }}>
               <button
-                className="btn btn-secondary"
                 onClick={() => setShowModal(false)}
+                style={{
+                  padding: '12px 24px',
+                  background: 'white',
+                  border: '1px solid var(--stone)',
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  color: 'var(--brown)',
+                  fontWeight: 500,
+                  fontSize: '14px'
+                }}
               >
                 Cancelar
               </button>
               <button
-                className="btn btn-primary"
                 onClick={handleSave}
                 disabled={saving}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '12px 24px',
+                  background: 'var(--brown)',
+                  border: 'none',
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  color: 'white',
+                  fontWeight: 500,
+                  fontSize: '14px',
+                  opacity: saving ? 0.7 : 1
+                }}
               >
                 {saving ? (
                   <>
-                    <Loader2 size={16} className="spin" style={{ marginRight: '8px' }} />
+                    <Loader2 size={16} className="spin" />
                     A guardar...
                   </>
                 ) : (
                   <>
-                    <Save size={16} style={{ marginRight: '8px' }} />
+                    <Save size={16} />
                     {editingAta ? 'Guardar Alteracoes' : 'Criar Ata'}
                   </>
                 )}
