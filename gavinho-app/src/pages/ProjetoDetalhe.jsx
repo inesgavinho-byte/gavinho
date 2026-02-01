@@ -108,7 +108,7 @@ import { DashboardTab } from '../components/projeto/dashboard'
 export default function ProjetoDetalhe() {
   const { id, tab: urlTab, subtab: urlSubtab } = useParams()
   const navigate = useNavigate()
-  const { isAdmin } = useAuth()
+  const { isAdmin, user } = useAuth()
   const [activeTab, setActiveTab] = useState(urlTab || 'dashboard')
   const [showActions, setShowActions] = useState(false)
   const [showUploadModal, setShowUploadModal] = useState(false)
