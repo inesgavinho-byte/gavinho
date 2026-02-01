@@ -181,14 +181,13 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
       console.log('=== CARREGANDO RENDERS ===')
       console.log('Projeto ID:', projeto.id)
 
-      // Query renders - tabela única com imagem_url
+      // Query renders
       const { data: rendersData, error: rendersError } = await supabase
         .from('projeto_renders')
-        .select('*')
+        .select('id, compartimento, vista, created_at')
         .eq('projeto_id', projeto.id)
         .order('compartimento')
         .order('vista')
-        .order('versao', { ascending: false })
 
       console.log('Renders encontrados:', rendersData?.length || 0)
       console.log('Renders data:', rendersData)
@@ -196,52 +195,53 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
 
       if (rendersError) throw rendersError
 
-      // Agrupar por compartimento+vista para criar "versões"
-      const rendersByKey = {}
-      ;(rendersData || []).forEach(render => {
-        const comp = render.compartimento_personalizado || render.compartimento || 'Sem Compartimento'
-        const vista = render.vista || 'Vista Principal'
-        const key = `${comp}|${vista}`
+      // Query versions separately
+      const renderIds = (rendersData || []).map(r => r.id)
+      let versoesData = []
 
-        if (!rendersByKey[key]) {
-          rendersByKey[key] = {
-            id: render.id,
-            compartimento: comp,
-            vista: vista,
-            created_at: render.created_at,
-            versoes: []
-          }
-        }
+      if (renderIds.length > 0) {
+        const { data: versoes, error: versoesError } = await supabase
+          .from('projeto_render_versoes')
+          .select('id, render_id, versao, url, is_final, created_at')
+          .in('render_id', renderIds)
+          .order('versao', { ascending: false })
 
-        rendersByKey[key].versoes.push({
-          id: render.id,
-          versao: render.versao || 1,
-          url: render.imagem_url,
-          is_final: render.is_final,
-          created_at: render.created_at
-        })
-      })
+        console.log('Versões encontradas:', versoes?.length || 0)
+        console.log('Versões error:', versoesError)
 
-      // Ordenar versões e agrupar por compartimento
-      const grouped = {}
-      Object.values(rendersByKey).forEach(render => {
-        render.versoes.sort((a, b) => b.versao - a.versao)
-        const key = render.compartimento
-        if (!grouped[key]) grouped[key] = []
-        grouped[key].push(render)
-      })
+        if (versoesError) throw versoesError
+        versoesData = versoes || []
+      }
+
+      // Join renders with versions in JavaScript
+      const sortedData = (rendersData || []).map(render => ({
+        ...render,
+        versoes: versoesData
+          .filter(v => v.render_id === render.id)
+          .sort((a, b) => b.versao - a.versao)
+      }))
+
+      // Group by compartimento
+      const grouped = sortedData.reduce((acc, render) => {
+        const key = render.compartimento || 'Sem Compartimento'
+        if (!acc[key]) acc[key] = []
+        acc[key].push(render)
+        return acc
+      }, {})
 
       console.log('Renders agrupados:', Object.keys(grouped).length, 'compartimentos')
       console.log('=== FIM CARREGAMENTO ===')
 
       setRenders(grouped)
 
-      const uniqueCompartimentos = [...new Set(Object.values(rendersByKey).map(r => r.compartimento))]
+      // Extract compartimentos from the data (avoid extra query)
+      const uniqueCompartimentos = [...new Set(sortedData.map(r => r.compartimento).filter(Boolean))]
       setCompartimentos(uniqueCompartimentos)
     } catch (err) {
       console.error('Erro ao carregar renders:', err)
       setLoadError(err.message)
 
+      // Retry up to 3 times with exponential backoff
       if (retryCount < 3) {
         setTimeout(() => {
           loadRenders(retryCount + 1)
@@ -328,15 +328,12 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
         .getPublicUrl(fileName)
       console.log('2. Public URL:', urlData.publicUrl)
 
-      // Create render record - tabela única com imagem_url
+      // Create render record
       console.log('3. Inserting into projeto_renders...')
       const insertData = {
         projeto_id: projeto.id,
         compartimento: compartimento,
         vista: newRender.vista || 'Vista Principal',
-        versao: 1,
-        imagem_url: urlData.publicUrl,
-        is_final: false,
         created_by: userId,
         created_by_name: userName
       }
@@ -350,6 +347,25 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
 
       console.log('3. projeto_renders result:', { renderData, renderError })
       if (renderError) throw renderError
+
+      // Create first version
+      console.log('4. Inserting into projeto_render_versoes...')
+      const versaoData = {
+        render_id: renderData.id,
+        versao: 1,
+        url: urlData.publicUrl,
+        uploaded_by: userId,
+        uploaded_by_name: userName
+      }
+      console.log('4. Versao data:', versaoData)
+
+      const { data: versaoResult, error: versaoError } = await supabase
+        .from('projeto_render_versoes')
+        .insert([versaoData])
+        .select()
+
+      console.log('4. projeto_render_versoes result:', { versaoResult, versaoError })
+      if (versaoError) throw versaoError
 
       console.log('=== UPLOAD COMPLETO COM SUCESSO ===')
       console.log('Render ID criado:', renderData.id)
@@ -377,22 +393,11 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
 
     setUploading(true)
     try {
-      // Get the original render to copy compartimento/vista
-      const { data: originalRender } = await supabase
-        .from('projeto_renders')
-        .select('compartimento, compartimento_personalizado, vista, versao')
-        .eq('id', renderId)
-        .single()
-
-      if (!originalRender) throw new Error('Render original não encontrado')
-
-      // Get max version for this compartimento+vista combination
+      // Get current version count
       const { data: versoes } = await supabase
-        .from('projeto_renders')
+        .from('projeto_render_versoes')
         .select('versao')
-        .eq('projeto_id', projeto.id)
-        .eq('compartimento', originalRender.compartimento)
-        .eq('vista', originalRender.vista)
+        .eq('render_id', renderId)
         .order('versao', { ascending: false })
         .limit(1)
 
@@ -400,7 +405,7 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
 
       // Upload file
       const fileExt = file.name.split('.').pop()
-      const fileName = `${projeto.id}/${Date.now()}_v${nextVersion}.${fileExt}`
+      const fileName = `${projeto.id}/${renderId}_v${nextVersion}.${fileExt}`
 
       const { error: uploadError } = await supabase.storage
         .from('renders')
@@ -412,22 +417,18 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
         .from('renders')
         .getPublicUrl(fileName)
 
-      // Create new render record with incremented version
-      const { error: insertError } = await supabase
-        .from('projeto_renders')
+      // Create version record
+      const { error: versaoError } = await supabase
+        .from('projeto_render_versoes')
         .insert([{
-          projeto_id: projeto.id,
-          compartimento: originalRender.compartimento,
-          compartimento_personalizado: originalRender.compartimento_personalizado,
-          vista: originalRender.vista,
+          render_id: renderId,
           versao: nextVersion,
-          imagem_url: urlData.publicUrl,
-          is_final: false,
-          created_by: userId,
-          created_by_name: userName
+          url: urlData.publicUrl,
+          uploaded_by: userId,
+          uploaded_by_name: userName
         }])
 
-      if (insertError) throw insertError
+      if (versaoError) throw versaoError
 
       loadRenders()
     } catch (err) {
@@ -441,27 +442,16 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
   // Mark as final
   const handleMarkFinal = async (renderId, versaoId) => {
     try {
-      // Get the render to find compartimento+vista
-      const { data: render } = await supabase
-        .from('projeto_renders')
-        .select('compartimento, vista')
-        .eq('id', renderId)
-        .single()
-
-      if (render) {
-        // Unmark all versions of this compartimento+vista first
-        await supabase
-          .from('projeto_renders')
-          .update({ is_final: false })
-          .eq('projeto_id', projeto.id)
-          .eq('compartimento', render.compartimento)
-          .eq('vista', render.vista)
-      }
+      // Unmark all versions first
+      await supabase
+        .from('projeto_render_versoes')
+        .update({ is_final: false })
+        .eq('render_id', renderId)
 
       // Mark selected as final
       const { error } = await supabase
-        .from('projeto_renders')
-        .update({ is_final: true })
+        .from('projeto_render_versoes')
+        .update({ is_final: true, marked_final_at: new Date().toISOString() })
         .eq('id', versaoId)
 
       if (error) throw error
