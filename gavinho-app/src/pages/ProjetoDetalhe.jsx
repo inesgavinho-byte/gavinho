@@ -186,7 +186,6 @@ export default function ProjetoDetalhe() {
   const [editingRender, setEditingRender] = useState(null)
   const [lightboxImage, setLightboxImage] = useState(null) // Para lightbox
   const [moleskineRender, setMoleskineRender] = useState(null) // Para Moleskine (anotação de renders)
-  const [showMoleskineDigital, setShowMoleskineDigital] = useState(false) // Para Moleskine Digital (caderno independente)
   const [renderAnnotations, setRenderAnnotations] = useState({}) // Mapa de render_id -> annotation count
   const [isDragging, setIsDragging] = useState(false) // Para drag & drop
   const [renderForm, setRenderForm] = useState({
@@ -2831,125 +2830,13 @@ export default function ProjetoDetalhe() {
             </div>
           )}
 
-          {/* Sub-tab Moleskine - Caderno Digital */}
+          {/* Sub-tab Moleskine - Abre diretamente o caderno */}
           {activeArchvizSection === 'moleskine' && (
-            <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
-              <div style={{
-                width: '80px',
-                height: '80px',
-                borderRadius: '20px',
-                background: 'linear-gradient(135deg, #8B8670 0%, #5F5C59 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 24px'
-              }}>
-                <BookOpen size={40} style={{ color: 'white' }} />
-              </div>
-
-              <h3 style={{
-                fontSize: '24px',
-                fontWeight: 600,
-                color: 'var(--brown)',
-                fontFamily: "'Cormorant Garamond', Georgia, serif",
-                marginBottom: '12px'
-              }}>
-                Moleskine Digital
-              </h3>
-
-              <p style={{
-                fontSize: '14px',
-                color: 'var(--brown-light)',
-                maxWidth: '500px',
-                margin: '0 auto 32px',
-                lineHeight: 1.6
-              }}>
-                O seu caderno digital para o projeto. Desenhe, escreva, adicione imagens e links livremente.
-                Importe renders do projeto ou carregue qualquer imagem como referência.
-              </p>
-
-              <div style={{
-                display: 'flex',
-                gap: '16px',
-                justifyContent: 'center',
-                flexWrap: 'wrap',
-                marginBottom: '32px'
-              }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '8px 16px',
-                  background: 'var(--cream)',
-                  borderRadius: '20px',
-                  fontSize: '13px',
-                  color: 'var(--brown)'
-                }}>
-                  <Pencil size={16} />
-                  Desenho livre
-                </div>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '8px 16px',
-                  background: 'var(--cream)',
-                  borderRadius: '20px',
-                  fontSize: '13px',
-                  color: 'var(--brown)'
-                }}>
-                  <Image size={16} />
-                  Upload de imagens
-                </div>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '8px 16px',
-                  background: 'var(--cream)',
-                  borderRadius: '20px',
-                  fontSize: '13px',
-                  color: 'var(--brown)'
-                }}>
-                  <Type size={16} />
-                  Texto e notas
-                </div>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '8px 16px',
-                  background: 'var(--cream)',
-                  borderRadius: '20px',
-                  fontSize: '13px',
-                  color: 'var(--brown)'
-                }}>
-                  <Link2 size={16} />
-                  Links
-                </div>
-              </div>
-
-              <button
-                onClick={() => setShowMoleskineDigital(true)}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  padding: '16px 32px',
-                  background: 'var(--olive-gray)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '12px',
-                  fontSize: '16px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-              >
-                <BookOpen size={20} />
-                Abrir Moleskine
-              </button>
-            </div>
+            <MoleskineDigital
+              projectId={project?.id}
+              projectName={project?.nome}
+              onClose={() => setActiveArchvizSection('inspiracoes')}
+            />
           )}
         </div>
       )}
@@ -3361,14 +3248,6 @@ export default function ProjetoDetalhe() {
         />
       )}
 
-      {/* Moleskine Digital - Caderno digital independente */}
-      {showMoleskineDigital && (
-        <MoleskineDigital
-          projectId={project?.id}
-          projectName={project?.nome}
-          onClose={() => setShowMoleskineDigital(false)}
-        />
-      )}
     </div>
   )
 }
