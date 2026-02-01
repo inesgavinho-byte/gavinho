@@ -178,9 +178,6 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
       setLoading(true)
       setLoadError(null)
 
-      console.log('=== CARREGANDO RENDERS ===')
-      console.log('Projeto ID:', projeto.id)
-
       // Query renders
       const { data: rendersData, error: rendersError } = await supabase
         .from('projeto_renders')
@@ -188,10 +185,6 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
         .eq('projeto_id', projeto.id)
         .order('compartimento')
         .order('vista')
-
-      console.log('Renders encontrados:', rendersData?.length || 0)
-      console.log('Renders data:', rendersData)
-      console.log('Renders error:', rendersError)
 
       if (rendersError) throw rendersError
 
@@ -205,9 +198,6 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
           .select('id, render_id, versao, url, is_final, created_at')
           .in('render_id', renderIds)
           .order('versao', { ascending: false })
-
-        console.log('Versões encontradas:', versoes?.length || 0)
-        console.log('Versões error:', versoesError)
 
         if (versoesError) throw versoesError
         versoesData = versoes || []
@@ -229,16 +219,12 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
         return acc
       }, {})
 
-      console.log('Renders agrupados:', Object.keys(grouped).length, 'compartimentos')
-      console.log('=== FIM CARREGAMENTO ===')
-
       setRenders(grouped)
 
       // Extract compartimentos from the data (avoid extra query)
       const uniqueCompartimentos = [...new Set(sortedData.map(r => r.compartimento).filter(Boolean))]
       setCompartimentos(uniqueCompartimentos)
     } catch (err) {
-      console.error('Erro ao carregar renders:', err)
       setLoadError(err.message)
 
       // Retry up to 3 times with exponential backoff
@@ -263,7 +249,7 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
       if (error) throw error
       setTeamMembers(data || [])
     } catch (err) {
-      console.error('Erro ao carregar equipa:', err)
+      // Silent fail - team members are optional
     }
   }
 
@@ -278,14 +264,33 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
       if (error) throw error
       setComments(prev => ({ ...prev, [renderId]: data || [] }))
     } catch (err) {
-      console.error('Erro ao carregar comentarios:', err)
+      // Silent fail - comments will show as empty
     }
   }
 
-  // Handle file upload
+  // File upload validation constants
+  const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+  const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+
+  // Handle file upload with validation
   const handleFileSelect = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
+
+    // Validate file type
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      alert('Tipo de ficheiro não suportado. Por favor use: JPEG, PNG, WebP ou GIF')
+      e.target.value = ''
+      return
+    }
+
+    // Validate file size
+    if (file.size > MAX_FILE_SIZE) {
+      alert('Ficheiro demasiado grande. Tamanho máximo: 10MB')
+      e.target.value = ''
+      return
+    }
+
     setNewRender(prev => ({ ...prev, arquivo: file }))
   }
 
@@ -301,86 +306,56 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
       return
     }
 
-    console.log('=== INICIANDO UPLOAD RENDER ===')
-    console.log('Projeto ID:', projeto.id)
-    console.log('Compartimento:', compartimento)
-    console.log('Vista:', newRender.vista || 'Vista Principal')
-    console.log('User ID:', userId)
-    console.log('User Name:', userName)
-
     setUploading(true)
     try {
       // Upload file to storage
       const fileExt = newRender.arquivo.name.split('.').pop()
       const fileName = `${projeto.id}/${Date.now()}.${fileExt}`
-      console.log('1. Uploading file:', fileName)
 
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('renders')
         .upload(fileName, newRender.arquivo)
 
-      console.log('1. Upload result:', { uploadData, uploadError })
       if (uploadError) throw uploadError
 
       // Get public URL
       const { data: urlData } = supabase.storage
         .from('renders')
         .getPublicUrl(fileName)
-      console.log('2. Public URL:', urlData.publicUrl)
 
       // Create render record
-      console.log('3. Inserting into projeto_renders...')
-      const insertData = {
-        projeto_id: projeto.id,
-        compartimento: compartimento,
-        vista: newRender.vista || 'Vista Principal',
-        created_by: userId,
-        created_by_name: userName
-      }
-      console.log('3. Insert data:', insertData)
-
       const { data: renderData, error: renderError } = await supabase
         .from('projeto_renders')
-        .insert([insertData])
+        .insert([{
+          projeto_id: projeto.id,
+          compartimento: compartimento,
+          vista: newRender.vista || 'Vista Principal',
+          created_by: userId,
+          created_by_name: userName
+        }])
         .select()
         .single()
 
-      console.log('3. projeto_renders result:', { renderData, renderError })
       if (renderError) throw renderError
 
       // Create first version
-      console.log('4. Inserting into projeto_render_versoes...')
-      const versaoData = {
-        render_id: renderData.id,
-        versao: 1,
-        url: urlData.publicUrl,
-        uploaded_by: userId,
-        uploaded_by_name: userName
-      }
-      console.log('4. Versao data:', versaoData)
-
-      const { data: versaoResult, error: versaoError } = await supabase
+      const { error: versaoError } = await supabase
         .from('projeto_render_versoes')
-        .insert([versaoData])
-        .select()
+        .insert([{
+          render_id: renderData.id,
+          versao: 1,
+          url: urlData.publicUrl,
+          uploaded_by: userId,
+          uploaded_by_name: userName
+        }])
 
-      console.log('4. projeto_render_versoes result:', { versaoResult, versaoError })
       if (versaoError) throw versaoError
-
-      console.log('=== UPLOAD COMPLETO COM SUCESSO ===')
-      console.log('Render ID criado:', renderData.id)
 
       // Reset and reload
       setNewRender({ compartimento: '', novoCompartimento: '', vista: '', arquivo: null })
       setShowAddModal(false)
       loadRenders()
     } catch (err) {
-      console.error('=== ERRO NO UPLOAD ===')
-      console.error('Erro completo:', err)
-      console.error('Mensagem:', err.message)
-      console.error('Detalhes:', err.details)
-      console.error('Hint:', err.hint)
-      console.error('Code:', err.code)
       alert('Erro ao adicionar render: ' + err.message)
     } finally {
       setUploading(false)
@@ -390,6 +365,18 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
   // Add new version to existing render
   const handleAddVersion = async (renderId, file) => {
     if (!file) return
+
+    // Validate file type
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      alert('Tipo de ficheiro não suportado. Por favor use: JPEG, PNG, WebP ou GIF')
+      return
+    }
+
+    // Validate file size
+    if (file.size > MAX_FILE_SIZE) {
+      alert('Ficheiro demasiado grande. Tamanho máximo: 10MB')
+      return
+    }
 
     setUploading(true)
     try {
@@ -432,7 +419,6 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
 
       loadRenders()
     } catch (err) {
-      console.error('Erro ao adicionar versao:', err)
       alert('Erro ao adicionar versao: ' + err.message)
     } finally {
       setUploading(false)
@@ -457,7 +443,7 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
       if (error) throw error
       loadRenders()
     } catch (err) {
-      console.error('Erro ao marcar como final:', err)
+      alert('Erro ao marcar como final: ' + err.message)
     }
   }
 
@@ -509,7 +495,6 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
       setShowDuvidaModal(false)
       alert('Duvida submetida com sucesso!')
     } catch (err) {
-      console.error('Erro ao submeter duvida:', err)
       alert('Erro ao submeter duvida: ' + err.message)
     } finally {
       setUploading(false)
@@ -535,7 +520,7 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
       setNewComment('')
       loadComments(renderId)
     } catch (err) {
-      console.error('Erro ao adicionar comentario:', err)
+      alert('Erro ao adicionar comentario: ' + err.message)
     }
   }
 

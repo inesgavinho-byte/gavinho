@@ -35,59 +35,7 @@ export default function Dashboard() {
   const [projectsByPhase, setProjectsByPhase] = useState([])
 
   // Recent activity from chat channels
-  const [recentActivity, setRecentActivity] = useState([
-    // Mock data - in production would come from chat_mensagens table
-    {
-      id: '1',
-      type: 'message',
-      projeto: { codigo: 'GA00469', nome: 'MYRIAD_imagens' },
-      autor: { nome: 'Raquel Sonobe', avatar_url: null },
-      conteudo: 'Ainda não carreguei. Farei isso amanhã',
-      created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-      hasAttachment: false,
-      hasMention: false
-    },
-    {
-      id: '2',
-      type: 'message',
-      projeto: { codigo: 'GA00466', nome: 'PENTHOUSE SI' },
-      autor: { nome: 'Leonardo Ribeiro', avatar_url: null },
-      conteudo: 'Ponto de situação: ajustes na planta geral conforme feedback do cliente',
-      created_at: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
-      hasAttachment: true,
-      hasMention: false
-    },
-    {
-      id: '3',
-      type: 'mention',
-      projeto: { codigo: 'GA00469', nome: 'MYRIAD_imagens' },
-      autor: { nome: 'Raquel Sonobe', avatar_url: null },
-      conteudo: '@Archviz mencionou-o(a): IGF GAVINHO Group Carolina Cipriano...',
-      created_at: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
-      hasAttachment: false,
-      hasMention: true
-    },
-    {
-      id: '4',
-      type: 'message',
-      projeto: { codigo: 'GA00464', nome: 'APARTMENT IG' },
-      autor: { nome: 'Nathalia Bampi', avatar_url: null },
-      conteudo: 'Enviou um ficheiro',
-      created_at: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-      hasAttachment: true,
-      hasMention: false
-    },
-    {
-      id: '5',
-      type: 'message',
-      projeto: { codigo: 'GA00461', nome: 'FPM' },
-      autor: { nome: 'Ana Miranda', avatar_url: null },
-      conteudo: 'Oi, Inês. Finalizei os ajustes que eu acrescentei...',
-      created_at: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
-      hasAttachment: false,
-      hasMention: false
-    }
-  ])
+  const [recentActivity, setRecentActivity] = useState([])
 
   // Buscar dados do Supabase
   useEffect(() => {
@@ -143,8 +91,37 @@ export default function Dashboard() {
           setProjectsByPhase(phaseData)
         }
 
+        // Buscar atividade recente dos chats
+        const { data: mensagens } = await supabase
+          .from('chat_mensagens')
+          .select(`
+            id,
+            conteudo,
+            autor_id,
+            autor_nome,
+            attachments,
+            created_at,
+            canal_id
+          `)
+          .order('created_at', { ascending: false })
+          .limit(10)
+
+        if (mensagens && mensagens.length > 0) {
+          const activity = mensagens.map(m => ({
+            id: m.id,
+            type: m.conteudo?.includes('@') ? 'mention' : 'message',
+            projeto: { codigo: '', nome: '' },
+            autor: { nome: m.autor_nome || 'Utilizador', avatar_url: null },
+            conteudo: m.conteudo || '',
+            created_at: m.created_at,
+            hasAttachment: m.attachments && m.attachments.length > 0,
+            hasMention: m.conteudo?.includes('@')
+          }))
+          setRecentActivity(activity)
+        }
+
       } catch (err) {
-        console.error('Erro ao carregar dashboard:', err)
+        // Silent fail - dashboard will show empty states
       } finally {
         setLoading(false)
       }

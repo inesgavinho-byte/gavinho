@@ -686,19 +686,12 @@ export default function ProjetoDetalhe() {
   // Carregar renders do projeto
   const fetchRenders = async (projetoId) => {
     try {
-      console.log('=== FETCH RENDERS ===')
-      console.log('Projeto ID:', projetoId)
-
       const { data, error } = await supabase
         .from('projeto_renders')
         .select('*')
         .eq('projeto_id', projetoId)
         .order('compartimento')
         .order('versao', { ascending: false })
-
-      console.log('Renders encontrados:', data?.length || 0)
-      console.log('Renders data:', data)
-      console.log('Renders error:', error)
 
       if (error) throw error
       setRenders(data || [])
@@ -717,7 +710,7 @@ export default function ProjetoDetalhe() {
         setRenderAnnotations(annotationsMap)
       }
     } catch (err) {
-      console.error('Erro ao carregar renders:', err)
+      // Silent fail - renders will show as empty
     }
   }
 
@@ -1223,7 +1216,6 @@ export default function ProjetoDetalhe() {
         (payload) => {
           // Verificar se e o projeto atual (por ID ou codigo)
           if (payload.new.id === id || payload.new.codigo === id) {
-            console.log('Projeto atualizado:', payload.new)
             setProject(prev => prev ? { ...prev, ...payload.new } : payload.new)
           }
         }
@@ -1427,10 +1419,6 @@ export default function ProjetoDetalhe() {
       return
     }
 
-    console.log('=== SAVE RENDER ===')
-    console.log('Project ID:', project.id)
-    console.log('Render Form:', renderForm)
-
     try {
       const renderData = {
         projeto_id: project.id,
@@ -1442,8 +1430,6 @@ export default function ProjetoDetalhe() {
         created_at: new Date().toISOString()
       }
 
-      console.log('Render Data to save:', renderData)
-
       if (editingRender) {
         // Atualizar render existente
         const { error } = await supabase
@@ -1451,7 +1437,6 @@ export default function ProjetoDetalhe() {
           .update(renderData)
           .eq('id', editingRender.id)
 
-        console.log('Update error:', error)
         if (error) throw error
 
         setRenders(prev => prev.map(r =>
@@ -1465,10 +1450,7 @@ export default function ProjetoDetalhe() {
           .select()
           .single()
 
-        console.log('Insert result:', { data, error })
-
         if (error) {
-          console.error('ERRO AO INSERIR RENDER:', error)
           alert('Erro ao guardar render: ' + error.message)
           return
         }
@@ -1478,19 +1460,7 @@ export default function ProjetoDetalhe() {
       setShowRenderModal(false)
       setEditingRender(null)
     } catch (err) {
-      console.error('Erro ao guardar render:', err)
-      // Fallback para armazenamento local
-      const newRender = {
-        ...renderForm,
-        id: Date.now(),
-        versao: getNextVersion(renderForm.compartimento)
-      }
-      setRenders(prev => editingRender
-        ? prev.map(r => r.id === editingRender.id ? { ...r, ...renderForm } : r)
-        : [...prev, newRender]
-      )
-      setShowRenderModal(false)
-      setEditingRender(null)
+      alert('Erro ao guardar render: ' + err.message)
     }
   }
 
@@ -1504,28 +1474,28 @@ export default function ProjetoDetalhe() {
         .eq('id', render.id)
 
       if (error) throw error
+      setRenders(prev => prev.filter(r => r.id !== render.id))
     } catch (err) {
-      console.error('Erro ao eliminar:', err)
+      alert('Erro ao eliminar: ' + err.message)
     }
-
-    setRenders(prev => prev.filter(r => r.id !== render.id))
   }
 
   const toggleFinalImage = async (render) => {
     const newIsFinal = !render.is_final
 
     try {
-      await supabase
+      const { error } = await supabase
         .from('projeto_renders')
         .update({ is_final: newIsFinal })
         .eq('id', render.id)
-    } catch (err) {
-      console.error('Erro ao atualizar:', err)
-    }
 
-    setRenders(prev => prev.map(r =>
-      r.id === render.id ? { ...r, is_final: newIsFinal } : r
-    ))
+      if (error) throw error
+      setRenders(prev => prev.map(r =>
+        r.id === render.id ? { ...r, is_final: newIsFinal } : r
+      ))
+    } catch (err) {
+      alert('Erro ao atualizar: ' + err.message)
+    }
   }
 
   const handleRenderImageUpload = (e) => {

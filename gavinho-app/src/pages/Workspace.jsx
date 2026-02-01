@@ -520,7 +520,7 @@ export default function Workspace() {
         setMembros(membrosRes.data)
       }
     } catch (err) {
-      console.error('Erro ao carregar dados:', err)
+      // Silent fail - will show empty state
     } finally {
       setLoading(false)
     }
@@ -541,8 +541,7 @@ export default function Workspace() {
         .limit(100)
 
       if (error) {
-        console.error('Tabela chat_mensagens não existe, usando mock:', error)
-        setPosts(getMockPosts())
+        setPosts([])
         return
       }
 
@@ -560,11 +559,10 @@ export default function Workspace() {
 
         setPosts(postsWithReplies)
       } else {
-        setPosts(getMockPosts())
+        setPosts([])
       }
     } catch (err) {
-      console.error('Erro:', err)
-      setPosts(getMockPosts())
+      setPosts([])
     }
   }
 
@@ -658,7 +656,7 @@ export default function Workspace() {
         }))
       }
     } catch (err) {
-      console.error('Erro ao carregar replies:', err)
+      // Silent fail - replies will show empty
     }
   }
 
@@ -722,7 +720,7 @@ export default function Workspace() {
       // await supabase.from('chat_mensagens').insert({...})
 
     } catch (err) {
-      console.error('Erro ao enviar mensagem:', err)
+      alert('Erro ao enviar mensagem: ' + err.message)
     } finally {
       setUploading(false)
     }
@@ -1042,7 +1040,7 @@ export default function Workspace() {
       oscillator.start(audioContext.currentTime)
       oscillator.stop(audioContext.currentTime + 0.3)
     } catch (e) {
-      console.log('Audio not supported')
+      // Audio not supported - silent fail
     }
   }
 
@@ -1324,11 +1322,9 @@ export default function Workspace() {
   }
 
   const handleCreateTask = (taskData) => {
-    // In production, would insert into tasks table
-    console.log('Creating task:', taskData)
+    // TODO: In production, would insert into tasks table
     setShowCreateTaskModal(false)
     setTaskFromMessage(null)
-    // Show success toast
     alert('Tarefa criada com sucesso!')
   }
 
@@ -1343,9 +1339,8 @@ export default function Workspace() {
     if (!messageToForward) return
 
     const targetChannel = canais.find(c => c.id === targetChannelId)
-    console.log('Forwarding to:', targetChannel?.nome)
 
-    // In production, would insert forwarded message
+    // TODO: In production, would insert forwarded message
     setShowForwardModal(false)
     setMessageToForward(null)
     alert(`Mensagem reencaminhada para ${targetChannel?.nome}`)
@@ -1661,8 +1656,7 @@ export default function Workspace() {
   }
 
   const createMeeting = () => {
-    // In production, would integrate with Google Calendar/Outlook
-    console.log('Creating meeting:', meetingDetails)
+    // TODO: In production, would integrate with Google Calendar/Outlook
     alert(`Reunião "${meetingDetails.title}" agendada para ${meetingDetails.date} às ${meetingDetails.time}`)
     setShowScheduleMeetingModal(false)
     setMeetingDetails({ title: '', date: '', time: '', duration: '30', participants: [], description: '' })
@@ -1904,8 +1898,7 @@ export default function Workspace() {
 
   const triggerWebhook = (event, data) => {
     webhooks.filter(w => w.active && w.events.includes(event)).forEach(webhook => {
-      // In production, would POST to webhook.url
-      console.log('Triggering webhook:', webhook.url, event, data)
+      // TODO: In production, would POST to webhook.url
     })
   }
 
@@ -2216,7 +2209,7 @@ export default function Workspace() {
         return data.value || []
       }
     } catch (error) {
-      console.error('Error fetching messages:', error)
+      // Silent fail - will return empty array
     }
     return []
   }
