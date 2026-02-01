@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { getStroke } from 'perfect-freehand'
 import * as pdfjsLib from 'pdfjs-dist'
+import { jsPDF } from 'jspdf'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import {
@@ -37,7 +38,11 @@ import {
   PanelLeft,
   FilePlus,
   Minus,
-  GripVertical
+  GripVertical,
+  Copy,
+  Clipboard,
+  LayoutGrid,
+  AlignJustify
 } from 'lucide-react'
 
 // Configurar PDF.js worker
@@ -70,6 +75,15 @@ const TOOLS = {
 }
 
 const STROKE_WIDTHS = [2, 4, 6, 8]
+
+// Page templates
+const PAGE_TEMPLATES = [
+  { id: 'blank', name: 'Em branco', icon: 'blank', pattern: null },
+  { id: 'grid', name: 'Quadriculado', icon: 'grid', pattern: 'grid' },
+  { id: 'lines', name: 'Linhas', icon: 'lines', pattern: 'lines' },
+  { id: 'dots', name: 'Pontos', icon: 'dots', pattern: 'dots' },
+  { id: 'cornell', name: 'Cornell', icon: 'cornell', pattern: 'cornell' },
+]
 
 // Opções do perfect-freehand
 const getPenOptions = (size) => ({
@@ -111,10 +125,11 @@ function generateId() {
 }
 
 // Página em branco default
-const createBlankPage = () => ({
+const createBlankPage = (template = 'blank') => ({
   id: generateId(),
   elements: [],
   background: '#FFFFFF',
+  template: template,
   createdAt: new Date().toISOString()
 })
 
@@ -173,6 +188,13 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
   // Floating toolbar state
   const [showFloatingToolbar, setShowFloatingToolbar] = useState(true)
 
+  // Clipboard state
+  const [clipboard, setClipboard] = useState(null)
+
+  // Drag and drop page reorder state
+  const [draggedPageIndex, setDraggedPageIndex] = useState(null)
+  const [dragOverPageIndex, setDragOverPageIndex] = useState(null)
+
   // UI state
   const [isSaving, setIsSaving] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
@@ -183,6 +205,9 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
   const [showThumbnails, setShowThumbnails] = useState(true) // Painel de miniaturas
   const [loadingPdf, setLoadingPdf] = useState(false) // Estado de carregamento PDF
   const pdfInputRef = useRef(null) // Ref para input de PDF
+  const [showTemplateModal, setShowTemplateModal] = useState(false) // Modal de templates
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(null) // Index da página a apagar
+  const [isExporting, setIsExporting] = useState(false) // Estado de exportação PDF
 
   // Current page shortcut
   const currentPage = pages[currentPageIndex] || createBlankPage()
@@ -358,6 +383,51 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
         setSelectedElement(null)
       }
 
+      // Copy (Ctrl+C / Cmd+C)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c' && selectedElement) {
+        e.preventDefault()
+        setClipboard({ ...selectedElement })
+      }
+
+      // Paste (Ctrl+V / Cmd+V)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v' && clipboard) {
+        e.preventDefault()
+        const pastedElement = {
+          ...clipboard,
+          id: generateId(),
+          // Offset position slightly to show it's a copy
+          x: clipboard.x !== undefined ? clipboard.x + 20 : undefined,
+          y: clipboard.y !== undefined ? clipboard.y + 20 : undefined,
+          x1: clipboard.x1 !== undefined ? clipboard.x1 + 20 : undefined,
+          y1: clipboard.y1 !== undefined ? clipboard.y1 + 20 : undefined,
+          x2: clipboard.x2 !== undefined ? clipboard.x2 + 20 : undefined,
+          y2: clipboard.y2 !== undefined ? clipboard.y2 + 20 : undefined,
+          points: clipboard.points ? clipboard.points.map(([px, py, pressure]) => [px + 20, py + 20, pressure]) : undefined,
+        }
+        updatePageElements([...currentPage.elements, pastedElement])
+        setSelectedElement(pastedElement)
+        // Update clipboard with new position for successive pastes
+        setClipboard(pastedElement)
+      }
+
+      // Duplicate (Ctrl+D / Cmd+D)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'd' && selectedElement) {
+        e.preventDefault()
+        const duplicatedElement = {
+          ...selectedElement,
+          id: generateId(),
+          x: selectedElement.x !== undefined ? selectedElement.x + 30 : undefined,
+          y: selectedElement.y !== undefined ? selectedElement.y + 30 : undefined,
+          x1: selectedElement.x1 !== undefined ? selectedElement.x1 + 30 : undefined,
+          y1: selectedElement.y1 !== undefined ? selectedElement.y1 + 30 : undefined,
+          x2: selectedElement.x2 !== undefined ? selectedElement.x2 + 30 : undefined,
+          y2: selectedElement.y2 !== undefined ? selectedElement.y2 + 30 : undefined,
+          points: selectedElement.points ? selectedElement.points.map(([px, py, pressure]) => [px + 30, py + 30, pressure]) : undefined,
+        }
+        updatePageElements([...currentPage.elements, duplicatedElement])
+        setSelectedElement(duplicatedElement)
+      }
+
       // Escape to deselect
       if (e.key === 'Escape') {
         setSelectedElement(null)
@@ -379,7 +449,7 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
       window.removeEventListener('keydown', handleKeyDown)
       window.removeEventListener('keyup', handleKeyUp)
     }
-  }, [currentPageIndex, pages.length, selectedElement, currentPage, fitToScreen])
+  }, [currentPageIndex, pages.length, selectedElement, currentPage, fitToScreen, clipboard])
 
   // Fit on mount and resize
   useEffect(() => {
@@ -450,13 +520,14 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
   }
 
   // Page management
-  const addNewPage = () => {
-    const newPage = createBlankPage()
+  const addNewPage = (template = 'blank') => {
+    const newPage = createBlankPage(template)
     setPages([...pages, newPage])
     setCurrentPageIndex(pages.length)
     setPageHistory(prev => ({ ...prev, [newPage.id]: [[]] }))
     setHistoryIndex(prev => ({ ...prev, [newPage.id]: 0 }))
     setHasUnsavedChanges(true)
+    setShowTemplateModal(false)
   }
 
   const deletePage = (index) => {
@@ -467,11 +538,253 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
       setCurrentPageIndex(newPages.length - 1)
     }
     setHasUnsavedChanges(true)
+    setShowDeleteConfirm(null)
   }
 
   const goToPage = (index) => {
     if (index >= 0 && index < pages.length) {
       setCurrentPageIndex(index)
+    }
+  }
+
+  // Drag and drop page reordering
+  const handlePageDragStart = (index) => {
+    setDraggedPageIndex(index)
+  }
+
+  const handlePageDragOver = (e, index) => {
+    e.preventDefault()
+    if (draggedPageIndex !== null && draggedPageIndex !== index) {
+      setDragOverPageIndex(index)
+    }
+  }
+
+  const handlePageDragEnd = () => {
+    if (draggedPageIndex !== null && dragOverPageIndex !== null && draggedPageIndex !== dragOverPageIndex) {
+      const newPages = [...pages]
+      const [draggedPage] = newPages.splice(draggedPageIndex, 1)
+      newPages.splice(dragOverPageIndex, 0, draggedPage)
+      setPages(newPages)
+      setHasUnsavedChanges(true)
+
+      // Update current page index if needed
+      if (currentPageIndex === draggedPageIndex) {
+        setCurrentPageIndex(dragOverPageIndex)
+      } else if (draggedPageIndex < currentPageIndex && dragOverPageIndex >= currentPageIndex) {
+        setCurrentPageIndex(currentPageIndex - 1)
+      } else if (draggedPageIndex > currentPageIndex && dragOverPageIndex <= currentPageIndex) {
+        setCurrentPageIndex(currentPageIndex + 1)
+      }
+    }
+    setDraggedPageIndex(null)
+    setDragOverPageIndex(null)
+  }
+
+  // Export to PDF
+  const exportToPdf = async () => {
+    setIsExporting(true)
+    try {
+      // Create PDF in landscape orientation
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'px',
+        format: [canvasWidth, canvasHeight]
+      })
+
+      for (let i = 0; i < pages.length; i++) {
+        const page = pages[i]
+
+        // Create canvas for this page
+        const canvas = document.createElement('canvas')
+        canvas.width = canvasWidth * 2 // Higher resolution
+        canvas.height = canvasHeight * 2
+        const ctx = canvas.getContext('2d')
+        ctx.scale(2, 2)
+
+        // Draw background
+        ctx.fillStyle = page.background || '#FFFFFF'
+        ctx.fillRect(0, 0, canvasWidth, canvasHeight)
+
+        // Draw background image if exists (PDF)
+        if (page.backgroundImage) {
+          await new Promise((resolve) => {
+            const img = new Image()
+            img.onload = () => {
+              ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight)
+              resolve()
+            }
+            img.onerror = resolve
+            img.src = page.backgroundImage
+          })
+        }
+
+        // Draw template pattern
+        if (page.template && page.template !== 'blank') {
+          drawTemplatePattern(ctx, page.template)
+        }
+
+        // Draw elements
+        for (const el of page.elements) {
+          await drawElementToCanvas(ctx, el)
+        }
+
+        // Add page to PDF
+        if (i > 0) {
+          pdf.addPage([canvasWidth, canvasHeight], 'landscape')
+        }
+
+        const imgData = canvas.toDataURL('image/jpeg', 0.95)
+        pdf.addImage(imgData, 'JPEG', 0, 0, canvasWidth, canvasHeight)
+      }
+
+      // Save PDF
+      const fileName = `${notebookName.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`
+      pdf.save(fileName)
+    } catch (err) {
+      console.error('Erro ao exportar PDF:', err)
+      alert('Erro ao exportar PDF. Tente novamente.')
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
+  // Draw template pattern to canvas context
+  const drawTemplatePattern = (ctx, template) => {
+    ctx.strokeStyle = '#E5E5E5'
+    ctx.lineWidth = 1
+
+    if (template === 'grid') {
+      const gridSize = 40
+      ctx.beginPath()
+      for (let x = 0; x <= canvasWidth; x += gridSize) {
+        ctx.moveTo(x, 0)
+        ctx.lineTo(x, canvasHeight)
+      }
+      for (let y = 0; y <= canvasHeight; y += gridSize) {
+        ctx.moveTo(0, y)
+        ctx.lineTo(canvasWidth, y)
+      }
+      ctx.stroke()
+    } else if (template === 'lines') {
+      const lineSpacing = 32
+      ctx.beginPath()
+      for (let y = lineSpacing; y < canvasHeight; y += lineSpacing) {
+        ctx.moveTo(60, y)
+        ctx.lineTo(canvasWidth - 60, y)
+      }
+      ctx.stroke()
+    } else if (template === 'dots') {
+      const dotSpacing = 30
+      ctx.fillStyle = '#D0D0D0'
+      for (let x = dotSpacing; x < canvasWidth; x += dotSpacing) {
+        for (let y = dotSpacing; y < canvasHeight; y += dotSpacing) {
+          ctx.beginPath()
+          ctx.arc(x, y, 2, 0, Math.PI * 2)
+          ctx.fill()
+        }
+      }
+    } else if (template === 'cornell') {
+      ctx.strokeStyle = '#D0D0D0'
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      // Left margin line
+      ctx.moveTo(200, 0)
+      ctx.lineTo(200, canvasHeight)
+      // Bottom summary area
+      ctx.moveTo(0, canvasHeight - 200)
+      ctx.lineTo(canvasWidth, canvasHeight - 200)
+      ctx.stroke()
+      // Horizontal lines in main area
+      ctx.strokeStyle = '#E5E5E5'
+      ctx.lineWidth = 1
+      const lineSpacing = 32
+      for (let y = lineSpacing; y < canvasHeight - 200; y += lineSpacing) {
+        ctx.beginPath()
+        ctx.moveTo(200, y)
+        ctx.lineTo(canvasWidth - 40, y)
+        ctx.stroke()
+      }
+    }
+  }
+
+  // Draw element to canvas
+  const drawElementToCanvas = async (ctx, el) => {
+    if (el.type === TOOLS.PEN || el.type === TOOLS.HIGHLIGHTER) {
+      const options = el.type === TOOLS.PEN ? getPenOptions(el.width) : getHighlighterOptions(el.width)
+      const stroke = getStroke(el.points, options)
+      const path = new Path2D(getSvgPathFromStroke(stroke))
+
+      ctx.globalAlpha = el.type === TOOLS.HIGHLIGHTER ? 0.3 : 1
+      ctx.fillStyle = el.color
+      ctx.fill(path)
+      ctx.globalAlpha = 1
+    } else if (el.type === TOOLS.LINE) {
+      ctx.beginPath()
+      ctx.strokeStyle = el.color
+      ctx.lineWidth = el.width
+      ctx.lineCap = 'round'
+      ctx.moveTo(el.x1, el.y1)
+      ctx.lineTo(el.x2, el.y2)
+      ctx.stroke()
+    } else if (el.type === TOOLS.RECTANGLE) {
+      ctx.beginPath()
+      ctx.strokeStyle = el.color
+      ctx.lineWidth = el.width
+      ctx.strokeRect(
+        Math.min(el.x1, el.x2),
+        Math.min(el.y1, el.y2),
+        Math.abs(el.x2 - el.x1),
+        Math.abs(el.y2 - el.y1)
+      )
+    } else if (el.type === TOOLS.CIRCLE) {
+      ctx.beginPath()
+      ctx.strokeStyle = el.color
+      ctx.lineWidth = el.width
+      ctx.ellipse(
+        (el.x1 + el.x2) / 2,
+        (el.y1 + el.y2) / 2,
+        Math.abs(el.x2 - el.x1) / 2,
+        Math.abs(el.y2 - el.y1) / 2,
+        0, 0, Math.PI * 2
+      )
+      ctx.stroke()
+    } else if (el.type === TOOLS.ARROW) {
+      ctx.beginPath()
+      ctx.strokeStyle = el.color
+      ctx.lineWidth = el.width
+      ctx.lineCap = 'round'
+      ctx.moveTo(el.x1, el.y1)
+      ctx.lineTo(el.x2, el.y2)
+      ctx.stroke()
+
+      // Arrow head
+      const angle = Math.atan2(el.y2 - el.y1, el.x2 - el.x1)
+      const headLength = 15
+      ctx.beginPath()
+      ctx.moveTo(el.x2, el.y2)
+      ctx.lineTo(el.x2 - headLength * Math.cos(angle - Math.PI / 6), el.y2 - headLength * Math.sin(angle - Math.PI / 6))
+      ctx.moveTo(el.x2, el.y2)
+      ctx.lineTo(el.x2 - headLength * Math.cos(angle + Math.PI / 6), el.y2 - headLength * Math.sin(angle + Math.PI / 6))
+      ctx.stroke()
+    } else if (el.type === TOOLS.TEXT) {
+      ctx.fillStyle = el.color
+      ctx.font = `${el.fontSize}px 'Quattrocento Sans', sans-serif`
+      ctx.fillText(el.text, el.x, el.y)
+    } else if (el.type === TOOLS.LINK) {
+      ctx.fillStyle = '#4338CA'
+      ctx.font = `16px 'Quattrocento Sans', sans-serif`
+      ctx.fillText(el.label, el.x, el.y)
+    } else if (el.type === 'image') {
+      await new Promise((resolve) => {
+        const img = new Image()
+        img.crossOrigin = 'anonymous'
+        img.onload = () => {
+          ctx.drawImage(img, el.x, el.y, el.width, el.height)
+          resolve()
+        }
+        img.onerror = resolve
+        img.src = el.url
+      })
     }
   }
 
@@ -1229,6 +1542,20 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
             Importar Render
           </button>
           <button
+            onClick={exportToPdf}
+            disabled={isExporting}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '8px 12px', borderRadius: 6,
+              border: '1px solid #E0DED8', background: '#FFFFFF',
+              color: '#5F5C59', fontSize: 13, cursor: isExporting ? 'wait' : 'pointer',
+              opacity: isExporting ? 0.7 : 1,
+            }}
+          >
+            {isExporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+            Exportar PDF
+          </button>
+          <button
             onClick={saveNotebook}
             disabled={isSaving || !hasUnsavedChanges}
             style={{
@@ -1363,14 +1690,49 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
               {pages.map((page, idx) => (
                 <div
                   key={page.id}
+                  draggable
+                  onDragStart={() => handlePageDragStart(idx)}
+                  onDragOver={(e) => handlePageDragOver(e, idx)}
+                  onDragEnd={handlePageDragEnd}
                   onClick={() => setCurrentPageIndex(idx)}
                   style={{
-                    cursor: 'pointer', borderRadius: 8, overflow: 'hidden',
-                    border: idx === currentPageIndex ? '2px solid #8B8670' : '2px solid transparent',
+                    cursor: 'grab', borderRadius: 8, overflow: 'hidden',
+                    border: dragOverPageIndex === idx
+                      ? '2px solid #4338CA'
+                      : idx === currentPageIndex
+                        ? '2px solid #8B8670'
+                        : '2px solid transparent',
                     background: '#FFFFFF', boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
                     transition: 'all 0.15s',
+                    opacity: draggedPageIndex === idx ? 0.5 : 1,
+                    transform: dragOverPageIndex === idx ? 'scale(1.02)' : 'scale(1)',
                   }}
                 >
+                  {/* Drag Handle */}
+                  <div style={{
+                    padding: '4px 8px', background: '#F9F9F7', borderBottom: '1px solid #E0DED8',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#8B8670' }}>
+                      <GripVertical size={12} />
+                      <span style={{ fontSize: 11 }}>Arrastar</span>
+                    </div>
+                    {pages.length > 1 && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(idx); }}
+                        title="Apagar página"
+                        style={{
+                          width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          background: 'transparent', border: 'none', cursor: 'pointer',
+                          color: '#DC2626', opacity: 0.6, borderRadius: 4,
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.opacity = 1}
+                        onMouseLeave={(e) => e.currentTarget.style.opacity = 0.6}
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    )}
+                  </div>
                   {/* Thumbnail Preview */}
                   <div style={{
                     width: '100%', aspectRatio: '16/10', position: 'relative',
@@ -1383,8 +1745,12 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
                     ) : (
                       <div style={{
                         width: '100%', height: '100%',
-                        backgroundImage: 'linear-gradient(#f0f0f0 1px, transparent 1px), linear-gradient(90deg, #f0f0f0 1px, transparent 1px)',
-                        backgroundSize: '10px 10px',
+                        backgroundImage: page.template === 'dots'
+                          ? 'radial-gradient(#D0D0D0 1px, transparent 1px)'
+                          : page.template === 'lines'
+                            ? 'linear-gradient(transparent 31px, #E5E5E5 32px)'
+                            : 'linear-gradient(#f0f0f0 1px, transparent 1px), linear-gradient(90deg, #f0f0f0 1px, transparent 1px)',
+                        backgroundSize: page.template === 'dots' ? '8px 8px' : page.template === 'lines' ? '100% 8px' : '10px 10px',
                       }} />
                     )}
                     {/* Mini preview of elements */}
@@ -1419,12 +1785,17 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
                     <span style={{ fontSize: 12, fontWeight: idx === currentPageIndex ? 600 : 400, color: '#5F5C59' }}>
                       {idx + 1}
                     </span>
+                    {page.template && page.template !== 'blank' && (
+                      <span style={{ fontSize: 10, color: '#8B8670', textTransform: 'capitalize' }}>
+                        {page.template}
+                      </span>
+                    )}
                     {page.pdfName && (
                       <span style={{ fontSize: 10, color: '#8B8670', maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         PDF p.{page.pdfPage}
                       </span>
                     )}
-                    {!page.pdfName && page.elements.length > 0 && (
+                    {!page.pdfName && !page.template && page.elements.length > 0 && (
                       <span style={{ fontSize: 10, color: '#8B8670' }}>
                         {page.elements.length} elem.
                       </span>
@@ -1436,7 +1807,7 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
 
             {/* Add Page Button */}
             <div style={{ padding: '12px', borderTop: '1px solid #E0DED8' }}>
-              <button onClick={addNewPage}
+              <button onClick={() => setShowTemplateModal(true)}
                 style={{
                   width: '100%', padding: '10px', borderRadius: 8,
                   border: '2px dashed #E0DED8', background: 'transparent',
@@ -1497,15 +1868,40 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
                 />
               )}
               <svg width={canvasWidth} height={canvasHeight} style={{ position: 'relative', zIndex: 1 }}>
-                {/* Grid pattern (only show if no background image) */}
+                {/* Template patterns (only show if no background image) */}
                 {!currentPage.backgroundImage && (
                   <>
                     <defs>
+                      {/* Grid pattern */}
                       <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#f0f0f0" strokeWidth="1"/>
+                        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#E5E5E5" strokeWidth="1"/>
+                      </pattern>
+                      {/* Lines pattern */}
+                      <pattern id="lines" width="100%" height="32" patternUnits="userSpaceOnUse">
+                        <line x1="60" y1="32" x2={canvasWidth - 60} y2="32" stroke="#E5E5E5" strokeWidth="1"/>
+                      </pattern>
+                      {/* Dots pattern */}
+                      <pattern id="dots" width="30" height="30" patternUnits="userSpaceOnUse">
+                        <circle cx="15" cy="15" r="2" fill="#D0D0D0"/>
                       </pattern>
                     </defs>
-                    <rect width="100%" height="100%" fill="url(#grid)" />
+                    {/* Render template based on page template */}
+                    {(!currentPage.template || currentPage.template === 'blank' || currentPage.template === 'grid') && (
+                      <rect width="100%" height="100%" fill="url(#grid)" />
+                    )}
+                    {currentPage.template === 'lines' && (
+                      <rect width="100%" height="100%" fill="url(#lines)" />
+                    )}
+                    {currentPage.template === 'dots' && (
+                      <rect width="100%" height="100%" fill="url(#dots)" />
+                    )}
+                    {currentPage.template === 'cornell' && (
+                      <>
+                        <rect width="100%" height="100%" fill="url(#lines)" />
+                        <line x1="200" y1="0" x2="200" y2={canvasHeight} stroke="#D0D0D0" strokeWidth="2"/>
+                        <line x1="0" y1={canvasHeight - 200} x2={canvasWidth} y2={canvasHeight - 200} stroke="#D0D0D0" strokeWidth="2"/>
+                      </>
+                    )}
                   </>
                 )}
 
@@ -1793,7 +2189,7 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
 
             <div style={{ width: 1, height: 24, background: '#E0DED8', margin: '0 4px' }} />
 
-            <button onClick={addNewPage} title="Nova Página"
+            <button onClick={() => setShowTemplateModal(true)} title="Nova Página"
               style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
                 borderRadius: 6, border: 'none', background: '#8B8670', color: '#FFFFFF', cursor: 'pointer' }}>
               <Plus size={18} />
@@ -1965,7 +2361,7 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
               ))}
             </div>
 
-            <button onClick={() => { addNewPage(); setShowPagesList(false) }}
+            <button onClick={() => { setShowTemplateModal(true); setShowPagesList(false) }}
               style={{
                 width: '100%', marginTop: 12, padding: '12px', borderRadius: 8,
                 border: '2px dashed #E0DED8', background: 'transparent',
@@ -1975,6 +2371,157 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
               <Plus size={18} />
               Adicionar Página
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Template Selection Modal */}
+      {showTemplateModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000,
+        }} onClick={() => setShowTemplateModal(false)}>
+          <div style={{
+            background: '#FFFFFF', borderRadius: 12, padding: 24,
+            maxWidth: 500, width: '90%',
+          }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <h3 style={{ fontSize: 18, fontWeight: 600, color: '#5F5C59' }}>Nova Página</h3>
+              <button onClick={() => setShowTemplateModal(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#5F5C59' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <p style={{ fontSize: 14, color: '#8B8670', marginBottom: 16 }}>
+              Escolhe um template para a nova página:
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+              {PAGE_TEMPLATES.map(template => (
+                <button
+                  key={template.id}
+                  onClick={() => addNewPage(template.id)}
+                  style={{
+                    padding: '16px 12px', borderRadius: 8,
+                    border: '2px solid #E0DED8', background: '#FFFFFF',
+                    cursor: 'pointer', transition: 'all 0.15s',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = '#8B8670'
+                    e.currentTarget.style.background = '#F9F9F7'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = '#E0DED8'
+                    e.currentTarget.style.background = '#FFFFFF'
+                  }}
+                >
+                  {/* Template Preview */}
+                  <div style={{
+                    width: 80, height: 50, borderRadius: 4, overflow: 'hidden',
+                    border: '1px solid #E0DED8', background: '#FFFFFF',
+                  }}>
+                    {template.id === 'blank' && (
+                      <div style={{ width: '100%', height: '100%', background: '#FFFFFF' }} />
+                    )}
+                    {template.id === 'grid' && (
+                      <div style={{
+                        width: '100%', height: '100%',
+                        backgroundImage: 'linear-gradient(#E5E5E5 1px, transparent 1px), linear-gradient(90deg, #E5E5E5 1px, transparent 1px)',
+                        backgroundSize: '8px 8px',
+                      }} />
+                    )}
+                    {template.id === 'lines' && (
+                      <div style={{
+                        width: '100%', height: '100%',
+                        backgroundImage: 'linear-gradient(transparent 7px, #E5E5E5 8px)',
+                        backgroundSize: '100% 8px',
+                      }} />
+                    )}
+                    {template.id === 'dots' && (
+                      <div style={{
+                        width: '100%', height: '100%',
+                        backgroundImage: 'radial-gradient(#D0D0D0 1.5px, transparent 1.5px)',
+                        backgroundSize: '8px 8px',
+                      }} />
+                    )}
+                    {template.id === 'cornell' && (
+                      <div style={{
+                        width: '100%', height: '100%', position: 'relative',
+                        backgroundImage: 'linear-gradient(transparent 7px, #E5E5E5 8px)',
+                        backgroundSize: '100% 8px',
+                      }}>
+                        <div style={{
+                          position: 'absolute', left: '25%', top: 0, bottom: 0,
+                          width: 2, background: '#D0D0D0',
+                        }} />
+                        <div style={{
+                          position: 'absolute', left: 0, right: 0, bottom: '30%',
+                          height: 2, background: '#D0D0D0',
+                        }} />
+                      </div>
+                    )}
+                  </div>
+                  <span style={{ fontSize: 13, color: '#5F5C59', fontWeight: 500 }}>
+                    {template.name}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Page Confirmation Modal */}
+      {showDeleteConfirm !== null && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10001,
+        }} onClick={() => setShowDeleteConfirm(null)}>
+          <div style={{
+            background: '#FFFFFF', borderRadius: 12, padding: 24,
+            maxWidth: 400, width: '90%',
+          }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: '50%', background: '#FEE2E2',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Trash2 size={20} color="#DC2626" />
+              </div>
+              <div>
+                <h3 style={{ fontSize: 16, fontWeight: 600, color: '#5F5C59', marginBottom: 4 }}>
+                  Apagar Página {showDeleteConfirm + 1}?
+                </h3>
+                <p style={{ fontSize: 13, color: '#8B8670' }}>
+                  Esta ação não pode ser revertida.
+                </p>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 12, marginTop: 20 }}>
+              <button
+                onClick={() => setShowDeleteConfirm(null)}
+                style={{
+                  flex: 1, padding: '10px 16px', borderRadius: 8,
+                  border: '1px solid #E0DED8', background: '#FFFFFF',
+                  color: '#5F5C59', fontSize: 14, cursor: 'pointer',
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => deletePage(showDeleteConfirm)}
+                style={{
+                  flex: 1, padding: '10px 16px', borderRadius: 8,
+                  border: 'none', background: '#DC2626',
+                  color: '#FFFFFF', fontSize: 14, cursor: 'pointer',
+                }}
+              >
+                Apagar Página
+              </button>
+            </div>
           </div>
         </div>
       )}
