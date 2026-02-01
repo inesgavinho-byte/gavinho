@@ -78,6 +78,7 @@ import ViabilidadeModule from '../components/viabilidade/ViabilidadeModule'
 import Moleskine from '../components/Moleskine'
 import MoleskineDigital from '../components/MoleskineDigital'
 import ProjetoChatIA from '../components/projeto/ProjetoChatIA'
+import ProjetoAtas from '../components/ProjetoAtas'
 
 // Importar dados de amostra e constantes de ficheiros separados
 import { sampleProjectData, projectsMap } from '../data/sampleProjects'
@@ -2436,27 +2437,7 @@ export default function ProjetoDetalhe() {
 
             {/* Atas */}
             {activeFaseSection === 'atas' && (
-              <div>
-                <div className="flex items-center justify-between" style={{ marginBottom: '20px' }}>
-                  <span style={{ fontSize: '13px', color: 'var(--brown-light)' }}>
-                    Atas de reunião desta fase
-                  </span>
-                  <button className="btn btn-primary" style={{ padding: '8px 16px' }}>
-                    <Plus size={16} style={{ marginRight: '8px' }} />
-                    Nova Ata
-                  </button>
-                </div>
-                <div style={{
-                  padding: '48px',
-                  background: 'var(--cream)',
-                  borderRadius: '12px',
-                  textAlign: 'center',
-                  color: 'var(--brown-light)'
-                }}>
-                  <FileText size={48} style={{ opacity: 0.3, marginBottom: '16px' }} />
-                  <p>Nenhuma ata registada para esta fase.</p>
-                </div>
-              </div>
+              <ProjetoAtas projeto={project} />
             )}
           </div>
         </div>
