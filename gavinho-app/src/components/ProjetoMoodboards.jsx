@@ -12,6 +12,8 @@ export default function ProjetoMoodboards({ projeto, userId, userName }) {
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [selectedMoodboard, setSelectedMoodboard] = useState(null)
+  const [htmlContent, setHtmlContent] = useState(null)
+  const [loadingHtml, setLoadingHtml] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
@@ -19,6 +21,31 @@ export default function ProjetoMoodboards({ projeto, userId, userName }) {
 
   const fileInputRef = useRef(null)
   const iframeRef = useRef(null)
+
+  // Fetch HTML content when moodboard is selected
+  const loadHtmlContent = async (moodboard) => {
+    if (!moodboard?.file_url) return
+
+    setLoadingHtml(true)
+    setHtmlContent(null)
+
+    try {
+      const response = await fetch(moodboard.file_url)
+      const text = await response.text()
+      setHtmlContent(text)
+    } catch (err) {
+      console.error('Erro ao carregar HTML:', err)
+      setHtmlContent(`<html><body><h1>Erro ao carregar</h1><p>${err.message}</p></body></html>`)
+    } finally {
+      setLoadingHtml(false)
+    }
+  }
+
+  // Handle moodboard selection
+  const handleSelectMoodboard = (moodboard) => {
+    setSelectedMoodboard(moodboard)
+    loadHtmlContent(moodboard)
+  }
 
   // Form state for new moodboard
   const [newMoodboard, setNewMoodboard] = useState({
@@ -262,7 +289,7 @@ export default function ProjetoMoodboards({ projeto, userId, userName }) {
                 <div
                   key={mb.id}
                   className={`moodboard-item ${selectedMoodboard?.id === mb.id ? 'active' : ''}`}
-                  onClick={() => setSelectedMoodboard(mb)}
+                  onClick={() => handleSelectMoodboard(mb)}
                 >
                   <div className="moodboard-item-icon">
                     <FileCode size={20} />
@@ -315,10 +342,11 @@ export default function ProjetoMoodboards({ projeto, userId, userName }) {
                 <div className="viewer-actions">
                   <button
                     className="btn btn-ghost"
-                    onClick={() => iframeRef.current?.contentWindow?.location.reload()}
+                    onClick={() => loadHtmlContent(selectedMoodboard)}
                     title="Recarregar"
+                    disabled={loadingHtml}
                   >
-                    <RefreshCw size={16} />
+                    <RefreshCw size={16} className={loadingHtml ? 'spin' : ''} />
                   </button>
                   <a
                     className="btn btn-ghost"
@@ -359,13 +387,24 @@ export default function ProjetoMoodboards({ projeto, userId, userName }) {
                 </div>
               </div>
               <div className="viewer-frame-container">
-                <iframe
-                  ref={iframeRef}
-                  src={selectedMoodboard.file_url}
-                  title={selectedMoodboard.titulo}
-                  className="viewer-iframe"
-                  sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
-                />
+                {loadingHtml ? (
+                  <div className="viewer-loading">
+                    <Loader2 size={32} className="spin" />
+                    <p>A carregar moodboard...</p>
+                  </div>
+                ) : htmlContent ? (
+                  <iframe
+                    ref={iframeRef}
+                    srcDoc={htmlContent}
+                    title={selectedMoodboard.titulo}
+                    className="viewer-iframe"
+                    sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+                  />
+                ) : (
+                  <div className="viewer-loading">
+                    <Loader2 size={32} className="spin" />
+                  </div>
+                )}
               </div>
               <div className="viewer-footer">
                 <span>

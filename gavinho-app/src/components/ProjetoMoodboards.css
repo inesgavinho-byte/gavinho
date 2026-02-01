@@ -233,6 +233,31 @@
   opacity: 0.7;
 }
 
+/* Viewer Loading */
+.viewer-loading {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  color: var(--brown-light, #666);
+}
+
+.viewer-loading svg {
+  margin-bottom: 12px;
+  color: var(--brown, #4a5d4a);
+}
+
+.viewer-loading p {
+  margin: 0;
+  font-size: 13px;
+}
+
 /* Viewer Toolbar */
 .viewer-toolbar {
   display: flex;
