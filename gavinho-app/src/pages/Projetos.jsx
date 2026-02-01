@@ -8,7 +8,7 @@ import { supabase } from '../lib/supabase'
 
 const fases = ['Todas', 'Proposta', 'Conceito', 'Projeto', 'Licenciamento', 'Construção', 'Fit-out', 'Entrega']
 const tipologias = ['Residencial', 'Hospitalidade', 'Comercial', 'Misto']
-const statusOptions = ['on_track', 'at_risk', 'blocked']
+const statusOptions = ['on_track', 'at_risk', 'delayed', 'on_hold', 'completed']
 const prioridades = ['Todas', 'Urgente', 'Alta', 'Média', 'Baixa']
 
 export default function Projetos() {
@@ -62,7 +62,7 @@ export default function Projetos() {
     const elapsedDays = (today - dataInicio) / (1000 * 60 * 60 * 24)
     const expectedProgress = totalDays > 0 ? Math.min(100, (elapsedDays / totalDays) * 100) : 0
 
-    if (progress < expectedProgress - 20) return 'blocked'
+    if (progress < expectedProgress - 20) return 'delayed'
     if (progress < expectedProgress - 10) return 'at_risk'
     return 'on_track'
   }
@@ -723,7 +723,9 @@ export default function Projetos() {
                   <select value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})} style={{ width: '100%', padding: '12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '14px', background: 'var(--white)' }}>
                     <option value="on_track">No Prazo</option>
                     <option value="at_risk">Em Risco</option>
-                    <option value="blocked">Bloqueado</option>
+                    <option value="delayed">Atrasado</option>
+                    <option value="on_hold">Em Espera</option>
+                    <option value="completed">Concluído</option>
                   </select>
                 </div>
               </div>

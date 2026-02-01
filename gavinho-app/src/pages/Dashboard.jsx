@@ -114,7 +114,7 @@ export default function Dashboard() {
         if (projetos && projetos.length > 0) {
           const ativos = projetos.filter(p => p.fase !== 'Entrega' && p.fase !== 'Casa Viva')
           const emProposta = projetos.filter(p => p.fase === 'Proposta' || p.fase === 'Conceito')
-          const emRisco = projetos.filter(p => p.status === 'at_risk' || p.status === 'blocked')
+          const emRisco = projetos.filter(p => p.status === 'at_risk' || p.status === 'delayed')
           
           const pipelineTotal = projetos.reduce((sum, p) => sum + (parseFloat(p.orcamento_atual) || 0), 0)
           const progressoMedio = projetos.length > 0 
@@ -166,7 +166,9 @@ export default function Dashboard() {
     switch (status) {
       case 'on_track': return 'var(--success)'
       case 'at_risk': return 'var(--warning)'
-      case 'blocked': return 'var(--error)'
+      case 'delayed': return 'var(--error)'
+      case 'on_hold': return 'var(--info)'
+      case 'completed': return 'var(--success)'
       default: return 'var(--info)'
     }
   }

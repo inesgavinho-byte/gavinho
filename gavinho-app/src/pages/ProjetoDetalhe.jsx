@@ -249,7 +249,7 @@ export default function ProjetoDetalhe() {
       const { error } = await supabase
         .from('projetos')
         .update(updateData)
-        .eq('codigo', project.codigo)
+        .eq('id', project.id)
 
       if (error) {
         console.error('Supabase error:', error)
@@ -947,7 +947,7 @@ export default function ProjetoDetalhe() {
       const { error } = await supabase
         .from('projetos')
         .delete()
-        .eq('codigo', project.codigo)
+        .eq('id', project.id)
 
       if (error) throw error
 
@@ -1104,7 +1104,7 @@ export default function ProjetoDetalhe() {
           // Localização
           localizacao: {
             morada: projetoData.morada || projetoData.localizacao,
-            cidade: projetoData.localizacao,
+            cidade: projetoData.cidade || '',
             estado: projetoData.estado,
             codigo_postal: projetoData.codigo_postal,
             pais: projetoData.pais || 'Portugal'
@@ -1263,7 +1263,9 @@ export default function ProjetoDetalhe() {
     switch (status) {
       case 'on_track': return 'var(--success)'
       case 'at_risk': return 'var(--warning)'
-      case 'blocked': return 'var(--error)'
+      case 'delayed': return 'var(--error)'
+      case 'on_hold': return 'var(--info)'
+      case 'completed': return 'var(--success)'
       case 'pago': return 'var(--success)'
       case 'pendente': return 'var(--warning)'
       case 'em_progresso': return 'var(--info)'
@@ -1275,7 +1277,9 @@ export default function ProjetoDetalhe() {
     switch (status) {
       case 'on_track': return 'No Prazo'
       case 'at_risk': return 'Em Risco'
-      case 'blocked': return 'Bloqueado'
+      case 'delayed': return 'Atrasado'
+      case 'on_hold': return 'Em Espera'
+      case 'completed': return 'Concluído'
       case 'pago': return 'Pago'
       case 'pendente': return 'Pendente'
       case 'em_progresso': return 'Em Progresso'

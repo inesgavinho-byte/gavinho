@@ -166,7 +166,7 @@ export default function DashboardProjetos() {
     const today = new Date()
     activeProjetos.forEach(p => {
       // Usar status se definido explicitamente
-      if (p.status === 'blocked') {
+      if (p.status === 'delayed') {
         delayed++
         return
       }
@@ -231,7 +231,7 @@ export default function DashboardProjetos() {
       let health = 'good'
 
       // Verificar status explicito primeiro
-      if (p.status === 'blocked') {
+      if (p.status === 'delayed') {
         health = 'risk'
       } else if (p.status === 'at_risk') {
         health = 'attention'

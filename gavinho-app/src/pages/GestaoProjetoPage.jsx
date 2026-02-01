@@ -117,7 +117,7 @@ export default function GestaoProjetoPage() {
           codigo: p.codigo,
           nome: p.nome,
           cliente_nome: p.clientes?.nome || 'N/A',
-          status_geral: p.status === 'blocked' ? 'off-track' : p.status === 'at_risk' ? 'at-risk' : 'on-track',
+          status_geral: p.status === 'delayed' ? 'off-track' : p.status === 'at_risk' ? 'at-risk' : 'on-track',
           progresso_percentagem: p.progresso || Math.floor(Math.random() * 80 + 10),
           desvio_prazo_dias: Math.floor(Math.random() * 20 - 10),
           desvio_custo_percentagem: Math.floor(Math.random() * 16 - 5),
