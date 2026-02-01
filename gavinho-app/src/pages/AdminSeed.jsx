@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { seedGA00413Diario } from '../scripts/seedGA00413Diario'
 import {
@@ -22,9 +22,14 @@ import {
   X,
   Eye,
   Upload,
-  Trash2
+  Trash2,
+  Sparkles,
+  ChevronDown,
+  ChevronUp,
+  RotateCcw
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { SeedInteligente } from '../components/admin'
 
 // Tabelas disponíveis para importação em massa
 const IMPORT_TABLES = {
@@ -58,6 +63,17 @@ const IMPORT_TABLES = {
   }
 }
 
+// Definição de seeds disponíveis (para auto-hide)
+const SEED_CARDS = {
+  GA00489_entregaveis: { nome: 'GA00489 - AS House Mora (Entregáveis)', descricao: 'Lista de Entregáveis Projeto Base + Execução' },
+  GA00469_myryad: { nome: 'GA00469 - MYRYAD (Entregas)', descricao: 'Entregas ao Cliente Ago 2024 - Ago 2025' },
+  GA00402_maria: { nome: 'GA00402 - Maria Residences', descricao: 'Projeto completo com utilizadores, tarefas e bloqueios' },
+  employee_dates: { nome: 'Datas de Colaboração', descricao: 'Atualização de datas de entrada dos colaboradores' },
+  feriados_portugal: { nome: 'Feriados Portugal', descricao: 'Feriados nacionais + Santo António 2025-2027' },
+  ferias_gozadas: { nome: 'Férias Gozadas', descricao: 'Férias já aprovadas de colaboradores' },
+  GA00413_diario: { nome: 'Diário GA00413 - Oeiras House', descricao: 'Entradas de reuniões de coordenação de obra' }
+}
+
 export default function AdminSeed() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
@@ -72,6 +88,79 @@ export default function AdminSeed() {
   const [importFormat, setImportFormat] = useState('csv') // 'csv', 'json', 'lines'
   const [importing, setImporting] = useState(false)
   const [linkedProjectId, setLinkedProjectId] = useState('') // Para entregáveis e tarefas
+
+  // Estados para seeds executados e IA
+  const [executedSeeds, setExecutedSeeds] = useState({})
+  const [showExecuted, setShowExecuted] = useState(false)
+  const [showAISeed, setShowAISeed] = useState(false)
+
+  // Carregar seeds executados ao montar
+  useEffect(() => {
+    loadExecutedSeeds()
+  }, [])
+
+  const loadExecutedSeeds = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('seeds_executados')
+        .select('seed_key, executado_em')
+
+      if (!error && data) {
+        const seedMap = {}
+        data.forEach(s => {
+          seedMap[s.seed_key] = s.executado_em
+        })
+        setExecutedSeeds(seedMap)
+      }
+    } catch (err) {
+      console.error('Erro ao carregar seeds executados:', err)
+    }
+  }
+
+  // Registar seed executado
+  const registerSeedExecution = useCallback(async (seedKey, resultado = {}) => {
+    try {
+      const seedInfo = SEED_CARDS[seedKey]
+      await supabase.from('seeds_executados').upsert({
+        seed_key: seedKey,
+        nome: seedInfo?.nome || seedKey,
+        descricao: seedInfo?.descricao || '',
+        resultado,
+        executado_em: new Date().toISOString()
+      }, { onConflict: 'seed_key' })
+
+      // Atualizar estado local
+      setExecutedSeeds(prev => ({
+        ...prev,
+        [seedKey]: new Date().toISOString()
+      }))
+    } catch (err) {
+      console.error('Erro ao registar seed:', err)
+    }
+  }, [])
+
+  // Verificar se seed foi executado
+  const isSeedExecuted = useCallback((seedKey) => {
+    return !!executedSeeds[seedKey]
+  }, [executedSeeds])
+
+  // Resetar seed executado (para poder executar novamente)
+  const resetSeedExecution = useCallback(async (seedKey) => {
+    try {
+      await supabase
+        .from('seeds_executados')
+        .delete()
+        .eq('seed_key', seedKey)
+
+      setExecutedSeeds(prev => {
+        const newState = { ...prev }
+        delete newState[seedKey]
+        return newState
+      })
+    } catch (err) {
+      console.error('Erro ao resetar seed:', err)
+    }
+  }, [])
 
   const addLog = (message, type = 'info') => {
     setLogs(prev => [...prev, { message, type, timestamp: new Date().toLocaleTimeString() }])
@@ -534,6 +623,7 @@ export default function AdminSeed() {
 
       addLog('🎉 Seed concluído com sucesso!', 'success')
       setResult({ success: true, projetoId })
+      await registerSeedExecution('GA00402_maria', { projetoId })
 
     } catch (error) {
       console.error('Erro:', error)
@@ -814,6 +904,7 @@ export default function AdminSeed() {
       const totalEntregaveis = entregaveisProjetoBase.length + entregaveisProjetoExecucao.length
       addLog(`🎉 Seed concluído! Total: ${totalEntregaveis} entregáveis`, 'success')
       setResult({ success: true, projetoId, total: totalEntregaveis })
+      await registerSeedExecution('GA00489_entregaveis', { projetoId, total: totalEntregaveis })
 
     } catch (error) {
       console.error('Erro:', error)
@@ -825,9 +916,8 @@ export default function AdminSeed() {
   }
 
   // ============================================
-  // SEED: Entregas Cliente MYRYAD (GA00469)
-  // ============================================
   // Atualizar datas de entrada dos colaboradores
+  // ============================================
   const updateEmployeeDates = async () => {
     setLoading(true)
     setLogs([])
@@ -898,6 +988,7 @@ export default function AdminSeed() {
 
       addLog(`📊 Resumo: ${updated} atualizados, ${notFound} não encontrados`, 'info')
       setResult({ success: true })
+      await registerSeedExecution('employee_dates', { updated, notFound })
     } catch (err) {
       addLog(`💥 Erro: ${err.message}`, 'error')
       setResult({ success: false, error: err.message })
@@ -1005,6 +1096,7 @@ export default function AdminSeed() {
 
       addLog(`📊 Total: ${total} feriados adicionados (2025-2027)`, 'info')
       setResult({ success: true })
+      await registerSeedExecution('feriados_portugal', { total })
     } catch (err) {
       addLog(`💥 Erro: ${err.message}`, 'error')
       setResult({ success: false, error: err.message })
@@ -1113,6 +1205,7 @@ export default function AdminSeed() {
 
       addLog(`📊 Resumo: ${inserted} férias adicionadas, ${errors} erros`, 'info')
       setResult({ success: errors === 0 })
+      if (errors === 0) await registerSeedExecution('ferias_gozadas', { inserted })
     } catch (err) {
       addLog(`💥 Erro: ${err.message}`, 'error')
       setResult({ success: false, error: err.message })
@@ -1135,6 +1228,7 @@ export default function AdminSeed() {
     try {
       const result = await seedGA00413Diario(supabase, addLogWrapper)
       setResult({ success: result.errors === 0 })
+      if (result.errors === 0) await registerSeedExecution('GA00413_diario', result)
     } catch (err) {
       addLogWrapper(`💥 Erro: ${err.message}`, 'error')
       setResult({ success: false, error: err.message })
@@ -1398,6 +1492,7 @@ export default function AdminSeed() {
       const total = countEntregas + countMails
       addLog(`🎉 Seed concluído! Total: ${total} entregas`, 'success')
       setResult({ success: true, projetoId, total })
+      await registerSeedExecution('GA00469_myryad', { projetoId, total })
 
     } catch (error) {
       console.error('Erro:', error)
@@ -1407,6 +1502,10 @@ export default function AdminSeed() {
 
     setLoading(false)
   }
+
+  // Contar seeds executados
+  const executedCount = Object.keys(executedSeeds).length
+  const totalSeeds = Object.keys(SEED_CARDS).length
 
   return (
     <div className="fade-in">
@@ -1424,12 +1523,102 @@ export default function AdminSeed() {
             <p className="page-subtitle">Carregar dados reais para a plataforma</p>
           </div>
         </div>
+        <div className="flex items-center gap-md">
+          {executedCount > 0 && (
+            <button
+              onClick={() => setShowExecuted(!showExecuted)}
+              className="btn btn-outline"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '13px'
+              }}
+            >
+              {showExecuted ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              {showExecuted ? 'Ocultar' : 'Mostrar'} {executedCount} executados
+            </button>
+          )}
+          <button
+            onClick={() => setShowAISeed(!showAISeed)}
+            className={showAISeed ? 'btn btn-outline' : 'btn btn-primary'}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              background: showAISeed ? 'transparent' : 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)'
+            }}
+          >
+            <Sparkles size={18} />
+            {showAISeed ? 'Ver Cards' : 'Seed Inteligente'}
+          </button>
+        </div>
       </div>
 
+      {/* AI Seed Section */}
+      {showAISeed && (
+        <div style={{ marginBottom: '32px' }}>
+          <SeedInteligente
+            linkedProjectId={linkedProjectId}
+            onSuccess={() => {
+              addLog('Seed inteligente concluído!', 'success')
+            }}
+          />
+        </div>
+      )}
+
       {/* Seed Cards */}
-      <div className="grid grid-2" style={{ gap: '24px', marginBottom: '32px' }}>
+      {!showAISeed && (
+        <>
+          {/* Stats Bar */}
+          {executedCount > 0 && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '12px 16px',
+              background: 'var(--cream)',
+              borderRadius: '10px',
+              marginBottom: '24px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <CheckCircle size={20} color="var(--success)" />
+                <span style={{ fontSize: '14px', color: 'var(--brown)' }}>
+                  {executedCount} de {totalSeeds} seeds executados
+                </span>
+              </div>
+              <div style={{
+                width: '200px',
+                height: '6px',
+                background: 'var(--stone)',
+                borderRadius: '3px',
+                overflow: 'hidden'
+              }}>
+                <div style={{
+                  width: `${(executedCount / totalSeeds) * 100}%`,
+                  height: '100%',
+                  background: 'var(--success)',
+                  borderRadius: '3px',
+                  transition: 'width 0.3s ease'
+                }} />
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-2" style={{ gap: '24px', marginBottom: '32px' }}>
         {/* GA00489 Entregáveis Card */}
-        <div className="card" style={{ padding: '24px' }}>
+        {(!isSeedExecuted('GA00489_entregaveis') || showExecuted) && (
+        <div className="card" style={{ padding: '24px', position: 'relative', opacity: isSeedExecuted('GA00489_entregaveis') ? 0.6 : 1 }}>
+          {isSeedExecuted('GA00489_entregaveis') && (
+            <div style={{ position: 'absolute', top: '12px', right: '12px', display: 'flex', gap: '8px' }}>
+              <span style={{ background: 'var(--success)', color: 'white', padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 500 }}>
+                Executado
+              </span>
+              <button onClick={() => resetSeedExecution('GA00489_entregaveis')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--brown-light)' }} title="Resetar">
+                <RotateCcw size={14} />
+              </button>
+            </div>
+          )}
           <div className="flex items-center gap-md" style={{ marginBottom: '20px' }}>
             <div style={{
               width: '56px',
@@ -1481,7 +1670,7 @@ export default function AdminSeed() {
 
           <button
             onClick={seedEntregaveisGA00489}
-            disabled={loading}
+            disabled={loading || isSeedExecuted('GA00489_entregaveis')}
             className="btn btn-primary"
             style={{ width: '100%', padding: '14px' }}
           >
@@ -1498,9 +1687,21 @@ export default function AdminSeed() {
             )}
           </button>
         </div>
+        )}
 
         {/* MYRYAD Entregas Card */}
-        <div className="card" style={{ padding: '24px' }}>
+        {(!isSeedExecuted('GA00469_myryad') || showExecuted) && (
+        <div className="card" style={{ padding: '24px', position: 'relative', opacity: isSeedExecuted('GA00469_myryad') ? 0.6 : 1 }}>
+          {isSeedExecuted('GA00469_myryad') && (
+            <div style={{ position: 'absolute', top: '12px', right: '12px', display: 'flex', gap: '8px' }}>
+              <span style={{ background: 'var(--success)', color: 'white', padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 500 }}>
+                Executado
+              </span>
+              <button onClick={() => resetSeedExecution('GA00469_myryad')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--brown-light)' }} title="Resetar">
+                <RotateCcw size={14} />
+              </button>
+            </div>
+          )}
           <div className="flex items-center gap-md" style={{ marginBottom: '20px' }}>
             <div style={{
               width: '56px',
@@ -1552,7 +1753,7 @@ export default function AdminSeed() {
 
           <button
             onClick={seedEntregasMYRYAD}
-            disabled={loading}
+            disabled={loading || isSeedExecuted('GA00469_myryad')}
             className="btn btn-primary"
             style={{ width: '100%', padding: '14px' }}
           >
@@ -1569,9 +1770,17 @@ export default function AdminSeed() {
             )}
           </button>
         </div>
+        )}
 
         {/* Maria Residences Card */}
-        <div className="card" style={{ padding: '24px' }}>
+        {(!isSeedExecuted('GA00402_maria') || showExecuted) && (
+        <div className="card" style={{ padding: '24px', position: 'relative', opacity: isSeedExecuted('GA00402_maria') ? 0.6 : 1 }}>
+          {isSeedExecuted('GA00402_maria') && (
+            <div style={{ position: 'absolute', top: '12px', right: '12px', display: 'flex', gap: '8px' }}>
+              <span style={{ background: 'var(--success)', color: 'white', padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 500 }}>Executado</span>
+              <button onClick={() => resetSeedExecution('GA00402_maria')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--brown-light)' }} title="Resetar"><RotateCcw size={14} /></button>
+            </div>
+          )}
           <div className="flex items-center gap-md" style={{ marginBottom: '20px' }}>
             <div style={{
               width: '56px',
@@ -1625,7 +1834,7 @@ export default function AdminSeed() {
 
           <button
             onClick={seedMariaResidences}
-            disabled={loading}
+            disabled={loading || isSeedExecuted('GA00402_maria')}
             className="btn btn-primary"
             style={{ width: '100%', padding: '14px' }}
           >
@@ -1642,9 +1851,17 @@ export default function AdminSeed() {
             )}
           </button>
         </div>
+        )}
 
         {/* Employee Dates Update Card */}
-        <div className="card" style={{ padding: '24px' }}>
+        {(!isSeedExecuted('employee_dates') || showExecuted) && (
+        <div className="card" style={{ padding: '24px', position: 'relative', opacity: isSeedExecuted('employee_dates') ? 0.6 : 1 }}>
+          {isSeedExecuted('employee_dates') && (
+            <div style={{ position: 'absolute', top: '12px', right: '12px', display: 'flex', gap: '8px' }}>
+              <span style={{ background: 'var(--success)', color: 'white', padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 500 }}>Executado</span>
+              <button onClick={() => resetSeedExecution('employee_dates')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--brown-light)' }} title="Resetar"><RotateCcw size={14} /></button>
+            </div>
+          )}
           <div className="flex items-center gap-md" style={{ marginBottom: '20px' }}>
             <div style={{
               width: '56px',
@@ -1693,7 +1910,7 @@ export default function AdminSeed() {
 
           <button
             onClick={updateEmployeeDates}
-            disabled={loading}
+            disabled={loading || isSeedExecuted('employee_dates')}
             className="btn btn-primary"
             style={{ width: '100%', padding: '14px' }}
           >
@@ -1710,9 +1927,17 @@ export default function AdminSeed() {
             )}
           </button>
         </div>
+        )}
 
         {/* Feriados Portugal Card */}
-        <div className="card" style={{ padding: '24px' }}>
+        {(!isSeedExecuted('feriados_portugal') || showExecuted) && (
+        <div className="card" style={{ padding: '24px', position: 'relative', opacity: isSeedExecuted('feriados_portugal') ? 0.6 : 1 }}>
+          {isSeedExecuted('feriados_portugal') && (
+            <div style={{ position: 'absolute', top: '12px', right: '12px', display: 'flex', gap: '8px' }}>
+              <span style={{ background: 'var(--success)', color: 'white', padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 500 }}>Executado</span>
+              <button onClick={() => resetSeedExecution('feriados_portugal')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--brown-light)' }} title="Resetar"><RotateCcw size={14} /></button>
+            </div>
+          )}
           <div className="flex items-center gap-md" style={{ marginBottom: '20px' }}>
             <div style={{
               width: '56px',
@@ -1767,7 +1992,7 @@ export default function AdminSeed() {
 
           <button
             onClick={seedFeriadosPortugal}
-            disabled={loading}
+            disabled={loading || isSeedExecuted('feriados_portugal')}
             className="btn btn-primary"
             style={{ width: '100%', padding: '14px' }}
           >
@@ -1784,9 +2009,17 @@ export default function AdminSeed() {
             )}
           </button>
         </div>
+        )}
 
         {/* Férias Gozadas Card */}
-        <div className="card" style={{ padding: '24px' }}>
+        {(!isSeedExecuted('ferias_gozadas') || showExecuted) && (
+        <div className="card" style={{ padding: '24px', position: 'relative', opacity: isSeedExecuted('ferias_gozadas') ? 0.6 : 1 }}>
+          {isSeedExecuted('ferias_gozadas') && (
+            <div style={{ position: 'absolute', top: '12px', right: '12px', display: 'flex', gap: '8px' }}>
+              <span style={{ background: 'var(--success)', color: 'white', padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 500 }}>Executado</span>
+              <button onClick={() => resetSeedExecution('ferias_gozadas')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--brown-light)' }} title="Resetar"><RotateCcw size={14} /></button>
+            </div>
+          )}
           <div className="flex items-center gap-md" style={{ marginBottom: '20px' }}>
             <div style={{
               width: '56px',
@@ -1830,7 +2063,7 @@ export default function AdminSeed() {
 
           <button
             onClick={seedFeriasGozadas}
-            disabled={loading}
+            disabled={loading || isSeedExecuted('ferias_gozadas')}
             className="btn btn-primary"
             style={{ width: '100%', padding: '14px' }}
           >
@@ -1847,9 +2080,17 @@ export default function AdminSeed() {
             )}
           </button>
         </div>
+        )}
 
         {/* GA00413 Diário de Bordo Card */}
-        <div className="card" style={{ padding: '24px' }}>
+        {(!isSeedExecuted('GA00413_diario') || showExecuted) && (
+        <div className="card" style={{ padding: '24px', position: 'relative', opacity: isSeedExecuted('GA00413_diario') ? 0.6 : 1 }}>
+          {isSeedExecuted('GA00413_diario') && (
+            <div style={{ position: 'absolute', top: '12px', right: '12px', display: 'flex', gap: '8px' }}>
+              <span style={{ background: 'var(--success)', color: 'white', padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 500 }}>Executado</span>
+              <button onClick={() => resetSeedExecution('GA00413_diario')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--brown-light)' }} title="Resetar"><RotateCcw size={14} /></button>
+            </div>
+          )}
           <div className="flex items-center gap-md" style={{ marginBottom: '20px' }}>
             <div style={{
               width: '56px',
@@ -1905,7 +2146,7 @@ export default function AdminSeed() {
 
           <button
             onClick={runSeedGA00413Diario}
-            disabled={loading}
+            disabled={loading || isSeedExecuted('GA00413_diario')}
             className="btn btn-primary"
             style={{ width: '100%', padding: '14px' }}
           >
@@ -1922,6 +2163,7 @@ export default function AdminSeed() {
             )}
           </button>
         </div>
+        )}
 
         {/* Importação em Massa Card */}
         <div className="card" style={{ padding: '24px', gridColumn: 'span 2' }}>
@@ -2223,6 +2465,8 @@ export default function AdminSeed() {
           )}
         </div>
       </div>
+        </>
+      )}
 
       {/* Instruções */}
       <div className="card" style={{ padding: '24px', background: 'var(--cream)' }}>
