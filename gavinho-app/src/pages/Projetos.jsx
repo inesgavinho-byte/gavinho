@@ -481,18 +481,33 @@ export default function Projetos() {
                 {/* Header: Título + Badge + Menu */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <h3 style={{
-                      fontSize: '14px',
-                      fontWeight: 600,
-                      color: 'var(--brown)',
-                      marginBottom: '4px',
-                      lineHeight: 1.4,
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis'
-                    }}>
-                      {p.codigo}_{(p.nome || '').toUpperCase()}
-                    </h3>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                      <h3 style={{
+                        fontSize: '14px',
+                        fontWeight: 600,
+                        color: 'var(--brown)',
+                        margin: 0,
+                        lineHeight: 1.4,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}>
+                        {p.codigo}_{(p.nome || '').toUpperCase()}
+                      </h3>
+                      {p.codigo_interno && (
+                        <span style={{
+                          fontSize: '10px',
+                          fontWeight: 600,
+                          color: 'var(--info)',
+                          background: 'rgba(59, 130, 246, 0.1)',
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          fontFamily: 'monospace'
+                        }}>
+                          {p.codigo_interno}
+                        </span>
+                      )}
+                    </div>
                     <p style={{
                       fontSize: '13px',
                       color: 'var(--brown-light)',
@@ -642,12 +657,13 @@ export default function Projetos() {
           <div className="table-container">
             <table>
               <thead>
-                <tr><th>Código</th><th>Nome</th><th>Fase</th><th>Status</th><th>Progresso</th><th></th></tr>
+                <tr><th>Código</th><th>ID Interno</th><th>Nome</th><th>Fase</th><th>Status</th><th>Progresso</th><th></th></tr>
               </thead>
               <tbody>
                 {filteredProjects.map((p) => (
                   <tr key={p.id} onClick={() => navigate(`/projetos/${p.codigo}`)} style={{ cursor: 'pointer' }}>
                     <td><span style={{ fontWeight: 600, color: 'var(--warning)', fontFamily: 'monospace' }}>{p.codigo}</span></td>
+                    <td><span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--info)', fontFamily: 'monospace' }}>{p.codigo_interno || '—'}</span></td>
                     <td style={{ fontWeight: 500 }}>{p.nome}</td>
                     <td><span style={{ padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 600, background: `${getFaseColor(p.fase)}20`, color: getFaseColor(p.fase) }}>{p.fase}</span></td>
                     <td><span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ width: '8px', height: '8px', borderRadius: '50%', background: getStatusColor(p.status_calculado || p.status) }} />{getStatusLabel(p.status_calculado || p.status)}</span></td>

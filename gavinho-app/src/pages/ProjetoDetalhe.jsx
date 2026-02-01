@@ -1637,14 +1637,27 @@ export default function ProjetoDetalhe() {
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-md mb-sm">
-              <span style={{ 
-                fontSize: '13px', 
-                fontWeight: 700, 
+              <span style={{
+                fontSize: '13px',
+                fontWeight: 700,
                 color: 'var(--blush-dark)',
                 letterSpacing: '0.5px'
               }}>
                 {project.codigo}
               </span>
+              {project.codigo_interno && (
+                <span style={{
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  color: 'var(--info)',
+                  background: 'rgba(59, 130, 246, 0.1)',
+                  padding: '3px 8px',
+                  borderRadius: '4px',
+                  fontFamily: 'monospace'
+                }}>
+                  {project.codigo_interno}
+                </span>
+              )}
               <span className="badge badge-gold">{project.fase}</span>
               <div 
                 style={{
