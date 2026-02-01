@@ -11,7 +11,7 @@ const STATUS_CONFIG = {
   resolved: { label: 'Resolvido', color: '#67C23A', bg: '#F0F9EB' }
 }
 
-export default function DecisionLog({ projeto }) {
+export default function DuvidasLog({ projeto }) {
   const [decisions, setDecisions] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
@@ -33,7 +33,7 @@ export default function DecisionLog({ projeto }) {
     setLoading(true)
     try {
       const { data, error } = await supabase
-        .from('project_decisions')
+        .from('projeto_duvidas')
         .select(`
           *,
           entregavel:projeto_entregaveis(id, codigo, nome)
@@ -47,9 +47,9 @@ export default function DecisionLog({ projeto }) {
       const decisionsWithComments = await Promise.all((data || []).map(async (decision) => {
         try {
           const { count, error: countError } = await supabase
-            .from('decision_comments')
+            .from('duvida_comentarios')
             .select('*', { count: 'exact', head: true })
-            .eq('decision_id', decision.id)
+            .eq('duvida_id', decision.id)
 
           return {
             ...decision,
@@ -119,7 +119,7 @@ export default function DecisionLog({ projeto }) {
 
     try {
       const { error } = await supabase
-        .from('project_decisions')
+        .from('projeto_duvidas')
         .delete()
         .eq('id', decision.id)
       if (error) throw error
@@ -143,10 +143,10 @@ export default function DecisionLog({ projeto }) {
       {/* Header */}
       <div>
         <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)', margin: 0 }}>
-          Decision Log
+          Dúvidas & Definições
         </h3>
         <p style={{ fontSize: '13px', color: 'var(--brown-light)', margin: '4px 0 0' }}>
-          Registo de dúvidas e decisões do projeto
+          Registo de dúvidas que precisam de resposta ou definição
         </p>
       </div>
 
@@ -441,9 +441,9 @@ function DecisionModal({ decision, utilizadores, onClose, onResponseSubmitted })
     setLoadingComments(true)
     try {
       const { data, error } = await supabase
-        .from('decision_comments')
+        .from('duvida_comentarios')
         .select('*')
-        .eq('decision_id', decision.id)
+        .eq('duvida_id', decision.id)
         .order('criado_em', { ascending: true })
 
       if (error) throw error
@@ -469,9 +469,9 @@ function DecisionModal({ decision, utilizadores, onClose, onResponseSubmitted })
       const autor = utilizadores.find(u => u.id === autorId)
 
       const { error } = await supabase
-        .from('decision_comments')
+        .from('duvida_comentarios')
         .insert({
-          decision_id: decision.id,
+          duvida_id: decision.id,
           comentario: newComment.trim(),
           autor_id: autorId || null,
           autor_nome: autor?.nome || 'Utilizador'
@@ -503,7 +503,7 @@ function DecisionModal({ decision, utilizadores, onClose, onResponseSubmitted })
       const autor = utilizadores.find(u => u.id === autorId)
 
       const { error } = await supabase
-        .from('project_decisions')
+        .from('projeto_duvidas')
         .update({
           status: 'resolved',
           resolucao_final: resolucaoFinal.trim(),
@@ -527,7 +527,7 @@ function DecisionModal({ decision, utilizadores, onClose, onResponseSubmitted })
   const handleReopen = async () => {
     try {
       const { error } = await supabase
-        .from('project_decisions')
+        .from('projeto_duvidas')
         .update({
           status: 'discussion',
           resolucao_final: null,
@@ -874,7 +874,7 @@ function NewDecisionModal({ projetoId, entregaveis, utilizadores, onClose, onCre
       }
 
       const { error } = await supabase
-        .from('project_decisions')
+        .from('projeto_duvidas')
         .insert({
           projeto_id: projetoId,
           entregavel_id: entregavelId || null,
