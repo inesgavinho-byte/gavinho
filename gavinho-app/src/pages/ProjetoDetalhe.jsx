@@ -100,6 +100,9 @@ import {
   ImageLightbox
 } from '../components/projeto/modals'
 
+// Importar componentes do dashboard
+import { DashboardTab } from '../components/projeto/dashboard'
+
 // NOTA: sampleProjectData é usado apenas para demonstração
 // Em produção, todos os dados devem vir da base de dados
 // Definir como false para desativar sample data completamente
@@ -1779,337 +1782,26 @@ export default function ProjetoDetalhe() {
 
       {/* Tab Content */}
       {activeTab === 'dashboard' && (
-        <div className="grid grid-2" style={{ gap: '24px' }}>
-          {/* Cliente */}
-          <div className="card">
-            <div className="flex items-center justify-between mb-lg">
-              <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
-                Cliente
-              </h3>
-              <button 
-                className="btn btn-secondary" 
-                style={{ padding: '6px 12px', fontSize: '12px' }}
-              >
-                Ver Ficha
-              </button>
-            </div>
-            
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '16px',
-              padding: '16px',
-              background: 'var(--cream)',
-              borderRadius: '12px',
-              marginBottom: '16px'
-            }}>
-              <div style={{
-                width: '48px',
-                height: '48px',
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, var(--blush), var(--blush-dark))',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'var(--white)',
-                fontWeight: 600,
-                fontSize: '16px'
-              }}>
-                {(project.cliente?.nome || 'Cliente').split(' ').map(n => n[0]).join('').slice(0, 2)}
-              </div>
-              <div>
-                <div style={{ fontWeight: 600, color: 'var(--brown)' }}>
-                  {project.cliente?.titulo} {project.cliente?.nome || 'Cliente'}
-                </div>
-                <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>
-                  {project.cliente?.codigo || 'N/D'} • {project.cliente?.tipo || 'Particular'}
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {project.cliente?.email && (
-                <div className="flex items-center gap-sm text-muted" style={{ fontSize: '13px' }}>
-                  <Mail size={14} />
-                  {project.cliente.email}
-                </div>
-              )}
-              {project.cliente?.telefone && (
-                <div className="flex items-center gap-sm text-muted" style={{ fontSize: '13px' }}>
-                  <Phone size={14} />
-                  {project.cliente.telefone}
-                </div>
-              )}
-              {(project.cliente?.segmento || project.cliente?.idioma) && (
-                <div className="flex items-center gap-sm text-muted" style={{ fontSize: '13px' }}>
-                  <Globe size={14} />
-                  {[project.cliente?.segmento, project.cliente?.idioma].filter(Boolean).join(' • ')}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Localização */}
-          <div className="card">
-            <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)', marginBottom: '16px' }}>
-              Localização
-            </h3>
-            
-            <div style={{
-              padding: '16px',
-              background: 'var(--cream)',
-              borderRadius: '12px',
-              marginBottom: '16px'
-            }}>
-              <div style={{ fontSize: '14px', fontWeight: 500, color: 'var(--brown)', marginBottom: '8px' }}>
-                {project.localizacao?.morada || project.morada || '—'}
-              </div>
-              <div style={{ fontSize: '13px', color: 'var(--brown-light)' }}>
-                {[project.localizacao?.codigo_postal, project.localizacao?.cidade || project.cidade].filter(Boolean).join(' ')}
-                {project.localizacao?.estado && `, ${project.localizacao.estado}`}
-              </div>
-              <div style={{ fontSize: '13px', color: 'var(--brown-light)' }}>
-                {project.localizacao?.pais || project.pais || 'Portugal'}
-              </div>
-            </div>
-
-            <div className="grid grid-2" style={{ gap: '12px' }}>
-              <div style={{ padding: '12px', background: 'var(--cream)', borderRadius: '8px' }}>
-                <div style={{ fontSize: '11px', color: 'var(--brown-light)', marginBottom: '4px' }}>
-                  Área Bruta
-                </div>
-                <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
-                  {project.area_bruta} {project.unidade_area}
-                </div>
-              </div>
-              <div style={{ padding: '12px', background: 'var(--cream)', borderRadius: '8px' }}>
-                <div style={{ fontSize: '11px', color: 'var(--brown-light)', marginBottom: '4px' }}>
-                  Área Exterior
-                </div>
-                <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
-                  {project.area_exterior} {project.unidade_area}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Serviços Contratados */}
-          <div className="card" style={{ gridColumn: 'span 2' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)', marginBottom: '16px' }}>
-              Serviços Contratados
-            </h3>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {(!project.servicos || project.servicos.length === 0) ? (
-                <p style={{ fontSize: '13px', color: 'var(--brown-light)', textAlign: 'center', padding: '24px', background: 'var(--cream)', borderRadius: '12px' }}>
-                  Nenhum serviço contratado.
-                </p>
-              ) : project.servicos.map((servico, idx) => (
-                <div 
-                  key={idx}
-                  style={{
-                    padding: '20px',
-                    background: 'var(--cream)',
-                    borderRadius: '12px'
-                  }}
-                >
-                  <div className="flex items-center justify-between mb-sm">
-                    <div style={{ fontWeight: 600, color: 'var(--brown)' }}>
-                      {servico.tipo}
-                    </div>
-                    {servico.data_fim && (
-                      <span style={{ fontSize: '12px', color: 'var(--brown-light)' }}>
-                        Até {formatDate(servico.data_fim)}
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ fontSize: '13px', color: 'var(--brown-light)', marginBottom: '12px' }}>
-                    {servico.descricao}
-                  </div>
-                  
-                  {servico.inclui && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                      {servico.inclui.map((item, i) => (
-                        <span 
-                          key={i}
-                          style={{
-                            padding: '4px 10px',
-                            background: 'var(--white)',
-                            borderRadius: '6px',
-                            fontSize: '11px',
-                            color: 'var(--brown)'
-                          }}
-                        >
-                          {item}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Equipa */}
-          <div className="card" style={{ gridColumn: 'span 2' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)', marginBottom: '16px' }}>
-              Equipa do Projeto
-            </h3>
-
-            {equipaProjeto.length === 0 ? (
-              <p style={{ fontSize: '13px', color: 'var(--brown-light)', textAlign: 'center', padding: '24px', background: 'var(--cream)', borderRadius: '12px' }}>
-                Nenhum membro atribuído. Clique em Editar para adicionar membros.
-              </p>
-            ) : (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
-                {equipaProjeto.map((membro) => (
-                  <div
-                    key={membro.id}
-                    style={{
-                      padding: '16px',
-                      background: 'var(--cream)',
-                      borderRadius: '12px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '12px',
-                      minWidth: '200px'
-                    }}
-                  >
-                    <div style={{
-                      width: '40px',
-                      height: '40px',
-                      borderRadius: '50%',
-                      background: 'var(--brown)',
-                      color: 'white',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '14px',
-                      fontWeight: 600
-                    }}>
-                      {membro.utilizadores?.nome?.substring(0, 2).toUpperCase() || '??'}
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: 500, color: 'var(--brown)', fontSize: '14px' }}>
-                        {membro.utilizadores?.nome || 'Sem nome'}
-                      </div>
-                      <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>
-                        {membro.funcao || membro.utilizadores?.cargo || 'Membro'}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Intervenientes do Projeto */}
-          <div className="card" style={{ gridColumn: 'span 2' }}>
-            <div className="flex items-center justify-between mb-lg">
-              <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
-                Intervenientes do Projeto
-              </h3>
-              <button
-                className="btn btn-primary"
-                style={{ padding: '6px 12px', fontSize: '12px' }}
-                onClick={() => {
-                  setEditingInterveniente(null)
-                  setIntervenienteForm({
-                    tipo: '',
-                    entidade: '',
-                    contacto_geral: '',
-                    responsavel_nome: '',
-                    responsavel_email: '',
-                    responsavel_secundario_nome: '',
-                    responsavel_secundario_email: ''
-                  })
-                  setShowIntervenienteModal(true)
-                }}
-              >
-                <Plus size={14} /> Adicionar
-              </button>
-            </div>
-
-            {intervenientes.length === 0 ? (
-              <p style={{ fontSize: '13px', color: 'var(--brown-light)', textAlign: 'center', padding: '24px', background: 'var(--cream)', borderRadius: '12px' }}>
-                Nenhum interveniente registado.
-              </p>
-            ) : (
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '2px solid var(--stone)' }}>
-                      <th style={{ textAlign: 'left', padding: '12px 8px', color: 'var(--brown)', fontWeight: 600 }}>Tipo</th>
-                      <th style={{ textAlign: 'left', padding: '12px 8px', color: 'var(--brown)', fontWeight: 600 }}>Entidade</th>
-                      <th style={{ textAlign: 'left', padding: '12px 8px', color: 'var(--brown)', fontWeight: 600 }}>Responsável</th>
-                      <th style={{ textAlign: 'left', padding: '12px 8px', color: 'var(--brown)', fontWeight: 600 }}>Responsável Secundário</th>
-                      <th style={{ width: '60px' }}></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {intervenientes.map((item) => (
-                      <tr key={item.id} style={{ borderBottom: '1px solid var(--cream)' }}>
-                        <td style={{ padding: '12px 8px', color: 'var(--brown)', fontWeight: 500 }}>
-                          {item.tipo}
-                        </td>
-                        <td style={{ padding: '12px 8px', color: 'var(--brown-light)' }}>
-                          <div>{item.entidade || '—'}</div>
-                          {item.contacto_geral && (
-                            <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>{item.contacto_geral}</div>
-                          )}
-                        </td>
-                        <td style={{ padding: '12px 8px' }}>
-                          <div style={{ color: 'var(--brown)' }}>{item.responsavel_nome || '—'}</div>
-                          {item.responsavel_email && (
-                            <a href={`mailto:${item.responsavel_email}`} style={{ fontSize: '11px', color: 'var(--gold-dark)' }}>
-                              {item.responsavel_email}
-                            </a>
-                          )}
-                        </td>
-                        <td style={{ padding: '12px 8px' }}>
-                          <div style={{ color: 'var(--brown)' }}>{item.responsavel_secundario_nome || '—'}</div>
-                          {item.responsavel_secundario_email && (
-                            <a href={`mailto:${item.responsavel_secundario_email}`} style={{ fontSize: '11px', color: 'var(--gold-dark)' }}>
-                              {item.responsavel_secundario_email}
-                            </a>
-                          )}
-                        </td>
-                        <td style={{ padding: '12px 8px' }}>
-                          <div style={{ display: 'flex', gap: '4px' }}>
-                            <button
-                              onClick={() => handleEditInterveniente(item)}
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                cursor: 'pointer',
-                                padding: '4px',
-                                color: 'var(--brown-light)'
-                              }}
-                            >
-                              <Edit size={14} />
-                            </button>
-                            <button
-                              onClick={() => handleRemoveInterveniente(item.id)}
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                cursor: 'pointer',
-                                padding: '4px',
-                                color: 'var(--danger)'
-                              }}
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
+        <DashboardTab
+          project={project}
+          equipaProjeto={equipaProjeto}
+          intervenientes={intervenientes}
+          onAddInterveniente={() => {
+            setEditingInterveniente(null)
+            setIntervenienteForm({
+              tipo: '',
+              entidade: '',
+              contacto_geral: '',
+              responsavel_nome: '',
+              responsavel_email: '',
+              responsavel_secundario_nome: '',
+              responsavel_secundario_email: ''
+            })
+            setShowIntervenienteModal(true)
+          }}
+          onEditInterveniente={handleEditInterveniente}
+          onRemoveInterveniente={handleRemoveInterveniente}
+        />
       )}
 
       {/* Modal Adicionar/Editar Interveniente */}
