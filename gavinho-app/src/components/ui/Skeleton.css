@@ -1,0 +1,165 @@
+/* =====================================================
+   SKELETON LOADING STYLES
+   ===================================================== */
+
+/* Base skeleton animation */
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes skeleton-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--stone) 0%,
+    var(--cream) 50%,
+    var(--stone) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+/* Skeleton card */
+.skeleton-card {
+  background: var(--white);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+/* Project card skeleton */
+.skeleton-project-card {
+  background: var(--white);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+}
+
+.skeleton-project-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.skeleton-project-body {
+  margin-bottom: 16px;
+}
+
+.skeleton-project-footer {
+  display: flex;
+  gap: 8px;
+}
+
+/* Dashboard card skeleton */
+.skeleton-dashboard-card {
+  background: var(--white);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Table skeleton */
+.skeleton-table {
+  background: var(--white);
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--stone);
+}
+
+.skeleton-table-header {
+  display: flex;
+  gap: 24px;
+  padding: 16px;
+  background: var(--cream);
+  border-bottom: 2px solid var(--stone);
+}
+
+.skeleton-table-row {
+  display: flex;
+  gap: 24px;
+  padding: 16px;
+  border-bottom: 1px solid var(--cream);
+}
+
+.skeleton-table-row:last-child {
+  border-bottom: none;
+}
+
+/* Render gallery skeleton */
+.skeleton-render-gallery {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+/* Page skeleton */
+.skeleton-page {
+  padding: 24px;
+}
+
+.skeleton-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.skeleton-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--stone);
+}
+
+.skeleton-content {
+  /* Content styles */
+}
+
+/* Dark mode support */
+[data-theme="dark"] .skeleton {
+  background: linear-gradient(
+    90deg,
+    #3d3d3d 0%,
+    #4d4d4d 50%,
+    #3d3d3d 100%
+  );
+  background-size: 200% 100%;
+}
+
+[data-theme="dark"] .skeleton-card,
+[data-theme="dark"] .skeleton-project-card,
+[data-theme="dark"] .skeleton-dashboard-card,
+[data-theme="dark"] .skeleton-table {
+  background: #2d2d2d;
+}
+
+[data-theme="dark"] .skeleton-table-header {
+  background: #3d3d3d;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .skeleton-render-gallery {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .skeleton-page-header {
+    flex-direction: column;
+    gap: 16px;
+    align-items: flex-start;
+  }
+}

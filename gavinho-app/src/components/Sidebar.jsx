@@ -1,5 +1,6 @@
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import ThemeToggle from './ui/ThemeToggle'
 import {
   LayoutDashboard,
   FolderKanban,
@@ -291,6 +292,22 @@ export default function Sidebar({ isOpen, onClose, isMobile, collapsed, onToggle
 
       {/* Footer */}
       <div className="sidebar-footer" style={collapsed ? { padding: '12px 8px' } : {}}>
+        {/* Theme Toggle */}
+        <div style={{
+          marginBottom: collapsed ? '8px' : '12px',
+          display: 'flex',
+          justifyContent: collapsed ? 'center' : 'flex-start',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <ThemeToggle size={collapsed ? 'sm' : 'md'} />
+          {!collapsed && (
+            <span style={{ fontSize: '12px', color: 'var(--brown-light)', fontWeight: 500 }}>
+              Tema
+            </span>
+          )}
+        </div>
+
         {/* View As indicator - collapsed mode */}
         {isAdmin() && collapsed && (
           <div

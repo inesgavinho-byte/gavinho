@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { AuthProvider } from './contexts/AuthContext'
+import { ThemeProvider } from './components/ui/ThemeProvider'
+import { ToastProvider } from './components/ui/Toast'
 import ProtectedRoute from './components/ProtectedRoute'
 import Layout from './components/Layout'
 import Login from './pages/Login'
@@ -109,10 +111,12 @@ function OAuthCallbackHandler({ children }) {
 
 function App() {
   return (
-    <OAuthCallbackHandler>
-      <BrowserRouter>
-      <AuthProvider>
-        <Routes>
+    <ThemeProvider>
+      <ToastProvider>
+        <OAuthCallbackHandler>
+          <BrowserRouter>
+            <AuthProvider>
+              <Routes>
           {/* Public Routes */}
           <Route path="/login" element={<Login />} />
           <Route path="/registo" element={<Registo />} />
@@ -170,10 +174,12 @@ function App() {
             <Route path="configuracoes" element={<PlaceholderPage title="Configurações" subtitle="Definições da plataforma" />} />
             <Route path="admin/seed" element={<AdminSeed />} />
           </Route>
-        </Routes>
-      </AuthProvider>
-    </BrowserRouter>
-    </OAuthCallbackHandler>
+              </Routes>
+            </AuthProvider>
+          </BrowserRouter>
+        </OAuthCallbackHandler>
+      </ToastProvider>
+    </ThemeProvider>
   )
 }
 

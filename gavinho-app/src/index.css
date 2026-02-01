@@ -69,6 +69,174 @@
   --sidebar-width: 260px;
 }
 
+/* ========================================
+   DARK MODE THEME
+   ======================================== */
+[data-theme="dark"] {
+  --sandy-beach: #1a1a1a;
+  --soft-cream: #1a1a1a;
+  --blush: #6B6B6B;
+  --blush-light: #7B7B7B;
+  --blush-dark: #5B5B5B;
+  --warm-beige: #6B6B6B;
+  --olive-gray: #7B7B7B;
+  --brown: #E5E5E5;
+  --brown-light: #A0A0A0;
+  --brown-dark: #F0F0F0;
+  --text-dark: #E5E5E5;
+  --text-muted: #A0A0A0;
+
+  /* Neutrals */
+  --white: #2D2D2D;
+  --cream: #252525;
+  --off-white: #1F1F1F;
+  --stone: #3D3D3D;
+  --stone-dark: #4D4D4D;
+  --border-light: #3D3D3D;
+
+  /* Status - softer in dark mode */
+  --success: #8FA882;
+  --warning: #D4B87A;
+  --error: #B8867A;
+  --info: #8FA8B8;
+
+  /* Shadows - more subtle in dark mode */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 40px rgba(0, 0, 0, 0.5);
+}
+
+/* Smooth theme transition */
+html {
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+[data-theme="dark"] body {
+  color-scheme: dark;
+}
+
+/* ========================================
+   ANIMATIONS & TRANSITIONS
+   ======================================== */
+
+/* Fade in animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Slide up animation */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Slide down animation */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Scale in animation */
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Animation classes */
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.4s ease-out forwards;
+}
+
+.animate-slide-down {
+  animation: slideDown 0.4s ease-out forwards;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.3s ease-out forwards;
+}
+
+/* Stagger children animations */
+.stagger-children > * {
+  opacity: 0;
+  animation: slideUp 0.4s ease-out forwards;
+}
+
+.stagger-children > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-children > *:nth-child(2) { animation-delay: 50ms; }
+.stagger-children > *:nth-child(3) { animation-delay: 100ms; }
+.stagger-children > *:nth-child(4) { animation-delay: 150ms; }
+.stagger-children > *:nth-child(5) { animation-delay: 200ms; }
+.stagger-children > *:nth-child(6) { animation-delay: 250ms; }
+
+/* Tab transition */
+.tab-content {
+  animation: fadeIn 0.25s ease-out;
+}
+
+/* Card hover effects */
+.card-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+/* Button press effect */
+.btn-press:active {
+  transform: scale(0.98);
+}
+
+/* Interactive element transitions */
+button, .btn, a, input, select, textarea {
+  transition: all 0.2s ease;
+}
+
+/* Focus visible styles for accessibility */
+:focus-visible {
+  outline: 2px solid var(--info);
+  outline-offset: 2px;
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 * {
   margin: 0;
   padding: 0;
