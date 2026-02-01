@@ -269,34 +269,34 @@ import {
 ## Checklist de Implementação
 
 ### Fase 1
-- [ ] Remover console.logs de ProjetoArchviz.jsx
-- [ ] Remover console.logs de ProjetoDetalhe.jsx
-- [ ] Remover console.logs de Workspace.jsx
+- [x] Remover console.logs de ProjetoArchviz.jsx
+- [x] Remover console.logs de ProjetoDetalhe.jsx
+- [x] Remover console.logs de Workspace.jsx
 - [ ] Implementar handler "Criar Orçamento do MQT"
 - [ ] Implementar handler "Nova POP"
 - [ ] Implementar handler "Nova Compra"
 - [ ] Implementar handler "Registar Execução"
 - [ ] Implementar handler "Novo Auto"
-- [ ] Remover mock data do Dashboard
-- [ ] Remover mock data do Workspace
-- [ ] Adicionar validação de tamanho de ficheiro
-- [ ] Adicionar validação de tipo de ficheiro
+- [x] Remover mock data do Dashboard
+- [x] Remover mock data do Workspace
+- [x] Adicionar validação de tamanho de ficheiro
+- [x] Adicionar validação de tipo de ficheiro
 
 ### Fase 2
-- [ ] Criar componente ConfirmModal
+- [x] Criar componente ConfirmModal
 - [ ] Substituir alert() por ConfirmModal
 - [ ] Substituir confirm() por ConfirmModal
 - [ ] Adicionar loading states em tabs
 - [ ] Adicionar loading states em modais
-- [ ] Otimizar queries com JOINs
-- [ ] Adicionar sanitização de texto
+- [x] Otimizar queries com JOINs
+- [x] Adicionar sanitização de texto
 
 ### Fase 3
 - [ ] Adicionar useMemo em ObraDetalhe
-- [ ] Adicionar useMemo em Projetos
-- [ ] Criar ficheiro de cores centralizado
+- [x] Adicionar useMemo em Projetos
+- [x] Criar ficheiro de cores centralizado
 - [ ] Adicionar aria-labels
-- [ ] Adicionar focus trap em modais
+- [x] Adicionar focus trap em modais (ConfirmModal)
 - [ ] Completar ou remover tabs placeholder
 - [ ] Remover imports não utilizados
 
