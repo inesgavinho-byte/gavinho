@@ -2626,7 +2626,7 @@ export default function ProjetoDetalhe() {
                     <h4 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--brown)' }}>
                       {compartimento}
                       <span style={{ fontWeight: 400, color: 'var(--brown-light)', marginLeft: '8px' }}>
-                        ({compartimentoRenders.length} versão{compartimentoRenders.length !== 1 ? 'ões' : ''})
+                        ({compartimentoRenders.length} {compartimentoRenders.length !== 1 ? 'versões' : 'versão'})
                       </span>
                     </h4>
                     <button
