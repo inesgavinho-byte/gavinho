@@ -2608,7 +2608,7 @@ export default function ProjetoDetalhe() {
                 Visualizações 3D & Renders
               </h3>
               <p style={{ fontSize: '13px', color: 'var(--brown-light)', marginTop: '4px' }}>
-                {renders.length} render{renders.length !== 1 ? 's' : ''} • {imagensFinais.length} imagem{imagensFinais.length !== 1 ? 'ns' : ''} final{imagensFinais.length !== 1 ? 'is' : ''}
+                {renders.length} render{renders.length !== 1 ? 's' : ''} • {imagensFinais.length} {imagensFinais.length !== 1 ? 'imagens finais' : 'imagem final'}
               </p>
             </div>
             <button onClick={openAddRenderModal} className="btn btn-primary" style={{ padding: '10px 16px' }}>
