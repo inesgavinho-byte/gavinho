@@ -239,7 +239,7 @@ export default function Workspace() {
   const typingTimeoutRef = useRef(null)
 
   // Online Status
-  const [onlineUsers, setOnlineUsers] = useState(['user1', 'user2', 'user3']) // Simulated
+  const [onlineUsers, setOnlineUsers] = useState([]) // Populated from realtime presence
 
   // Read Receipts
   const [readReceipts, setReadReceipts] = useState({})
@@ -268,64 +268,7 @@ export default function Workspace() {
   // Activity Log
   const [showActivityLog, setShowActivityLog] = useState(false)
   const [activityFilter, setActivityFilter] = useState('all') // all, mentions, unread
-  const [activityLog, setActivityLog] = useState([
-    // Mock data - in production would come from database
-    {
-      id: '1',
-      type: 'mention',
-      canal: { id: 'c1', codigo: 'GA00469', nome: 'MYRIAD_imagens' },
-      autor: { id: 'u1', nome: 'Raquel Sonobe GAVINHO', avatar_url: null },
-      preview: 'Archviz e 1 responderam à...',
-      conteudo: 'Ainda não carreguei. Farei isso amanhã',
-      created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-      unread: true,
-      equipa: 'GAVINHO HOSP.'
-    },
-    {
-      id: '2',
-      type: 'reply',
-      canal: { id: 'c2', codigo: 'GA00466', nome: 'PENTHOUSE SI' },
-      autor: { id: 'u2', nome: 'Leonardo Ribeiro GAVINHO', avatar_url: null },
-      preview: 'Design & Build PM responde...',
-      conteudo: 'ponto de situação: ajustes na planta geral...',
-      created_at: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
-      unread: true,
-      equipa: 'GAVINHO Signature'
-    },
-    {
-      id: '3',
-      type: 'message',
-      canal: { id: 'c3', codigo: 'GA00469', nome: 'MYRIAD' },
-      autor: { id: 'u3', nome: 'Carolina Cipriano GAVINHO', avatar_url: null },
-      preview: 'Design & Build PM e 1...',
-      conteudo: 'Ponto de situação: estive a organizar as...',
-      created_at: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
-      unread: false,
-      equipa: 'GAVINHO HOSP.'
-    },
-    {
-      id: '4',
-      type: 'mention',
-      canal: { id: 'c1', codigo: 'GA00469', nome: 'MYRIAD_imagens' },
-      autor: { id: 'u1', nome: 'Raquel Sonobe GAVINHO', avatar_url: null },
-      preview: 'Archviz mencionou-o(a)',
-      conteudo: 'IGF GAVINHO GroupCarolina Cipriano G...',
-      created_at: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-      unread: false,
-      equipa: 'GAVINHO HOSP.'
-    },
-    {
-      id: '5',
-      type: 'file',
-      canal: { id: 'c4', codigo: 'GA00464', nome: 'APARTMENT IG_imagens' },
-      autor: { id: 'u4', nome: 'Nathalia Bampi GAVINHO', avatar_url: null },
-      preview: 'Archviz e 2 responderam à...',
-      conteudo: 'Enviou um ficheiro',
-      created_at: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
-      unread: false,
-      equipa: 'GAVINHO Sign...'
-    }
-  ])
+  const [activityLog, setActivityLog] = useState([])
 
   // ========== NEW FEATURES STATE ==========
 
@@ -483,7 +426,7 @@ export default function Workspace() {
           ...p,
           equipa: p.tipologia?.toLowerCase().includes('hosp') ? 'hosp' :
                   p.tipologia?.toLowerCase().includes('signature') ? 'signature' : 'arch',
-          unreadCount: Math.floor(Math.random() * 5), // Mock - em produção vem da DB
+          unreadCount: 0, // Real count loaded from database
           lastActivity: new Date().toISOString()
         }))
 
@@ -546,7 +489,7 @@ export default function Workspace() {
       }
 
       if (data && data.length > 0) {
-        // Carregar contagem de replies para cada post
+        // Carregar contagem de replies e formatar attachments
         const postsWithReplies = await Promise.all(data.map(async (post) => {
           const { count } = await supabase
             .from('chat_mensagens')
@@ -554,7 +497,41 @@ export default function Workspace() {
             .eq('parent_id', post.id)
             .eq('eliminado', false)
 
-          return { ...post, replyCount: count || 0 }
+          // Construir array de attachments a partir dos campos de ficheiro
+          let attachments = []
+          if (post.ficheiro_url) {
+            const isImage = post.tipo === 'imagem' || post.ficheiro_nome?.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i)
+            attachments.push({
+              name: post.ficheiro_nome || 'Ficheiro',
+              url: post.ficheiro_url,
+              type: isImage ? 'image' : 'file',
+              size: post.ficheiro_tamanho ? `${Math.round(post.ficheiro_tamanho / 1024)} KB` : ''
+            })
+          }
+
+          // Carregar anexos adicionais da tabela chat_anexos
+          const { data: extraAnexos } = await supabase
+            .from('chat_anexos')
+            .select('*')
+            .eq('mensagem_id', post.id)
+
+          if (extraAnexos && extraAnexos.length > 0) {
+            extraAnexos.forEach(anexo => {
+              const isImage = anexo.nome?.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i)
+              attachments.push({
+                name: anexo.nome || 'Ficheiro',
+                url: anexo.url,
+                type: isImage ? 'image' : 'file',
+                size: anexo.tamanho ? `${Math.round(anexo.tamanho / 1024)} KB` : ''
+              })
+            })
+          }
+
+          return {
+            ...post,
+            replyCount: count || 0,
+            attachments: attachments.length > 0 ? attachments : undefined
+          }
         }))
 
         setPosts(postsWithReplies)
@@ -688,22 +665,48 @@ export default function Workspace() {
         }
       }
 
-      // Criar mensagem
+      // Inserir mensagem na base de dados
+      const { data: insertedMessage, error: insertError } = await supabase
+        .from('chat_mensagens')
+        .insert({
+          conteudo: messageInput,
+          tipo: attachments.length > 0 ? (attachments[0].type === 'image' ? 'imagem' : 'ficheiro') : 'texto',
+          autor_id: profile?.id,
+          canal_id: canalAtivo?.id,
+          topico_id: null, // Workspace uses canal_id directly
+          parent_id: replyingTo?.id || null,
+          ficheiro_url: attachments.length > 0 ? attachments[0].url : null,
+          ficheiro_nome: attachments.length > 0 ? attachments[0].name : null,
+          ficheiro_tamanho: attachments.length > 0 ? parseInt(attachments[0].size) || null : null,
+          ficheiro_tipo: attachments.length > 0 ? attachments[0].type : null
+        })
+        .select(`
+          *,
+          autor:autor_id(id, nome, avatar_url, funcao)
+        `)
+        .single()
+
+      if (insertError) {
+        throw insertError
+      }
+
+      // Se houver múltiplos anexos, inserir os adicionais na tabela chat_anexos
+      if (attachments.length > 1) {
+        const extraAttachments = attachments.slice(1).map(att => ({
+          mensagem_id: insertedMessage.id,
+          url: att.url,
+          nome: att.name,
+          tamanho: parseInt(att.size) || null,
+          tipo: att.type
+        }))
+        await supabase.from('chat_anexos').insert(extraAttachments)
+      }
+
+      // Adicionar attachments ao post para exibição local
       const newPost = {
-        id: Date.now().toString(),
-        conteudo: messageInput,
-        autor: {
-          id: profile?.id,
-          nome: profile?.nome || 'Utilizador',
-          avatar_url: profile?.avatar_url,
-          funcao: profile?.funcao || 'Equipa'
-        },
-        created_at: new Date().toISOString(),
-        reacoes: [],
-        replyCount: 0,
+        ...insertedMessage,
         attachments: attachments.length > 0 ? attachments : undefined,
-        topic: activeTopic,
-        canal_id: canalAtivo?.id,
+        replyCount: 0,
         replyTo: replyingTo ? {
           id: replyingTo.id,
           autor: replyingTo.autor,
@@ -715,9 +718,6 @@ export default function Workspace() {
       setMessageInput('')
       setSelectedFiles([])
       setReplyingTo(null)
-
-      // Em produção, inserir na base de dados
-      // await supabase.from('chat_mensagens').insert({...})
 
     } catch (err) {
       alert('Erro ao enviar mensagem: ' + err.message)
@@ -4182,30 +4182,75 @@ export default function Workspace() {
                             {/* Attachments */}
                             {post.attachments?.length > 0 && (
                               <div style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
-                                {post.attachments.map((file, idx) => (
-                                  <div
-                                    key={idx}
-                                    style={{
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '8px',
-                                      padding: '10px 14px',
-                                      background: 'var(--cream)',
-                                      borderRadius: '8px',
-                                      cursor: 'pointer'
-                                    }}
-                                  >
-                                    <FileText size={18} style={{ color: 'var(--accent-olive)' }} />
-                                    <div>
-                                      <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--brown)' }}>
-                                        {file.name}
+                                {post.attachments.map((file, idx) => {
+                                  const isImage = file.type === 'image' || file.name?.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i)
+
+                                  if (isImage && file.url) {
+                                    return (
+                                      <a
+                                        key={idx}
+                                        href={file.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        style={{
+                                          display: 'block',
+                                          maxWidth: '300px',
+                                          borderRadius: '8px',
+                                          overflow: 'hidden',
+                                          border: '1px solid var(--stone)'
+                                        }}
+                                      >
+                                        <img
+                                          src={file.url}
+                                          alt={file.name}
+                                          style={{
+                                            width: '100%',
+                                            maxHeight: '200px',
+                                            objectFit: 'cover',
+                                            display: 'block'
+                                          }}
+                                        />
+                                        <div style={{
+                                          padding: '6px 10px',
+                                          background: 'var(--cream)',
+                                          fontSize: '11px',
+                                          color: 'var(--brown-light)'
+                                        }}>
+                                          {file.name} • {file.size}
+                                        </div>
+                                      </a>
+                                    )
+                                  }
+
+                                  return (
+                                    <a
+                                      key={idx}
+                                      href={file.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        padding: '10px 14px',
+                                        background: 'var(--cream)',
+                                        borderRadius: '8px',
+                                        cursor: 'pointer',
+                                        textDecoration: 'none'
+                                      }}
+                                    >
+                                      <FileText size={18} style={{ color: 'var(--accent-olive)' }} />
+                                      <div>
+                                        <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--brown)' }}>
+                                          {file.name}
+                                        </div>
+                                        <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
+                                          {file.size}
+                                        </div>
                                       </div>
-                                      <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
-                                        {file.size}
-                                      </div>
-                                    </div>
-                                  </div>
-                                ))}
+                                    </a>
+                                  )
+                                })}
                               </div>
                             )}
 
