@@ -189,8 +189,10 @@ export default function ProjetoDetalhe() {
   const [moleskineRender, setMoleskineRender] = useState(null) // Para Moleskine (anotação de renders)
   const [renderAnnotations, setRenderAnnotations] = useState({}) // Mapa de render_id -> annotation count
   const [isDragging, setIsDragging] = useState(false) // Para drag & drop
+  const [projetoCompartimentos, setProjetoCompartimentos] = useState([]) // Compartimentos do projeto
   const [renderForm, setRenderForm] = useState({
     compartimento: '',
+    vista: '',
     versao: 1,
     descricao: '',
     is_final: false,
@@ -697,10 +699,22 @@ export default function ProjetoDetalhe() {
         .select('*')
         .eq('projeto_id', projetoId)
         .order('compartimento')
+        .order('vista')
         .order('versao', { ascending: false })
 
       if (error) throw error
       setRenders(data || [])
+
+      // Carregar compartimentos do projeto
+      const { data: compartimentosData } = await supabase
+        .from('projeto_compartimentos')
+        .select('nome')
+        .eq('projeto_id', projetoId)
+        .order('nome')
+
+      if (compartimentosData) {
+        setProjetoCompartimentos(compartimentosData.map(c => c.nome))
+      }
 
       // Carregar anotações existentes
       const { data: annotationsData } = await supabase
@@ -1384,16 +1398,21 @@ export default function ProjetoDetalhe() {
   }
 
   // Funções de gestão de renders
-  const getNextVersion = (compartimento) => {
-    const compartimentoRenders = renders.filter(r => r.compartimento === compartimento)
-    return compartimentoRenders.length + 1
+  const getNextVersion = (compartimento, vista = '') => {
+    // Filtrar renders pelo compartimento e vista
+    const matchingRenders = renders.filter(r =>
+      r.compartimento === compartimento &&
+      (r.vista || '') === (vista || '')
+    )
+    return matchingRenders.length + 1
   }
 
-  const openAddRenderModal = (compartimento = '') => {
+  const openAddRenderModal = (compartimento = '', vista = '') => {
     setEditingRender(null)
-    const versao = compartimento ? getNextVersion(compartimento) : 1
+    const versao = compartimento ? getNextVersion(compartimento, vista) : 1
     setRenderForm({
       compartimento: compartimento,
+      vista: vista,
       versao: versao,
       descricao: '',
       is_final: false,
@@ -1407,6 +1426,7 @@ export default function ProjetoDetalhe() {
     setEditingRender(render)
     setRenderForm({
       compartimento: render.compartimento,
+      vista: render.vista || '',
       versao: render.versao,
       descricao: render.descricao || '',
       is_final: render.is_final || false,
@@ -1417,7 +1437,7 @@ export default function ProjetoDetalhe() {
   }
 
   const handleRenderCompartimentoChange = (compartimento) => {
-    const versao = getNextVersion(compartimento)
+    const versao = getNextVersion(compartimento, renderForm.vista)
     setRenderForm(prev => ({ ...prev, compartimento, versao }))
   }
 
@@ -1428,10 +1448,29 @@ export default function ProjetoDetalhe() {
     }
 
     try {
+      // Guardar compartimento do projeto se for novo
+      const compartimentoNome = renderForm.compartimento.trim()
+      if (compartimentoNome && !projetoCompartimentos.includes(compartimentoNome)) {
+        const { error: compError } = await supabase
+          .from('projeto_compartimentos')
+          .insert([{
+            projeto_id: project.id,
+            nome: compartimentoNome,
+            created_by: user?.id,
+            created_by_name: user?.email?.split('@')[0] || 'Utilizador'
+          }])
+          .select()
+
+        if (!compError) {
+          setProjetoCompartimentos(prev => [...prev, compartimentoNome].sort())
+        }
+      }
+
       const renderData = {
         projeto_id: project.id,
-        compartimento: renderForm.compartimento,
-        versao: editingRender ? renderForm.versao : getNextVersion(renderForm.compartimento),
+        compartimento: compartimentoNome,
+        vista: renderForm.vista || null,
+        versao: editingRender ? renderForm.versao : getNextVersion(compartimentoNome, renderForm.vista),
         descricao: renderForm.descricao,
         is_final: renderForm.is_final,
         imagem_url: renderForm.imagem_url,
@@ -3224,6 +3263,7 @@ export default function ProjetoDetalhe() {
         onDragLeave={handleRenderDragLeave}
         onDrop={handleRenderDrop}
         onImageUpload={handleRenderImageUpload}
+        projetoCompartimentos={projetoCompartimentos}
       />
 
       {/* MODAL: Editar Projeto */}

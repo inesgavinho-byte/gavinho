@@ -19,9 +19,19 @@ export default function RenderModal({
   onDragOver,
   onDragLeave,
   onDrop,
-  onImageUpload
+  onImageUpload,
+  projetoCompartimentos = [] // Compartimentos específicos do projeto
 }) {
   if (!isOpen) return null
+
+  // Combinar compartimentos do projeto com os gerais (projeto primeiro)
+  const allCompartimentos = [
+    ...projetoCompartimentos.filter(c => !COMPARTIMENTOS.includes(c)),
+    ...COMPARTIMENTOS
+  ]
+
+  // Remover duplicados
+  const uniqueCompartimentos = [...new Set(allCompartimentos)]
 
   return (
     <div
@@ -91,12 +101,46 @@ export default function RenderModal({
               }}
             />
             <datalist id="compartimentos-list">
+              {projetoCompartimentos.length > 0 && (
+                <>
+                  <option disabled>── Deste Projeto ──</option>
+                  {projetoCompartimentos.map(comp => (
+                    <option key={`proj-${comp}`} value={comp} />
+                  ))}
+                  <option disabled>── Sugestões ──</option>
+                </>
+              )}
               {COMPARTIMENTOS.map(comp => (
                 <option key={comp} value={comp} />
               ))}
             </datalist>
             <p style={{ fontSize: '11px', color: 'var(--brown-light)', marginTop: '6px' }}>
               Selecione da lista ou escreva um nome personalizado
+            </p>
+          </div>
+
+          {/* Vista */}
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '8px', color: 'var(--brown)' }}>
+              Vista
+            </label>
+            <input
+              type="text"
+              value={renderForm.vista || ''}
+              onChange={(e) => setRenderForm(prev => ({ ...prev, vista: e.target.value }))}
+              placeholder="Ex: Vista Frontal, Vista Diagonal, Detalhe Sofá..."
+              style={{
+                width: '100%',
+                padding: '12px',
+                border: '1px solid var(--stone)',
+                borderRadius: '8px',
+                fontSize: '14px',
+                background: 'var(--white)',
+                color: 'var(--brown)'
+              }}
+            />
+            <p style={{ fontSize: '11px', color: 'var(--brown-light)', marginTop: '6px' }}>
+              Diferenciar várias vistas dentro do mesmo compartimento
             </p>
           </div>
 
@@ -122,7 +166,7 @@ export default function RenderModal({
                 padding: '4px 12px',
                 borderRadius: '6px'
               }}>
-                v{editingRender ? renderForm.versao : getNextVersion(renderForm.compartimento)}
+                v{editingRender ? renderForm.versao : getNextVersion(renderForm.compartimento, renderForm.vista)}
               </span>
             </div>
           )}
