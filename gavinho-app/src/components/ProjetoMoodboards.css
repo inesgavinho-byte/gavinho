@@ -1,10 +1,10 @@
-/* ProjetoMoodboards.css - New Horizontal Layout */
+/* ProjetoMoodboards.css - Compact Layout for Maximum Viewer Space */
 
 .moodboards-container {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 280px);
-  min-height: 500px;
+  height: calc(100vh - 200px);
+  min-height: 600px;
 }
 
 .moodboards-container.fullscreen {
@@ -16,37 +16,47 @@
   z-index: 1000;
   background: white;
   height: 100vh;
-  padding: 20px;
+  padding: 16px;
 }
 
-/* Header */
+.moodboards-container.fullscreen .moodboards-header,
+.moodboards-container.fullscreen .moodboards-cards {
+  display: none;
+}
+
+.moodboards-container.fullscreen .moodboards-viewer-full {
+  height: 100%;
+}
+
+/* Compact Header */
 .moodboards-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
 }
 
 .moodboards-title {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .moodboards-title svg {
   color: var(--brown, #4a5d4a);
+  width: 20px;
+  height: 20px;
 }
 
 .moodboards-title h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 15px;
   color: var(--brown, #4a5d4a);
 }
 
 .moodboards-title p {
-  margin: 0;
-  font-size: 12px;
-  color: var(--brown-light, #666);
+  display: none;
 }
 
 /* Empty State */
@@ -55,7 +65,8 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 80px 40px;
+  flex: 1;
+  padding: 40px;
   background: var(--cream, #fafaf8);
   border-radius: 12px;
   text-align: center;
@@ -64,42 +75,55 @@
 .moodboards-empty-state svg {
   color: var(--brown-light, #666);
   opacity: 0.3;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .moodboards-empty-state h3 {
-  margin: 0 0 8px;
-  font-size: 16px;
+  margin: 0 0 6px;
+  font-size: 15px;
   color: var(--brown, #4a5d4a);
 }
 
 .moodboards-empty-state p {
-  margin: 0 0 20px;
-  font-size: 13px;
+  margin: 0 0 16px;
+  font-size: 12px;
   color: var(--brown-light, #666);
 }
 
-/* Horizontal Cards */
+/* Compact Horizontal Cards */
 .moodboards-cards {
   display: flex;
-  gap: 12px;
-  padding-bottom: 16px;
-  margin-bottom: 16px;
+  gap: 8px;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
   overflow-x: auto;
   flex-shrink: 0;
+}
+
+.moodboards-cards::-webkit-scrollbar {
+  height: 4px;
+}
+
+.moodboards-cards::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.moodboards-cards::-webkit-scrollbar-thumb {
+  background: var(--stone, #ddd);
+  border-radius: 2px;
 }
 
 .moodboard-card {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
+  gap: 8px;
+  padding: 8px 12px;
   background: var(--cream, #fafaf8);
   border: 2px solid transparent;
-  border-radius: 10px;
+  border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s;
-  min-width: 200px;
+  min-width: 160px;
   flex-shrink: 0;
 }
 
@@ -115,14 +139,19 @@
 }
 
 .moodboard-card-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
   background: rgba(0, 0, 0, 0.05);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+}
+
+.moodboard-card-icon svg {
+  width: 18px;
+  height: 18px;
 }
 
 .moodboard-card.active .moodboard-card-icon {
@@ -136,7 +165,7 @@
 
 .moodboard-card-info h4 {
   margin: 0;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
@@ -144,35 +173,32 @@
 }
 
 .moodboard-card-info span {
-  font-size: 11px;
+  font-size: 10px;
   opacity: 0.7;
 }
 
 .moodboard-card-actions {
   display: flex;
-  gap: 4px;
+  gap: 2px;
   opacity: 0;
   transition: opacity 0.2s;
 }
 
-.moodboard-card:hover .moodboard-card-actions {
-  opacity: 1;
-}
-
+.moodboard-card:hover .moodboard-card-actions,
 .moodboard-card.active .moodboard-card-actions {
   opacity: 1;
 }
 
-/* Full Width Viewer */
+/* Full Width Viewer - Takes all remaining space */
 .moodboards-viewer-full {
   flex: 1;
   background: white;
   border: 1px solid var(--stone, #e5e5e5);
-  border-radius: 12px;
+  border-radius: 10px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  min-height: 400px;
+  min-height: 0;
 }
 
 /* Viewer Placeholder */
@@ -187,18 +213,18 @@
 }
 
 .viewer-placeholder svg {
-  opacity: 0.2;
-  margin-bottom: 16px;
+  opacity: 0.15;
+  margin-bottom: 12px;
 }
 
 .viewer-placeholder h3 {
-  margin: 0 0 8px;
-  font-size: 16px;
+  margin: 0 0 4px;
+  font-size: 14px;
 }
 
 .viewer-placeholder p {
   margin: 0;
-  font-size: 13px;
+  font-size: 12px;
   opacity: 0.7;
 }
 
@@ -218,65 +244,85 @@
 }
 
 .viewer-loading svg {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   color: var(--brown, #4a5d4a);
 }
 
 .viewer-loading p {
   margin: 0;
-  font-size: 13px;
+  font-size: 12px;
 }
 
-/* Viewer Toolbar */
+/* Compact Viewer Toolbar */
 .viewer-toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 20px;
+  padding: 8px 12px;
   background: var(--cream, #fafaf8);
   border-bottom: 1px solid var(--stone, #e5e5e5);
   flex-shrink: 0;
+  min-height: 44px;
+}
+
+.viewer-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
 }
 
 .viewer-info h3 {
   margin: 0;
-  font-size: 15px;
+  font-size: 13px;
+  font-weight: 600;
   color: var(--brown, #4a5d4a);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .viewer-info p {
-  margin: 4px 0 0;
-  font-size: 12px;
-  color: var(--brown-light, #666);
+  display: none;
 }
 
 .viewer-meta {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 4px;
-  font-size: 11px;
+  font-size: 10px;
   color: var(--brown-light, #666);
+  white-space: nowrap;
 }
 
 .viewer-meta svg {
+  width: 10px;
+  height: 10px;
   opacity: 0.6;
 }
 
 .viewer-actions {
   display: flex;
-  gap: 8px;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
 .viewer-actions .btn {
-  padding: 8px 12px;
+  padding: 6px 8px;
 }
 
-/* Iframe Container */
+.viewer-actions .btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Iframe Container - Maximum space */
 .viewer-frame-container {
   flex: 1;
   position: relative;
   background: #f5f5f5;
+  min-height: 0;
 }
 
 .viewer-iframe {
@@ -317,8 +363,8 @@
   background: white;
   border-radius: 12px;
   width: 100%;
-  max-width: 480px;
-  max-height: 90vh;
+  max-width: 420px;
+  max-height: 85vh;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -328,13 +374,13 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 20px;
+  padding: 14px 16px;
   border-bottom: 1px solid var(--stone, #e5e5e5);
 }
 
 .modal-header h3 {
   margin: 0;
-  font-size: 16px;
+  font-size: 15px;
   color: var(--brown, #4a5d4a);
 }
 
@@ -352,21 +398,21 @@
 }
 
 .modal-body {
-  padding: 20px;
+  padding: 16px;
   overflow-y: auto;
 }
 
 .modal-footer {
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
-  padding: 16px 20px;
+  gap: 10px;
+  padding: 12px 16px;
   border-top: 1px solid var(--stone, #e5e5e5);
 }
 
 /* Form Elements */
 .form-group {
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
 .form-group:last-child {
@@ -375,8 +421,8 @@
 
 .form-group label {
   display: block;
-  margin-bottom: 6px;
-  font-size: 13px;
+  margin-bottom: 5px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--brown, #4a5d4a);
 }
@@ -385,10 +431,10 @@
 .form-select,
 .form-textarea {
   width: 100%;
-  padding: 10px 12px;
+  padding: 8px 10px;
   border: 1px solid var(--stone, #e5e5e5);
   border-radius: 6px;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--brown, #4a5d4a);
   background: white;
   transition: border-color 0.2s;
@@ -403,14 +449,14 @@
 
 .form-textarea {
   resize: vertical;
-  min-height: 80px;
+  min-height: 60px;
 }
 
 /* Upload Area */
 .upload-area {
   border: 2px dashed var(--stone, #e5e5e5);
   border-radius: 8px;
-  padding: 30px;
+  padding: 24px;
   text-align: center;
   cursor: pointer;
   transition: all 0.2s;
@@ -423,16 +469,17 @@
 }
 
 .upload-area svg {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   opacity: 0.5;
 }
 
 .upload-area span {
   display: block;
+  font-size: 13px;
 }
 
 .upload-hint {
-  font-size: 12px;
+  font-size: 11px;
   opacity: 0.6;
   margin-top: 4px;
 }
@@ -441,7 +488,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .upload-preview svg {
@@ -450,7 +497,7 @@
 }
 
 .upload-size {
-  font-size: 12px;
+  font-size: 11px;
   opacity: 0.6;
 }
 
@@ -458,11 +505,11 @@
 .btn {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
+  gap: 6px;
+  padding: 8px 14px;
   border: none;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
@@ -493,7 +540,7 @@
 }
 
 .btn-icon {
-  padding: 6px;
+  padding: 5px;
   border: none;
   background: transparent;
   cursor: pointer;
@@ -519,27 +566,31 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 60px;
+  flex: 1;
   color: var(--brown-light, #666);
 }
 
 .moodboards-loading svg {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 /* Responsive */
 @media (max-width: 768px) {
+  .moodboards-container {
+    height: calc(100vh - 180px);
+  }
+
   .moodboards-cards {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    padding-bottom: 12px;
+    gap: 6px;
   }
 
   .moodboard-card {
-    min-width: 180px;
+    min-width: 140px;
+    padding: 6px 10px;
   }
 
-  .moodboards-viewer-full {
-    min-height: 300px;
+  .viewer-toolbar {
+    flex-wrap: wrap;
+    gap: 8px;
   }
 }
