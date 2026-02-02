@@ -98,9 +98,9 @@ export default function ProjetoMoodboards({ projeto, userId, userName }) {
       return
     }
 
-    // Validate file size (max 10MB)
-    if (file.size > 10 * 1024 * 1024) {
-      alert('Ficheiro demasiado grande. Máximo: 10MB')
+    // Validate file size (max 50MB)
+    if (file.size > 50 * 1024 * 1024) {
+      alert('Ficheiro demasiado grande. Máximo: 50MB')
       e.target.value = ''
       return
     }
@@ -473,7 +473,7 @@ export default function ProjetoMoodboards({ projeto, userId, userName }) {
                     <>
                       <Upload size={32} />
                       <span>Clique para selecionar ficheiro HTML</span>
-                      <span className="upload-hint">.html ou .htm (máx. 10MB)</span>
+                      <span className="upload-hint">.html ou .htm (máx. 50MB)</span>
                     </>
                   )}
                   <input
