@@ -176,7 +176,7 @@ export default function ProjetoDetalhe() {
   const [activeArchvizSection, setActiveArchvizSection] = useState(urlSubtab || 'inspiracoes')
 
   // Sub-tabs para Gestão de Projeto
-  const [activeGestaoSection, setActiveGestaoSection] = useState(urlSubtab || 'contratos')
+  const [activeGestaoSection, setActiveGestaoSection] = useState(urlSubtab || 'decisoes')
 
   // Sub-tabs para Briefing & Conceito
   const [activeBriefingSection, setActiveBriefingSection] = useState(urlSubtab || 'moodboards')
@@ -1567,8 +1567,6 @@ export default function ProjetoDetalhe() {
     { id: 'dashboard', label: 'Dashboard', icon: Layers },
     { id: 'briefing', label: 'Briefing & Conceito', icon: Lightbulb, hasSubtabs: true },
     { id: 'fases', label: 'Fases & Entregas', icon: Target, hasSubtabs: true },
-    { id: 'decisoes', label: 'Decisões', icon: ClipboardList },
-    { id: 'viabilidade', label: 'Viabilidade', icon: FileSearch },
     { id: 'chat-ia', label: 'Chat IA', icon: MessageSquare },
     { id: 'archviz', label: 'Archviz', icon: Image, hasSubtabs: true },
     { id: 'biblioteca', label: 'Biblioteca', icon: Library },
@@ -1601,6 +1599,8 @@ export default function ProjetoDetalhe() {
 
   // Secções dentro de Gestão de Projeto
   const gestaoSections = [
+    { id: 'decisoes', label: 'Decisões', icon: ClipboardList },
+    { id: 'viabilidade', label: 'Viabilidade', icon: FileSearch },
     { id: 'contratos', label: 'Contratos', icon: FileText },
     { id: 'diario-projeto', label: 'Diário de Projeto', icon: BookOpen },
     { id: 'faturacao', label: 'Faturação', icon: Euro },
@@ -2962,16 +2962,6 @@ export default function ProjetoDetalhe() {
         </div>
       )}
 
-      {/* Tab Decisões */}
-      {activeTab === 'decisoes' && (
-        <ProjetoDecisoes projetoId={project?.id} />
-      )}
-
-      {/* Tab Viabilidade Urbanística */}
-      {activeTab === 'viabilidade' && (
-        <ViabilidadeModule projetoId={project?.id} projeto={project} />
-      )}
-
       {/* Tab Chat IA */}
       {activeTab === 'chat-ia' && (
         <ProjetoChatIA projetoId={project?.id} projeto={project} />
@@ -3012,6 +3002,16 @@ export default function ProjetoDetalhe() {
               </button>
             ))}
           </div>
+
+          {/* Decisões */}
+          {activeGestaoSection === 'decisoes' && (
+            <ProjetoDecisoes projetoId={project?.id} />
+          )}
+
+          {/* Viabilidade Urbanística */}
+          {activeGestaoSection === 'viabilidade' && (
+            <ViabilidadeModule projetoId={project?.id} projeto={project} />
+          )}
 
           {/* Contratos */}
           {activeGestaoSection === 'contratos' && (
