@@ -2927,7 +2927,7 @@ export default function ProjetoDetalhe() {
                       position: 'absolute',
                       top: '8px',
                       right: '8px',
-                      padding: '6px 10px',
+                      padding: '6px',
                       background: 'var(--error)',
                       color: 'white',
                       border: 'none',
@@ -2936,11 +2936,11 @@ export default function ProjetoDetalhe() {
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '4px'
+                      justifyContent: 'center'
                     }}
+                    title="Remover das imagens finais"
                   >
-                    <X size={12} />
-                    Remover
+                    <X size={14} />
                   </button>
                 </div>
               ))}
