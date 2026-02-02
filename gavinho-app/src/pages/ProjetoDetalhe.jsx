@@ -61,7 +61,8 @@ import {
   Pencil,
   MessageSquare,
   Link2,
-  Type
+  Type,
+  Camera
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -80,6 +81,7 @@ import MoleskineDigital from '../components/MoleskineDigital'
 import ProjetoChatIA from '../components/projeto/ProjetoChatIA'
 import ProjetoAtas from '../components/ProjetoAtas'
 import ProjetoMoodboards from '../components/ProjetoMoodboards'
+import ProjetoLevantamento from '../components/ProjetoLevantamento'
 
 // Importar constantes de ficheiros separados
 import {
@@ -175,6 +177,9 @@ export default function ProjetoDetalhe() {
 
   // Sub-tabs para Gestão de Projeto
   const [activeGestaoSection, setActiveGestaoSection] = useState(urlSubtab || 'contratos')
+
+  // Sub-tabs para Briefing & Conceito
+  const [activeBriefingSection, setActiveBriefingSection] = useState(urlSubtab || 'moodboards')
 
   // Gestão de Renders/Archviz
   const [renders, setRenders] = useState([])
@@ -734,6 +739,8 @@ export default function ProjetoDetalhe() {
       setActiveArchvizSection(subtabId)
     } else if (tabType === 'gestao') {
       setActiveGestaoSection(subtabId)
+    } else if (tabType === 'briefing') {
+      setActiveBriefingSection(subtabId)
     }
   }
 
@@ -1558,7 +1565,7 @@ export default function ProjetoDetalhe() {
   // Tabs principais
   const allTabs = [
     { id: 'dashboard', label: 'Dashboard', icon: Layers },
-    { id: 'briefing', label: 'Briefing & Conceito', icon: Lightbulb },
+    { id: 'briefing', label: 'Briefing & Conceito', icon: Lightbulb, hasSubtabs: true },
     { id: 'fases', label: 'Fases & Entregas', icon: Target, hasSubtabs: true },
     { id: 'decisoes', label: 'Decisões', icon: ClipboardList },
     { id: 'viabilidade', label: 'Viabilidade', icon: FileSearch },
@@ -1566,6 +1573,12 @@ export default function ProjetoDetalhe() {
     { id: 'archviz', label: 'Archviz', icon: Image, hasSubtabs: true },
     { id: 'biblioteca', label: 'Biblioteca', icon: Library },
     { id: 'gestao', label: 'Gestão de Projeto', icon: Settings, hasSubtabs: true }
+  ]
+
+  // Secções dentro de Briefing & Conceito
+  const briefingSections = [
+    { id: 'moodboards', label: 'Moodboards', icon: Lightbulb },
+    { id: 'levantamento', label: 'Levantamento Fotografico', icon: Camera }
   ]
 
   // Secções dentro de Fases & Entregas
@@ -2446,13 +2459,60 @@ export default function ProjetoDetalhe() {
         </div>
       )}
 
-      {/* Tab Briefing & Conceito */}
+      {/* Tab Briefing & Conceito com subtabs */}
       {activeTab === 'briefing' && (
-        <ProjetoMoodboards
-          projeto={project}
-          userId={user?.id}
-          userName={user?.email?.split('@')[0] || 'Utilizador'}
-        />
+        <div>
+          {/* Section navigation */}
+          <div style={{
+            display: 'flex',
+            gap: '8px',
+            marginBottom: '20px',
+            borderBottom: '1px solid var(--stone)',
+            paddingBottom: '12px'
+          }}>
+            {briefingSections.map(section => (
+              <button
+                key={section.id}
+                onClick={() => handleSubtabChange(section.id, 'briefing')}
+                style={{
+                  padding: '8px 16px',
+                  background: activeBriefingSection === section.id ? 'var(--brown)' : 'transparent',
+                  color: activeBriefingSection === section.id ? 'white' : 'var(--brown-light)',
+                  border: activeBriefingSection === section.id ? 'none' : '1px solid var(--stone)',
+                  borderRadius: '20px',
+                  fontSize: '12px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <section.icon size={14} />
+                {section.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Moodboards */}
+          {activeBriefingSection === 'moodboards' && (
+            <ProjetoMoodboards
+              projeto={project}
+              userId={user?.id}
+              userName={user?.email?.split('@')[0] || 'Utilizador'}
+            />
+          )}
+
+          {/* Levantamento Fotografico */}
+          {activeBriefingSection === 'levantamento' && (
+            <ProjetoLevantamento
+              projeto={project}
+              userId={user?.id}
+              userName={user?.email?.split('@')[0] || 'Utilizador'}
+            />
+          )}
+        </div>
       )}
 
       {/* Tab Archviz com subtabs */}
