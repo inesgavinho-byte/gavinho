@@ -2617,182 +2617,231 @@ export default function ProjetoDetalhe() {
             </button>
           </div>
 
-          {/* Renders por Compartimento */}
+          {/* Renders por Compartimento e Vista */}
           {Object.keys(rendersByCompartimento).length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              {Object.entries(rendersByCompartimento).map(([compartimento, compartimentoRenders]) => (
-                <div key={compartimento}>
-                  <div className="flex items-center justify-between" style={{ marginBottom: '12px' }}>
-                    <h4 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--brown)' }}>
-                      {compartimento}
-                      <span style={{ fontWeight: 400, color: 'var(--brown-light)', marginLeft: '8px' }}>
-                        ({compartimentoRenders.length} {compartimentoRenders.length !== 1 ? 'versões' : 'versão'})
-                      </span>
-                    </h4>
-                    <button
-                      onClick={() => openAddRenderModal(compartimento)}
-                      className="btn btn-secondary"
-                      style={{ padding: '6px 12px', fontSize: '12px' }}
-                    >
-                      <Plus size={14} style={{ marginRight: '6px' }} />
-                      Adicionar Versão
-                    </button>
-                  </div>
-                  <div className="grid grid-3" style={{ gap: '16px' }}>
-                    {compartimentoRenders.sort((a, b) => new Date(b.data_upload || b.created_at || 0) - new Date(a.data_upload || a.created_at || 0)).map((render) => (
-                      <div
-                        key={render.id}
-                        style={{
-                          position: 'relative',
-                          aspectRatio: '16/10',
-                          background: render.imagem_url ? `url(${render.imagem_url}) center/cover` : 'var(--cream)',
-                          borderRadius: '12px',
-                          overflow: 'hidden',
-                          border: render.is_final ? '3px solid var(--success)' : '1px solid var(--stone)',
-                          cursor: render.imagem_url ? 'pointer' : 'default'
-                        }}
-                        onClick={() => openLightbox(render)}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+              {Object.entries(rendersByCompartimento).map(([compartimento, compartimentoRenders]) => {
+                // Agrupar renders por vista dentro do compartimento
+                const rendersByVista = compartimentoRenders.reduce((acc, render) => {
+                  const vista = render.vista || 'Vista Principal'
+                  if (!acc[vista]) acc[vista] = []
+                  acc[vista].push(render)
+                  return acc
+                }, {})
+
+                const totalVersoes = compartimentoRenders.length
+                const totalVistas = Object.keys(rendersByVista).length
+
+                return (
+                  <div key={compartimento} style={{
+                    background: 'var(--white)',
+                    border: '1px solid var(--stone)',
+                    borderRadius: '12px',
+                    padding: '16px'
+                  }}>
+                    {/* Cabeçalho do Compartimento */}
+                    <div className="flex items-center justify-between" style={{ marginBottom: '16px' }}>
+                      <h4 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--brown)', margin: 0 }}>
+                        {compartimento}
+                        <span style={{ fontWeight: 400, color: 'var(--brown-light)', marginLeft: '8px', fontSize: '13px' }}>
+                          ({totalVistas} {totalVistas !== 1 ? 'vistas' : 'vista'} • {totalVersoes} {totalVersoes !== 1 ? 'versões' : 'versão'})
+                        </span>
+                      </h4>
+                      <button
+                        onClick={() => openAddRenderModal(compartimento)}
+                        className="btn btn-secondary"
+                        style={{ padding: '6px 12px', fontSize: '12px' }}
                       >
-                        {!render.imagem_url && (
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                            <Image size={24} style={{ color: 'var(--brown-light)', opacity: 0.4 }} />
-                          </div>
-                        )}
+                        <Plus size={14} style={{ marginRight: '6px' }} />
+                        Nova Vista
+                      </button>
+                    </div>
 
-                        {/* Versão & Data Badge */}
-                        <div style={{
-                          position: 'absolute',
-                          top: '8px',
-                          left: '8px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '4px'
+                    {/* Vistas dentro do Compartimento */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                      {Object.entries(rendersByVista).map(([vista, vistaRenders]) => (
+                        <div key={vista} style={{
+                          background: 'var(--cream)',
+                          borderRadius: '8px',
+                          padding: '12px'
                         }}>
-                          <div style={{
-                            padding: '4px 8px',
-                            background: 'rgba(0,0,0,0.7)',
-                            color: 'white',
-                            borderRadius: '6px',
-                            fontSize: '11px',
-                            fontWeight: 600
-                          }}>
-                            v{render.versao}
-                          </div>
-                          {render.data_upload && (
-                            <div style={{
-                              padding: '3px 6px',
-                              background: 'rgba(0,0,0,0.5)',
-                              color: 'white',
-                              borderRadius: '4px',
-                              fontSize: '9px'
-                            }}>
-                              {new Date(render.data_upload).toLocaleDateString('pt-PT')}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Final Badge */}
-                        {render.is_final && (
-                          <div style={{
-                            position: 'absolute',
-                            top: '8px',
-                            right: '8px',
-                            padding: '4px 8px',
-                            background: 'var(--success)',
-                            color: 'white',
-                            borderRadius: '6px',
-                            fontSize: '10px',
-                            fontWeight: 600,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px'
-                          }}>
-                            <CheckCircle size={12} />
-                            FINAL
-                          </div>
-                        )}
-
-                        {/* Hover Actions */}
-                        <div style={{
-                          position: 'absolute',
-                          bottom: 0,
-                          left: 0,
-                          right: 0,
-                          padding: '8px',
-                          background: 'linear-gradient(transparent, rgba(0,0,0,0.8))',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center'
-                        }}>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); toggleFinalImage(render) }}
-                            style={{
-                              padding: '4px 8px',
-                              background: render.is_final ? 'var(--error)' : 'var(--success)',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '4px',
-                              fontSize: '10px',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            {render.is_final ? 'Remover Final' : 'Marcar Final'}
-                          </button>
-                          <div style={{ display: 'flex', gap: '4px' }}>
+                          {/* Cabeçalho da Vista */}
+                          <div className="flex items-center justify-between" style={{ marginBottom: '10px' }}>
+                            <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--brown)' }}>
+                              {vista}
+                              <span style={{ fontWeight: 400, color: 'var(--brown-light)', marginLeft: '6px' }}>
+                                ({vistaRenders.length} {vistaRenders.length !== 1 ? 'versões' : 'versão'})
+                              </span>
+                            </span>
                             <button
-                              onClick={(e) => { e.stopPropagation(); setMoleskineRender(render) }}
+                              onClick={() => openAddRenderModal(compartimento, vista)}
                               style={{
                                 padding: '4px 8px',
-                                background: '#8B8670',
-                                color: 'white',
-                                border: 'none',
+                                background: 'transparent',
+                                color: 'var(--brown)',
+                                border: '1px solid var(--stone)',
                                 borderRadius: '4px',
+                                fontSize: '11px',
                                 cursor: 'pointer',
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: '4px',
-                                fontSize: '10px',
-                                fontWeight: 500
-                              }}
-                              title="Moleskine - Anotar render"
-                            >
-                              <Pencil size={12} />
-                              Moleskine
-                            </button>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); openEditRenderModal(render) }}
-                              style={{
-                                padding: '4px',
-                                background: 'rgba(255,255,255,0.2)',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '4px',
-                                cursor: 'pointer'
-                              }}
-                              title="Editar"
-                            >
-                              <Edit size={14} />
-                            </button>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleDeleteRender(render) }}
-                              style={{
-                                padding: '4px',
-                                background: 'rgba(255,255,255,0.2)',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '4px',
-                                cursor: 'pointer'
+                                gap: '4px'
                               }}
                             >
-                              <Trash2 size={14} />
+                              <Plus size={12} />
+                              Versão
                             </button>
                           </div>
+
+                          {/* Grid de Renders da Vista */}
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                            gap: '12px'
+                          }}>
+                            {vistaRenders
+                              .sort((a, b) => (b.versao || 0) - (a.versao || 0))
+                              .map((render) => (
+                              <div
+                                key={render.id}
+                                style={{
+                                  position: 'relative',
+                                  aspectRatio: '16/10',
+                                  background: render.imagem_url ? `url(${render.imagem_url}) center/cover` : 'var(--white)',
+                                  borderRadius: '8px',
+                                  overflow: 'hidden',
+                                  border: render.is_final ? '3px solid var(--success)' : '1px solid var(--stone)',
+                                  cursor: render.imagem_url ? 'pointer' : 'default'
+                                }}
+                                onClick={() => openLightbox(render)}
+                              >
+                                {!render.imagem_url && (
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                                    <Image size={24} style={{ color: 'var(--brown-light)', opacity: 0.4 }} />
+                                  </div>
+                                )}
+
+                                {/* Versão Badge */}
+                                <div style={{
+                                  position: 'absolute',
+                                  top: '6px',
+                                  left: '6px',
+                                  padding: '3px 7px',
+                                  background: 'rgba(0,0,0,0.7)',
+                                  color: 'white',
+                                  borderRadius: '4px',
+                                  fontSize: '11px',
+                                  fontWeight: 600
+                                }}>
+                                  v{render.versao}
+                                </div>
+
+                                {/* Final Badge */}
+                                {render.is_final && (
+                                  <div style={{
+                                    position: 'absolute',
+                                    top: '6px',
+                                    right: '6px',
+                                    padding: '3px 6px',
+                                    background: 'var(--success)',
+                                    color: 'white',
+                                    borderRadius: '4px',
+                                    fontSize: '9px',
+                                    fontWeight: 600,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '3px'
+                                  }}>
+                                    <CheckCircle size={10} />
+                                    FINAL
+                                  </div>
+                                )}
+
+                                {/* Hover Actions */}
+                                <div style={{
+                                  position: 'absolute',
+                                  bottom: 0,
+                                  left: 0,
+                                  right: 0,
+                                  padding: '6px',
+                                  background: 'linear-gradient(transparent, rgba(0,0,0,0.8))',
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center'
+                                }}>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); toggleFinalImage(render) }}
+                                    style={{
+                                      padding: '3px 6px',
+                                      background: render.is_final ? 'var(--error)' : 'var(--success)',
+                                      color: 'white',
+                                      border: 'none',
+                                      borderRadius: '4px',
+                                      fontSize: '9px',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    {render.is_final ? 'Remover Final' : 'Marcar Final'}
+                                  </button>
+                                  <div style={{ display: 'flex', gap: '3px' }}>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); setMoleskineRender(render) }}
+                                      style={{
+                                        padding: '3px 6px',
+                                        background: '#8B8670',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '3px',
+                                        fontSize: '9px',
+                                        fontWeight: 500
+                                      }}
+                                      title="Moleskine - Anotar render"
+                                    >
+                                      <Pencil size={10} />
+                                      Moleskine
+                                    </button>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); openEditRenderModal(render) }}
+                                      style={{
+                                        padding: '3px',
+                                        background: 'rgba(255,255,255,0.2)',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        cursor: 'pointer'
+                                      }}
+                                      title="Editar"
+                                    >
+                                      <Edit size={12} />
+                                    </button>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); handleDeleteRender(render) }}
+                                      style={{
+                                        padding: '3px',
+                                        background: 'rgba(255,255,255,0.2)',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        cursor: 'pointer'
+                                      }}
+                                    >
+                                      <Trash2 size={12} />
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           ) : (
             <div style={{
