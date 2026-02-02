@@ -70,6 +70,15 @@ const CANAL_ICONS = [
   { id: 'users', icon: Users, label: 'Equipa' }
 ]
 
+// G.A.R.V.I.S. - Virtual AI Assistant
+const GARVIS_USER = {
+  id: 'garvis-bot-001',
+  nome: 'G.A.R.V.I.S.',
+  avatar_url: '/avatars/garvis.png',
+  is_bot: true,
+  cargo: 'Assistente IA'
+}
+
 export default function ChatProjetos() {
   const { profile } = useAuth()
   const [projetos, setProjetos] = useState([])
@@ -294,10 +303,15 @@ export default function ChatProjetos() {
         .eq('projeto_id', projetoId)
 
       if (equipaData) {
-        setMembrosEquipa(equipaData.map(e => e.utilizador).filter(Boolean))
+        // Include GARVIS as first option in mentions
+        const membros = equipaData.map(e => e.utilizador).filter(Boolean)
+        setMembrosEquipa([GARVIS_USER, ...membros])
+      } else {
+        setMembrosEquipa([GARVIS_USER])
       }
     } catch (err) {
       console.error('Erro ao carregar equipa:', err)
+      setMembrosEquipa([GARVIS_USER])
     }
   }
 
@@ -593,7 +607,7 @@ export default function ChatProjetos() {
 
   const handleEnviarMensagem = async () => {
     if (!novaMensagem.trim() || !topicoAtivo) return
-    
+
     try {
       const mentionRegex = /@\[([^\]]+)\]\(([^)]+)\)/g
       const mencoes = []
@@ -601,9 +615,12 @@ export default function ChatProjetos() {
       while ((match = mentionRegex.exec(novaMensagem)) !== null) {
         mencoes.push(match[2])
       }
-      
+
+      // Check if GARVIS is mentioned
+      const garvisMentioned = mencoes.includes(GARVIS_USER.id)
+
       const conteudoLimpo = novaMensagem.replace(/@\[([^\]]+)\]\(([^)]+)\)/g, '@$1')
-      
+
       const { data, error } = await supabase
         .from('chat_mensagens')
         .insert({
@@ -615,28 +632,54 @@ export default function ChatProjetos() {
         })
         .select()
         .single()
-      
+
       if (error) throw error
-      
-      if (mencoes.length > 0) {
+
+      // Insert mentions for non-bot users
+      const humanMencoes = mencoes.filter(id => id !== GARVIS_USER.id)
+      if (humanMencoes.length > 0) {
         await supabase.from('chat_mencoes').insert(
-          mencoes.map(userId => ({
+          humanMencoes.map(userId => ({
             mensagem_id: data.id,
             utilizador_id: userId
           }))
         )
       }
-      
+
       await supabase
         .from('chat_topicos')
         .update({ updated_at: new Date().toISOString() })
         .eq('id', topicoAtivo.id)
-      
+
       setNovaMensagem('')
       setReplyTo(null)
-      
+
       // Recarregar mensagens após envio
       loadMensagens(topicoAtivo.id)
+
+      // If GARVIS was mentioned, call the edge function
+      if (garvisMentioned && projetoAtivo) {
+        try {
+          const response = await supabase.functions.invoke('garvis-chat', {
+            body: {
+              projetoId: projetoAtivo.id,
+              topicoId: topicoAtivo.id,
+              mensagem: conteudoLimpo,
+              mensagemId: data.id,
+              autorNome: profile?.nome || 'Utilizador'
+            }
+          })
+
+          if (response.error) {
+            console.error('GARVIS error:', response.error)
+          } else {
+            // Reload messages to show GARVIS response
+            setTimeout(() => loadMensagens(topicoAtivo.id), 500)
+          }
+        } catch (garvisErr) {
+          console.error('Erro ao chamar GARVIS:', garvisErr)
+        }
+      }
     } catch (err) {
       alert('Erro ao enviar mensagem: ' + err.message)
     }
@@ -1187,13 +1230,14 @@ export default function ChatProjetos() {
             ) : (
               mensagens.map((msg, idx) => {
                 const isOwn = msg.autor_id === profile?.id
+                const isGarvis = msg.autor_id === GARVIS_USER.id
                 const showAuthor = idx === 0 || mensagens[idx - 1]?.autor_id !== msg.autor_id
                 const reactions = groupReactions(msg.reacoes)
-                
+
                 return (
                   <div key={msg.id} style={{ marginTop: showAuthor ? '12px' : '2px' }}>
                     {msg.parent && (
-                      <div style={{ 
+                      <div style={{
                         display: 'flex',
                         alignItems: 'center',
                         gap: '6px',
@@ -1213,15 +1257,19 @@ export default function ChatProjetos() {
                         </span>
                       </div>
                     )}
-                    
-                    <div style={{ 
-                      display: 'flex', 
+
+                    <div style={{
+                      display: 'flex',
                       gap: '10px',
-                      padding: '4px 8px',
-                      borderRadius: '6px',
-                      transition: 'background 0.15s'
+                      padding: isGarvis ? '12px' : '4px 8px',
+                      borderRadius: isGarvis ? '12px' : '6px',
+                      transition: 'background 0.15s',
+                      background: isGarvis ? 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%)' : 'transparent',
+                      border: isGarvis ? '1px solid rgba(99, 102, 241, 0.2)' : 'none',
+                      marginLeft: isGarvis ? '0' : undefined,
+                      marginRight: isGarvis ? '0' : undefined
                     }}
-                    className="message-hover"
+                    className={isGarvis ? 'garvis-message' : 'message-hover'}
                     >
                       {showAuthor ? (
                         <div style={{ position: 'relative', flexShrink: 0 }}>
@@ -1229,18 +1277,21 @@ export default function ChatProjetos() {
                             width: '36px',
                             height: '36px',
                             borderRadius: '50%',
-                            background: msg.autor?.avatar_url ? `url(${msg.autor.avatar_url})` : 'var(--gold)',
+                            background: isGarvis
+                              ? 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)'
+                              : (msg.autor?.avatar_url ? `url(${msg.autor.avatar_url})` : 'var(--gold)'),
                             backgroundSize: 'cover',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             color: 'white',
                             fontWeight: 600,
-                            fontSize: '14px'
+                            fontSize: isGarvis ? '11px' : '14px',
+                            boxShadow: isGarvis ? '0 2px 8px rgba(99, 102, 241, 0.3)' : 'none'
                           }}>
-                            {!msg.autor?.avatar_url && msg.autor?.nome?.charAt(0)}
+                            {isGarvis ? 'AI' : (!msg.autor?.avatar_url && msg.autor?.nome?.charAt(0))}
                           </div>
-                          {/* Indicador de presença */}
+                          {/* Indicador de presença - always online for GARVIS */}
                           <div style={{
                             position: 'absolute',
                             bottom: 0,
@@ -1248,19 +1299,39 @@ export default function ChatProjetos() {
                             width: '10px',
                             height: '10px',
                             borderRadius: '50%',
-                            background: getPresenceColor(msg.autor_id),
+                            background: isGarvis ? '#22c55e' : getPresenceColor(msg.autor_id),
                             border: '2px solid white'
                           }} />
                         </div>
                       ) : (
                         <div style={{ width: '36px' }} />
                       )}
-                      
+
                       <div style={{ flex: 1, minWidth: 0 }}>
                         {showAuthor && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
-                            <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--brown)' }}>
+                            <span style={{
+                              fontWeight: 600,
+                              fontSize: '13px',
+                              color: isGarvis ? '#6366f1' : 'var(--brown)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px'
+                            }}>
                               {msg.autor?.nome || 'Utilizador'}
+                              {isGarvis && (
+                                <span style={{
+                                  fontSize: '9px',
+                                  background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                                  color: 'white',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  fontWeight: 500,
+                                  letterSpacing: '0.5px'
+                                }}>
+                                  BOT
+                                </span>
+                              )}
                             </span>
                             <span style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
                               {formatDate(msg.created_at)}
@@ -1485,41 +1556,75 @@ export default function ChatProjetos() {
                   marginBottom: '8px',
                   zIndex: 10
                 }}>
-                  {filteredMembros.map(user => (
-                    <button
-                      key={user.id}
-                      onClick={() => insertMention(user)}
-                      style={{
-                        width: '100%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        padding: '10px 14px',
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        textAlign: 'left'
-                      }}
-                      className="hover-bg"
-                    >
-                      <div style={{
-                        width: '28px',
-                        height: '28px',
-                        borderRadius: '50%',
-                        background: user.avatar_url ? `url(${user.avatar_url})` : 'var(--gold)',
-                        backgroundSize: 'cover',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: 'white',
-                        fontSize: '12px',
-                        fontWeight: 600
-                      }}>
-                        {!user.avatar_url && user.nome?.charAt(0)}
-                      </div>
-                      <span style={{ fontSize: '13px', color: 'var(--brown)' }}>{user.nome}</span>
-                    </button>
-                  ))}
+                  {filteredMembros.map(user => {
+                    const isGarvisUser = user.id === GARVIS_USER.id
+                    return (
+                      <button
+                        key={user.id}
+                        onClick={() => insertMention(user)}
+                        style={{
+                          width: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          padding: '10px 14px',
+                          background: isGarvisUser ? 'linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%)' : 'none',
+                          border: 'none',
+                          borderBottom: isGarvisUser ? '1px solid rgba(99, 102, 241, 0.1)' : 'none',
+                          cursor: 'pointer',
+                          textAlign: 'left'
+                        }}
+                        className="hover-bg"
+                      >
+                        <div style={{
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '50%',
+                          background: isGarvisUser
+                            ? 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)'
+                            : (user.avatar_url ? `url(${user.avatar_url})` : 'var(--gold)'),
+                          backgroundSize: 'cover',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'white',
+                          fontSize: isGarvisUser ? '10px' : '12px',
+                          fontWeight: 600,
+                          boxShadow: isGarvisUser ? '0 2px 6px rgba(99, 102, 241, 0.3)' : 'none'
+                        }}>
+                          {isGarvisUser ? 'AI' : (!user.avatar_url && user.nome?.charAt(0))}
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <span style={{
+                            fontSize: '13px',
+                            color: isGarvisUser ? '#6366f1' : 'var(--brown)',
+                            fontWeight: isGarvisUser ? 600 : 400,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}>
+                            {user.nome}
+                            {isGarvisUser && (
+                              <span style={{
+                                fontSize: '8px',
+                                background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                                color: 'white',
+                                padding: '1px 4px',
+                                borderRadius: '3px'
+                              }}>
+                                BOT
+                              </span>
+                            )}
+                          </span>
+                          {isGarvisUser && (
+                            <span style={{ fontSize: '10px', color: 'var(--brown-light)' }}>
+                              Assistente IA do projeto
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    )
+                  })}
                 </div>
               )}
               
