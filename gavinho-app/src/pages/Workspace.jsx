@@ -238,8 +238,8 @@ export default function Workspace() {
   const [typingUsers, setTypingUsers] = useState([])
   const typingTimeoutRef = useRef(null)
 
-  // Online Status
-  const [onlineUsers, setOnlineUsers] = useState([]) // Populated from realtime presence
+  // Online Status - {userId: 'online'|'away'|'offline'}
+  const [onlineUsers, setOnlineUsers] = useState({})
 
   // Read Receipts
   const [readReceipts, setReadReceipts] = useState({})
@@ -384,9 +384,18 @@ export default function Workspace() {
   const fileInputRef = useRef(null)
   const messagesEndRef = useRef(null)
   const messageInputRef = useRef(null)
+  const presenceIntervalRef = useRef(null)
 
   useEffect(() => {
     loadData()
+
+    // Iniciar presença
+    updateMyPresence()
+    presenceIntervalRef.current = setInterval(updateMyPresence, 60000) // A cada minuto
+
+    return () => {
+      clearInterval(presenceIntervalRef.current)
+    }
   }, [])
 
   useEffect(() => {
@@ -404,6 +413,15 @@ export default function Workspace() {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }
   }, [posts])
+
+  // Carregar presença quando membros mudam
+  useEffect(() => {
+    if (membros.length > 0) {
+      loadOnlineUsers()
+      const interval = setInterval(loadOnlineUsers, 30000) // A cada 30s
+      return () => clearInterval(interval)
+    }
+  }, [membros])
 
   const loadData = async () => {
     try {
@@ -677,7 +695,7 @@ export default function Workspace() {
           parent_id: replyingTo?.id || null,
           ficheiro_url: attachments.length > 0 ? attachments[0].url : null,
           ficheiro_nome: attachments.length > 0 ? attachments[0].name : null,
-          ficheiro_tamanho: attachments.length > 0 ? parseInt(attachments[0].size) || null : null,
+          ficheiro_tamanho: attachments.length > 0 ? attachments[0].size || null : null,
           ficheiro_tipo: attachments.length > 0 ? attachments[0].type : null
         })
         .select(`
@@ -696,7 +714,7 @@ export default function Workspace() {
           mensagem_id: insertedMessage.id,
           url: att.url,
           nome: att.name,
-          tamanho: parseInt(att.size) || null,
+          tamanho: att.size || null,
           tipo: att.type
         }))
         await supabase.from('chat_anexos').insert(extraAttachments)
@@ -807,7 +825,8 @@ export default function Workspace() {
       file,
       name: file.name,
       type: file.type.startsWith('image/') ? 'image' : 'file',
-      size: formatFileSize(file.size),
+      size: file.size, // Store raw bytes for database
+      sizeFormatted: formatFileSize(file.size), // Formatted for display
       preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : null
     }))
     setSelectedFiles(prev => [...prev, ...newFiles])
@@ -1244,8 +1263,63 @@ export default function Workspace() {
   }
 
   // ========== ONLINE STATUS ==========
+  // Atualizar própria presença
+  const updateMyPresence = async () => {
+    if (!profile?.id) return
+
+    try {
+      await supabase.from('chat_presenca').upsert({
+        utilizador_id: profile.id,
+        estado: 'online',
+        ultima_actividade: new Date().toISOString(),
+        dispositivo: 'web'
+      }, { onConflict: 'utilizador_id' })
+    } catch (err) {
+      // Silenciar erros
+    }
+  }
+
+  // Carregar presença dos membros
+  const loadOnlineUsers = async () => {
+    if (!membros.length) return
+
+    try {
+      const { data } = await supabase
+        .from('chat_presenca')
+        .select('utilizador_id, estado, ultima_actividade')
+        .in('utilizador_id', membros.map(m => m.id))
+
+      const map = {}
+      data?.forEach(p => {
+        // Considerar offline se última atividade > 15min
+        const lastActive = new Date(p.ultima_actividade)
+        const diffMinutes = (Date.now() - lastActive.getTime()) / 60000
+
+        if (diffMinutes > 15) {
+          map[p.utilizador_id] = 'offline'
+        } else if (diffMinutes > 5) {
+          map[p.utilizador_id] = 'away'
+        } else {
+          map[p.utilizador_id] = p.estado
+        }
+      })
+
+      setOnlineUsers(map)
+    } catch (err) {
+      // Silenciar erros
+    }
+  }
+
   const isUserOnline = (userId) => {
-    return onlineUsers.includes(userId)
+    return onlineUsers[userId] === 'online'
+  }
+
+  // Cor do indicador de presença
+  const getPresenceColor = (userId) => {
+    const estado = onlineUsers[userId]
+    if (estado === 'online') return '#22c55e' // Verde
+    if (estado === 'away') return '#eab308' // Amarelo
+    return '#9ca3af' // Cinza
   }
 
   // ========== READ RECEIPTS ==========
@@ -1735,27 +1809,85 @@ export default function Workspace() {
   }
 
   // ========== CHANNEL ANALYTICS ==========
-  const loadChannelAnalytics = () => {
-    // In production, would fetch from database
-    const mockAnalytics = {
-      totalMessages: posts.length + Math.floor(Math.random() * 100),
-      messagesThisWeek: Math.floor(Math.random() * 30) + 10,
-      activeUsers: membros.slice(0, 5).length,
-      topContributors: membros.slice(0, 5).map(m => ({
-        ...m,
-        messageCount: Math.floor(Math.random() * 20) + 1
-      })),
-      activityByDay: [
-        { day: 'Seg', count: Math.floor(Math.random() * 15) + 5 },
-        { day: 'Ter', count: Math.floor(Math.random() * 15) + 5 },
-        { day: 'Qua', count: Math.floor(Math.random() * 15) + 5 },
-        { day: 'Qui', count: Math.floor(Math.random() * 15) + 5 },
-        { day: 'Sex', count: Math.floor(Math.random() * 15) + 5 }
-      ],
-      popularTopics: getCurrentChannelTopics().slice(0, 3)
+  const loadChannelAnalytics = async () => {
+    if (!canalAtivo?.id) return
+
+    try {
+      // Buscar todas as mensagens do canal
+      const { data: mensagens } = await supabase
+        .from('chat_mensagens')
+        .select('id, autor_id, created_at, autor:autor_id(id, nome, avatar_url, funcao)')
+        .eq('canal_id', canalAtivo.id)
+
+      if (!mensagens) {
+        setShowAnalytics(true)
+        return
+      }
+
+      const totalMessages = mensagens.length
+
+      // Mensagens desta semana
+      const oneWeekAgo = new Date()
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
+      const messagesThisWeek = mensagens.filter(m => new Date(m.created_at) >= oneWeekAgo).length
+
+      // Utilizadores ativos únicos
+      const uniqueAuthors = new Set(mensagens.map(m => m.autor_id))
+      const activeUsers = uniqueAuthors.size
+
+      // Top contributors - contar mensagens por autor
+      const authorCounts = {}
+      mensagens.forEach(m => {
+        if (m.autor_id) {
+          authorCounts[m.autor_id] = (authorCounts[m.autor_id] || 0) + 1
+        }
+      })
+
+      const topContributors = Object.entries(authorCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([autorId, count]) => {
+          const msg = mensagens.find(m => m.autor_id === autorId)
+          return {
+            id: autorId,
+            nome: msg?.autor?.nome || 'Utilizador',
+            avatar_url: msg?.autor?.avatar_url,
+            funcao: msg?.autor?.funcao,
+            messageCount: count
+          }
+        })
+
+      // Atividade por dia da semana (últimos 30 dias)
+      const thirtyDaysAgo = new Date()
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+      const recentMessages = mensagens.filter(m => new Date(m.created_at) >= thirtyDaysAgo)
+
+      const dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+      const dayCounts = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }
+
+      recentMessages.forEach(m => {
+        const dayOfWeek = new Date(m.created_at).getDay()
+        dayCounts[dayOfWeek]++
+      })
+
+      const activityByDay = [1, 2, 3, 4, 5].map(dayIndex => ({
+        day: dayNames[dayIndex],
+        count: dayCounts[dayIndex]
+      }))
+
+      setChannelAnalytics({
+        totalMessages,
+        messagesThisWeek,
+        activeUsers,
+        topContributors,
+        activityByDay,
+        popularTopics: getCurrentChannelTopics().slice(0, 3)
+      })
+      setShowAnalytics(true)
+    } catch (err) {
+      console.error('Erro ao carregar analytics:', err)
+      setShowAnalytics(true)
     }
-    setChannelAnalytics(mockAnalytics)
-    setShowAnalytics(true)
   }
 
   // ========== TAGS/LABELS ==========
@@ -3706,9 +3838,9 @@ export default function Workspace() {
                                   width: '12px',
                                   height: '12px',
                                   borderRadius: '50%',
-                                  background: isUserOnline(post.autor?.id) ? '#22c55e' : '#9ca3af',
+                                  background: getPresenceColor(post.autor?.id),
                                   border: '2px solid var(--white)'
-                                }} title={isUserOnline(post.autor?.id) ? 'Online' : 'Offline'} />
+                                }} title={onlineUsers[post.autor?.id] === 'online' ? 'Online' : onlineUsers[post.autor?.id] === 'away' ? 'Ausente' : 'Offline'} />
                               </div>
                               <div style={{ flex: 1 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -4216,7 +4348,7 @@ export default function Workspace() {
                                           fontSize: '11px',
                                           color: 'var(--brown-light)'
                                         }}>
-                                          {file.name} • {file.size}
+                                          {file.name} • {file.sizeFormatted || (typeof file.size === 'number' ? formatFileSize(file.size) : file.size)}
                                         </div>
                                       </a>
                                     )
@@ -4245,7 +4377,7 @@ export default function Workspace() {
                                           {file.name}
                                         </div>
                                         <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
-                                          {file.size}
+                                          {file.sizeFormatted || (typeof file.size === 'number' ? formatFileSize(file.size) : file.size)}
                                         </div>
                                       </div>
                                     </a>
