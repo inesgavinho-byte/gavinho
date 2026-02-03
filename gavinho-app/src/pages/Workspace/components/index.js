@@ -5,3 +5,6 @@
 
 // Modals
 export * from './Modals'
+
+// Panels
+export * from './Panels'
