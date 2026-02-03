@@ -554,7 +554,7 @@ export default function ChatProjetos() {
 
   const handleCriarCanal = async () => {
     if (!novoCanal.nome.trim() || !projetoAtivo) return
-    
+
     try {
       const { data, error } = await supabase
         .from('chat_canais')
@@ -569,11 +569,34 @@ export default function ChatProjetos() {
         })
         .select()
         .single()
-      
+
       if (error) throw error
-      
+
+      // Criar tópico "Geral" automaticamente para o novo canal
+      const { data: topicoGeral, error: topicoError } = await supabase
+        .from('chat_topicos')
+        .insert({
+          canal_id: data.id,
+          titulo: 'Geral',
+          descricao: 'Tópico geral do canal',
+          criado_por: profile?.id
+        })
+        .select()
+        .single()
+
+      if (topicoError) {
+        console.error('Erro ao criar tópico Geral:', topicoError)
+      }
+
       setCanais([...canais, data])
       setCanalAtivo(data)
+
+      // Selecionar o tópico Geral automaticamente
+      if (topicoGeral) {
+        setTopicos([topicoGeral])
+        setTopicoAtivo(topicoGeral)
+      }
+
       setShowNovoCanal(false)
       setNovoCanal({ nome: '', descricao: '', tipo: 'publico', icone: 'hash' })
     } catch (err) {
@@ -663,7 +686,12 @@ export default function ChatProjetos() {
   }
 
   const handleEnviarMensagem = async () => {
-    if (!novaMensagem.trim() || !topicoAtivo) return
+    if (!novaMensagem.trim()) return
+
+    if (!topicoAtivo) {
+      alert('Por favor, seleciona ou cria um tópico antes de enviar mensagens.')
+      return
+    }
 
     try {
       const mentionRegex = /@\[([^\]]+)\]\(([^)]+)\)/g
