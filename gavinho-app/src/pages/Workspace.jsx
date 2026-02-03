@@ -27,101 +27,49 @@ import {
   Loader2, FolderDown, MessageSquarePlus, UsersRound
 } from 'lucide-react'
 
-// Microsoft Graph API Configuration
-const MS_GRAPH_CONFIG = {
-  clientId: import.meta.env.VITE_MS_CLIENT_ID || 'YOUR_CLIENT_ID',
-  authority: 'https://login.microsoftonline.com/common',
-  redirectUri: typeof window !== 'undefined' ? window.location.origin + '/oauth/callback' : '',
-  scopes: ['User.Read', 'Team.ReadBasic.All', 'Channel.ReadBasic.All', 'ChannelMessage.Read.All', 'Files.Read.All']
-}
+// Import extracted utilities and constants
+import {
+  MS_GRAPH_CONFIG,
+  USER_STATUS_OPTIONS,
+  MESSAGE_TAGS,
+  REMINDER_OPTIONS,
+  EQUIPAS_GAVINHO,
+  DEFAULT_TOPICS,
+  REACTIONS,
+  EMOJI_CATEGORIES,
+  FILTER_OPTIONS,
+  KEYBOARD_SHORTCUTS
+} from './Workspace/utils/constants'
 
-// Status options for users
-const USER_STATUS_OPTIONS = [
-  { id: 'available', label: 'Disponível', icon: 'CheckCircle2', color: '#22c55e' },
-  { id: 'busy', label: 'Ocupado', icon: 'XCircle', color: '#ef4444' },
-  { id: 'away', label: 'Ausente', icon: 'Clock', color: '#f59e0b' },
-  { id: 'dnd', label: 'Não incomodar', icon: 'BellOff', color: '#ef4444' },
-  { id: 'meeting', label: 'Em reunião', icon: 'Video', color: '#8b5cf6' },
-  { id: 'lunch', label: 'Almoço', icon: 'Coffee', color: '#f97316' },
-  { id: 'vacation', label: 'Férias', icon: 'Plane', color: '#06b6d4' },
-  { id: 'wfh', label: 'A trabalhar de casa', icon: 'Home', color: '#10b981' }
-]
+import {
+  formatTime,
+  formatDateTime,
+  formatFileSize,
+  getInitials,
+  extractUrls
+} from './Workspace/utils/formatters'
 
-// Message tags/labels
-const MESSAGE_TAGS = [
-  { id: 'urgent', label: 'Urgente', color: '#ef4444' },
-  { id: 'important', label: 'Importante', color: '#f59e0b' },
-  { id: 'followup', label: 'Follow-up', color: '#8b5cf6' },
-  { id: 'decision', label: 'Decisão', color: '#3b82f6' },
-  { id: 'info', label: 'Informação', color: '#06b6d4' },
-  { id: 'action', label: 'Ação necessária', color: '#ec4899' }
-]
+import {
+  renderFormattedText,
+  applyFormatting as applyFormattingUtil,
+  insertEmoji as insertEmojiUtil,
+  insertMention as insertMentionUtil,
+  isOwnMessage
+} from './Workspace/utils/messageUtils'
 
-// Reminder options
-const REMINDER_OPTIONS = [
-  { id: '30min', label: 'Em 30 minutos', minutes: 30 },
-  { id: '1h', label: 'Em 1 hora', minutes: 60 },
-  { id: '2h', label: 'Em 2 horas', minutes: 120 },
-  { id: '4h', label: 'Em 4 horas', minutes: 240 },
-  { id: 'tomorrow', label: 'Amanhã de manhã', minutes: 'tomorrow' },
-  { id: 'nextweek', label: 'Próxima semana', minutes: 'nextweek' },
-  { id: 'custom', label: 'Personalizado...', minutes: 'custom' }
-]
+import {
+  getPresenceColor,
+  isUserOnline as checkUserOnline,
+  getTypingText
+} from './Workspace/utils/presenceUtils'
 
-// Estrutura de equipas GAVINHO (baseado no Teams)
-const EQUIPAS_GAVINHO = [
-  { id: 'arch', nome: 'GAVINHO ARCH', cor: '#6366f1', inicial: 'A', descricao: 'Projetos de Arquitetura' },
-  { id: 'hosp', nome: 'GAVINHO HOSP.', cor: '#f59e0b', inicial: 'H', descricao: 'Projetos de Hospitalidade' },
-  { id: 'signature', nome: 'GAVINHO Signature', cor: '#10b981', inicial: 'GS', descricao: 'Projetos Premium' }
-]
-
-// Tópicos padrão para cada canal/projeto
-const DEFAULT_TOPICS = [
-  { id: 'geral', nome: 'Geral', icon: 'MessageSquare', cor: '#6b7280' },
-  { id: 'estudo-previo', nome: 'Estudo Prévio', icon: 'FileText', cor: '#8b5cf6' },
-  { id: 'projeto-execucao', nome: 'Projeto de Execução', icon: 'Building2', cor: '#3b82f6' },
-  { id: 'central-entregas', nome: 'Central de Entregas', icon: 'FolderOpen', cor: '#10b981' },
-  { id: 'obra', nome: 'Acompanhamento Obra', icon: 'Grip', cor: '#f59e0b' },
-  { id: 'cliente', nome: 'Cliente', icon: 'Users', cor: '#ec4899' }
-]
-
-// Reações disponíveis (estilo Teams)
-const REACTIONS = [
-  { emoji: '👍', name: 'like' },
-  { emoji: '❤️', name: 'heart' },
-  { emoji: '😄', name: 'laugh' },
-  { emoji: '😮', name: 'surprised' },
-  { emoji: '😢', name: 'sad' },
-  { emoji: '🎉', name: 'celebrate' }
-]
-
-// Emojis organizados por categoria
-const EMOJI_CATEGORIES = [
-  {
-    name: 'Frequentes',
-    emojis: ['👍', '❤️', '😄', '🎉', '👏', '🙏', '💪', '✅', '🔥', '⭐']
-  },
-  {
-    name: 'Caras',
-    emojis: ['😀', '😃', '😄', '😁', '😅', '😂', '🤣', '😊', '😇', '🙂', '😉', '😌', '😍', '🥰', '😘', '😋', '😛', '🤔', '🤨', '😐', '😑', '😶', '🙄', '😏', '😮', '😲', '😳', '🥺', '😢', '😭', '😤', '😠', '🤯', '😱', '🥴', '😴']
-  },
-  {
-    name: 'Gestos',
-    emojis: ['👋', '🤚', '✋', '🖐️', '👌', '🤌', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '👇', '☝️', '👍', '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '🤝', '🙏', '💪']
-  },
-  {
-    name: 'Objetos',
-    emojis: ['💼', '📁', '📂', '📄', '📝', '✏️', '📌', '📎', '🔗', '📧', '📨', '💻', '🖥️', '📱', '📷', '🎨', '🏠', '🏢', '🏗️', '🔨', '🔧', '📐', '📏', '🗓️', '⏰', '💡', '🔑', '🔒']
-  },
-  {
-    name: 'Símbolos',
-    emojis: ['✅', '❌', '⭕', '❗', '❓', '💯', '🔴', '🟠', '🟡', '🟢', '🔵', '🟣', '⚪', '⚫', '▶️', '⏸️', '⏹️', '🔄', '➡️', '⬅️', '⬆️', '⬇️', '↗️', '↘️', '🔔', '🔕']
-  },
-  {
-    name: 'Celebração',
-    emojis: ['🎉', '🎊', '🎈', '🎁', '🏆', '🥇', '🥈', '🥉', '🏅', '🎯', '🌟', '✨', '💫', '🔥', '💥', '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '💕', '💖', '💗']
-  }
-]
+// Import extracted components
+import {
+  KeyboardShortcutsModal,
+  EmojiPicker,
+  CreateTaskModal,
+  ForwardMessageModal
+} from './Workspace/components'
 
 export default function Workspace() {
   // Handle OAuth callback in popup
@@ -832,36 +780,6 @@ export default function Workspace() {
     setSelectedFiles(prev => [...prev, ...newFiles])
   }
 
-  const formatFileSize = (bytes) => {
-    if (bytes < 1024) return bytes + ' B'
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-    return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
-  }
-
-  const formatTime = (dateStr) => {
-    const date = new Date(dateStr)
-    const now = new Date()
-    const diffMs = now - date
-    const diffMins = Math.floor(diffMs / 60000)
-    const diffHours = Math.floor(diffMs / 3600000)
-    const diffDays = Math.floor(diffMs / 86400000)
-
-    if (diffMins < 1) return 'Agora'
-    if (diffMins < 60) return `${diffMins}m`
-    if (diffHours < 24) return `${diffHours}h`
-    if (diffDays < 7) return `${diffDays}d`
-    return date.toLocaleDateString('pt-PT', { day: '2-digit', month: 'short' })
-  }
-
-  const formatDateTime = (dateStr) => {
-    return new Date(dateStr).toLocaleDateString('pt-PT', {
-      day: '2-digit',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  }
-
   const getEquipaCanais = (equipaId) => canais.filter(c => c.equipa === equipaId)
 
   const toggleEquipa = (equipaId) => {
@@ -893,11 +811,6 @@ export default function Workspace() {
   const openThread = (post) => {
     setActiveThread(post)
     loadThreadReplies(post.id)
-  }
-
-  const getInitials = (nome) => {
-    if (!nome) return 'U'
-    return nome.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
   }
 
   // Insert emoji at cursor position
@@ -1068,15 +981,6 @@ export default function Workspace() {
     return canais.reduce((sum, c) => sum + (c.unreadCount || 0), 0)
   }
 
-  // Filter options
-  const FILTER_OPTIONS = [
-    { id: 'all', label: 'Todas', icon: MessageSquare },
-    { id: 'attachments', label: 'Com anexos', icon: FileText },
-    { id: 'images', label: 'Com imagens', icon: FileImage },
-    { id: 'mentions', label: 'Menções', icon: AtSign },
-    { id: 'saved', label: 'Guardadas', icon: Bookmark }
-  ]
-
   // Apply filters to posts
   const applyFilters = (postsToFilter) => {
     let result = postsToFilter
@@ -1209,46 +1113,6 @@ export default function Workspace() {
       input.focus()
       input.setSelectionRange(start + cursorOffset, start + cursorOffset)
     }, 0)
-  }
-
-  // Render formatted text (bold, italic, code, links)
-  const renderFormattedText = (text) => {
-    if (!text) return null
-
-    // Process code blocks first
-    const codeBlockRegex = /```([\s\S]*?)```/g
-    const inlineCodeRegex = /`([^`]+)`/g
-    const boldRegex = /\*\*([^*]+)\*\*/g
-    const italicRegex = /_([^_]+)_/g
-    const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g
-    const urlRegex = /(https?:\/\/[^\s]+)/g
-
-    let result = text
-
-    // Code blocks
-    result = result.replace(codeBlockRegex, '<pre class="code-block">$1</pre>')
-    // Inline code
-    result = result.replace(inlineCodeRegex, '<code class="inline-code">$1</code>')
-    // Bold
-    result = result.replace(boldRegex, '<strong>$1</strong>')
-    // Italic
-    result = result.replace(italicRegex, '<em>$1</em>')
-    // Links
-    result = result.replace(linkRegex, '<a href="$2" target="_blank" class="chat-link">$1</a>')
-    // Auto-link URLs
-    result = result.replace(urlRegex, (match) => {
-      if (result.includes(`href="${match}"`)) return match
-      return `<a href="${match}" target="_blank" class="chat-link">${match}</a>`
-    })
-
-    return <span dangerouslySetInnerHTML={{ __html: result }} />
-  }
-
-  // Extract URL previews from text
-  const extractUrls = (text) => {
-    if (!text) return []
-    const urlRegex = /(https?:\/\/[^\s]+)/g
-    return text.match(urlRegex) || []
   }
 
   // ========== TYPING INDICATOR ==========
@@ -1511,17 +1375,6 @@ export default function Workspace() {
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [messageInput])
-
-  // KEYBOARD_SHORTCUTS constant for help modal
-  const KEYBOARD_SHORTCUTS = [
-    { keys: ['Ctrl', 'Enter'], description: 'Enviar mensagem' },
-    { keys: ['Ctrl', 'K'], description: 'Pesquisar' },
-    { keys: ['Ctrl', 'B'], description: 'Negrito' },
-    { keys: ['Ctrl', 'I'], description: 'Itálico' },
-    { keys: ['Ctrl', 'Shift', 'C'], description: 'Código' },
-    { keys: ['Esc'], description: 'Fechar menus/modais' },
-    { keys: ['?'], description: 'Atalhos de teclado' }
-  ]
 
   // ========== ACTIVITY LOG ==========
   // Filter activity log
@@ -5370,347 +5223,28 @@ export default function Workspace() {
       {/* ========== MODALS ========== */}
 
       {/* Keyboard Shortcuts Modal */}
-      {showKeyboardShortcuts && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 2000
-        }} onClick={() => setShowKeyboardShortcuts(false)}>
-          <div
-            style={{
-              background: 'var(--white)',
-              borderRadius: '16px',
-              padding: '24px',
-              width: '400px',
-              maxHeight: '80vh',
-              overflow: 'auto'
-            }}
-            onClick={e => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--brown)' }}>
-                <Keyboard size={20} style={{ verticalAlign: 'middle', marginRight: '8px' }} />
-                Atalhos de Teclado
-              </h3>
-              <button
-                onClick={() => setShowKeyboardShortcuts(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--brown-light)' }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {KEYBOARD_SHORTCUTS.map((shortcut, idx) => (
-                <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '13px', color: 'var(--brown)' }}>{shortcut.description}</span>
-                  <div style={{ display: 'flex', gap: '4px' }}>
-                    {shortcut.keys.map((key, kidx) => (
-                      <span key={kidx} style={{
-                        padding: '4px 8px',
-                        background: 'var(--cream)',
-                        borderRadius: '4px',
-                        fontSize: '11px',
-                        fontWeight: 600,
-                        color: 'var(--brown)',
-                        border: '1px solid var(--stone)'
-                      }}>
-                        {key}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+      <KeyboardShortcutsModal
+        isOpen={showKeyboardShortcuts}
+        onClose={() => setShowKeyboardShortcuts(false)}
+      />
 
       {/* Create Task Modal */}
-      {showCreateTaskModal && taskFromMessage && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 2000
-        }} onClick={() => setShowCreateTaskModal(false)}>
-          <div
-            style={{
-              background: 'var(--white)',
-              borderRadius: '16px',
-              padding: '24px',
-              width: '480px',
-              maxHeight: '80vh',
-              overflow: 'auto'
-            }}
-            onClick={e => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--brown)' }}>
-                <CheckSquare size={20} style={{ verticalAlign: 'middle', marginRight: '8px' }} />
-                Criar Tarefa
-              </h3>
-              <button
-                onClick={() => setShowCreateTaskModal(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--brown-light)' }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div style={{
-              padding: '12px',
-              background: 'var(--cream)',
-              borderRadius: '8px',
-              borderLeft: '3px solid var(--accent-olive)',
-              marginBottom: '20px'
-            }}>
-              <div style={{ fontSize: '11px', color: 'var(--brown-light)', marginBottom: '4px' }}>
-                Mensagem de {taskFromMessage.autor?.nome}
-              </div>
-              <p style={{ margin: 0, fontSize: '13px', color: 'var(--brown)' }}>
-                {taskFromMessage.conteudo?.substring(0, 150)}{taskFromMessage.conteudo?.length > 150 ? '...' : ''}
-              </p>
-            </div>
-
-            <form onSubmit={(e) => {
-              e.preventDefault()
-              const formData = new FormData(e.target)
-              handleCreateTask({
-                titulo: formData.get('titulo'),
-                descricao: formData.get('descricao'),
-                prioridade: formData.get('prioridade'),
-                prazo: formData.get('prazo'),
-                mensagem_origem: taskFromMessage.id
-              })
-            }}>
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--brown-light)', marginBottom: '6px' }}>
-                  Título da tarefa
-                </label>
-                <input
-                  name="titulo"
-                  type="text"
-                  defaultValue={taskFromMessage.conteudo?.substring(0, 50)}
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    border: '1px solid var(--stone)',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    outline: 'none'
-                  }}
-                />
-              </div>
-
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--brown-light)', marginBottom: '6px' }}>
-                  Descrição
-                </label>
-                <textarea
-                  name="descricao"
-                  rows={3}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    border: '1px solid var(--stone)',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    outline: 'none',
-                    resize: 'vertical'
-                  }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', gap: '16px', marginBottom: '20px' }}>
-                <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--brown-light)', marginBottom: '6px' }}>
-                    Prioridade
-                  </label>
-                  <select
-                    name="prioridade"
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      border: '1px solid var(--stone)',
-                      borderRadius: '8px',
-                      fontSize: '14px',
-                      outline: 'none',
-                      background: 'white'
-                    }}
-                  >
-                    <option value="baixa">Baixa</option>
-                    <option value="media">Média</option>
-                    <option value="alta">Alta</option>
-                    <option value="urgente">Urgente</option>
-                  </select>
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--brown-light)', marginBottom: '6px' }}>
-                    Prazo
-                  </label>
-                  <input
-                    name="prazo"
-                    type="date"
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      border: '1px solid var(--stone)',
-                      borderRadius: '8px',
-                      fontSize: '14px',
-                      outline: 'none'
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-                <button
-                  type="button"
-                  onClick={() => setShowCreateTaskModal(false)}
-                  style={{
-                    padding: '10px 20px',
-                    borderRadius: '8px',
-                    background: 'var(--stone)',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: 'var(--brown)',
-                    fontWeight: 500
-                  }}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  style={{
-                    padding: '10px 20px',
-                    borderRadius: '8px',
-                    background: 'var(--accent-olive)',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: 'white',
-                    fontWeight: 500
-                  }}
-                >
-                  Criar Tarefa
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <CreateTaskModal
+        isOpen={showCreateTaskModal}
+        onClose={() => setShowCreateTaskModal(false)}
+        message={taskFromMessage}
+        onCreateTask={handleCreateTask}
+      />
 
       {/* Forward Message Modal */}
-      {showForwardModal && messageToForward && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 2000
-        }} onClick={() => setShowForwardModal(false)}>
-          <div
-            style={{
-              background: 'var(--white)',
-              borderRadius: '16px',
-              padding: '24px',
-              width: '400px',
-              maxHeight: '80vh',
-              overflow: 'auto'
-            }}
-            onClick={e => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--brown)' }}>
-                <Forward size={20} style={{ verticalAlign: 'middle', marginRight: '8px' }} />
-                Reencaminhar Mensagem
-              </h3>
-              <button
-                onClick={() => setShowForwardModal(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--brown-light)' }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div style={{
-              padding: '12px',
-              background: 'var(--cream)',
-              borderRadius: '8px',
-              marginBottom: '20px'
-            }}>
-              <div style={{ fontSize: '11px', color: 'var(--brown-light)', marginBottom: '4px' }}>
-                De: {messageToForward.autor?.nome}
-              </div>
-              <p style={{ margin: 0, fontSize: '13px', color: 'var(--brown)' }}>
-                {messageToForward.conteudo?.substring(0, 100)}{messageToForward.conteudo?.length > 100 ? '...' : ''}
-              </p>
-            </div>
-
-            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--brown-light)', marginBottom: '12px' }}>
-              Selecionar canal de destino
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '250px', overflowY: 'auto' }}>
-              {canais.filter(c => c.id !== canalAtivo?.id).map(canal => (
-                <button
-                  key={canal.id}
-                  onClick={() => handleForwardMessage(canal.id)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    padding: '12px',
-                    background: 'var(--off-white)',
-                    border: '1px solid var(--stone)',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    transition: 'all 0.15s'
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.background = 'var(--cream)'
-                    e.currentTarget.style.borderColor = 'var(--accent-olive)'
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.background = 'var(--off-white)'
-                    e.currentTarget.style.borderColor = 'var(--stone)'
-                  }}
-                >
-                  <Hash size={16} style={{ color: 'var(--brown-light)' }} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--brown)' }}>
-                      {canal.codigo}
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
-                      {canal.nome}
-                    </div>
-                  </div>
-                  <Forward size={14} style={{ color: 'var(--brown-light)' }} />
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+      <ForwardMessageModal
+        isOpen={showForwardModal}
+        onClose={() => setShowForwardModal(false)}
+        message={messageToForward}
+        canais={canais}
+        currentCanalId={canalAtivo?.id}
+        onForward={handleForwardMessage}
+      />
 
       {/* ========== DM PANEL ========== */}
       {showDMPanel && (
