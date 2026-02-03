@@ -62,7 +62,7 @@ export default function DuvidasLog({ projeto }) {
 
       setDecisions(decisionsWithComments)
     } catch (err) {
-      console.error('Erro ao carregar decisões:', err)
+      // Error handled silently
     } finally {
       setLoading(false)
     }
@@ -77,7 +77,7 @@ export default function DuvidasLog({ projeto }) {
         .order('codigo')
       setEntregaveis(data || [])
     } catch (err) {
-      console.error('Erro ao carregar entregáveis:', err)
+      // Error handled silently
     }
   }
 
@@ -90,7 +90,7 @@ export default function DuvidasLog({ projeto }) {
         .order('nome')
       setUtilizadores(data || [])
     } catch (err) {
-      console.error('Erro ao carregar utilizadores:', err)
+      // Error handled silently
     }
   }
 
@@ -125,7 +125,6 @@ export default function DuvidasLog({ projeto }) {
       if (error) throw error
       fetchDecisions()
     } catch (err) {
-      console.error('Erro ao eliminar:', err)
       alert('Erro ao eliminar')
     }
   }
@@ -449,7 +448,6 @@ function DecisionModal({ decision, utilizadores, onClose, onResponseSubmitted })
       if (error) throw error
       setComments(data || [])
     } catch (err) {
-      console.error('Erro ao carregar comentários:', err)
       // Se a tabela não existir, silently fail
       setComments([])
     } finally {
@@ -484,7 +482,6 @@ function DecisionModal({ decision, utilizadores, onClose, onResponseSubmitted })
       // Notificar parent para atualizar status se necessário
       onResponseSubmitted()
     } catch (err) {
-      console.error('Erro ao adicionar comentário:', err)
       alert('Erro ao adicionar comentário: ' + err.message)
     } finally {
       setSubmitting(false)
@@ -516,7 +513,6 @@ function DecisionModal({ decision, utilizadores, onClose, onResponseSubmitted })
       if (error) throw error
       onResponseSubmitted()
     } catch (err) {
-      console.error('Erro ao resolver:', err)
       alert('Erro ao marcar como resolvido: ' + err.message)
     } finally {
       setResolving(false)
@@ -540,7 +536,7 @@ function DecisionModal({ decision, utilizadores, onClose, onResponseSubmitted })
       if (error) throw error
       onResponseSubmitted()
     } catch (err) {
-      console.error('Erro ao reabrir:', err)
+      // Error handled silently
     }
   }
 
@@ -861,7 +857,6 @@ function NewDecisionModal({ projetoId, entregaveis, utilizadores, onClose, onCre
           })
 
         if (uploadError) {
-          console.error('Erro no upload da imagem:', uploadError)
           throw new Error('Erro ao carregar imagem. Verifique se o bucket "decision-images" está configurado.')
         }
 
@@ -888,7 +883,6 @@ function NewDecisionModal({ projetoId, entregaveis, utilizadores, onClose, onCre
       if (error) throw error
       onCreated()
     } catch (err) {
-      console.error('Erro ao criar decisão:', err)
       alert('Erro ao criar dúvida: ' + err.message)
     } finally {
       setSubmitting(false)

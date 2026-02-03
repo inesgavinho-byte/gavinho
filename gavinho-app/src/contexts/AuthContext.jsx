@@ -33,7 +33,6 @@ export const AuthProvider = ({ children }) => {
         .single()
       
       if (error) {
-        console.warn('Perfil não encontrado:', error.message)
         setProfile(null)
         return null
       }
@@ -41,7 +40,6 @@ export const AuthProvider = ({ children }) => {
       setProfile(data)
       return data
     } catch (err) {
-      console.error('Erro ao buscar perfil:', err)
       setProfile(null)
       return null
     }

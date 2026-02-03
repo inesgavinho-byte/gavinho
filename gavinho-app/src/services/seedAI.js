@@ -235,7 +235,6 @@ export async function parseWithClaude(text, tableName, apiKey) {
       }
     }
   } catch (err) {
-    console.error('Erro no parsing com Claude:', err)
     return {
       success: false,
       error: err.message,

@@ -980,7 +980,6 @@ export const exportDiarioToPDF = async (diario, obra, options = {}) => {
 
     return true
   } catch (error) {
-    console.error('Error exporting PDF:', error)
     throw error
   } finally {
     // Clean up
