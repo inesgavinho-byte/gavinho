@@ -11,3 +11,6 @@ export * from './Panels'
 
 // Messages
 export * from './Messages'
+
+// Channel Header
+export { default as ChannelHeader } from './ChannelHeader'
