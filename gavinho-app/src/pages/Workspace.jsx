@@ -68,8 +68,20 @@ import {
   KeyboardShortcutsModal,
   EmojiPicker,
   CreateTaskModal,
-  ForwardMessageModal
+  ForwardMessageModal,
+  CallModal,
+  ReminderModal,
+  StatusMenu,
+  DMPanel
 } from './Workspace/components'
+
+// Import custom hooks
+import {
+  useChannelData,
+  useMessageActions,
+  usePresence,
+  useNotifications
+} from './Workspace/hooks'
 
 export default function Workspace() {
   // Handle OAuth callback in popup
@@ -100,238 +112,161 @@ export default function Workspace() {
 
   const { profile, getUserInitials } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
-  const [loading, setLoading] = useState(true)
   const [linkCopied, setLinkCopied] = useState(false)
 
-  // Estrutura Teams
-  const [equipas, setEquipas] = useState(EQUIPAS_GAVINHO)
-  const [equipaAtiva, setEquipaAtiva] = useState(null)
-  const [equipasExpanded, setEquipasExpanded] = useState({})
+  // ========== CUSTOM HOOKS ==========
 
-  // Canais (projetos dentro de cada equipa)
-  const [canais, setCanais] = useState([])
-  const [canalAtivo, setCanalAtivo] = useState(null)
+  // Channel Data Hook
+  const {
+    loading, equipas, equipaAtiva, equipasExpanded, canais, canalAtivo,
+    channelTopics, activeTopic, showAddTopic, newTopicName, activeTab, membros, favoriteChannels,
+    setEquipaAtiva, setEquipasExpanded, setCanalAtivo, setActiveTopic, setShowAddTopic,
+    setNewTopicName, setActiveTab, setMembros, loadData, loadTopics, addTopic,
+    getEquipaCanais, toggleEquipa, selectCanal, toggleFavorite, isFavorite, getChannelLink
+  } = useChannelData()
 
-  // Tópicos dentro do canal
-  const [channelTopics, setChannelTopics] = useState({})
-  const [activeTopic, setActiveTopic] = useState('geral')
-  const [showAddTopic, setShowAddTopic] = useState(false)
-  const [newTopicName, setNewTopicName] = useState('')
+  // Message Actions Hook
+  const {
+    posts, messageInput, replyInput, messageInputRef, editingMessage, editingContent,
+    replyingTo, showMessageMenu, activeThread, threadReplies, selectedFiles, uploading,
+    showEmojiPicker, emojiCategory, showMentions, mentionQuery, mentionStartIndex,
+    showFormattingToolbar, savedMessages, messageTags, showTagSelector,
+    setPosts, setMessageInput, setReplyInput, setEditingMessage, setEditingContent,
+    setReplyingTo, setShowMessageMenu, setActiveThread, setSelectedFiles, setShowEmojiPicker,
+    setEmojiCategory, setShowMentions, setMentionQuery, setMentionStartIndex,
+    setShowFormattingToolbar, setShowTagSelector, loadPosts, loadThreadReplies,
+    sendMessage, sendReply, editMessage, deleteMessage, addReaction,
+    toggleSaveMessage, isMessageSaved, forwardMessage, tagMessage, removeTag,
+    openThread, closeThread, handleFileSelect, removeFile, insertEmoji
+  } = useMessageActions(profile)
 
-  // Tabs do canal
-  const [activeTab, setActiveTab] = useState('publicacoes')
+  // Presence Hook
+  const {
+    typingUsers, onlineUsers, readReceipts, userStatus, customStatusMessage, showStatusMenu,
+    setTypingUsers, setUserStatus, setCustomStatusMessage, setShowStatusMenu,
+    updateMyPresence, loadOnlineUsers, handleTyping, setUserTyping,
+    isUserOnline, getUserStatus, getPresenceColor: getPresenceColorHook, getPresenceLabel,
+    markMessageAsRead, getReadStatus, isMessageRead, updateUserStatus
+  } = usePresence(profile, membros)
 
-  // Mensagens/Posts
-  const [posts, setPosts] = useState([])
+  // Notifications Hook
+  const {
+    mutedChannels, soundEnabled, channelPinnedMessages, showPinnedMessages,
+    dndEnabled, dndSchedule, showDndSettings, reminders, showReminderModal,
+    reminderMessage, customReminderDate, setMutedChannels, setSoundEnabled,
+    setShowPinnedMessages, setDndEnabled, setDndSchedule, setShowDndSettings,
+    setReminders, setShowReminderModal, setReminderMessage, setCustomReminderDate,
+    toggleMuteChannel, isChannelMuted, toggleSound, playNotificationSound,
+    togglePinMessage, isMessagePinned, getChannelPinnedMessages, toggleDnd,
+    updateDndSchedule, isDndActive, addReminder, removeReminder,
+    markReminderComplete, getActiveReminders, openReminderModal
+  } = useNotifications()
+
+  // ========== REMAINING LOCAL STATE ==========
+
+  // Search
   const [searchQuery, setSearchQuery] = useState('')
   const [showSearch, setShowSearch] = useState(false)
-
-  // Threads
-  const [activeThread, setActiveThread] = useState(null)
-  const [threadReplies, setThreadReplies] = useState({})
-
-  // Input
-  const [messageInput, setMessageInput] = useState('')
-  const [replyInput, setReplyInput] = useState('')
-
-  // Emoji Picker
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false)
-  const [emojiCategory, setEmojiCategory] = useState('Frequentes')
-
-  // Mention Autocomplete
-  const [showMentions, setShowMentions] = useState(false)
-  const [mentionQuery, setMentionQuery] = useState('')
-  const [mentionStartIndex, setMentionStartIndex] = useState(-1)
-
-  // Edit/Delete/Reply
-  const [editingMessage, setEditingMessage] = useState(null)
-  const [editingContent, setEditingContent] = useState('')
-  const [replyingTo, setReplyingTo] = useState(null)
-  const [showMessageMenu, setShowMessageMenu] = useState(null)
-
-  // Upload
-  const [selectedFiles, setSelectedFiles] = useState([])
-  const [uploading, setUploading] = useState(false)
-
-  // Equipa members
-  const [membros, setMembros] = useState([])
-
-  // Notifications
-  const [mutedChannels, setMutedChannels] = useState([])
-  const [pinnedMessages, setPinnedMessages] = useState([])
-  const [soundEnabled, setSoundEnabled] = useState(true)
-
-  // Saved Messages (Bookmarks)
-  const [savedMessages, setSavedMessages] = useState([])
   const [showSavedMessages, setShowSavedMessages] = useState(false)
-
-  // Filters
   const [activeFilter, setActiveFilter] = useState('all')
   const [showFilters, setShowFilters] = useState(false)
-
-  // Advanced Search
   const [showAdvancedSearch, setShowAdvancedSearch] = useState(false)
   const [searchFilters, setSearchFilters] = useState({
-    author: '',
-    dateFrom: '',
-    dateTo: '',
-    hasAttachments: false,
-    hasMentions: false
+    author: '', dateFrom: '', dateTo: '', hasAttachments: false, hasMentions: false
   })
 
-  // Rich Text Formatting
-  const [showFormattingToolbar, setShowFormattingToolbar] = useState(true)
-
-  // Typing Indicator
-  const [typingUsers, setTypingUsers] = useState([])
+  // Legacy
+  const [pinnedMessages, setPinnedMessages] = useState([])
+  const [filterByTag, setFilterByTag] = useState(null)
   const typingTimeoutRef = useRef(null)
 
-  // Online Status - {userId: 'online'|'away'|'offline'}
-  const [onlineUsers, setOnlineUsers] = useState({})
-
-  // Read Receipts
-  const [readReceipts, setReadReceipts] = useState({})
-
-  // Favorite Channels
-  const [favoriteChannels, setFavoriteChannels] = useState([])
-
-  // Pinned Messages
-  const [channelPinnedMessages, setChannelPinnedMessages] = useState({})
-  const [showPinnedMessages, setShowPinnedMessages] = useState(false)
-
-  // Create Task Modal
+  // Modals
   const [showCreateTaskModal, setShowCreateTaskModal] = useState(false)
   const [taskFromMessage, setTaskFromMessage] = useState(null)
-
-  // Forward Message Modal
   const [showForwardModal, setShowForwardModal] = useState(false)
   const [messageToForward, setMessageToForward] = useState(null)
-
-  // Drag & Drop
   const [isDragging, setIsDragging] = useState(false)
-
-  // Keyboard shortcuts help
   const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false)
-
-  // Activity Log
   const [showActivityLog, setShowActivityLog] = useState(false)
-  const [activityFilter, setActivityFilter] = useState('all') // all, mentions, unread
+  const [activityFilter, setActivityFilter] = useState('all')
   const [activityLog, setActivityLog] = useState([])
 
-  // ========== NEW FEATURES STATE ==========
-
-  // Direct Messages (DM)
+  // DM
   const [showDMPanel, setShowDMPanel] = useState(false)
   const [directMessages, setDirectMessages] = useState([])
   const [activeDM, setActiveDM] = useState(null)
   const [dmMessages, setDmMessages] = useState({})
   const [showNewDMModal, setShowNewDMModal] = useState(false)
 
-  // Video/Audio Calls
+  // Calls
   const [showCallModal, setShowCallModal] = useState(false)
   const [activeCall, setActiveCall] = useState(null)
-  const [callType, setCallType] = useState(null) // 'video' or 'audio'
+  const [callType, setCallType] = useState(null)
   const [isMuted, setIsMuted] = useState(false)
   const [isVideoOff, setIsVideoOff] = useState(false)
   const [isScreenSharing, setIsScreenSharing] = useState(false)
 
-  // Message Reminders
-  const [showReminderModal, setShowReminderModal] = useState(false)
-  const [reminderMessage, setReminderMessage] = useState(null)
-  const [reminders, setReminders] = useState([])
-  const [customReminderDate, setCustomReminderDate] = useState('')
-
-  // Calendar Integration
+  // Calendar
   const [showScheduleMeetingModal, setShowScheduleMeetingModal] = useState(false)
   const [meetingDetails, setMeetingDetails] = useState({
-    title: '',
-    date: '',
-    time: '',
-    duration: '30',
-    participants: [],
-    description: ''
+    title: '', date: '', time: '', duration: '30', participants: [], description: ''
   })
 
-  // AI Bot/Assistant
+  // AI
   const [showAIAssistant, setShowAIAssistant] = useState(false)
   const [aiMessages, setAiMessages] = useState([])
   const [aiInput, setAiInput] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
 
-  // Private Channels
+  // Channels
   const [privateChannels, setPrivateChannels] = useState([])
   const [showCreatePrivateChannel, setShowCreatePrivateChannel] = useState(false)
   const [newPrivateChannel, setNewPrivateChannel] = useState({ name: '', members: [] })
-
-  // Archive Channels
   const [archivedChannels, setArchivedChannels] = useState([])
   const [showArchivedChannels, setShowArchivedChannels] = useState(false)
 
-  // Channel Analytics
+  // Analytics
   const [showAnalytics, setShowAnalytics] = useState(false)
   const [channelAnalytics, setChannelAnalytics] = useState({
-    totalMessages: 0,
-    messagesThisWeek: 0,
-    activeUsers: 0,
-    topContributors: [],
-    activityByDay: [],
-    popularTopics: []
+    totalMessages: 0, messagesThisWeek: 0, activeUsers: 0,
+    topContributors: [], activityByDay: [], popularTopics: []
   })
 
-  // Tags/Labels
-  const [messageTags, setMessageTags] = useState({})
-  const [showTagSelector, setShowTagSelector] = useState(null)
-  const [filterByTag, setFilterByTag] = useState(null)
-
-  // User Status
-  const [userStatus, setUserStatus] = useState('available')
-  const [customStatusMessage, setCustomStatusMessage] = useState('')
-  const [showStatusMenu, setShowStatusMenu] = useState(false)
-
-  // Do Not Disturb
-  const [dndEnabled, setDndEnabled] = useState(false)
-  const [dndSchedule, setDndSchedule] = useState({ start: '22:00', end: '08:00' })
-  const [showDndSettings, setShowDndSettings] = useState(false)
-
-  // User Profile Card
+  // Profile
   const [showProfileCard, setShowProfileCard] = useState(null)
   const [expandedProfile, setExpandedProfile] = useState(null)
-
-  // Desktop Notifications
   const [notificationsEnabled, setNotificationsEnabled] = useState(false)
   const [notificationPermission, setNotificationPermission] = useState('default')
 
-  // Export Conversation
+  // Export
   const [showExportModal, setShowExportModal] = useState(false)
   const [exportFormat, setExportFormat] = useState('pdf')
   const [exportDateRange, setExportDateRange] = useState({ from: '', to: '' })
 
-  // Webhooks
+  // Webhooks & Email
   const [webhooks, setWebhooks] = useState([])
   const [showWebhookSettings, setShowWebhookSettings] = useState(false)
   const [newWebhook, setNewWebhook] = useState({ url: '', events: [] })
-
-  // Email Sync
   const [emailSyncEnabled, setEmailSyncEnabled] = useState(false)
   const [emailDigestFrequency, setEmailDigestFrequency] = useState('daily')
   const [showEmailSettings, setShowEmailSettings] = useState(false)
 
-  // ========== MICROSOFT TEAMS IMPORT ==========
+  // Teams Import
   const [showTeamsImport, setShowTeamsImport] = useState(false)
-  const [teamsAuthState, setTeamsAuthState] = useState('idle') // idle, authenticating, authenticated, error
+  const [teamsAuthState, setTeamsAuthState] = useState('idle')
   const [teamsAccessToken, setTeamsAccessToken] = useState(null)
   const [teamsUser, setTeamsUser] = useState(null)
   const [availableTeams, setAvailableTeams] = useState([])
   const [selectedTeamsToImport, setSelectedTeamsToImport] = useState([])
-  const [teamsChannels, setTeamsChannels] = useState({}) // { teamId: [channels] }
+  const [teamsChannels, setTeamsChannels] = useState({})
   const [selectedChannelsToImport, setSelectedChannelsToImport] = useState([])
   const [importProgress, setImportProgress] = useState({ status: 'idle', current: 0, total: 0, currentItem: '' })
   const [importLog, setImportLog] = useState([])
-  const [importStep, setImportStep] = useState(1) // 1: Auth, 2: Select Teams, 3: Select Channels, 4: Import, 5: Complete
+  const [importStep, setImportStep] = useState(1)
 
+  // Refs
   const fileInputRef = useRef(null)
   const messagesEndRef = useRef(null)
-  const messageInputRef = useRef(null)
   const presenceIntervalRef = useRef(null)
 
   useEffect(() => {
@@ -370,144 +305,6 @@ export default function Workspace() {
       return () => clearInterval(interval)
     }
   }, [membros])
-
-  const loadData = async () => {
-    try {
-      setLoading(true)
-      const [projetosRes, membrosRes] = await Promise.all([
-        supabase
-          .from('projetos')
-          .select('id, codigo, nome, tipologia, status')
-          .eq('arquivado', false)
-          .order('codigo', { ascending: false }),
-        supabase
-          .from('utilizadores')
-          .select('id, nome, avatar_url, funcao')
-          .eq('ativo', true)
-          .order('nome')
-      ])
-
-      if (projetosRes.data) {
-        const canaisComEquipa = projetosRes.data.map(p => ({
-          ...p,
-          equipa: p.tipologia?.toLowerCase().includes('hosp') ? 'hosp' :
-                  p.tipologia?.toLowerCase().includes('signature') ? 'signature' : 'arch',
-          unreadCount: 0, // Real count loaded from database
-          lastActivity: new Date().toISOString()
-        }))
-
-        setCanais(canaisComEquipa)
-
-        // Check URL for canal parameter
-        const canalParam = searchParams.get('canal')
-        const tabParam = searchParams.get('tab')
-
-        if (canalParam) {
-          // Find canal by codigo or id
-          const canalFromUrl = canaisComEquipa.find(c =>
-            c.codigo === canalParam || c.id === canalParam
-          )
-          if (canalFromUrl) {
-            setEquipaAtiva(canalFromUrl.equipa)
-            setEquipasExpanded({ [canalFromUrl.equipa]: true })
-            setCanalAtivo(canalFromUrl)
-            if (tabParam) setActiveTab(tabParam)
-            return
-          }
-        }
-
-        // Default: select first canal
-        if (canaisComEquipa.length > 0) {
-          const primeiraEquipa = canaisComEquipa[0].equipa
-          setEquipaAtiva(primeiraEquipa)
-          setEquipasExpanded({ [primeiraEquipa]: true })
-          setCanalAtivo(canaisComEquipa[0])
-        }
-      }
-
-      if (membrosRes.data) {
-        setMembros(membrosRes.data)
-      }
-    } catch (err) {
-      // Silent fail - will show empty state
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const loadPosts = async (canalId) => {
-    try {
-      const { data, error } = await supabase
-        .from('chat_mensagens')
-        .select(`
-          *,
-          autor:autor_id(id, nome, avatar_url, funcao)
-        `)
-        .eq('canal_id', canalId)
-        .is('parent_id', null)
-        .eq('eliminado', false)
-        .order('created_at', { ascending: true })
-        .limit(100)
-
-      if (error) {
-        setPosts([])
-        return
-      }
-
-      if (data && data.length > 0) {
-        // Carregar contagem de replies e formatar attachments
-        const postsWithReplies = await Promise.all(data.map(async (post) => {
-          const { count } = await supabase
-            .from('chat_mensagens')
-            .select('*', { count: 'exact', head: true })
-            .eq('parent_id', post.id)
-            .eq('eliminado', false)
-
-          // Construir array de attachments a partir dos campos de ficheiro
-          let attachments = []
-          if (post.ficheiro_url) {
-            const isImage = post.tipo === 'imagem' || post.ficheiro_nome?.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i)
-            attachments.push({
-              name: post.ficheiro_nome || 'Ficheiro',
-              url: post.ficheiro_url,
-              type: isImage ? 'image' : 'file',
-              size: post.ficheiro_tamanho ? `${Math.round(post.ficheiro_tamanho / 1024)} KB` : ''
-            })
-          }
-
-          // Carregar anexos adicionais da tabela chat_anexos
-          const { data: extraAnexos } = await supabase
-            .from('chat_anexos')
-            .select('*')
-            .eq('mensagem_id', post.id)
-
-          if (extraAnexos && extraAnexos.length > 0) {
-            extraAnexos.forEach(anexo => {
-              const isImage = anexo.nome?.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i)
-              attachments.push({
-                name: anexo.nome || 'Ficheiro',
-                url: anexo.url,
-                type: isImage ? 'image' : 'file',
-                size: anexo.tamanho ? `${Math.round(anexo.tamanho / 1024)} KB` : ''
-              })
-            })
-          }
-
-          return {
-            ...post,
-            replyCount: count || 0,
-            attachments: attachments.length > 0 ? attachments : undefined
-          }
-        }))
-
-        setPosts(postsWithReplies)
-      } else {
-        setPosts([])
-      }
-    } catch (err) {
-      setPosts([])
-    }
-  }
 
   const subscribeToChannel = (canalId) => {
     const channel = supabase
@@ -561,47 +358,6 @@ export default function Workspace() {
       imagem_url: '/api/placeholder/600/400'
     }
   ]
-
-  const loadThreadReplies = async (postId) => {
-    if (threadReplies[postId]) return
-
-    try {
-      const { data } = await supabase
-        .from('chat_mensagens')
-        .select(`
-          *,
-          autor:autor_id(id, nome, avatar_url, funcao)
-        `)
-        .eq('parent_id', postId)
-        .eq('eliminado', false)
-        .order('created_at', { ascending: true })
-
-      if (data) {
-        setThreadReplies(prev => ({ ...prev, [postId]: data }))
-      } else {
-        // Mock replies
-        setThreadReplies(prev => ({
-          ...prev,
-          [postId]: [
-            {
-              id: `${postId}-r1`,
-              conteudo: 'Concordo! Vou verificar também com o nosso contacto em Itália.',
-              autor: { nome: 'Ana Santos', funcao: 'Project Manager' },
-              created_at: new Date(Date.now() - 3600000 * 10).toISOString()
-            },
-            {
-              id: `${postId}-r2`,
-              conteudo: 'Excelente iniciativa. Sustentabilidade é cada vez mais importante para os nossos clientes.',
-              autor: { nome: 'Carlos Mendes', funcao: 'Arquiteto' },
-              created_at: new Date(Date.now() - 3600000 * 8).toISOString()
-            }
-          ]
-        }))
-      }
-    } catch (err) {
-      // Silent fail - replies will show empty
-    }
-  }
 
   const handleSendMessage = async () => {
     if (!messageInput.trim() && selectedFiles.length === 0) return
@@ -767,33 +523,6 @@ export default function Workspace() {
     }
   }
 
-  const handleFileSelect = (e) => {
-    const files = Array.from(e.target.files || [])
-    const newFiles = files.map(file => ({
-      file,
-      name: file.name,
-      type: file.type.startsWith('image/') ? 'image' : 'file',
-      size: file.size, // Store raw bytes for database
-      sizeFormatted: formatFileSize(file.size), // Formatted for display
-      preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : null
-    }))
-    setSelectedFiles(prev => [...prev, ...newFiles])
-  }
-
-  const getEquipaCanais = (equipaId) => canais.filter(c => c.equipa === equipaId)
-
-  const toggleEquipa = (equipaId) => {
-    setEquipasExpanded(prev => ({ ...prev, [equipaId]: !prev[equipaId] }))
-    setEquipaAtiva(equipaId)
-  }
-
-  // Select canal and update URL
-  const selectCanal = (canal) => {
-    setCanalAtivo(canal)
-    setActiveThread(null)
-    setSearchParams({ canal: canal.codigo })
-  }
-
   // Copy direct link to clipboard
   const copyChannelLink = () => {
     const url = `${window.location.origin}/chat?canal=${canalAtivo.codigo}`
@@ -801,35 +530,6 @@ export default function Workspace() {
       setLinkCopied(true)
       setTimeout(() => setLinkCopied(false), 2000)
     })
-  }
-
-  // Get direct link for a canal
-  const getChannelLink = (canal) => {
-    return `${window.location.origin}/chat?canal=${canal.codigo}`
-  }
-
-  const openThread = (post) => {
-    setActiveThread(post)
-    loadThreadReplies(post.id)
-  }
-
-  // Insert emoji at cursor position
-  const insertEmoji = (emoji) => {
-    const input = messageInputRef.current
-    if (input) {
-      const start = input.selectionStart
-      const end = input.selectionEnd
-      const newValue = messageInput.substring(0, start) + emoji + messageInput.substring(end)
-      setMessageInput(newValue)
-      // Set cursor position after emoji
-      setTimeout(() => {
-        input.selectionStart = input.selectionEnd = start + emoji.length
-        input.focus()
-      }, 0)
-    } else {
-      setMessageInput(prev => prev + emoji)
-    }
-    setShowEmojiPicker(false)
   }
 
   // Handle message input change with mention detection
@@ -909,17 +609,6 @@ export default function Workspace() {
     setEditingContent('')
   }
 
-  // Delete message
-  const deleteMessage = (postId) => {
-    if (!window.confirm('Tens a certeza que queres eliminar esta mensagem?')) return
-
-    setPosts(prev => prev.filter(p => p.id !== postId))
-    setShowMessageMenu(null)
-
-    // Em produção, marcar como eliminado na base de dados
-    // await supabase.from('chat_mensagens').update({ eliminado: true }).eq('id', postId)
-  }
-
   // Start replying to a message
   const startReplyTo = (post) => {
     setReplyingTo(post)
@@ -935,45 +624,6 @@ export default function Workspace() {
   // Check if current user owns the message
   const isOwnMessage = (post) => {
     return post.autor?.id === profile?.id || post.autor?.nome === profile?.nome
-  }
-
-  // Toggle saved message (bookmark)
-  const toggleSaveMessage = (post) => {
-    const isSaved = savedMessages.some(m => m.id === post.id)
-    if (isSaved) {
-      setSavedMessages(prev => prev.filter(m => m.id !== post.id))
-    } else {
-      setSavedMessages(prev => [...prev, { ...post, savedAt: new Date().toISOString() }])
-    }
-    setShowMessageMenu(null)
-  }
-
-  // Check if message is saved
-  const isMessageSaved = (postId) => {
-    return savedMessages.some(m => m.id === postId)
-  }
-
-  // Play notification sound
-  const playNotificationSound = () => {
-    if (!soundEnabled) return
-    try {
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)()
-      const oscillator = audioContext.createOscillator()
-      const gainNode = audioContext.createGain()
-
-      oscillator.connect(gainNode)
-      gainNode.connect(audioContext.destination)
-
-      oscillator.frequency.value = 800
-      oscillator.type = 'sine'
-      gainNode.gain.setValueAtTime(0.1, audioContext.currentTime)
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3)
-
-      oscillator.start(audioContext.currentTime)
-      oscillator.stop(audioContext.currentTime + 0.3)
-    } catch (e) {
-      // Audio not supported - silent fail
-    }
   }
 
   // Get total unread count
@@ -1115,138 +765,16 @@ export default function Workspace() {
     }, 0)
   }
 
-  // ========== TYPING INDICATOR ==========
-  const handleTyping = () => {
-    // Emit typing event (in production, would broadcast via Supabase realtime)
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current)
-    }
-    typingTimeoutRef.current = setTimeout(() => {
-      // Stop typing indicator after 3 seconds of no input
-    }, 3000)
-  }
-
-  // ========== ONLINE STATUS ==========
-  // Atualizar própria presença
-  const updateMyPresence = async () => {
-    if (!profile?.id) return
-
-    try {
-      await supabase.from('chat_presenca').upsert({
-        utilizador_id: profile.id,
-        estado: 'online',
-        ultima_actividade: new Date().toISOString(),
-        dispositivo: 'web'
-      }, { onConflict: 'utilizador_id' })
-    } catch (err) {
-      // Silenciar erros
-    }
-  }
-
-  // Carregar presença dos membros
-  const loadOnlineUsers = async () => {
-    if (!membros.length) return
-
-    try {
-      const { data } = await supabase
-        .from('chat_presenca')
-        .select('utilizador_id, estado, ultima_actividade')
-        .in('utilizador_id', membros.map(m => m.id))
-
-      const map = {}
-      data?.forEach(p => {
-        // Considerar offline se última atividade > 15min
-        const lastActive = new Date(p.ultima_actividade)
-        const diffMinutes = (Date.now() - lastActive.getTime()) / 60000
-
-        if (diffMinutes > 15) {
-          map[p.utilizador_id] = 'offline'
-        } else if (diffMinutes > 5) {
-          map[p.utilizador_id] = 'away'
-        } else {
-          map[p.utilizador_id] = p.estado
-        }
-      })
-
-      setOnlineUsers(map)
-    } catch (err) {
-      // Silenciar erros
-    }
-  }
-
-  const isUserOnline = (userId) => {
-    return onlineUsers[userId] === 'online'
-  }
-
-  // Cor do indicador de presença
-  const getPresenceColor = (userId) => {
-    const estado = onlineUsers[userId]
-    if (estado === 'online') return '#22c55e' // Verde
-    if (estado === 'away') return '#eab308' // Amarelo
-    return '#9ca3af' // Cinza
-  }
-
-  // ========== READ RECEIPTS ==========
-  const markMessageAsRead = (messageId) => {
-    setReadReceipts(prev => ({
-      ...prev,
-      [messageId]: {
-        read: true,
-        readAt: new Date().toISOString(),
-        readBy: [...(prev[messageId]?.readBy || []), profile?.id]
-      }
-    }))
-  }
-
-  const getReadStatus = (message) => {
-    const receipt = readReceipts[message.id]
-    if (!receipt) return 'sent'
-    if (receipt.readBy?.length > 0) return 'read'
-    return 'delivered'
-  }
-
-  // ========== FAVORITE CHANNELS ==========
-  const toggleFavoriteChannel = (channelId) => {
-    setFavoriteChannels(prev =>
-      prev.includes(channelId)
-        ? prev.filter(id => id !== channelId)
-        : [...prev, channelId]
-    )
-  }
-
-  const isFavoriteChannel = (channelId) => {
-    return favoriteChannels.includes(channelId)
-  }
-
   // Sort channels: favorites first
   const sortedCanais = [...canais].sort((a, b) => {
-    const aFav = isFavoriteChannel(a.id)
-    const bFav = isFavoriteChannel(b.id)
+    const aFav = isFavorite(a.id)
+    const bFav = isFavorite(b.id)
     if (aFav && !bFav) return -1
     if (!aFav && bFav) return 1
     return 0
   })
 
-  // ========== PINNED MESSAGES ==========
-  const togglePinMessage = (post) => {
-    if (!canalAtivo) return
-    const channelId = canalAtivo.id
-    const isPinned = channelPinnedMessages[channelId]?.some(m => m.id === post.id)
-
-    setChannelPinnedMessages(prev => ({
-      ...prev,
-      [channelId]: isPinned
-        ? (prev[channelId] || []).filter(m => m.id !== post.id)
-        : [...(prev[channelId] || []), { ...post, pinnedAt: new Date().toISOString() }]
-    }))
-    setShowMessageMenu(null)
-  }
-
-  const isMessagePinned = (postId) => {
-    if (!canalAtivo) return false
-    return channelPinnedMessages[canalAtivo.id]?.some(m => m.id === postId)
-  }
-
+  // Get current channel pinned messages
   const getCurrentChannelPinnedMessages = () => {
     if (!canalAtivo) return []
     return channelPinnedMessages[canalAtivo.id] || []
@@ -1766,13 +1294,6 @@ export default function Workspace() {
   }
 
   // ========== USER STATUS ==========
-  const updateUserStatus = (statusId, customMessage = '') => {
-    setUserStatus(statusId)
-    setCustomStatusMessage(customMessage)
-    setShowStatusMenu(false)
-    // In production, would sync to database
-  }
-
   const getStatusInfo = (statusId) => {
     return USER_STATUS_OPTIONS.find(s => s.id === statusId) || USER_STATUS_OPTIONS[0]
   }
