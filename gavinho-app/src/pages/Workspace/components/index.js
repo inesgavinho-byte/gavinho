@@ -8,3 +8,6 @@ export * from './Modals'
 
 // Panels
 export * from './Panels'
+
+// Messages
+export * from './Messages'
