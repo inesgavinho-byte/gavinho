@@ -186,6 +186,9 @@ export default function ProjetoDetalhe() {
   const [showRenderModal, setShowRenderModal] = useState(false)
   const [editingRender, setEditingRender] = useState(null)
   const [lightboxImage, setLightboxImage] = useState(null) // Para lightbox
+  const [lightboxImages, setLightboxImages] = useState([]) // Array de imagens para navegação no lightbox
+  const [lightboxIndex, setLightboxIndex] = useState(0) // Índice atual no lightbox
+  const [collapsedCompartimentos, setCollapsedCompartimentos] = useState({}) // Compartimentos colapsados
   const [moleskineRender, setMoleskineRender] = useState(null) // Para Moleskine (anotação de renders)
   const [renderAnnotations, setRenderAnnotations] = useState({}) // Mapa de render_id -> annotation count
   const [isDragging, setIsDragging] = useState(false) // Para drag & drop
@@ -1582,11 +1585,38 @@ export default function ProjetoDetalhe() {
     if (file) processImageFile(file)
   }
 
-  // Abrir lightbox
-  const openLightbox = (render) => {
+  // Abrir lightbox com navegação
+  const openLightbox = (render, imageArray = null) => {
     if (render.imagem_url) {
       setLightboxImage(render)
+      if (imageArray && imageArray.length > 0) {
+        // Filtrar apenas imagens com URL
+        const imagesWithUrl = imageArray.filter(r => r.imagem_url)
+        setLightboxImages(imagesWithUrl)
+        const index = imagesWithUrl.findIndex(r => r.id === render.id)
+        setLightboxIndex(index >= 0 ? index : 0)
+      } else {
+        setLightboxImages([render])
+        setLightboxIndex(0)
+      }
     }
+  }
+
+  // Navegar no lightbox
+  const navigateLightbox = (direction) => {
+    const newIndex = lightboxIndex + direction
+    if (newIndex >= 0 && newIndex < lightboxImages.length) {
+      setLightboxIndex(newIndex)
+      setLightboxImage(lightboxImages[newIndex])
+    }
+  }
+
+  // Toggle colapsar compartimento
+  const toggleCompartimentoCollapse = (compartimento) => {
+    setCollapsedCompartimentos(prev => ({
+      ...prev,
+      [compartimento]: !prev[compartimento]
+    }))
   }
 
   // Renders agrupados por compartimento
@@ -1597,6 +1627,15 @@ export default function ProjetoDetalhe() {
     acc[render.compartimento].push(render)
     return acc
   }, {})
+
+  // Colapsar/Expandir todos os compartimentos
+  const toggleAllCompartimentos = (collapse) => {
+    const newState = {}
+    Object.keys(rendersByCompartimento).forEach(comp => {
+      newState[comp] = collapse
+    })
+    setCollapsedCompartimentos(newState)
+  }
 
   // Imagens finais do projeto
   const imagensFinais = renders.filter(r => r.is_final)
@@ -2611,10 +2650,55 @@ export default function ProjetoDetalhe() {
                 {renders.length} render{renders.length !== 1 ? 's' : ''} • {imagensFinais.length} {imagensFinais.length !== 1 ? 'imagens finais' : 'imagem final'}
               </p>
             </div>
-            <button onClick={openAddRenderModal} className="btn btn-primary" style={{ padding: '10px 16px' }}>
-              <Plus size={16} style={{ marginRight: '8px' }} />
-              Adicionar Render
-            </button>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              {/* Botões Colapsar/Expandir Tudo */}
+              {Object.keys(rendersByCompartimento).length > 1 && (
+                <>
+                  <button
+                    onClick={() => toggleAllCompartimentos(true)}
+                    style={{
+                      padding: '6px 12px',
+                      background: 'transparent',
+                      color: 'var(--brown-light)',
+                      border: '1px solid var(--stone)',
+                      borderRadius: '6px',
+                      fontSize: '11px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                    title="Colapsar todos os compartimentos"
+                  >
+                    <ChevronUp size={14} />
+                    Colapsar
+                  </button>
+                  <button
+                    onClick={() => toggleAllCompartimentos(false)}
+                    style={{
+                      padding: '6px 12px',
+                      background: 'transparent',
+                      color: 'var(--brown-light)',
+                      border: '1px solid var(--stone)',
+                      borderRadius: '6px',
+                      fontSize: '11px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                    title="Expandir todos os compartimentos"
+                  >
+                    <ChevronDown size={14} />
+                    Expandir
+                  </button>
+                </>
+              )}
+              <button onClick={openAddRenderModal} className="btn btn-primary" style={{ padding: '10px 16px' }}>
+                <Plus size={16} style={{ marginRight: '8px' }} />
+                Adicionar Render
+              </button>
+            </div>
           </div>
 
           {/* Renders por Compartimento e Vista */}
@@ -2632,32 +2716,79 @@ export default function ProjetoDetalhe() {
                 const totalVersoes = compartimentoRenders.length
                 const totalVistas = Object.keys(rendersByVista).length
 
+                const isCollapsed = collapsedCompartimentos[compartimento]
+
                 return (
                   <div key={compartimento} style={{
                     background: 'var(--white)',
                     border: '1px solid var(--stone)',
                     borderRadius: '12px',
-                    padding: '16px'
+                    padding: isCollapsed ? '12px 16px' : '16px',
+                    transition: 'padding 0.2s ease'
                   }}>
                     {/* Cabeçalho do Compartimento */}
-                    <div className="flex items-center justify-between" style={{ marginBottom: '16px' }}>
-                      <h4 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--brown)', margin: 0 }}>
-                        {compartimento}
-                        <span style={{ fontWeight: 400, color: 'var(--brown-light)', marginLeft: '8px', fontSize: '13px' }}>
-                          ({totalVistas} {totalVistas !== 1 ? 'vistas' : 'vista'} • {totalVersoes} {totalVersoes !== 1 ? 'versões' : 'versão'})
-                        </span>
-                      </h4>
-                      <button
-                        onClick={() => openAddRenderModal(compartimento)}
-                        className="btn btn-secondary"
-                        style={{ padding: '6px 12px', fontSize: '12px' }}
-                      >
-                        <Plus size={14} style={{ marginRight: '6px' }} />
-                        Nova Vista
-                      </button>
+                    <div
+                      className="flex items-center justify-between"
+                      style={{
+                        marginBottom: isCollapsed ? 0 : '16px',
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => toggleCompartimentoCollapse(compartimento)}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); toggleCompartimentoCollapse(compartimento) }}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            padding: '4px',
+                            cursor: 'pointer',
+                            color: 'var(--brown-light)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            transition: 'transform 0.2s ease',
+                            transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)'
+                          }}
+                          title={isCollapsed ? 'Expandir' : 'Colapsar'}
+                        >
+                          <ChevronDown size={18} />
+                        </button>
+                        <h4 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--brown)', margin: 0 }}>
+                          {compartimento}
+                          <span style={{ fontWeight: 400, color: 'var(--brown-light)', marginLeft: '8px', fontSize: '13px' }}>
+                            ({totalVistas} {totalVistas !== 1 ? 'vistas' : 'vista'} • {totalVersoes} {totalVersoes !== 1 ? 'versões' : 'versão'})
+                          </span>
+                        </h4>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {/* Preview de imagens quando colapsado */}
+                        {isCollapsed && compartimentoRenders.filter(r => r.imagem_url).slice(0, 4).map((render, idx) => (
+                          <div
+                            key={render.id}
+                            style={{
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '4px',
+                              background: `url(${render.imagem_url}) center/cover`,
+                              border: render.is_final ? '2px solid var(--success)' : '1px solid var(--stone)',
+                              marginLeft: idx > 0 ? '-8px' : 0
+                            }}
+                            onClick={(e) => { e.stopPropagation(); openLightbox(render, compartimentoRenders) }}
+                          />
+                        ))}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); openAddRenderModal(compartimento) }}
+                          className="btn btn-secondary"
+                          style={{ padding: '6px 12px', fontSize: '12px' }}
+                        >
+                          <Plus size={14} style={{ marginRight: '6px' }} />
+                          Nova Vista
+                        </button>
+                      </div>
                     </div>
 
-                    {/* Vistas dentro do Compartimento */}
+                    {/* Vistas dentro do Compartimento - só mostra se não colapsado */}
+                    {!isCollapsed && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                       {Object.entries(rendersByVista).map(([vista, vistaRenders]) => (
                         <div key={vista} style={{
@@ -2713,7 +2844,7 @@ export default function ProjetoDetalhe() {
                                   border: render.is_final ? '3px solid var(--success)' : '1px solid var(--stone)',
                                   cursor: render.imagem_url ? 'pointer' : 'default'
                                 }}
-                                onClick={() => openLightbox(render)}
+                                onClick={() => openLightbox(render, compartimentoRenders)}
                               >
                                 {!render.imagem_url && (
                                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
@@ -2839,6 +2970,7 @@ export default function ProjetoDetalhe() {
                         </div>
                       ))}
                     </div>
+                    )}
                   </div>
                 )
               })}
@@ -2899,8 +3031,10 @@ export default function ProjetoDetalhe() {
                     background: render.imagem_url ? `url(${render.imagem_url}) center/cover` : 'var(--cream)',
                     borderRadius: '12px',
                     overflow: 'hidden',
-                    border: '3px solid var(--success)'
+                    border: '3px solid var(--success)',
+                    cursor: render.imagem_url ? 'pointer' : 'default'
                   }}
+                  onClick={() => render.imagem_url && openLightbox(render, imagensFinais)}
                 >
                   {!render.imagem_url && (
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
@@ -2922,7 +3056,7 @@ export default function ProjetoDetalhe() {
                   </div>
 
                   <button
-                    onClick={() => toggleFinalImage(render)}
+                    onClick={(e) => { e.stopPropagation(); toggleFinalImage(render) }}
                     style={{
                       position: 'absolute',
                       top: '8px',
@@ -3349,9 +3483,12 @@ export default function ProjetoDetalhe() {
       {/* Lightbox para visualizar imagens em grande */}
       <ImageLightbox
         image={lightboxImage}
-        onClose={() => setLightboxImage(null)}
-        onEditRender={(img) => { openEditRenderModal(img); setLightboxImage(null) }}
-        onOpenMoleskine={(img) => { setMoleskineRender(img); setLightboxImage(null) }}
+        images={lightboxImages}
+        currentIndex={lightboxIndex}
+        onClose={() => { setLightboxImage(null); setLightboxImages([]); setLightboxIndex(0) }}
+        onNavigate={navigateLightbox}
+        onEditRender={(img) => { openEditRenderModal(img); setLightboxImage(null); setLightboxImages([]); setLightboxIndex(0) }}
+        onOpenMoleskine={(img) => { setMoleskineRender(img); setLightboxImage(null); setLightboxImages([]); setLightboxIndex(0) }}
       />
 
       {/* Moleskine - Ferramenta de anotação de renders */}

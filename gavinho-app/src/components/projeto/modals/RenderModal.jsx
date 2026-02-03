@@ -3,7 +3,8 @@
 // Modal para adicionar/editar renders do projeto
 // =====================================================
 
-import { X, Upload } from 'lucide-react'
+import { useState } from 'react'
+import { X, Upload, Edit, RefreshCw } from 'lucide-react'
 import { COMPARTIMENTOS } from '../../../constants/projectConstants'
 
 export default function RenderModal({
@@ -22,6 +23,8 @@ export default function RenderModal({
   onImageUpload,
   projetoCompartimentos = [] // Compartimentos específicos do projeto
 }) {
+  const [useManualVersion, setUseManualVersion] = useState(false)
+
   if (!isOpen) return null
 
   // Combinar compartimentos do projeto com os gerais (projeto primeiro)
@@ -144,30 +147,94 @@ export default function RenderModal({
             </p>
           </div>
 
-          {/* Versão (auto) */}
+          {/* Versão */}
           {renderForm.compartimento && (
             <div style={{
               marginBottom: '20px',
               padding: '12px 16px',
               background: 'var(--cream)',
-              borderRadius: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
+              borderRadius: '8px'
             }}>
-              <span style={{ fontSize: '13px', color: 'var(--brown-light)' }}>
-                Versão automática
-              </span>
-              <span style={{
-                fontSize: '16px',
-                fontWeight: 700,
-                color: 'var(--brown)',
-                background: 'var(--white)',
-                padding: '4px 12px',
-                borderRadius: '6px'
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: useManualVersion ? '12px' : 0
               }}>
-                v{editingRender ? renderForm.versao : getNextVersion(renderForm.compartimento, renderForm.vista)}
-              </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '13px', color: 'var(--brown-light)' }}>
+                    {useManualVersion ? 'Versão manual' : 'Versão automática'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!useManualVersion) {
+                        // Switching to manual - set current auto version as starting point
+                        const autoVersion = editingRender ? renderForm.versao : getNextVersion(renderForm.compartimento, renderForm.vista)
+                        setRenderForm(prev => ({ ...prev, versao: autoVersion }))
+                      } else {
+                        // Switching back to auto
+                        const autoVersion = editingRender ? renderForm.versao : getNextVersion(renderForm.compartimento, renderForm.vista)
+                        setRenderForm(prev => ({ ...prev, versao: autoVersion }))
+                      }
+                      setUseManualVersion(!useManualVersion)
+                    }}
+                    style={{
+                      padding: '3px 8px',
+                      background: 'transparent',
+                      color: 'var(--info)',
+                      border: '1px solid var(--info)',
+                      borderRadius: '4px',
+                      fontSize: '10px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                    title={useManualVersion ? 'Usar versão automática' : 'Editar versão manualmente'}
+                  >
+                    {useManualVersion ? <RefreshCw size={10} /> : <Edit size={10} />}
+                    {useManualVersion ? 'Auto' : 'Editar'}
+                  </button>
+                </div>
+                {!useManualVersion && (
+                  <span style={{
+                    fontSize: '16px',
+                    fontWeight: 700,
+                    color: 'var(--brown)',
+                    background: 'var(--white)',
+                    padding: '4px 12px',
+                    borderRadius: '6px'
+                  }}>
+                    v{editingRender ? renderForm.versao : getNextVersion(renderForm.compartimento, renderForm.vista)}
+                  </span>
+                )}
+              </div>
+              {useManualVersion && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '14px', color: 'var(--brown)', fontWeight: 500 }}>v</span>
+                  <input
+                    type="number"
+                    min="1"
+                    value={renderForm.versao || 1}
+                    onChange={(e) => setRenderForm(prev => ({ ...prev, versao: parseInt(e.target.value) || 1 }))}
+                    style={{
+                      width: '80px',
+                      padding: '8px 12px',
+                      border: '1px solid var(--stone)',
+                      borderRadius: '6px',
+                      fontSize: '16px',
+                      fontWeight: 700,
+                      color: 'var(--brown)',
+                      background: 'var(--white)',
+                      textAlign: 'center'
+                    }}
+                  />
+                  <span style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
+                    Insira o número da versão
+                  </span>
+                </div>
+              )}
             </div>
           )}
 
