@@ -402,6 +402,9 @@ export default function Workspace() {
       }
 
       // Inserir mensagem na base de dados
+      // Check if activeTopic is a valid UUID (not the default 'geral' string)
+      const isValidUUID = activeTopic && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(activeTopic)
+
       const { data: insertedMessage, error: insertError } = await supabase
         .from('chat_mensagens')
         .insert({
@@ -409,7 +412,7 @@ export default function Workspace() {
           tipo: attachments.length > 0 ? (attachments[0].type === 'image' ? 'imagem' : 'ficheiro') : 'texto',
           autor_id: profile?.id,
           canal_id: canalAtivo?.id,
-          topico_id: activeTopic || 'geral',
+          ...(isValidUUID && { topico_id: activeTopic }),
           parent_id: replyingTo?.id || null,
           ficheiro_url: attachments.length > 0 ? attachments[0].url : null,
           ficheiro_nome: attachments.length > 0 ? attachments[0].name : null,
