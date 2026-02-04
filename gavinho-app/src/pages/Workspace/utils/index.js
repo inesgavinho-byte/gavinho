@@ -17,3 +17,6 @@ export * from './presenceUtils'
 
 // Syntax highlighting
 export * from './syntaxHighlighter'
+
+// Export conversation
+export * from './exportConversation'

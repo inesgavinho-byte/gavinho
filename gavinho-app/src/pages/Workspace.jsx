@@ -97,7 +97,7 @@ import {
   useConfirm
 } from './Workspace/hooks'
 
-import { ConfirmModal, ToastContainer } from './Workspace/components/Modals'
+import { ConfirmModal, ToastContainer, ExportModal } from './Workspace/components/Modals'
 import CentralEntregasChat from './Workspace/components/CentralEntregasChat'
 
 export default function Workspace() {
@@ -262,8 +262,6 @@ export default function Workspace() {
 
   // Export
   const [showExportModal, setShowExportModal] = useState(false)
-  const [exportFormat, setExportFormat] = useState('pdf')
-  const [exportDateRange, setExportDateRange] = useState({ from: '', to: '' })
 
   // Webhooks & Email
   const [webhooks, setWebhooks] = useState([])
@@ -1387,39 +1385,6 @@ export default function Workspace() {
     }
   }
 
-  // ========== EXPORT CONVERSATION ==========
-  const exportConversation = () => {
-    const content = posts.map(p =>
-      `[${formatDateTime(p.created_at)}] ${p.autor?.nome}: ${p.conteudo}`
-    ).join('\n\n')
-
-    if (exportFormat === 'txt') {
-      const blob = new Blob([content], { type: 'text/plain' })
-      downloadBlob(blob, `${canalAtivo?.codigo || 'chat'}_export.txt`)
-    } else {
-      // For PDF, create a simple HTML-based export
-      const htmlContent = `
-        <html><head><title>Exportação - ${canalAtivo?.codigo}</title>
-        <style>body{font-family:Arial;padding:40px;}h1{color:#3D3D3D;}.msg{margin:20px 0;padding:15px;border-left:3px solid #7A8B6E;}.time{color:#888;font-size:12px;}.author{font-weight:bold;}</style></head>
-        <body><h1>${canalAtivo?.codigo} - ${canalAtivo?.nome}</h1>
-        ${posts.map(p => `<div class="msg"><div class="time">${formatDateTime(p.created_at)}</div><div class="author">${p.autor?.nome}</div><div>${p.conteudo}</div></div>`).join('')}
-        </body></html>
-      `
-      const blob = new Blob([htmlContent], { type: 'text/html' })
-      downloadBlob(blob, `${canalAtivo?.codigo || 'chat'}_export.html`)
-    }
-    setShowExportModal(false)
-  }
-
-  const downloadBlob = (blob, filename) => {
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
   // ========== WEBHOOKS ==========
   const addWebhook = () => {
     if (!newWebhook.url.trim()) return
@@ -2013,30 +1978,18 @@ export default function Workspace() {
       )}
 
       {/* ========== EXPORT MODAL ========== */}
-      {showExportModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }} onClick={() => setShowExportModal(false)}>
-          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--white)', borderRadius: '16px', padding: '24px', width: '400px' }}>
-            <h3 style={{ margin: '0 0 20px 0', fontSize: '18px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <FileDown size={20} style={{ color: 'var(--accent-olive)' }} /> Exportar Conversa
-            </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--brown-light)', display: 'block', marginBottom: '8px' }}>Formato</label>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  {['txt', 'html'].map(fmt => (
-                    <button key={fmt} onClick={() => setExportFormat(fmt)} style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid', borderColor: exportFormat === fmt ? 'var(--accent-olive)' : 'var(--stone)', background: exportFormat === fmt ? 'var(--success-bg)' : 'transparent', cursor: 'pointer', fontWeight: exportFormat === fmt ? 600 : 400 }}>
-                      {fmt.toUpperCase()}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <button onClick={exportConversation} style={{ padding: '14px', background: 'var(--accent-olive)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                <Download size={18} /> Exportar {posts.length} mensagens
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ExportModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        channelInfo={canalAtivo}
+        messages={posts}
+        onSuccess={(result) => {
+          showToast(`Exportação concluída: ${result.filename}`, 'success')
+        }}
+        onError={(error) => {
+          showToast(`Erro na exportação: ${error}`, 'error')
+        }}
+      />
 
       {/* ========== STATUS MENU ========== */}
       {showStatusMenu && (
