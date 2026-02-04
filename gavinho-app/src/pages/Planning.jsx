@@ -1,5 +1,7 @@
-import { useState } from 'react'
-import { 
+import { useState, useEffect } from 'react'
+import { useSearchParams, useNavigate } from 'react-router-dom'
+import { supabase } from '../lib/supabase'
+import {
   Calendar,
   ChevronLeft,
   ChevronRight,
@@ -17,7 +19,17 @@ import {
   X,
   Users,
   Flag,
-  ArrowRight
+  ArrowRight,
+  AlertOctagon,
+  Kanban,
+  GanttChart,
+  Building2,
+  User,
+  CheckCircle,
+  Circle,
+  Loader2,
+  LayoutList,
+  FolderOpen
 } from 'lucide-react'
 
 // Dados de exemplo - projetos com tarefas e timeline
@@ -247,13 +259,157 @@ const healthConfig = {
   critical: { color: 'var(--error)' }
 }
 
+// Dados de bloqueios de todos os projetos
+const bloqueiosData = [
+  {
+    id: 1,
+    titulo: 'Aguardar aprovação de materiais pelo cliente',
+    descricao: 'Cliente ainda não aprovou a seleção de mármores para a cozinha',
+    projeto: { codigo: 'GA00466', nome: 'Penthouse António Enes' },
+    tipo: 'cliente',
+    prioridade: 'alta',
+    status: 'ativo',
+    criado_em: '2024-12-10',
+    responsavel: 'Maria Santos',
+    impacto: 'Atrasa início da marcenaria em 2 semanas'
+  },
+  {
+    id: 2,
+    titulo: 'Licença de construção pendente',
+    descricao: 'Câmara Municipal ainda não emitiu o alvará de construção',
+    projeto: { codigo: 'GA00470', nome: 'Villa Cascais' },
+    tipo: 'legal',
+    prioridade: 'critica',
+    status: 'ativo',
+    criado_em: '2024-11-28',
+    responsavel: 'Pedro Costa',
+    impacto: 'Bloqueia todo o início de obra'
+  },
+  {
+    id: 3,
+    titulo: 'Fornecedor de luminárias com atraso',
+    descricao: 'Artemide comunicou atraso de 6 semanas na entrega das luminárias',
+    projeto: { codigo: 'GA00466', nome: 'Penthouse António Enes' },
+    tipo: 'fornecedor',
+    prioridade: 'media',
+    status: 'ativo',
+    criado_em: '2024-12-15',
+    responsavel: 'Ana Oliveira',
+    impacto: 'Pode atrasar acabamentos finais'
+  },
+  {
+    id: 4,
+    titulo: 'Decisão de layout da suite principal',
+    descricao: 'Cliente pediu tempo para decidir entre as 2 opções apresentadas',
+    projeto: { codigo: 'GA00472', nome: 'Hotel Comporta' },
+    tipo: 'cliente',
+    prioridade: 'media',
+    status: 'ativo',
+    criado_em: '2024-12-12',
+    responsavel: 'Inês Gavinho',
+    impacto: 'Atrasa finalização do projeto de execução'
+  },
+  {
+    id: 5,
+    titulo: 'Problemas estruturais detetados',
+    descricao: 'Engenheiro identificou necessidade de reforço estrutural não previsto',
+    projeto: { codigo: 'GA00466', nome: 'Penthouse António Enes' },
+    tipo: 'tecnico',
+    prioridade: 'critica',
+    status: 'resolvido',
+    criado_em: '2024-12-01',
+    resolvido_em: '2024-12-08',
+    responsavel: 'Carlos Ferreira',
+    impacto: 'Orçamento adicional aprovado'
+  }
+]
+
+const bloqueioTipoConfig = {
+  cliente: { label: 'Cliente', color: 'var(--info)', icon: Users },
+  fornecedor: { label: 'Fornecedor', color: 'var(--warning)', icon: Building2 },
+  legal: { label: 'Legal/Licenças', color: 'var(--error)', icon: AlertOctagon },
+  tecnico: { label: 'Técnico', color: 'var(--brown)', icon: AlertTriangle },
+  interno: { label: 'Interno', color: 'var(--brown-light)', icon: Users }
+}
+
+const prioridadeConfig = {
+  critica: { label: 'Crítica', color: 'var(--error)', bg: 'rgba(184, 138, 138, 0.15)' },
+  alta: { label: 'Alta', color: 'var(--warning)', bg: 'rgba(201, 168, 130, 0.2)' },
+  media: { label: 'Média', color: 'var(--info)', bg: 'rgba(138, 158, 184, 0.15)' },
+  baixa: { label: 'Baixa', color: 'var(--brown-light)', bg: 'var(--stone)' }
+}
+
 export default function Planning() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
+  const activeTab = searchParams.get('tab') || 'planning'
   const [projects, setProjects] = useState(projectsData)
   const [viewMode, setViewMode] = useState('month') // week, month, quarter
   const [currentDate, setCurrentDate] = useState(new Date(2024, 11, 18)) // Dec 18, 2024
   const [selectedTask, setSelectedTask] = useState(null)
   const [filterPM, setFilterPM] = useState('Todos')
   const [showAddTaskModal, setShowAddTaskModal] = useState(false)
+
+  // Real data from Supabase
+  const [realTarefas, setRealTarefas] = useState([])
+  const [realProjetos, setRealProjetos] = useState([])
+  const [equipa, setEquipa] = useState([])
+  const [loadingReal, setLoadingReal] = useState(true)
+
+  // Sub-tab for Tarefas view
+  const [tarefasView, setTarefasView] = useState('projeto') // 'projeto' or 'pessoa'
+
+  // Load real data from Supabase
+  useEffect(() => {
+    loadRealData()
+  }, [])
+
+  const loadRealData = async () => {
+    setLoadingReal(true)
+    try {
+      const [tarefasRes, projetosRes, equipaRes] = await Promise.all([
+        supabase.from('tarefas').select('*').order('created_at', { ascending: false }),
+        supabase.from('projetos').select('id, codigo, nome, pm_id').eq('arquivado', false).order('codigo', { ascending: false }),
+        supabase.from('utilizadores').select('id, nome, avatar_url, funcao').eq('ativo', true).order('nome')
+      ])
+
+      setRealTarefas(tarefasRes.data || [])
+      setRealProjetos(projetosRes.data || [])
+      setEquipa(equipaRes.data || [])
+    } catch (err) {
+      console.error('Erro ao carregar dados:', err)
+    } finally {
+      setLoadingReal(false)
+    }
+  }
+
+  // Get member info
+  const getMembroInfo = (id) => equipa.find(m => m.id === id)
+  const getProjetoInfo = (id) => realProjetos.find(p => p.id === id)
+
+  // Group tasks by project
+  const getTarefasPorProjeto = () => {
+    const groups = {}
+    realTarefas.filter(t => !t.tarefa_pai_id).forEach(tarefa => {
+      const projectId = tarefa.projeto_id || 'sem_projeto'
+      if (!groups[projectId]) groups[projectId] = []
+      const subtarefas = realTarefas.filter(t => t.tarefa_pai_id === tarefa.id)
+      groups[projectId].push({ ...tarefa, subtarefas })
+    })
+    return groups
+  }
+
+  // Group tasks by person (responsavel)
+  const getTarefasPorPessoa = () => {
+    const groups = {}
+    realTarefas.filter(t => !t.tarefa_pai_id).forEach(tarefa => {
+      const personId = tarefa.responsavel_id || 'sem_atribuicao'
+      if (!groups[personId]) groups[personId] = []
+      const subtarefas = realTarefas.filter(t => t.tarefa_pai_id === tarefa.id)
+      groups[personId].push({ ...tarefa, subtarefas })
+    })
+    return groups
+  }
 
   // Calcular range de datas baseado no viewMode
   const getDateRange = () => {
@@ -365,7 +521,7 @@ export default function Planning() {
   }
 
   // Navegar no tempo
-  const navigate = (direction) => {
+  const navigateTime = (direction) => {
     const newDate = new Date(currentDate)
     if (viewMode === 'week') {
       newDate.setDate(newDate.getDate() + (direction * 14))
@@ -401,63 +557,197 @@ export default function Planning() {
   // Coluna width
   const colWidth = viewMode === 'week' ? 40 : viewMode === 'month' ? 28 : 60
 
+  // Estatísticas de bloqueios
+  const bloqueiosAtivos = bloqueiosData.filter(b => b.status === 'ativo').length
+  const bloqueiosCriticos = bloqueiosData.filter(b => b.status === 'ativo' && b.prioridade === 'critica').length
+
+  // Todas as tarefas de todos os projetos para a tab Tarefas
+  const todasTarefas = projects.flatMap(p =>
+    p.tarefas.map(t => ({ ...t, projeto: { codigo: p.codigo, nome: p.nome } }))
+  )
+
+  const setActiveTab = (tab) => {
+    setSearchParams({ tab })
+  }
+
   return (
     <div className="fade-in">
       {/* Page Header */}
       <div className="page-header">
         <div>
           <h1 className="page-title">Planning</h1>
-          <p className="page-subtitle">Timeline de projetos e marcos</p>
+          <p className="page-subtitle">
+            {activeTab === 'planning' && 'Timeline de projetos e marcos'}
+            {activeTab === 'bloqueios' && 'Bloqueios ativos em todos os projetos'}
+            {activeTab === 'tarefas' && 'Todas as tarefas de todos os projetos'}
+          </p>
         </div>
         <div className="flex gap-sm">
           <button className="btn btn-secondary">
             <Download size={18} />
             Exportar
           </button>
-          <button className="btn btn-primary" onClick={() => setShowAddTaskModal(true)}>
-            <Plus size={18} />
-            Nova Tarefa
+          {activeTab === 'planning' && (
+            <button className="btn btn-primary" onClick={() => setShowAddTaskModal(true)}>
+              <Plus size={18} />
+              Nova Tarefa
+            </button>
+          )}
+          {activeTab === 'bloqueios' && (
+            <button className="btn btn-primary">
+              <Plus size={18} />
+              Novo Bloqueio
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Tabs Navigation */}
+      <div style={{
+        display: 'flex',
+        gap: '8px',
+        marginBottom: '24px',
+        background: 'var(--cream)',
+        padding: '6px',
+        borderRadius: '12px',
+        width: 'fit-content'
+      }}>
+        {[
+          { id: 'planning', label: 'Planning', icon: GanttChart },
+          { id: 'bloqueios', label: 'Bloqueios', icon: AlertOctagon, badge: bloqueiosAtivos },
+          { id: 'tarefas', label: 'Tarefas', icon: Kanban }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 20px',
+              background: activeTab === tab.id ? 'var(--white)' : 'transparent',
+              boxShadow: activeTab === tab.id ? 'var(--shadow-sm)' : 'none',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '13px',
+              fontWeight: activeTab === tab.id ? 600 : 500,
+              color: activeTab === tab.id ? 'var(--brown)' : 'var(--brown-light)',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+          >
+            <tab.icon size={16} />
+            {tab.label}
+            {tab.badge > 0 && (
+              <span style={{
+                padding: '2px 8px',
+                background: activeTab === tab.id ? 'var(--error)' : 'rgba(184, 138, 138, 0.2)',
+                color: activeTab === tab.id ? 'white' : 'var(--error)',
+                borderRadius: '10px',
+                fontSize: '11px',
+                fontWeight: 600
+              }}>
+                {tab.badge}
+              </span>
+            )}
           </button>
-        </div>
+        ))}
       </div>
 
-      {/* KPIs */}
-      <div className="stats-grid mb-xl" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
-        <div className="stat-card">
-          <div className="stat-icon projects">
-            <Calendar size={22} />
-          </div>
-          <div className="stat-value">{projects.length}</div>
-          <div className="stat-label">Projetos Ativos</div>
-        </div>
+      {/* TAB: Planning (Gantt) */}
+      {activeTab === 'planning' && (
+        <>
+          {/* KPIs Compactos */}
+          <div style={{
+            display: 'flex',
+            gap: '16px',
+            marginBottom: '20px',
+            flexWrap: 'wrap'
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '12px 20px',
+              background: 'var(--white)',
+              borderRadius: '12px',
+              border: '1px solid var(--stone)',
+              minWidth: '160px'
+            }}>
+              <div style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '8px',
+                background: 'rgba(201, 168, 130, 0.15)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <Calendar size={18} style={{ color: 'var(--warning)' }} />
+              </div>
+              <div>
+                <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--brown)', lineHeight: 1 }}>{projects.length}</div>
+                <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>Projetos Ativos</div>
+              </div>
+            </div>
 
-        <div className="stat-card">
-          <div className="stat-icon" style={{ background: 'rgba(138, 158, 184, 0.15)' }}>
-            <Clock size={22} style={{ stroke: 'var(--info)' }} />
-          </div>
-          <div className="stat-value">{tasksInProgress}</div>
-          <div className="stat-label">Tarefas em Progresso</div>
-        </div>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '12px 20px',
+              background: 'var(--white)',
+              borderRadius: '12px',
+              border: '1px solid var(--stone)',
+              minWidth: '160px'
+            }}>
+              <div style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '8px',
+                background: 'rgba(138, 158, 184, 0.15)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <Clock size={18} style={{ color: 'var(--info)' }} />
+              </div>
+              <div>
+                <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--brown)', lineHeight: 1 }}>{tasksInProgress}</div>
+                <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>Tarefas em Progresso</div>
+              </div>
+            </div>
 
-        <div className="stat-card">
-          <div className="stat-icon" style={{ background: 'rgba(201, 168, 130, 0.2)' }}>
-            <AlertTriangle size={22} style={{ stroke: 'var(--warning)' }} />
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '12px 20px',
+              background: 'var(--white)',
+              borderRadius: '12px',
+              border: '1px solid var(--stone)',
+              minWidth: '160px'
+            }}>
+              <div style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '8px',
+                background: 'rgba(201, 168, 130, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <AlertTriangle size={18} style={{ color: 'var(--warning)' }} />
+              </div>
+              <div>
+                <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--brown)', lineHeight: 1 }}>{tasksPending}</div>
+                <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>Pendentes de Ap.</div>
+              </div>
+            </div>
           </div>
-          <div className="stat-value">{tasksPending}</div>
-          <div className="stat-label">Pendentes de Aprovação</div>
-        </div>
 
-        <div className="stat-card">
-          <div className="stat-icon" style={{ background: 'rgba(122, 158, 122, 0.15)' }}>
-            <Milestone size={22} style={{ stroke: 'var(--success)' }} />
-          </div>
-          <div className="stat-value">{milestonesUpcoming}</div>
-          <div className="stat-label">Marcos Próximos</div>
-        </div>
-      </div>
-
-      {/* Controls */}
-      <div className="card mb-lg">
+          {/* Controls */}
+          <div className="card mb-lg">
         <div className="flex items-center justify-between" style={{ flexWrap: 'wrap', gap: 'var(--space-md)' }}>
           {/* View Mode Toggle */}
           <div className="flex items-center gap-sm">
@@ -493,7 +783,7 @@ export default function Planning() {
 
           {/* Navigation */}
           <div className="flex items-center gap-md">
-            <button className="btn btn-ghost btn-icon" onClick={() => navigate(-1)}>
+            <button className="btn btn-ghost btn-icon" onClick={() => navigateTime(-1)}>
               <ChevronLeft size={20} />
             </button>
             <div style={{ fontWeight: 600, minWidth: '180px', textAlign: 'center' }}>
@@ -501,7 +791,7 @@ export default function Planning() {
               {' "" '}
               {rangeEnd.toLocaleDateString('pt-PT', { month: 'long', year: 'numeric' })}
             </div>
-            <button className="btn btn-ghost btn-icon" onClick={() => navigate(1)}>
+            <button className="btn btn-ghost btn-icon" onClick={() => navigateTime(1)}>
               <ChevronRight size={20} />
             </button>
             <button 
@@ -532,17 +822,17 @@ export default function Planning() {
 
       {/* Gantt Chart */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto' }}>
-          <div style={{ minWidth: `${300 + (columns.length * colWidth)}px` }}>
+        <div style={{ overflowX: 'auto', maxHeight: 'calc(100vh - 340px)' }}>
+          <div style={{ minWidth: `${280 + (columns.length * colWidth)}px` }}>
             {/* Header - Months */}
-            <div className="flex" style={{ borderBottom: '1px solid var(--stone)' }}>
-              <div style={{ 
-                width: '300px', 
-                minWidth: '300px', 
-                padding: '12px 16px',
+            <div className="flex" style={{ borderBottom: '1px solid var(--stone)', position: 'sticky', top: 0, zIndex: 10 }}>
+              <div style={{
+                width: '280px',
+                minWidth: '280px',
+                padding: '10px 14px',
                 background: 'var(--cream)',
                 fontWeight: 600,
-                fontSize: '13px',
+                fontSize: '12px',
                 borderRight: '1px solid var(--stone)'
               }}>
                 Projeto / Tarefa
@@ -569,10 +859,10 @@ export default function Planning() {
             </div>
 
             {/* Header - Days */}
-            <div className="flex" style={{ borderBottom: '1px solid var(--stone)' }}>
-              <div style={{ 
-                width: '300px', 
-                minWidth: '300px',
+            <div className="flex" style={{ borderBottom: '1px solid var(--stone)', position: 'sticky', top: '42px', zIndex: 9, background: 'var(--white)' }}>
+              <div style={{
+                width: '280px',
+                minWidth: '280px',
                 borderRight: '1px solid var(--stone)'
               }} />
               <div className="flex" style={{ flex: 1 }}>
@@ -610,15 +900,15 @@ export default function Planning() {
                   }}
                   onClick={() => toggleProject(project.id)}
                 >
-                  <div 
-                    style={{ 
-                      width: '300px', 
-                      minWidth: '300px', 
-                      padding: '12px 16px',
+                  <div
+                    style={{
+                      width: '280px',
+                      minWidth: '280px',
+                      padding: '10px 14px',
                       borderRight: '1px solid var(--stone)',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '12px'
+                      gap: '10px'
                     }}
                   >
                     {project.expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
@@ -656,15 +946,15 @@ export default function Planning() {
                         background: 'var(--white)'
                       }}
                     >
-                      <div 
-                        style={{ 
-                          width: '300px', 
-                          minWidth: '300px', 
-                          padding: '10px 16px 10px 48px',
+                      <div
+                        style={{
+                          width: '280px',
+                          minWidth: '280px',
+                          padding: '8px 14px 8px 40px',
                           borderRight: '1px solid var(--stone)',
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '10px'
+                          gap: '8px'
                         }}
                       >
                         {tarefa.marco ? (
@@ -808,44 +1098,465 @@ export default function Planning() {
             ))}
           </div>
         </div>
-      </div>
-
-      {/* Legend */}
-      <div className="card mt-lg">
-        <div className="flex items-center gap-lg" style={{ flexWrap: 'wrap' }}>
-          <span className="text-muted" style={{ fontSize: '12px', fontWeight: 600 }}>Legenda:</span>
+        {/* Legend - Inline */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '16px',
+          padding: '10px 16px',
+          background: 'var(--cream)',
+          borderTop: '1px solid var(--stone)',
+          fontSize: '11px',
+          flexWrap: 'wrap'
+        }}>
           {Object.entries(statusConfig).map(([key, config]) => (
-            <div key={key} className="flex items-center gap-xs">
-              <div 
-                style={{ 
-                  width: '12px', 
-                  height: '12px', 
-                  borderRadius: '3px',
-                  background: config.bg,
-                  border: `1px solid ${config.color}`
-                }} 
-              />
-              <span style={{ fontSize: '12px' }}>{config.label}</span>
+            <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <div style={{ width: '10px', height: '10px', borderRadius: '2px', background: config.bg, border: `1px solid ${config.color}` }} />
+              <span style={{ color: 'var(--brown-light)' }}>{config.label}</span>
             </div>
           ))}
-          <div className="flex items-center gap-xs">
-            <div 
-              style={{ 
-                width: '10px', 
-                height: '10px', 
-                background: 'var(--warning)',
-                borderRadius: '2px',
-                transform: 'rotate(45deg)'
-              }} 
-            />
-            <span style={{ fontSize: '12px' }}>Marco</span>
-          </div>
-          <div className="flex items-center gap-xs">
-            <Link2 size={12} style={{ color: 'var(--brown-light)' }} />
-            <span style={{ fontSize: '12px' }}>Tem dependências</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <div style={{ width: '8px', height: '8px', background: 'var(--warning)', borderRadius: '1px', transform: 'rotate(45deg)' }} />
+            <span style={{ color: 'var(--brown-light)' }}>Marco</span>
           </div>
         </div>
       </div>
+        </>
+      )}
+
+      {/* TAB: Bloqueios */}
+      {activeTab === 'bloqueios' && (
+        <div>
+          {/* KPIs Bloqueios */}
+          <div className="stats-grid mb-xl" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+            <div className="stat-card">
+              <div className="stat-icon" style={{ background: 'rgba(184, 138, 138, 0.15)' }}>
+                <AlertOctagon size={22} style={{ stroke: 'var(--error)' }} />
+              </div>
+              <div className="stat-value">{bloqueiosAtivos}</div>
+              <div className="stat-label">Bloqueios Ativos</div>
+            </div>
+
+            <div className="stat-card">
+              <div className="stat-icon" style={{ background: 'rgba(184, 138, 138, 0.25)' }}>
+                <AlertTriangle size={22} style={{ stroke: 'var(--error)' }} />
+              </div>
+              <div className="stat-value">{bloqueiosCriticos}</div>
+              <div className="stat-label">Críticos</div>
+            </div>
+
+            <div className="stat-card">
+              <div className="stat-icon" style={{ background: 'rgba(138, 158, 184, 0.15)' }}>
+                <Users size={22} style={{ stroke: 'var(--info)' }} />
+              </div>
+              <div className="stat-value">{bloqueiosData.filter(b => b.tipo === 'cliente').length}</div>
+              <div className="stat-label">Aguardam Cliente</div>
+            </div>
+
+            <div className="stat-card">
+              <div className="stat-icon" style={{ background: 'rgba(122, 158, 122, 0.15)' }}>
+                <CheckCircle size={22} style={{ stroke: 'var(--success)' }} />
+              </div>
+              <div className="stat-value">{bloqueiosData.filter(b => b.status === 'resolvido').length}</div>
+              <div className="stat-label">Resolvidos</div>
+            </div>
+          </div>
+
+          {/* Lista de Bloqueios */}
+          <div className="card">
+            <div className="flex items-center justify-between" style={{ marginBottom: '20px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
+                Bloqueios de Todos os Projetos
+              </h3>
+              <div className="flex gap-sm">
+                <select className="select" style={{ width: 'auto', minWidth: '150px' }}>
+                  <option value="todos">Todos os Tipos</option>
+                  {Object.entries(bloqueioTipoConfig).map(([key, config]) => (
+                    <option key={key} value={key}>{config.label}</option>
+                  ))}
+                </select>
+                <select className="select" style={{ width: 'auto', minWidth: '130px' }}>
+                  <option value="ativos">Ativos</option>
+                  <option value="resolvidos">Resolvidos</option>
+                  <option value="todos">Todos</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {bloqueiosData.filter(b => b.status === 'ativo').map(bloqueio => {
+                const TipoIcon = bloqueioTipoConfig[bloqueio.tipo]?.icon || AlertOctagon
+                return (
+                  <div
+                    key={bloqueio.id}
+                    style={{
+                      padding: '20px',
+                      background: 'var(--cream)',
+                      borderRadius: '12px',
+                      borderLeft: `4px solid ${prioridadeConfig[bloqueio.prioridade]?.color || 'var(--stone)'}`
+                    }}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start gap-md" style={{ flex: 1 }}>
+                        <div style={{
+                          width: '40px',
+                          height: '40px',
+                          borderRadius: '10px',
+                          background: 'var(--white)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: bloqueioTipoConfig[bloqueio.tipo]?.color || 'var(--brown-light)'
+                        }}>
+                          <TipoIcon size={20} />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 600, color: 'var(--brown)', marginBottom: '4px' }}>
+                            {bloqueio.titulo}
+                          </div>
+                          <div style={{ fontSize: '13px', color: 'var(--brown-light)', marginBottom: '8px' }}>
+                            {bloqueio.descricao}
+                          </div>
+                          <div className="flex items-center gap-md" style={{ fontSize: '12px', color: 'var(--brown-light)' }}>
+                            <span className="flex items-center gap-xs">
+                              <Building2 size={12} />
+                              {bloqueio.projeto.codigo} - {bloqueio.projeto.nome}
+                            </span>
+                            <span className="flex items-center gap-xs">
+                              <User size={12} />
+                              {bloqueio.responsavel}
+                            </span>
+                            <span className="flex items-center gap-xs">
+                              <Calendar size={12} />
+                              {new Date(bloqueio.criado_em).toLocaleDateString('pt-PT')}
+                            </span>
+                          </div>
+                          {bloqueio.impacto && (
+                            <div style={{
+                              marginTop: '10px',
+                              padding: '8px 12px',
+                              background: 'rgba(184, 138, 138, 0.1)',
+                              borderRadius: '6px',
+                              fontSize: '12px',
+                              color: 'var(--error)'
+                            }}>
+                              <strong>Impacto:</strong> {bloqueio.impacto}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-sm">
+                        <span style={{
+                          padding: '4px 10px',
+                          borderRadius: '12px',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          background: prioridadeConfig[bloqueio.prioridade]?.bg,
+                          color: prioridadeConfig[bloqueio.prioridade]?.color
+                        }}>
+                          {prioridadeConfig[bloqueio.prioridade]?.label}
+                        </span>
+                        <span style={{
+                          padding: '4px 10px',
+                          borderRadius: '12px',
+                          fontSize: '11px',
+                          fontWeight: 500,
+                          background: bloqueioTipoConfig[bloqueio.tipo]?.color + '20',
+                          color: bloqueioTipoConfig[bloqueio.tipo]?.color
+                        }}>
+                          {bloqueioTipoConfig[bloqueio.tipo]?.label}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB: Tarefas (Asana-style) */}
+      {activeTab === 'tarefas' && (
+        <div>
+          {/* KPIs Tarefas */}
+          <div className="stats-grid mb-xl" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+            <div className="stat-card">
+              <div className="stat-icon" style={{ background: 'rgba(138, 158, 184, 0.15)' }}>
+                <Kanban size={22} style={{ stroke: 'var(--info)' }} />
+              </div>
+              <div className="stat-value">{realTarefas.filter(t => !t.tarefa_pai_id).length}</div>
+              <div className="stat-label">Total Tarefas</div>
+            </div>
+
+            <div className="stat-card">
+              <div className="stat-icon" style={{ background: 'rgba(138, 158, 184, 0.15)' }}>
+                <Clock size={22} style={{ stroke: 'var(--info)' }} />
+              </div>
+              <div className="stat-value">{realTarefas.filter(t => !t.tarefa_pai_id && t.status === 'em_progresso').length}</div>
+              <div className="stat-label">Em Progresso</div>
+            </div>
+
+            <div className="stat-card">
+              <div className="stat-icon" style={{ background: 'rgba(201, 168, 130, 0.2)' }}>
+                <Circle size={22} style={{ stroke: 'var(--warning)' }} />
+              </div>
+              <div className="stat-value">{realTarefas.filter(t => !t.tarefa_pai_id && t.status === 'pendente').length}</div>
+              <div className="stat-label">Pendentes</div>
+            </div>
+
+            <div className="stat-card">
+              <div className="stat-icon" style={{ background: 'rgba(122, 158, 122, 0.15)' }}>
+                <CheckCircle size={22} style={{ stroke: 'var(--success)' }} />
+              </div>
+              <div className="stat-value">{realTarefas.filter(t => !t.tarefa_pai_id && t.status === 'concluida').length}</div>
+              <div className="stat-label">Concluídas</div>
+            </div>
+          </div>
+
+          {/* Sub-tabs: Por Projeto / Por Pessoa */}
+          <div style={{
+            display: 'flex',
+            gap: '4px',
+            marginBottom: '20px',
+            background: 'var(--stone)',
+            padding: '4px',
+            borderRadius: '10px',
+            width: 'fit-content'
+          }}>
+            <button
+              onClick={() => setTarefasView('projeto')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 20px',
+                background: tarefasView === 'projeto' ? 'var(--white)' : 'transparent',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '13px',
+                fontWeight: tarefasView === 'projeto' ? 600 : 500,
+                color: tarefasView === 'projeto' ? 'var(--brown)' : 'var(--brown-light)',
+                cursor: 'pointer',
+                boxShadow: tarefasView === 'projeto' ? 'var(--shadow-sm)' : 'none'
+              }}
+            >
+              <FolderOpen size={16} />
+              Por Projeto
+            </button>
+            <button
+              onClick={() => setTarefasView('pessoa')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 20px',
+                background: tarefasView === 'pessoa' ? 'var(--white)' : 'transparent',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '13px',
+                fontWeight: tarefasView === 'pessoa' ? 600 : 500,
+                color: tarefasView === 'pessoa' ? 'var(--brown)' : 'var(--brown-light)',
+                cursor: 'pointer',
+                boxShadow: tarefasView === 'pessoa' ? 'var(--shadow-sm)' : 'none'
+              }}
+            >
+              <Users size={16} />
+              Por Pessoa
+            </button>
+          </div>
+
+          {/* Loading state */}
+          {loadingReal ? (
+            <div className="card" style={{ padding: '60px', textAlign: 'center' }}>
+              <Loader2 size={32} style={{ animation: 'spin 1s linear infinite', color: 'var(--brown-light)' }} />
+            </div>
+          ) : (
+            <>
+              {/* Vista: Por Projeto */}
+              {tarefasView === 'projeto' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {Object.entries(getTarefasPorProjeto())
+                    .sort(([a], [b]) => {
+                      if (a === 'sem_projeto') return 1
+                      if (b === 'sem_projeto') return -1
+                      const projA = getProjetoInfo(a)
+                      const projB = getProjetoInfo(b)
+                      return (projB?.codigo || '').localeCompare(projA?.codigo || '')
+                    })
+                    .map(([projectId, tarefas]) => {
+                      const projeto = getProjetoInfo(projectId)
+                      const concluidas = tarefas.filter(t => t.status === 'concluida').length
+                      return (
+                        <div key={projectId} className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                          {/* Project Header */}
+                          <div style={{
+                            padding: '14px 20px',
+                            background: 'var(--cream)',
+                            borderBottom: '1px solid var(--stone)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px'
+                          }}>
+                            <FolderOpen size={18} style={{ color: 'var(--warning)' }} />
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontWeight: 600, color: 'var(--brown)' }}>
+                                {projeto ? `${projeto.codigo} - ${projeto.nome}` : 'Sem Projeto'}
+                              </div>
+                            </div>
+                            <span style={{
+                              fontSize: '12px',
+                              color: 'var(--brown-light)',
+                              background: 'var(--white)',
+                              padding: '4px 10px',
+                              borderRadius: '12px'
+                            }}>
+                              {concluidas}/{tarefas.length} concluídas
+                            </span>
+                          </div>
+
+                          {/* Tasks List */}
+                          <div>
+                            {tarefas.map(tarefa => (
+                              <TarefaRow
+                                key={tarefa.id}
+                                tarefa={tarefa}
+                                getMembroInfo={getMembroInfo}
+                                getProjetoInfo={getProjetoInfo}
+                                showProject={false}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })}
+
+                  {Object.keys(getTarefasPorProjeto()).length === 0 && (
+                    <div className="card" style={{ padding: '60px', textAlign: 'center', color: 'var(--brown-light)' }}>
+                      <LayoutList size={48} style={{ marginBottom: '12px', opacity: 0.5 }} />
+                      <p style={{ margin: 0 }}>Sem tarefas. Cria a primeira na página Tarefas!</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Vista: Por Pessoa */}
+              {tarefasView === 'pessoa' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {Object.entries(getTarefasPorPessoa())
+                    .sort(([a], [b]) => {
+                      if (a === 'sem_atribuicao') return 1
+                      if (b === 'sem_atribuicao') return -1
+                      const membroA = getMembroInfo(a)
+                      const membroB = getMembroInfo(b)
+                      return (membroA?.nome || '').localeCompare(membroB?.nome || '')
+                    })
+                    .map(([personId, tarefas]) => {
+                      const pessoa = getMembroInfo(personId)
+                      const concluidas = tarefas.filter(t => t.status === 'concluida').length
+                      const emProgresso = tarefas.filter(t => t.status === 'em_progresso').length
+                      return (
+                        <div key={personId} className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                          {/* Person Header */}
+                          <div style={{
+                            padding: '14px 20px',
+                            background: 'var(--cream)',
+                            borderBottom: '1px solid var(--stone)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px'
+                          }}>
+                            {pessoa ? (
+                              <div style={{
+                                width: '36px',
+                                height: '36px',
+                                borderRadius: '50%',
+                                background: 'linear-gradient(135deg, var(--blush), var(--blush-dark))',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: 600,
+                                fontSize: '13px',
+                                color: 'var(--brown-dark)'
+                              }}>
+                                {pessoa.nome?.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                              </div>
+                            ) : (
+                              <div style={{
+                                width: '36px',
+                                height: '36px',
+                                borderRadius: '50%',
+                                background: 'var(--stone)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}>
+                                <User size={18} style={{ color: 'var(--brown-light)' }} />
+                              </div>
+                            )}
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontWeight: 600, color: 'var(--brown)' }}>
+                                {pessoa?.nome || 'Sem Atribuição'}
+                              </div>
+                              {pessoa?.funcao && (
+                                <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>
+                                  {pessoa.funcao}
+                                </div>
+                              )}
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              {emProgresso > 0 && (
+                                <span style={{
+                                  fontSize: '11px',
+                                  color: 'var(--info)',
+                                  background: 'rgba(138, 158, 184, 0.15)',
+                                  padding: '4px 10px',
+                                  borderRadius: '12px',
+                                  fontWeight: 500
+                                }}>
+                                  {emProgresso} em progresso
+                                </span>
+                              )}
+                              <span style={{
+                                fontSize: '12px',
+                                color: 'var(--brown-light)',
+                                background: 'var(--white)',
+                                padding: '4px 10px',
+                                borderRadius: '12px'
+                              }}>
+                                {concluidas}/{tarefas.length}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Tasks List */}
+                          <div>
+                            {tarefas.map(tarefa => (
+                              <TarefaRow
+                                key={tarefa.id}
+                                tarefa={tarefa}
+                                getMembroInfo={getMembroInfo}
+                                getProjetoInfo={getProjetoInfo}
+                                showProject={true}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })}
+
+                  {Object.keys(getTarefasPorPessoa()).length === 0 && (
+                    <div className="card" style={{ padding: '60px', textAlign: 'center', color: 'var(--brown-light)' }}>
+                      <Users size={48} style={{ marginBottom: '12px', opacity: 0.5 }} />
+                      <p style={{ margin: 0 }}>Sem tarefas. Cria a primeira na página Tarefas!</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {/* Task Detail Sidebar */}
       {selectedTask && (
@@ -1130,6 +1841,165 @@ export default function Planning() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// Component: TarefaRow (used in Tarefas tab)
+function TarefaRow({ tarefa, getMembroInfo, getProjetoInfo, showProject }) {
+  const responsavel = getMembroInfo(tarefa.responsavel_id)
+  const projeto = getProjetoInfo(tarefa.projeto_id)
+  const isComplete = tarefa.status === 'concluida'
+  const isOverdue = tarefa.data_limite && tarefa.status !== 'concluida' && new Date(tarefa.data_limite) < new Date()
+
+  const getStatusConfig = (status) => {
+    const configs = {
+      pendente: { label: 'A Fazer', color: 'var(--brown-light)', bg: 'var(--stone)' },
+      em_progresso: { label: 'Em Progresso', color: 'var(--info)', bg: 'rgba(138, 158, 184, 0.15)' },
+      em_revisao: { label: 'Em Revisão', color: 'var(--warning)', bg: 'rgba(201, 168, 130, 0.2)' },
+      concluida: { label: 'Concluída', color: 'var(--success)', bg: 'rgba(122, 158, 122, 0.15)' },
+      cancelada: { label: 'Cancelada', color: 'var(--error)', bg: 'rgba(184, 138, 138, 0.15)' }
+    }
+    return configs[status] || configs.pendente
+  }
+
+  const getPrioridadeConfig = (prio) => {
+    const configs = {
+      baixa: { label: 'Baixa', color: 'var(--info)', bg: 'rgba(138, 158, 184, 0.15)' },
+      media: { label: 'Média', color: 'var(--brown)', bg: 'var(--stone)' },
+      alta: { label: 'Alta', color: 'var(--warning)', bg: 'rgba(201, 168, 130, 0.2)' },
+      urgente: { label: 'Urgente', color: 'var(--error)', bg: 'rgba(184, 138, 138, 0.15)' }
+    }
+    return configs[prio?.toLowerCase()] || configs.media
+  }
+
+  const statusConfig = getStatusConfig(tarefa.status)
+  const prioConfig = getPrioridadeConfig(tarefa.prioridade)
+
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '14px',
+      padding: '14px 20px',
+      borderBottom: '1px solid var(--stone)',
+      background: 'var(--white)'
+    }}>
+      {/* Status circle */}
+      <div style={{
+        width: '24px',
+        height: '24px',
+        borderRadius: '50%',
+        border: `2px solid ${statusConfig.color}`,
+        background: isComplete ? statusConfig.color : 'transparent',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0
+      }}>
+        {isComplete && <CheckCircle size={14} style={{ color: 'white' }} />}
+      </div>
+
+      {/* Task info */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{
+          fontWeight: 500,
+          color: isComplete ? 'var(--brown-light)' : 'var(--brown)',
+          textDecoration: isComplete ? 'line-through' : 'none',
+          marginBottom: '2px'
+        }}>
+          {tarefa.titulo}
+        </div>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          fontSize: '12px',
+          color: 'var(--brown-light)'
+        }}>
+          {showProject && projeto && (
+            <>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <FolderOpen size={12} />
+                {projeto.codigo}
+              </span>
+              <span>•</span>
+            </>
+          )}
+          {tarefa.data_limite && (
+            <span style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              color: isOverdue ? 'var(--error)' : 'var(--brown-light)'
+            }}>
+              <Calendar size={12} />
+              {new Date(tarefa.data_limite).toLocaleDateString('pt-PT', { day: 'numeric', month: 'short' })}
+              {isOverdue && ' (Atrasada)'}
+            </span>
+          )}
+          {tarefa.subtarefas && tarefa.subtarefas.length > 0 && (
+            <span style={{
+              fontSize: '10px',
+              background: 'var(--stone)',
+              padding: '2px 6px',
+              borderRadius: '8px'
+            }}>
+              {tarefa.subtarefas.filter(s => s.status === 'concluida').length}/{tarefa.subtarefas.length} subtarefas
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Responsavel avatar */}
+      {!showProject && responsavel && (
+        <div
+          title={responsavel.nome}
+          style={{
+            width: '28px',
+            height: '28px',
+            borderRadius: '50%',
+            background: 'var(--warning)',
+            color: 'white',
+            fontSize: '10px',
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0
+          }}
+        >
+          {responsavel.nome?.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+        </div>
+      )}
+
+      {/* Priority badge */}
+      <span style={{
+        padding: '4px 8px',
+        borderRadius: '6px',
+        fontSize: '10px',
+        fontWeight: 600,
+        background: prioConfig.bg,
+        color: prioConfig.color,
+        flexShrink: 0
+      }}>
+        {prioConfig.label}
+      </span>
+
+      {/* Status badge */}
+      <span style={{
+        padding: '4px 10px',
+        borderRadius: '12px',
+        fontSize: '11px',
+        fontWeight: 500,
+        background: statusConfig.bg,
+        color: statusConfig.color,
+        flexShrink: 0,
+        minWidth: '80px',
+        textAlign: 'center'
+      }}>
+        {statusConfig.label}
+      </span>
     </div>
   )
 }

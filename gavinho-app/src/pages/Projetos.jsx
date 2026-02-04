@@ -1,14 +1,15 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { 
+import {
   Plus, Search, Filter, LayoutGrid, List, MoreVertical, MapPin, Calendar, X,
-  Edit, Trash2, Eye, FolderKanban
+  Edit, Trash2, Eye, FolderKanban, ChevronDown
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
 const fases = ['Todas', 'Proposta', 'Conceito', 'Projeto', 'Licenciamento', 'Construção', 'Fit-out', 'Entrega']
 const tipologias = ['Residencial', 'Hospitalidade', 'Comercial', 'Misto']
-const statusOptions = ['on_track', 'at_risk', 'blocked']
+const statusOptions = ['on_track', 'at_risk', 'delayed', 'on_hold', 'completed']
+const prioridades = ['Todas', 'Urgente', 'Alta', 'Média', 'Baixa']
 
 export default function Projetos() {
   const navigate = useNavigate()
@@ -18,11 +19,13 @@ export default function Projetos() {
   const [viewMode, setViewMode] = useState('grid')
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedFase, setSelectedFase] = useState('Todas')
+  const [selectedPrioridade, setSelectedPrioridade] = useState('Todas')
   const [showModal, setShowModal] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null)
   const [editingProject, setEditingProject] = useState(null)
   const [activeMenu, setActiveMenu] = useState(null)
   const [formData, setFormData] = useState({
+    codigo: '',
     nome: '',
     tipologia: 'Residencial',
     localizacao: '',
@@ -39,57 +42,145 @@ export default function Projetos() {
     orcamento_atual: ''
   })
 
-  // Carregar projetos e clientes
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const [projRes, cliRes] = await Promise.all([
-          supabase.from('projetos').select('*').order('codigo', { ascending: true }),
-          supabase.from('clientes').select('id, nome').order('nome')
-        ])
-        
-        setProjects(projRes.data || [])
-        setClientes(cliRes.data || [])
-      } catch (err) {
-        console.error('Erro ao carregar dados:', err)
-      } finally {
-        setLoading(false)
-      }
+  // Calcular status automatico baseado no timeline
+  const calcularStatusAutomatico = (projeto) => {
+    // Se ja tem status definido explicitamente, usar esse
+    if (projeto.status && projeto.status !== '') {
+      return projeto.status
     }
-    loadData()
-  }, [])
 
-  // Gerar código do projeto
-  const generateProjectCode = async () => {
-    const { data } = await supabase
-      .from('projetos')
-      .select('codigo')
-      .order('codigo', { ascending: true })
-      .limit(1)
-    
-    let nextNum = 1
-    if (data && data.length > 0 && data[0].codigo) {
-      const match = data[0].codigo.match(/GA(\d+)/)
-      if (match) nextNum = parseInt(match[1]) + 1
+    const today = new Date()
+    const dataFim = projeto.data_prevista_conclusao ? new Date(projeto.data_prevista_conclusao) : null
+    const dataInicio = projeto.data_inicio ? new Date(projeto.data_inicio) : null
+    const progress = projeto.progresso || 0
+
+    if (!dataFim || !dataInicio) {
+      return progress >= 25 ? 'on_track' : progress > 0 ? 'at_risk' : 'on_track'
     }
-    return `GA${String(nextNum).padStart(5, '0')}`
+
+    const totalDays = (dataFim - dataInicio) / (1000 * 60 * 60 * 24)
+    const elapsedDays = (today - dataInicio) / (1000 * 60 * 60 * 24)
+    const expectedProgress = totalDays > 0 ? Math.min(100, (elapsedDays / totalDays) * 100) : 0
+
+    if (progress < expectedProgress - 20) return 'delayed'
+    if (progress < expectedProgress - 10) return 'at_risk'
+    return 'on_track'
   }
 
-  // Filtrar projetos
-  const filteredProjects = projects.filter(p => {
-    const matchesSearch = 
-      p.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.codigo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.cliente_nome?.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesFase = selectedFase === 'Todas' || p.fase === selectedFase
-    return matchesSearch && matchesFase
-  })
+  // Carregar projetos, clientes e calcular metricas
+  // Otimizado: usa JOINs do Supabase em vez de queries separadas
+  const loadData = async () => {
+    try {
+      const [projRes, cliRes] = await Promise.all([
+        supabase
+          .from('projetos')
+          .select(`
+            *,
+            projeto_entregaveis(status),
+            projeto_pagamentos(valor, estado)
+          `)
+          .order('codigo', { ascending: true }),
+        supabase.from('clientes').select('id, nome').order('nome')
+      ])
+
+      const projetos = projRes.data || []
+
+      // Calcular progresso e financeiro para cada projeto
+      // Dados ja vem relacionados - sem necessidade de filtrar
+      const projetosComMetricas = projetos.map(p => {
+        const entregaveis = p.projeto_entregaveis || []
+        const pagamentos = p.projeto_pagamentos || []
+
+        // Calcular progresso dos entregaveis
+        let progressoCalculado = p.progresso || 0
+        if (entregaveis.length > 0) {
+          const concluidos = entregaveis.filter(e =>
+            e.status === 'concluido' || e.status === 'aprovado'
+          ).length
+          progressoCalculado = Math.round((concluidos / entregaveis.length) * 100)
+        }
+
+        // Calcular financeiro
+        const valorPago = pagamentos
+          .filter(pg => pg.estado === 'pago')
+          .reduce((sum, pg) => sum + (parseFloat(pg.valor) || 0), 0)
+
+        // Calcular status automatico
+        const statusCalculado = calcularStatusAutomatico({ ...p, progresso: progressoCalculado })
+
+        return {
+          ...p,
+          projeto_entregaveis: undefined, // Remover dados aninhados
+          projeto_pagamentos: undefined,
+          progresso: progressoCalculado,
+          progresso_manual: p.progresso,
+          status_calculado: statusCalculado,
+          valor_pago: valorPago,
+          entregaveis_total: entregaveis.length,
+          entregaveis_concluidos: entregaveis.filter(e =>
+            e.status === 'concluido' || e.status === 'aprovado'
+          ).length
+        }
+      })
+
+      setProjects(projetosComMetricas)
+      setClientes(cliRes.data || [])
+    } catch (err) {
+      // Silent fail - will show empty state
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Carregar dados inicialmente e configurar realtime subscriptions
+  useEffect(() => {
+    loadData()
+
+    // Supabase Realtime subscription para sincronizar alteracoes
+    // Escutar projetos, entregaveis e pagamentos para recalcular metricas
+    const channel = supabase
+      .channel('projetos-sync')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'projetos' },
+        () => loadData()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'projeto_entregaveis' },
+        () => loadData()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'projeto_pagamentos' },
+        () => loadData()
+      )
+      .subscribe()
+
+    // Cleanup subscription
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [])
+
+  // Filtrar projetos - memoizado para evitar recalculos desnecessarios
+  const filteredProjects = useMemo(() => {
+    return projects.filter(p => {
+      const searchLower = searchTerm.toLowerCase()
+      const matchesSearch =
+        p.nome?.toLowerCase().includes(searchLower) ||
+        p.codigo?.toLowerCase().includes(searchLower) ||
+        p.cliente_nome?.toLowerCase().includes(searchLower)
+      const matchesFase = selectedFase === 'Todas' || p.fase === selectedFase
+      return matchesSearch && matchesFase
+    })
+  }, [projects, searchTerm, selectedFase])
 
   // Abrir modal para criar
   const handleNewProject = () => {
     setEditingProject(null)
     setFormData({
-      nome: '', tipologia: 'Residencial', localizacao: '', morada: '', cidade: '',
+      codigo: '', nome: '', tipologia: 'Residencial', localizacao: '', morada: '', cidade: '',
       cliente_id: '', cliente_nome: '', fase: 'Conceito', status: 'on_track',
       progresso: 0, descricao: '', data_inicio: new Date().toISOString().split('T')[0],
       data_prevista_conclusao: '', orcamento_atual: ''
@@ -101,6 +192,7 @@ export default function Projetos() {
   const handleEditProject = (project) => {
     setEditingProject(project)
     setFormData({
+      codigo: project.codigo || '',
       nome: project.nome || '',
       tipologia: project.tipologia || 'Residencial',
       localizacao: project.localizacao || '',
@@ -122,6 +214,10 @@ export default function Projetos() {
 
   // Guardar projeto (criar ou atualizar)
   const handleSaveProject = async () => {
+    if (!formData.codigo.trim()) {
+      alert('O código do projeto é obrigatório')
+      return
+    }
     if (!formData.nome.trim()) {
       alert('O nome do projeto é obrigatório')
       return
@@ -153,6 +249,11 @@ export default function Projetos() {
         updated_at: new Date().toISOString()
       }
 
+      // Incluir código quando estiver a editar
+      if (editingProject && formData.codigo) {
+        projectData.codigo = formData.codigo
+      }
+
       console.log('A guardar projeto:', projectData)
 
       if (editingProject) {
@@ -170,12 +271,9 @@ export default function Projetos() {
         console.log('Projeto atualizado:', data)
       } else {
         // Criar novo
-        const codigo = await generateProjectCode()
-        console.log('Código gerado:', codigo)
-        
         const { data, error } = await supabase
           .from('projetos')
-          .insert([{ ...projectData, codigo }])
+          .insert([{ ...projectData, codigo: formData.codigo.trim() }])
           .select()
 
         if (error) {
@@ -217,7 +315,7 @@ export default function Projetos() {
   }
 
   const getStatusLabel = (status) => {
-    const labels = { on_track: 'No prazo', at_risk: 'Em risco', blocked: 'Bloqueado' }
+    const labels = { on_track: 'Em Andamento', at_risk: 'Em Risco', blocked: 'Bloqueado' }
     return labels[status] || 'N/D'
   }
 
@@ -226,9 +324,40 @@ export default function Projetos() {
     return colors[fase] || '#C3BAAF'
   }
 
+  const getPrioridadeFromOrcamento = (orcamento) => {
+    if (!orcamento) return 'media'
+    if (orcamento >= 500000) return 'urgente'
+    if (orcamento >= 300000) return 'alta'
+    if (orcamento >= 100000) return 'media'
+    return 'baixa'
+  }
+
+  const getPrioridadeStyle = (prioridade) => {
+    const styles = {
+      urgente: { bg: 'var(--priority-urgente)', label: 'URGENTE' },
+      alta: { bg: 'var(--priority-alta)', label: 'ALTA' },
+      media: { bg: 'var(--priority-media)', label: 'MÉDIA' },
+      baixa: { bg: 'var(--priority-baixa)', label: 'BAIXA' }
+    }
+    return styles[prioridade] || styles.media
+  }
+
   const formatCurrency = (value) => {
-    if (!value) return '-'
+    if (!value) return '— €0'
     return new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(value)
+  }
+
+  const formatDateRange = (dataInicio, dataFim) => {
+    const format = (d) => {
+      if (!d) return ''
+      return new Date(d).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    }
+    const inicio = format(dataInicio)
+    const fim = format(dataFim)
+    if (inicio && fim) return `${inicio} - ${fim}`
+    if (inicio) return inicio
+    if (fim) return `até ${fim}`
+    return '—'
   }
 
   if (loading) {
@@ -241,10 +370,11 @@ export default function Projetos() {
 
   return (
     <div className="fade-in">
+      {/* Header */}
       <div className="page-header">
         <div>
           <h1 className="page-title">Projetos</h1>
-          <p className="page-subtitle">{filteredProjects.length} projetos</p>
+          <p className="page-subtitle">Gestão completa de projetos de design & build</p>
         </div>
         <button className="btn btn-primary" onClick={handleNewProject}>
           <Plus size={18} />
@@ -252,22 +382,72 @@ export default function Projetos() {
         </button>
       </div>
 
-      {/* Filtros */}
-      <div className="card mb-lg">
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
-            <Search size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--brown-light)' }} />
-            <input type="text" placeholder="Pesquisar projetos..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ width: '100%', padding: '12px 12px 12px 40px', border: '1px solid var(--stone)', borderRadius: '10px', fontSize: '14px' }} />
-          </div>
-          <select value={selectedFase} onChange={(e) => setSelectedFase(e.target.value)}
-            style={{ padding: '12px 16px', border: '1px solid var(--stone)', borderRadius: '10px', fontSize: '14px', background: 'var(--white)', minWidth: '150px' }}>
-            {fases.map(f => <option key={f} value={f}>{f}</option>)}
+      {/* Filtros - Novo Design */}
+      <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap', alignItems: 'center' }}>
+        {/* Search */}
+        <div style={{ position: 'relative', flex: 1, minWidth: '300px', maxWidth: '450px' }}>
+          <Search size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--brown-light)' }} />
+          <input
+            type="text"
+            placeholder="Procurar por nome, cliente ou localização..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '14px 16px 14px 48px',
+              border: '1px solid var(--stone)',
+              borderRadius: '24px',
+              fontSize: '14px',
+              background: 'var(--white)',
+              color: 'var(--brown)'
+            }}
+          />
+        </div>
+
+        {/* Status Filter */}
+        <div style={{ position: 'relative' }}>
+          <select
+            value={selectedFase}
+            onChange={(e) => setSelectedFase(e.target.value)}
+            style={{
+              padding: '14px 40px 14px 20px',
+              border: '1px solid var(--stone)',
+              borderRadius: '24px',
+              fontSize: '14px',
+              background: 'var(--white)',
+              color: 'var(--brown)',
+              appearance: 'none',
+              cursor: 'pointer',
+              minWidth: '180px'
+            }}
+          >
+            <option value="Todas">Todos os estados</option>
+            {fases.filter(f => f !== 'Todas').map(f => <option key={f} value={f}>{f}</option>)}
           </select>
-          <div style={{ display: 'flex', gap: '4px', background: 'var(--stone)', padding: '4px', borderRadius: '10px' }}>
-            <button onClick={() => setViewMode('grid')} style={{ padding: '8px', background: viewMode === 'grid' ? 'var(--white)' : 'transparent', border: 'none', borderRadius: '6px', cursor: 'pointer' }}><LayoutGrid size={18} /></button>
-            <button onClick={() => setViewMode('list')} style={{ padding: '8px', background: viewMode === 'list' ? 'var(--white)' : 'transparent', border: 'none', borderRadius: '6px', cursor: 'pointer' }}><List size={18} /></button>
-          </div>
+          <ChevronDown size={16} style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--brown-light)', pointerEvents: 'none' }} />
+        </div>
+
+        {/* Priority Filter */}
+        <div style={{ position: 'relative' }}>
+          <select
+            value={selectedPrioridade}
+            onChange={(e) => setSelectedPrioridade(e.target.value)}
+            style={{
+              padding: '14px 40px 14px 20px',
+              border: '1px solid var(--stone)',
+              borderRadius: '24px',
+              fontSize: '14px',
+              background: 'var(--white)',
+              color: 'var(--brown)',
+              appearance: 'none',
+              cursor: 'pointer',
+              minWidth: '180px'
+            }}
+          >
+            <option value="Todas">Todas as prioridades</option>
+            {prioridades.filter(p => p !== 'Todas').map(p => <option key={p} value={p.toLowerCase()}>{p}</option>)}
+          </select>
+          <ChevronDown size={16} style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--brown-light)', pointerEvents: 'none' }} />
         </div>
       </div>
 
@@ -279,55 +459,221 @@ export default function Projetos() {
           <button className="btn btn-primary" style={{ marginTop: '16px' }} onClick={handleNewProject}>Criar Primeiro Projeto</button>
         </div>
       ) : viewMode === 'grid' ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
-          {filteredProjects.map((p) => (
-            <div key={p.id} className="card" style={{ cursor: 'pointer', position: 'relative' }} onClick={() => navigate(`/projetos/${p.codigo}`)}>
-              <div style={{ position: 'absolute', top: '16px', right: '16px' }}>
-                <button onClick={(e) => { e.stopPropagation(); setActiveMenu(activeMenu === p.id ? null : p.id) }} className="btn btn-ghost btn-icon"><MoreVertical size={16} /></button>
-                {activeMenu === p.id && (
-                  <div style={{ position: 'absolute', right: 0, top: '100%', background: 'var(--white)', borderRadius: '10px', boxShadow: 'var(--shadow-lg)', minWidth: '150px', zIndex: 100, overflow: 'hidden' }}>
-                    <button onClick={(e) => { e.stopPropagation(); navigate(`/projetos/${p.codigo}`) }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--brown)' }}><Eye size={14} />Ver Detalhe</button>
-                    <button onClick={(e) => { e.stopPropagation(); handleEditProject(p) }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--brown)' }}><Edit size={14} />Editar</button>
-                    <button onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(p); setActiveMenu(null) }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--error)' }}><Trash2 size={14} />Eliminar</button>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '16px' }}>
+          {filteredProjects.map((p) => {
+            const prioridade = getPrioridadeFromOrcamento(p.orcamento_atual)
+            const prioridadeStyle = getPrioridadeStyle(prioridade)
+            return (
+              <div
+                key={p.id}
+                className="card"
+                style={{
+                  cursor: 'pointer',
+                  position: 'relative',
+                  padding: '20px 20px 16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                  transition: 'box-shadow 0.2s ease'
+                }}
+                onClick={() => navigate(`/projetos/${p.codigo}`)}
+                onMouseEnter={(e) => e.currentTarget.style.boxShadow = 'var(--shadow-lg)'}
+                onMouseLeave={(e) => e.currentTarget.style.boxShadow = 'var(--shadow-sm)'}
+              >
+                {/* Header: Título + Badge + Menu */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                      <h3 style={{
+                        fontSize: '14px',
+                        fontWeight: 600,
+                        color: 'var(--brown)',
+                        margin: 0,
+                        lineHeight: 1.4,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}>
+                        {p.codigo}_{(p.nome || '').toUpperCase()}
+                      </h3>
+                      {p.codigo_interno && (
+                        <span style={{
+                          fontSize: '10px',
+                          fontWeight: 600,
+                          color: 'var(--info)',
+                          background: 'rgba(59, 130, 246, 0.1)',
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          fontFamily: 'monospace'
+                        }}>
+                          {p.codigo_interno}
+                        </span>
+                      )}
+                    </div>
+                    <p style={{
+                      fontSize: '13px',
+                      color: 'var(--brown-light)',
+                      margin: 0
+                    }}>
+                      {p.cliente_nome || 'Cliente não definido'}
+                    </p>
                   </div>
-                )}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                <span style={{ fontFamily: 'monospace', fontWeight: 600, color: 'var(--warning)' }}>{p.codigo}</span>
-                <span style={{ padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 600, background: `${getFaseColor(p.fase)}20`, color: getFaseColor(p.fase) }}>{p.fase}</span>
-              </div>
-              <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '12px' }}>{p.nome}</h3>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                <div style={{ flex: 1, height: '6px', background: 'var(--stone)', borderRadius: '3px', overflow: 'hidden' }}>
-                  <div style={{ width: `${p.progresso || 0}%`, height: '100%', background: getStatusColor(p.status), borderRadius: '3px' }} />
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                    {/* Priority Badge */}
+                    <span style={{
+                      padding: '4px 10px',
+                      fontSize: '9px',
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      borderRadius: '4px',
+                      background: prioridadeStyle.bg,
+                      color: 'white'
+                    }}>
+                      {prioridadeStyle.label}
+                    </span>
+
+                    {/* Menu */}
+                    <div style={{ position: 'relative' }}>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setActiveMenu(activeMenu === p.id ? null : p.id) }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          padding: '4px',
+                          color: 'var(--brown-light)',
+                          borderRadius: '4px'
+                        }}
+                      >
+                        <MoreVertical size={16} />
+                      </button>
+                      {activeMenu === p.id && (
+                        <div style={{
+                          position: 'absolute',
+                          right: 0,
+                          top: '100%',
+                          background: 'var(--white)',
+                          borderRadius: '10px',
+                          boxShadow: 'var(--shadow-lg)',
+                          minWidth: '150px',
+                          zIndex: 100,
+                          overflow: 'hidden'
+                        }}>
+                          <button onClick={(e) => { e.stopPropagation(); navigate(`/projetos/${p.codigo}`) }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--brown)' }}><Eye size={14} />Ver Detalhe</button>
+                          <button onClick={(e) => { e.stopPropagation(); handleEditProject(p) }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--brown)' }}><Edit size={14} />Editar</button>
+                          <button onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(p); setActiveMenu(null) }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--error)' }}><Trash2 size={14} />Eliminar</button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <span style={{ fontSize: '12px', fontWeight: 500 }}>{p.progresso || 0}%</span>
+
+                {/* Meta Info: Localização + Datas */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '16px',
+                  fontSize: '12px',
+                  color: 'var(--brown-light)'
+                }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <MapPin size={13} />
+                    {p.cidade || p.localizacao || '—'}
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <Calendar size={13} />
+                    {formatDateRange(p.data_inicio, p.data_prevista_conclusao)}
+                  </span>
+                </div>
+
+                {/* Progress Bar com percentagem */}
+                <div style={{ marginTop: '8px' }}>
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '4px'
+                  }}>
+                    <span style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
+                      {p.entregaveis_total > 0
+                        ? `${p.entregaveis_concluidos}/${p.entregaveis_total} entregaveis`
+                        : 'Sem entregaveis'}
+                    </span>
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--brown)' }}>
+                      {p.progresso || 0}%
+                    </span>
+                  </div>
+                  <div style={{
+                    width: '100%',
+                    height: '4px',
+                    background: 'var(--stone)',
+                    borderRadius: '2px',
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{
+                      width: `${p.progresso || 0}%`,
+                      height: '100%',
+                      background: getStatusColor(p.status_calculado || p.status),
+                      borderRadius: '2px',
+                      transition: 'width 0.3s ease'
+                    }} />
+                  </div>
+                </div>
+
+                {/* Footer: Status + Financeiro */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginTop: '8px'
+                }}>
+                  <span style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '12px',
+                    color: 'var(--brown-light)'
+                  }}>
+                    <span style={{
+                      width: '6px',
+                      height: '6px',
+                      borderRadius: '50%',
+                      background: getStatusColor(p.status_calculado || p.status)
+                    }} />
+                    {getStatusLabel(p.status_calculado || p.status)}
+                  </span>
+                  {p.orcamento_atual > 0 && (
+                    <span style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
+                      {formatCurrency(p.valor_pago || 0)} / {formatCurrency(p.orcamento_atual)}
+                    </span>
+                  )}
+                </div>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--brown-light)' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><MapPin size={12} />{p.cidade || p.localizacao || '-'}</span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ width: '8px', height: '8px', borderRadius: '50%', background: getStatusColor(p.status) }} />{getStatusLabel(p.status)}</span>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       ) : (
         <div className="card">
           <div className="table-container">
             <table>
               <thead>
-                <tr><th>Código</th><th>Nome</th><th>Fase</th><th>Status</th><th>Progresso</th><th></th></tr>
+                <tr><th>Código</th><th>ID Interno</th><th>Nome</th><th>Fase</th><th>Status</th><th>Progresso</th><th></th></tr>
               </thead>
               <tbody>
                 {filteredProjects.map((p) => (
                   <tr key={p.id} onClick={() => navigate(`/projetos/${p.codigo}`)} style={{ cursor: 'pointer' }}>
                     <td><span style={{ fontWeight: 600, color: 'var(--warning)', fontFamily: 'monospace' }}>{p.codigo}</span></td>
+                    <td><span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--info)', fontFamily: 'monospace' }}>{p.codigo_interno || '—'}</span></td>
                     <td style={{ fontWeight: 500 }}>{p.nome}</td>
                     <td><span style={{ padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 600, background: `${getFaseColor(p.fase)}20`, color: getFaseColor(p.fase) }}>{p.fase}</span></td>
-                    <td><span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ width: '8px', height: '8px', borderRadius: '50%', background: getStatusColor(p.status) }} />{getStatusLabel(p.status)}</span></td>
+                    <td><span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ width: '8px', height: '8px', borderRadius: '50%', background: getStatusColor(p.status_calculado || p.status) }} />{getStatusLabel(p.status_calculado || p.status)}</span></td>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div style={{ width: '60px', height: '6px', background: 'var(--stone)', borderRadius: '3px', overflow: 'hidden' }}><div style={{ width: `${p.progresso || 0}%`, height: '100%', background: getStatusColor(p.status), borderRadius: '3px' }} /></div>
+                        <div style={{ width: '60px', height: '6px', background: 'var(--stone)', borderRadius: '3px', overflow: 'hidden' }}><div style={{ width: `${p.progresso || 0}%`, height: '100%', background: getStatusColor(p.status_calculado || p.status), borderRadius: '3px' }} /></div>
                         <span style={{ fontSize: '12px' }}>{p.progresso || 0}%</span>
+                        {p.entregaveis_total > 0 && <span style={{ fontSize: '10px', color: 'var(--brown-light)' }}>({p.entregaveis_concluidos}/{p.entregaveis_total})</span>}
                       </div>
                     </td>
                     <td>
@@ -359,10 +705,14 @@ export default function Projetos() {
             </div>
             <div style={{ padding: '24px' }}>
               <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '6px', color: 'var(--brown)' }}>Código do Projeto *</label>
+                <input type="text" value={formData.codigo} onChange={(e) => setFormData({...formData, codigo: e.target.value})} placeholder="Ex: GA00123" style={{ width: '100%', padding: '12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box', fontFamily: 'monospace' }} />
+              </div>
+              <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '6px', color: 'var(--brown)' }}>Nome do Projeto *</label>
                 <input type="text" value={formData.nome} onChange={(e) => setFormData({...formData, nome: e.target.value})} placeholder="Ex: Casa Silva" style={{ width: '100%', padding: '12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }} />
               </div>
-              
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '6px', color: 'var(--brown)' }}>Tipologia</label>
@@ -391,7 +741,9 @@ export default function Projetos() {
                   <select value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})} style={{ width: '100%', padding: '12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '14px', background: 'var(--white)' }}>
                     <option value="on_track">No Prazo</option>
                     <option value="at_risk">Em Risco</option>
-                    <option value="blocked">Bloqueado</option>
+                    <option value="delayed">Atrasado</option>
+                    <option value="on_hold">Em Espera</option>
+                    <option value="completed">Concluído</option>
                   </select>
                 </div>
               </div>
@@ -435,7 +787,7 @@ export default function Projetos() {
             </div>
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', padding: '16px 24px', borderTop: '1px solid var(--stone)', background: 'var(--cream)' }}>
               <button onClick={() => setShowModal(false)} className="btn btn-outline">Cancelar</button>
-              <button onClick={handleSaveProject} className="btn btn-primary" disabled={!formData.nome.trim()}>{editingProject ? 'Guardar Alterações' : 'Criar Projeto'}</button>
+              <button onClick={handleSaveProject} className="btn btn-primary" disabled={!formData.codigo.trim() || !formData.nome.trim()}>{editingProject ? 'Guardar Alterações' : 'Criar Projeto'}</button>
             </div>
           </div>
         </div>

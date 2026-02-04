@@ -1,63 +1,101 @@
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import ThemeToggle from './ui/ThemeToggle'
 import {
   LayoutDashboard,
   FolderKanban,
   Users,
   HardHat,
-  UserCircle,
   Calendar,
-  FileText,
   Truck,
   Settings,
-  Kanban,
-  AlertOctagon,
-  MessageSquare,
-  Euro,
-  GanttChart,
   LogOut,
   ChevronDown,
+  ChevronRight,
+  ChevronLeft,
   User,
-  UsersRound
+  UsersRound,
+  Receipt,
+  ShoppingCart,
+  PieChart,
+  Wallet,
+  Library,
+  Database,
+  Shield,
+  FileSearch,
+  Mail,
+  Layers,
+  Eye,
+  EyeOff,
+  Check
 } from 'lucide-react'
 import { useState } from 'react'
 
 const navigation = [
   {
-    section: 'Geral',
+    section: 'Módulo Projetos',
     items: [
-      { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-      { name: 'Projetos', href: '/projetos', icon: FolderKanban, badge: 12 },
-      { name: 'Chat', href: '/chat', icon: MessageSquare },
-    ]
-  },
-  {
-    section: 'Operação',
-    items: [
-      { name: 'Obras', href: '/obras', icon: HardHat, badge: 3 },
-      { name: 'Planning', href: '/planning', icon: GanttChart },
-      { name: 'Bloqueios', href: '/bloqueios', icon: AlertOctagon, badge: 4 },
-      { name: 'Tarefas', href: '/tarefas', icon: Kanban },
+      { name: 'Dashboard Projetos', href: '/dashboard-projetos', icon: LayoutDashboard },
+      { name: 'Projetos', href: '/projetos', icon: FolderKanban },
+      { name: 'Workspace', href: '/workspace', icon: Layers },
       { name: 'Calendário', href: '/calendario', icon: Calendar },
+      { name: 'Biblioteca', href: '/biblioteca', icon: Library },
     ]
   },
   {
-    section: 'Gestão',
+    section: 'Módulo Obras',
+    adminOnly: true, // Restrito a administradores
     items: [
-      { name: 'Dashboard Gestão', href: '/gestao', icon: LayoutDashboard },
-      { name: 'Recursos Humanos', href: '/equipa', icon: UsersRound },
+      { name: 'Dashboard Obras', href: '/obras', icon: HardHat },
+      { name: 'Gestão Obras', href: '/gestao-obras', icon: UsersRound },
+    ]
+  },
+  {
+    section: 'Gestão Projetos',
+    adminOnly: true, // Restrito a administradores
+    items: [
+      { name: 'Gestão de Projeto', href: '/gestao-projeto', icon: LayoutDashboard, highlight: true },
+      { name: 'Emails', href: '/emails', icon: Mail },
       { name: 'Clientes', href: '/clientes', icon: Users },
-      { name: 'Orçamentos', href: '/orcamentos', icon: FileText },
-      { name: 'Controlo Custos', href: '/financeiro', icon: Euro },
+      { name: 'Viabilidade', href: '/viabilidade', icon: FileSearch },
+      {
+        name: 'Gestão Financeira',
+        href: '/financeiro',
+        icon: Wallet,
+        subItems: [
+          { name: 'Orçamentos', href: '/financeiro?tab=orcamentos', icon: Receipt },
+          { name: 'Compras', href: '/financeiro?tab=compras', icon: ShoppingCart },
+          { name: 'Controlo Executado', href: '/financeiro?tab=controlo', icon: PieChart }
+        ]
+      },
       { name: 'Fornecedores', href: '/fornecedores', icon: Truck },
+    ]
+  },
+  {
+    section: 'Administração',
+    adminOnly: true, // Restrito a administradores
+    items: [
+      { name: 'Recursos Humanos', href: '/equipa', icon: UsersRound },
+      { name: 'Seed de Dados', href: '/admin/seed', icon: Database },
+      { name: 'Configurações', href: '/configuracoes', icon: Settings },
     ]
   }
 ]
 
-export default function Sidebar({ isOpen, onClose, isMobile }) {
-  const { user, signOut, getUserName, getUserInitials, getUserAvatar } = useAuth()
+export default function Sidebar({ isOpen, onClose, isMobile, collapsed, onToggleCollapse, isWorkspace }) {
+  const { user, signOut, getUserName, getUserInitials, getUserAvatar, isAdmin } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const [expandedItems, setExpandedItems] = useState({})
+  const [viewAsRole, setViewAsRole] = useState(null) // null = normal, 'user' = ver como utilizador normal
+  const [showViewAsMenu, setShowViewAsMenu] = useState(false)
+
+  // Verificar se deve mostrar como admin (real ou simulado)
+  const shouldShowAsAdmin = () => {
+    if (viewAsRole === 'user') return false
+    return isAdmin()
+  }
 
   const handleLogout = async () => {
     try {
@@ -83,82 +121,330 @@ export default function Sidebar({ isOpen, onClose, isMobile }) {
     }
   }
 
+  const toggleExpanded = (itemName) => {
+    setExpandedItems(prev => ({
+      ...prev,
+      [itemName]: !prev[itemName]
+    }))
+  }
+
+  const isItemActive = (item) => {
+    const basePath = item.href.split('?')[0]
+    return location.pathname === basePath || location.pathname.startsWith(basePath + '/')
+  }
+
+  const renderNavItem = (item) => {
+    const hasSubItems = item.subItems && item.subItems.length > 0
+    const isExpanded = expandedItems[item.name]
+    const isActive = isItemActive(item)
+
+    // Collapsed mode - show only icons with custom tooltip
+    if (collapsed) {
+      return (
+        <NavLink
+          key={item.name}
+          to={item.href}
+          end={item.href === '/'}
+          onClick={handleNavClick}
+          className={({ isActive }) =>
+            `nav-item nav-item-collapsed ${isActive ? 'active' : ''} ${item.highlight ? 'nav-item-highlight' : ''}`
+          }
+        >
+          <item.icon size={20} />
+          <span className="nav-tooltip">{item.name}</span>
+        </NavLink>
+      )
+    }
+
+    if (hasSubItems) {
+      return (
+        <div key={item.name}>
+          <div
+            onClick={() => toggleExpanded(item.name)}
+            className={`nav-item ${isActive ? 'active' : ''}`}
+            style={{ cursor: 'pointer' }}
+          >
+            <item.icon size={18} />
+            <span style={{ flex: 1 }}>{item.name}</span>
+            <ChevronRight
+              size={16}
+              style={{
+                transition: 'transform 0.2s',
+                transform: isExpanded ? 'rotate(90deg)' : 'rotate(0)'
+              }}
+            />
+          </div>
+          {isExpanded && (
+            <div style={{ marginLeft: '12px', borderLeft: '1px solid var(--stone)', marginTop: '4px' }}>
+              {item.subItems.map(subItem => (
+                <NavLink
+                  key={subItem.name}
+                  to={subItem.href}
+                  onClick={handleNavClick}
+                  className="nav-item nav-subitem"
+                  style={{
+                    paddingLeft: '20px',
+                    fontSize: '13px'
+                  }}
+                >
+                  <subItem.icon size={16} />
+                  <span style={{ flex: 1 }}>{subItem.name}</span>
+                </NavLink>
+              ))}
+            </div>
+          )}
+        </div>
+      )
+    }
+
+    return (
+      <NavLink
+        key={item.name}
+        to={item.href}
+        end={item.href === '/'}
+        onClick={handleNavClick}
+        className={({ isActive }) =>
+          `nav-item ${isActive ? 'active' : ''} ${item.highlight ? 'nav-item-highlight' : ''}`
+        }
+      >
+        <item.icon size={18} />
+        <span style={{ flex: 1 }}>{item.name}</span>
+        {item.badge && (
+          <span className="nav-item-badge">{item.badge}</span>
+        )}
+      </NavLink>
+    )
+  }
+
   return (
-    <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
+    <aside className={`sidebar ${isOpen ? 'open' : ''} ${collapsed ? 'collapsed' : ''}`}>
       {/* Logo */}
-      <div className="sidebar-header">
-        <NavLink to="/" className="sidebar-logo" onClick={handleNavClick}>
+      <div className="sidebar-header" style={collapsed ? { justifyContent: 'center', padding: '16px 8px' } : {}}>
+        <NavLink to="/" className="sidebar-logo" onClick={handleNavClick} style={collapsed ? { gap: 0 } : {}}>
           <div className="logo-mark">G</div>
-          <span className="logo-text">GAVINHO</span>
+          {!collapsed && <span className="logo-text">GAVINHO</span>}
         </NavLink>
       </div>
 
+      {/* Collapse Toggle Button */}
+      {!isMobile && (
+        <button
+          onClick={onToggleCollapse}
+          className="sidebar-collapse-btn"
+          title={collapsed ? 'Expandir sidebar' : 'Colapsar sidebar'}
+          style={{
+            position: 'absolute',
+            top: '70px',
+            right: collapsed ? '50%' : '-12px',
+            transform: collapsed ? 'translateX(50%)' : 'none',
+            width: '24px',
+            height: '24px',
+            borderRadius: '50%',
+            background: 'var(--white)',
+            border: '1px solid var(--stone)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'var(--brown-light)',
+            zIndex: 10,
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+            transition: 'all 0.2s'
+          }}
+        >
+          {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+        </button>
+      )}
+
       {/* Navigation */}
       <nav className="sidebar-nav">
-        {navigation.map((group) => (
+        {navigation
+          .filter(group => !group.adminOnly || shouldShowAsAdmin())
+          .map((group, index) => (
           <div key={group.section} className="nav-section">
-            <div className="nav-section-title">{group.section}</div>
-            {group.items.map((item) => (
-              <NavLink
-                key={item.name}
-                to={item.href}
-                end={item.href === '/'}
-                onClick={handleNavClick}
-                className={({ isActive }) =>
-                  `nav-item ${isActive ? 'active' : ''}`
-                }
-              >
-                <item.icon size={18} />
-                <span style={{ flex: 1 }}>{item.name}</span>
-                {item.badge && (
-                  <span className="nav-item-badge">{item.badge}</span>
-                )}
-              </NavLink>
-            ))}
+            {!collapsed && <div className="nav-section-title">{group.section}</div>}
+            {collapsed && index > 0 && <div className="nav-section-divider" />}
+            {group.items.map((item) => renderNavItem(item))}
           </div>
         ))}
       </nav>
 
       {/* Footer */}
-      <div className="sidebar-footer">
-        <NavLink to="/configuracoes" className="nav-item">
-          <Settings size={18} />
-          <span style={{ flex: 1 }}>Configurações</span>
-        </NavLink>
-        
+      <div className="sidebar-footer" style={collapsed ? { padding: '12px 8px' } : {}}>
+        {/* Theme Toggle */}
+        <div style={{
+          marginBottom: collapsed ? '8px' : '12px',
+          display: 'flex',
+          justifyContent: collapsed ? 'center' : 'flex-start',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <ThemeToggle size={collapsed ? 'sm' : 'md'} />
+          {!collapsed && (
+            <span style={{ fontSize: '12px', color: 'var(--brown-light)', fontWeight: 500 }}>
+              Tema
+            </span>
+          )}
+        </div>
+
+        {/* View As indicator - collapsed mode */}
+        {isAdmin() && collapsed && (
+          <div
+            className="view-as-indicator"
+            onClick={() => setViewAsRole(viewAsRole ? null : 'user')}
+            style={{
+              background: viewAsRole ? 'rgba(239, 68, 68, 0.15)' : 'var(--cream)',
+              border: viewAsRole ? '2px solid rgba(239, 68, 68, 0.4)' : '1px solid var(--stone)',
+              color: viewAsRole ? '#dc2626' : 'var(--brown-light)'
+            }}
+            title={viewAsRole ? 'A ver como: Utilizador - Clique para voltar ao normal' : 'Visualizar como utilizador normal'}
+          >
+            {viewAsRole ? <EyeOff size={16} /> : <Eye size={16} />}
+            <div className="user-tooltip" style={{ minWidth: '160px' }}>
+              <div className="tooltip-name">{viewAsRole ? 'Modo: Utilizador' : 'Visualizar como...'}</div>
+              <div className="tooltip-role">{viewAsRole ? 'Clique para voltar ao normal' : 'Clique para simular utilizador'}</div>
+            </div>
+          </div>
+        )}
+
+        {/* View As - apenas para admins reais */}
+        {isAdmin() && !collapsed && (
+          <div style={{ marginBottom: '12px', position: 'relative' }}>
+            <button
+              onClick={() => setShowViewAsMenu(!showViewAsMenu)}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px',
+                padding: '10px 12px',
+                background: viewAsRole ? 'rgba(239, 68, 68, 0.1)' : 'var(--cream)',
+                border: viewAsRole ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid var(--stone)',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                color: viewAsRole ? '#dc2626' : 'var(--brown)',
+                fontWeight: 500
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {viewAsRole ? <EyeOff size={14} /> : <Eye size={14} />}
+                <span>{viewAsRole ? 'A ver como: Utilizador' : 'Visualizar como...'}</span>
+              </div>
+              <ChevronDown size={14} style={{ transform: showViewAsMenu ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+            </button>
+
+            {showViewAsMenu && (
+              <div style={{
+                position: 'absolute',
+                bottom: '100%',
+                left: 0,
+                right: 0,
+                marginBottom: '4px',
+                background: 'var(--white)',
+                borderRadius: '8px',
+                boxShadow: 'var(--shadow-lg)',
+                overflow: 'hidden',
+                zIndex: 100
+              }}>
+                <div style={{ padding: '8px 12px', fontSize: '11px', color: 'var(--brown-light)', borderBottom: '1px solid var(--stone)' }}>
+                  Visualizar plataforma como:
+                </div>
+                <button
+                  onClick={() => { setViewAsRole(null); setShowViewAsMenu(false); }}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '10px 12px',
+                    background: !viewAsRole ? 'var(--cream)' : 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    color: 'var(--brown)',
+                    textAlign: 'left'
+                  }}
+                >
+                  <Shield size={14} />
+                  Administrador (normal)
+                  {!viewAsRole && <Check size={14} style={{ marginLeft: 'auto', color: 'var(--success)' }} />}
+                </button>
+                <button
+                  onClick={() => { setViewAsRole('user'); setShowViewAsMenu(false); }}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '10px 12px',
+                    background: viewAsRole === 'user' ? 'var(--cream)' : 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    color: 'var(--brown)',
+                    textAlign: 'left'
+                  }}
+                >
+                  <User size={14} />
+                  Utilizador normal
+                  {viewAsRole === 'user' && <Check size={14} style={{ marginLeft: 'auto', color: 'var(--success)' }} />}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* User Card with Dropdown */}
         <div style={{ position: 'relative' }}>
-          <div 
-            className="user-card"
+          <div
+            className={`user-card ${collapsed ? 'user-card-collapsed' : ''}`}
             onClick={() => setShowUserMenu(!showUserMenu)}
-            style={{ cursor: 'pointer' }}
+            style={collapsed ? {
+              cursor: 'pointer',
+              justifyContent: 'center',
+              padding: '8px'
+            } : { cursor: 'pointer' }}
           >
             {getUserAvatar() ? (
-              <img 
-                src={getUserAvatar()} 
+              <img
+                src={getUserAvatar()}
                 alt={getUserName()}
                 style={{
-                  width: '36px',
-                  height: '36px',
+                  width: collapsed ? '32px' : '36px',
+                  height: collapsed ? '32px' : '36px',
                   borderRadius: '50%',
                   objectFit: 'cover'
                 }}
               />
             ) : (
-              <div className="user-avatar">{getUserInitials()}</div>
+              <div className="user-avatar" style={collapsed ? { width: '32px', height: '32px', fontSize: '11px' } : {}}>
+                {getUserInitials()}
+              </div>
             )}
-            <div className="user-info">
-              <div className="user-name">{getUserName()}</div>
-              <div className="user-role">{getUserRole()}</div>
-            </div>
-            <ChevronDown 
-              size={16} 
-              style={{ 
-                color: 'var(--brown-light)',
-                transform: showUserMenu ? 'rotate(180deg)' : 'rotate(0)',
-                transition: 'transform 0.2s'
-              }} 
-            />
+            {!collapsed && (
+              <>
+                <div className="user-info">
+                  <div className="user-name">{getUserName()}</div>
+                  <div className="user-role">{getUserRole()}</div>
+                </div>
+                <ChevronDown
+                  size={16}
+                  style={{
+                    color: 'var(--brown-light)',
+                    transform: showUserMenu ? 'rotate(180deg)' : 'rotate(0)',
+                    transition: 'transform 0.2s'
+                  }}
+                />
+              </>
+            )}
+            {collapsed && (
+              <div className="user-tooltip">
+                <div className="tooltip-name">{getUserName()}</div>
+                <div className="tooltip-role">{getUserRole()}</div>
+              </div>
+            )}
           </div>
 
           {/* User Menu Dropdown */}

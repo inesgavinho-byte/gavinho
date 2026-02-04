@@ -1,0 +1,104 @@
+/* =====================================================
+   THEME TOGGLE - Estilos do botão de alternar tema
+   ===================================================== */
+
+.theme-toggle {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--cream);
+  border: 2px solid var(--stone);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.theme-toggle:hover {
+  background: var(--stone);
+  border-color: var(--gold);
+  transform: scale(1.05);
+}
+
+.theme-toggle:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--gold-light);
+}
+
+.theme-toggle:active {
+  transform: scale(0.95);
+}
+
+/* Dark mode styles */
+.theme-toggle-dark {
+  background: var(--brown);
+  border-color: var(--gold-dark);
+}
+
+.theme-toggle-dark:hover {
+  background: var(--brown-light);
+  border-color: var(--gold);
+}
+
+/* Icons container */
+.theme-toggle-icons {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Individual icons */
+.theme-toggle-icon {
+  position: absolute;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  color: var(--brown-light);
+}
+
+.theme-toggle-sun {
+  opacity: 0;
+  transform: rotate(-90deg) scale(0.5);
+}
+
+.theme-toggle-sun.active {
+  opacity: 1;
+  transform: rotate(0deg) scale(1);
+  color: var(--gold-dark);
+}
+
+.theme-toggle-moon {
+  opacity: 0;
+  transform: rotate(90deg) scale(0.5);
+}
+
+.theme-toggle-moon.active {
+  opacity: 1;
+  transform: rotate(0deg) scale(1);
+  color: var(--gold);
+}
+
+/* Label */
+.theme-toggle-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--brown);
+  white-space: nowrap;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .theme-toggle,
+  .theme-toggle-icon {
+    transition: none;
+  }
+
+  .theme-toggle:hover {
+    transform: none;
+  }
+
+  .theme-toggle:active {
+    transform: none;
+  }
+}

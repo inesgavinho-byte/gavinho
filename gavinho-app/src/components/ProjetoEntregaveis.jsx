@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
-import { 
+import {
   Plus, Upload, FileText, ChevronRight, ChevronDown, Edit2, Trash2, Save, X,
   Calendar, User, CheckCircle, Clock, AlertCircle, Download, FileSpreadsheet,
-  Loader2, MoreVertical, Eye
+  Loader2, MoreVertical, Eye, CheckSquare, Square, Paperclip, Shield,
+  GripVertical, ChevronUp, FolderPlus
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
+import { DeliveryFileSection } from './deliveries'
 
 const statusConfig = {
   'pendente': { label: 'Pendente', color: 'var(--brown-light)', bg: 'var(--stone)' },
@@ -23,9 +25,20 @@ export default function ProjetoEntregaveis({ projeto }) {
   const [saving, setSaving] = useState(false)
   const fileInputRef = useRef(null)
 
+  // Estado para seleção múltipla
+  const [selectedItems, setSelectedItems] = useState(new Set())
+
+  // Estado para edição inline
+  const [editingCell, setEditingCell] = useState(null) // { id: itemId, field: 'status' | 'executante' }
+
+  // Lista de utilizadores (Recursos Humanos)
+  const [utilizadores, setUtilizadores] = useState([])
+
   const [formData, setFormData] = useState({
     codigo: '',
     nome: '',
+    fase: '',
+    categoria: '',
     escala: '',
     data_inicio: '',
     data_conclusao: '',
@@ -34,15 +47,87 @@ export default function ProjetoEntregaveis({ projeto }) {
     notas: ''
   })
 
+  // Opções de fases predefinidas
+  const FASES_OPCOES = [
+    'Projeto Base',
+    'Projeto de Execução',
+    'Licenciamento',
+    'Construção',
+    'Fiscalização'
+  ]
+
   // Estado para controlar visualização por fase
   const [viewMode, setViewMode] = useState('fase') // 'fase' ou 'codigo'
   const [expandedFases, setExpandedFases] = useState({})
 
+  // Estado para modal de ficheiros
+  const [fileModalItem, setFileModalItem] = useState(null)
+
+  // Estado para modal de nova fase
+  const [showFaseModal, setShowFaseModal] = useState(false)
+  const [newFaseName, setNewFaseName] = useState('')
+  const [savingFase, setSavingFase] = useState(false)
+
+  // Estado para edição de fase
+  const [editingFase, setEditingFase] = useState(null) // { nome: 'Projeto Base', newName: '' }
+
+  // Estado para modal de subcategoria
+  const [showSubcategoriaModal, setShowSubcategoriaModal] = useState(false)
+  const [subcategoriaData, setSubcategoriaData] = useState({ fase: '', nome: '', prefixoCodigo: '' })
+  const [editingSubcategoriaMode, setEditingSubcategoriaMode] = useState({}) // { 'fase__categoria': true }
+
+  // Estado para cache de ficheiros atuais (para mostrar ícones)
+  const [filesCache, setFilesCache] = useState({})
+
   useEffect(() => {
     if (projeto?.id) {
       loadEntregaveis()
+      loadUtilizadores()
+      loadFilesCache()
     }
   }, [projeto?.id])
+
+  // Carregar cache de ficheiros para mostrar ícones na lista
+  const loadFilesCache = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('entrega_ficheiros')
+        .select('entregavel_id, versao, aprovado_construcao')
+        .eq('projeto_id', projeto.id)
+        .eq('versao_atual', true)
+
+      if (!error && data) {
+        const cache = {}
+        data.forEach(f => {
+          cache[f.entregavel_id] = {
+            hasFile: true,
+            version: f.versao,
+            approved: f.aprovado_construcao
+          }
+        })
+        setFilesCache(cache)
+      }
+    } catch (err) {
+      // Silently fail - table might not exist yet
+      console.log('Files cache not loaded (table may not exist)')
+    }
+  }
+
+  // Carregar utilizadores (Recursos Humanos)
+  const loadUtilizadores = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('utilizadores')
+        .select('id, nome, cargo, departamento')
+        .eq('ativo', true)
+        .order('nome')
+
+      if (error) throw error
+      setUtilizadores(data || [])
+    } catch (err) {
+      console.error('Erro ao carregar utilizadores:', err)
+    }
+  }
 
   const loadEntregaveis = async (resetExpanded = true) => {
     try {
@@ -114,6 +199,8 @@ export default function ProjetoEntregaveis({ projeto }) {
         projeto_id: projeto.id,
         codigo: formData.codigo.trim(),
         nome: formData.nome.trim(),
+        fase: formData.fase || null,
+        categoria: formData.categoria || null,
         escala: formData.escala || null,
         data_inicio: formData.data_inicio || null,
         data_conclusao: formData.data_conclusao || null,
@@ -128,11 +215,21 @@ export default function ProjetoEntregaveis({ projeto }) {
           .update(itemData)
           .eq('id', editingItem.id)
         if (error) throw error
+
+        // Se adicionou executante e tem datas (e não tinha antes), criar tarefa
+        if (itemData.executante && itemData.data_inicio && !editingItem.executante) {
+          await criarTarefaEntregavel(itemData, itemData.executante)
+        }
       } else {
         const { error } = await supabase
           .from('projeto_entregaveis')
           .insert([itemData])
         if (error) throw error
+
+        // Se criou com executante e datas, criar tarefa
+        if (itemData.executante && itemData.data_inicio) {
+          await criarTarefaEntregavel(itemData, itemData.executante)
+        }
       }
 
       setShowModal(false)
@@ -163,11 +260,107 @@ export default function ProjetoEntregaveis({ projeto }) {
     }
   }
 
+  // Seleção múltipla
+  const toggleSelectItem = (id) => {
+    setSelectedItems(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(id)) {
+        newSet.delete(id)
+      } else {
+        newSet.add(id)
+      }
+      return newSet
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedItems.size === entregaveis.length) {
+      setSelectedItems(new Set())
+    } else {
+      setSelectedItems(new Set(entregaveis.map(e => e.id)))
+    }
+  }
+
+  const handleDeleteSelected = async () => {
+    if (selectedItems.size === 0) return
+    if (!confirm(`Tem certeza que deseja eliminar ${selectedItems.size} entregável(is)?`)) return
+
+    try {
+      const { error } = await supabase
+        .from('projeto_entregaveis')
+        .delete()
+        .in('id', Array.from(selectedItems))
+      if (error) throw error
+      setSelectedItems(new Set())
+      loadEntregaveis(false)
+    } catch (err) {
+      console.error('Erro ao eliminar:', err)
+      alert('Erro ao eliminar: ' + err.message)
+    }
+  }
+
+  // Atualização inline de um campo específico
+  const handleInlineUpdate = async (itemId, field, value) => {
+    try {
+      const { error } = await supabase
+        .from('projeto_entregaveis')
+        .update({ [field]: value })
+        .eq('id', itemId)
+
+      if (error) throw error
+
+      // Buscar item atualizado para verificar se deve criar tarefa
+      const item = entregaveis.find(e => e.id === itemId)
+      const updatedItem = { ...item, [field]: value }
+
+      // Se atribuiu executante e tem datas, criar tarefa
+      if (field === 'executante' && value && updatedItem.data_inicio) {
+        await criarTarefaEntregavel(updatedItem, value)
+      }
+
+      // Atualizar estado local imediatamente
+      setEntregaveis(prev => prev.map(item =>
+        item.id === itemId ? { ...item, [field]: value } : item
+      ))
+      setEditingCell(null)
+    } catch (err) {
+      console.error('Erro ao atualizar:', err)
+      alert('Erro ao atualizar')
+    }
+  }
+
+  // Criar tarefa automaticamente ao atribuir executante com datas
+  const criarTarefaEntregavel = async (entregavel, executanteNome) => {
+    try {
+      // Encontrar o utilizador pelo nome
+      const utilizador = utilizadores.find(u => u.nome === executanteNome)
+
+      const { error } = await supabase.from('tarefas').insert([{
+        titulo: `[ENTREGÁVEL] ${entregavel.codigo} - ${entregavel.nome}`,
+        descricao: `Entregável do projeto: ${entregavel.nome}\nEscala: ${entregavel.escala || '-'}\nFase: ${entregavel.fase || '-'}`,
+        projeto_id: projeto.id,
+        responsavel_id: utilizador?.id || null,
+        responsavel_nome: executanteNome,
+        status: 'pendente',
+        prioridade: 'media',
+        data_limite: entregavel.data_conclusao || entregavel.data_inicio,
+        categoria: 'entregavel'
+      }])
+
+      if (error) throw error
+      console.log('Tarefa criada para entregável:', entregavel.codigo)
+    } catch (err) {
+      console.error('Erro ao criar tarefa:', err)
+    }
+  }
+
   const handleEdit = (item) => {
     setEditingItem(item)
     setFormData({
       codigo: item.codigo,
       nome: item.nome,
+      fase: item.fase || '',
+      categoria: item.categoria || '',
       escala: item.escala || '',
       data_inicio: item.data_inicio || '',
       data_conclusao: item.data_conclusao || '',
@@ -182,6 +375,8 @@ export default function ProjetoEntregaveis({ projeto }) {
     setFormData({
       codigo: '',
       nome: '',
+      fase: '',
+      categoria: '',
       escala: '',
       data_inicio: '',
       data_conclusao: '',
@@ -205,9 +400,9 @@ export default function ProjetoEntregaveis({ projeto }) {
       let headerRow = -1
       for (let i = 0; i < Math.min(10, rows.length); i++) {
         const row = rows[i]
-        if (row && row.some(cell => 
-          cell && typeof cell === 'string' && 
-          (cell.toUpperCase().includes('COD') || cell.toUpperCase().includes('DESENHO'))
+        if (row && row.some(cell =>
+          cell && typeof cell === 'string' &&
+          (cell.toUpperCase().includes('COD') || cell.toUpperCase().includes('DESENHO') || cell.toUpperCase().includes('DESCRI'))
         )) {
           headerRow = i
           break
@@ -220,17 +415,32 @@ export default function ProjetoEntregaveis({ projeto }) {
       }
 
       const headers = rows[headerRow].map(h => (h || '').toString().toUpperCase().trim())
-      const codigoIdx = headers.findIndex(h => h.includes('COD'))
-      const nomeIdx = headers.findIndex(h => h.includes('DESENHO') && !h.includes('ESCALA'))
+      // Procurar colunas - usar fallback para primeira e segunda coluna
+      let codigoIdx = headers.findIndex(h => h.includes('COD') || h.includes('CODIGO'))
+      let nomeIdx = headers.findIndex(h => (h.includes('DESENHO') || h.includes('DESCRI') || h.includes('DESCRICAO') || h.includes('NOME')) && !h.includes('ESCALA'))
+      // Fallback: usar primeira e segunda coluna se nao encontrar
+      if (codigoIdx === -1 && headers.length >= 2) codigoIdx = 0
+      if (nomeIdx === -1 && headers.length >= 2) nomeIdx = 1
+      console.log('Headers:', headers, 'codigoIdx:', codigoIdx, 'nomeIdx:', nomeIdx)
       const escalaIdx = headers.findIndex(h => h.includes('ESCALA'))
-      const dataInicioIdx = headers.findIndex(h => h.includes('INÍCIO') || h.includes('INICIO'))
+      const faseIdx = headers.findIndex(h => h.includes('FASE'))
+      const dataInicioIdx = headers.findIndex(h => h.includes('INÀCIO') || h.includes('INICIO'))
       const dataConclusaoIdx = headers.findIndex(h => h.includes('CONCLUS'))
       const estadoIdx = headers.findIndex(h => h.includes('ESTADO') || h.includes('STATUS'))
       const executanteIdx = headers.findIndex(h => h.includes('EXECUTANTE') || h.includes('PESSOA'))
 
       if (codigoIdx === -1 || nomeIdx === -1) {
-        alert('Colunas COD. DESENHO e DESENHO são obrigatórias')
+        alert('Colunas CÓDIGO e DESCRIÇÃO (ou DESENHO) são obrigatórias')
         return
+      }
+
+      // Perguntar ao utilizador qual a fase
+      let faseDefault = 'Projeto Base'
+      if (typeof faseIdx === 'undefined' || faseIdx === -1) {
+        const faseEscolhida = prompt('Qual a fase destes entregaveis?\n\n1 - Projeto Base\n2 - Projeto de Execucao (PEXA)\n3 - Licenciamento\n4 - Construcao\n\nDigite o numero ou nome:', '1')
+        if (!faseEscolhida) return
+        const faseMap = { '1': 'Projeto Base', '2': 'Projeto de Execução', '3': 'Licenciamento', '4': 'Construção', 'pexa': 'Projeto de Execução' }
+        faseDefault = faseMap[faseEscolhida.toLowerCase().trim()] || faseEscolhida.trim()
       }
 
       const items = []
@@ -242,8 +452,12 @@ export default function ProjetoEntregaveis({ projeto }) {
         const nome = row[nomeIdx]?.toString().trim()
         if (!codigo || !nome) continue
 
+        // Usar fase da coluna ou faseDefault
+        const fase = faseIdx >= 0 ? (row[faseIdx]?.toString().trim() || faseDefault) : faseDefault
+
         items.push({
           projeto_id: projeto.id,
+          fase,
           codigo,
           nome,
           escala: escalaIdx >= 0 ? row[escalaIdx]?.toString().trim() || null : null,
@@ -266,7 +480,7 @@ export default function ProjetoEntregaveis({ projeto }) {
 
       if (error) throw error
 
-      alert(`✓ Importados ${items.length} entregáveis`)
+      alert(`âœ“ Importados ${items.length} entregáveis`)
       loadEntregaveis()
     } catch (err) {
       console.error('Erro ao importar:', err)
@@ -314,6 +528,207 @@ export default function ProjetoEntregaveis({ projeto }) {
 
   const toggleGroup = (codigo) => {
     setExpandedGroups(prev => ({ ...prev, [codigo]: !prev[codigo] }))
+  }
+
+  // Criar nova fase de projeto
+  const handleCreateFase = async () => {
+    if (!newFaseName.trim()) {
+      alert('O nome da fase é obrigatório')
+      return
+    }
+
+    // Verificar se a fase já existe
+    if (FASES_OPCOES.includes(newFaseName.trim()) ||
+        entregaveis.some(e => e.fase === newFaseName.trim())) {
+      alert('Esta fase já existe')
+      return
+    }
+
+    setSavingFase(true)
+    try {
+      // Criar um item "placeholder" para a fase (sem código de desenho)
+      // Isso permite que a fase apareça mesmo vazia
+      const { error } = await supabase
+        .from('projeto_entregaveis')
+        .insert([{
+          projeto_id: projeto.id,
+          fase: newFaseName.trim(),
+          codigo: `${newFaseName.trim().substring(0, 3).toUpperCase()}.00`,
+          nome: `Fase: ${newFaseName.trim()}`,
+          categoria: 'Geral',
+          status: 'pendente'
+        }])
+
+      if (error) throw error
+
+      setShowFaseModal(false)
+      setNewFaseName('')
+      loadEntregaveis(false)
+      // Expandir a nova fase
+      setExpandedFases(prev => ({ ...prev, [newFaseName.trim()]: true }))
+    } catch (err) {
+      console.error('Erro ao criar fase:', err)
+      alert('Erro ao criar fase: ' + err.message)
+    } finally {
+      setSavingFase(false)
+    }
+  }
+
+  // Adicionar entregável a uma fase específica
+  const handleAddToFase = (faseNome, categoriaNome = null) => {
+    resetForm()
+    setFormData(prev => ({
+      ...prev,
+      fase: faseNome,
+      categoria: categoriaNome || ''
+    }))
+    setEditingItem(null)
+    setShowModal(true)
+  }
+
+  // Editar nome da fase
+  const handleEditFase = async (oldFaseName, newFaseName) => {
+    if (!newFaseName.trim() || oldFaseName === newFaseName.trim()) {
+      setEditingFase(null)
+      return
+    }
+
+    try {
+      // Atualizar todos os entregáveis desta fase
+      const { error } = await supabase
+        .from('projeto_entregaveis')
+        .update({ fase: newFaseName.trim() })
+        .eq('projeto_id', projeto.id)
+        .eq('fase', oldFaseName)
+
+      if (error) throw error
+
+      setEditingFase(null)
+      loadEntregaveis(false)
+    } catch (err) {
+      alert('Erro ao renomear fase: ' + err.message)
+    }
+  }
+
+  // Abrir modal para adicionar subcategoria
+  const handleOpenSubcategoriaModal = (faseNome, existingCategoria = null) => {
+    setSubcategoriaData({
+      fase: faseNome,
+      nome: existingCategoria || '',
+      prefixoCodigo: '',
+      isEditing: !!existingCategoria,
+      oldNome: existingCategoria
+    })
+    setShowSubcategoriaModal(true)
+  }
+
+  // Guardar subcategoria (criar ou renomear)
+  const handleSaveSubcategoria = async () => {
+    const { fase, nome, prefixoCodigo, isEditing, oldNome } = subcategoriaData
+
+    if (!nome.trim()) {
+      alert('Nome da subcategoria é obrigatório')
+      return
+    }
+
+    try {
+      if (isEditing && oldNome !== nome.trim()) {
+        // Renomear categoria existente
+        const { error } = await supabase
+          .from('projeto_entregaveis')
+          .update({ categoria: nome.trim() })
+          .eq('projeto_id', projeto.id)
+          .eq('fase', fase)
+          .eq('categoria', oldNome)
+
+        if (error) throw error
+      }
+
+      // Se tem prefixo de código e não é edição, criar primeiro item placeholder
+      if (prefixoCodigo.trim() && !isEditing) {
+        // Apenas definir o prefixo para uso futuro ao adicionar itens
+        // O prefixo será usado na função handleAddToFase
+      }
+
+      setShowSubcategoriaModal(false)
+      setSubcategoriaData({ fase: '', nome: '', prefixoCodigo: '' })
+      loadEntregaveis(false)
+    } catch (err) {
+      alert('Erro ao guardar subcategoria: ' + err.message)
+    }
+  }
+
+  // Toggle modo edição da subcategoria
+  const toggleSubcategoriaEditMode = (faseNome, catNome) => {
+    const key = `${faseNome}__${catNome}`
+    setEditingSubcategoriaMode(prev => ({
+      ...prev,
+      [key]: !prev[key]
+    }))
+  }
+
+  // Mover item para cima ou para baixo dentro da categoria
+  const handleMoveItem = async (item, direction, categoryItems) => {
+    const sortedItems = [...categoryItems].sort((a, b) =>
+      (a.codigo || '').localeCompare(b.codigo || '', undefined, { numeric: true })
+    )
+    const currentIndex = sortedItems.findIndex(i => i.id === item.id)
+    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1
+
+    if (newIndex < 0 || newIndex >= sortedItems.length) return
+
+    // Trocar códigos entre os dois itens
+    const otherItem = sortedItems[newIndex]
+    const tempCodigo = item.codigo
+
+    try {
+      // Atualizar código do item atual para o do outro
+      await supabase
+        .from('projeto_entregaveis')
+        .update({ codigo: otherItem.codigo })
+        .eq('id', item.id)
+
+      // Atualizar código do outro item para o do atual
+      await supabase
+        .from('projeto_entregaveis')
+        .update({ codigo: tempCodigo })
+        .eq('id', otherItem.id)
+
+      loadEntregaveis(false)
+    } catch (err) {
+      alert('Erro ao mover item: ' + err.message)
+    }
+  }
+
+  // Gerar próximo código baseado no prefixo da categoria
+  const generateNextCode = (faseNome, catNome, existingItems) => {
+    const categoryItems = existingItems.filter(
+      i => i.fase === faseNome && i.categoria === catNome
+    )
+
+    if (categoryItems.length === 0) {
+      // Primeiro item - usar prefixo padrão baseado na fase
+      const fasePrefix = faseNome === 'Projeto Base' ? 'PB' :
+                         faseNome === 'Projeto de Execução' ? 'PEXA' :
+                         faseNome === 'Licenciamento' ? 'LIC' :
+                         faseNome === 'Construção' ? 'CONS' : 'XX'
+      return `${fasePrefix}.01.001`
+    }
+
+    // Encontrar o maior código e incrementar
+    const codes = categoryItems.map(i => i.codigo || '').filter(Boolean)
+    if (codes.length === 0) return `01.001`
+
+    const lastCode = codes.sort((a, b) =>
+      b.localeCompare(a, undefined, { numeric: true })
+    )[0]
+
+    // Extrair e incrementar o último número
+    const parts = lastCode.split('.')
+    const lastNum = parseInt(parts[parts.length - 1]) || 0
+    parts[parts.length - 1] = String(lastNum + 1).padStart(3, '0')
+
+    return parts.join('.')
   }
 
   const formatDate = (date) => {
@@ -379,10 +794,19 @@ export default function ProjetoEntregaveis({ projeto }) {
           <div>
             <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0 }}>Lista de Entregáveis</h3>
             <p style={{ fontSize: '12px', color: 'var(--brown-light)', margin: '4px 0 0' }}>
-              {stats.total} entregáveis • {progressPercent}% concluído
+              {stats.total} entregáveis  –  {progressPercent}% concluído
             </p>
           </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {selectedItems.size > 0 && (
+              <button
+                onClick={handleDeleteSelected}
+                className="btn"
+                style={{ fontSize: '12px', padding: '8px 12px', background: 'var(--error)', color: 'white' }}
+              >
+                <Trash2 size={14} /> Apagar ({selectedItems.size})
+              </button>
+            )}
             <input
               type="file"
               ref={fileInputRef}
@@ -390,14 +814,21 @@ export default function ProjetoEntregaveis({ projeto }) {
               accept=".xlsx,.xls"
               style={{ display: 'none' }}
             />
-            <button 
+            <button
               onClick={() => fileInputRef.current?.click()}
               className="btn btn-outline"
               style={{ fontSize: '12px', padding: '8px 12px' }}
             >
               <FileSpreadsheet size={14} /> Importar Excel
             </button>
-            <button 
+            <button
+              onClick={() => setShowFaseModal(true)}
+              className="btn btn-secondary"
+              style={{ fontSize: '12px', padding: '8px 12px' }}
+            >
+              <Plus size={14} /> Nova Fase
+            </button>
+            <button
               onClick={() => { resetForm(); setEditingItem(null); setShowModal(true) }}
               className="btn btn-primary"
               style={{ fontSize: '12px', padding: '8px 12px' }}
@@ -493,35 +924,113 @@ export default function ProjetoEntregaveis({ projeto }) {
               return (
                 <div key={faseNome} className="card" style={{ padding: 0, overflow: 'hidden' }}>
                   {/* Header da Fase */}
-                  <div 
-                    onClick={() => toggleFase(faseNome)}
-                    style={{ 
-                      padding: '16px 20px', 
+                  <div
+                    style={{
+                      padding: '16px 20px',
                       background: 'linear-gradient(135deg, var(--blush-dark) 0%, var(--warning) 100%)',
                       color: 'white',
-                      cursor: 'pointer',
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center'
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div
+                      onClick={() => toggleFase(faseNome)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', flex: 1 }}
+                    >
                       {expandedFases[faseNome] ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
                       <div>
                         <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>{faseNome}</h4>
                         <span style={{ fontSize: '11px', opacity: 0.9 }}>
-                          {faseItems.length} entregáveis • {faseConcluidos} concluídos
+                          {faseItems.length} entregáveis  –  {faseConcluidos} concluídos
                         </span>
                       </div>
                     </div>
-                    <div style={{ 
-                      background: 'rgba(255,255,255,0.2)', 
-                      padding: '6px 12px', 
-                      borderRadius: '20px',
-                      fontSize: '13px',
-                      fontWeight: 600
-                    }}>
-                      {fasePercent}%
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{
+                        background: 'rgba(255,255,255,0.2)',
+                        padding: '6px 12px',
+                        borderRadius: '20px',
+                        fontSize: '13px',
+                        fontWeight: 600
+                      }}>
+                        {fasePercent}%
+                      </div>
+                      {/* Botão Editar Fase */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setEditingFase({ nome: faseNome, newName: faseNome })
+                        }}
+                        title="Editar nome da fase"
+                        style={{
+                          background: 'rgba(255,255,255,0.25)',
+                          border: '1px solid rgba(255,255,255,0.4)',
+                          borderRadius: '6px',
+                          padding: '6px 10px',
+                          cursor: 'pointer',
+                          color: 'white',
+                          display: 'flex',
+                          alignItems: 'center',
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.35)'}
+                        onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
+                      >
+                        <Edit2 size={14} />
+                      </button>
+                      {/* Botão Adicionar Subcategoria */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleOpenSubcategoriaModal(faseNome)
+                        }}
+                        title="Adicionar nova subcategoria"
+                        style={{
+                          background: 'rgba(255,255,255,0.25)',
+                          border: '1px solid rgba(255,255,255,0.4)',
+                          borderRadius: '6px',
+                          padding: '6px 10px',
+                          cursor: 'pointer',
+                          color: 'white',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          fontSize: '11px',
+                          fontWeight: 500,
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.35)'}
+                        onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
+                      >
+                        <FolderPlus size={14} />
+                      </button>
+                      {/* Botão Adicionar Entregável */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleAddToFase(faseNome)
+                        }}
+                        title="Adicionar novo entregável"
+                        style={{
+                          background: 'rgba(255,255,255,0.25)',
+                          border: '1px solid rgba(255,255,255,0.4)',
+                          borderRadius: '6px',
+                          padding: '6px 10px',
+                          cursor: 'pointer',
+                          color: 'white',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          fontSize: '11px',
+                          fontWeight: 500,
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.35)'}
+                        onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
+                      >
+                        <Plus size={14} />
+                      </button>
                     </div>
                   </div>
                   
@@ -531,105 +1040,393 @@ export default function ProjetoEntregaveis({ projeto }) {
                       {Object.entries(categorias).map(([catNome, items]) => (
                         <div key={catNome} style={{ marginBottom: '12px' }}>
                           {/* Header da Categoria */}
-                          <div 
-                            onClick={() => toggleFase(`${faseNome}__${catNome}`)}
-                            style={{ 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              gap: '8px', 
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px',
                               padding: '10px 12px',
                               background: 'var(--cream)',
                               borderRadius: '8px',
-                              cursor: 'pointer',
                               marginBottom: expandedFases[`${faseNome}__${catNome}`] ? '8px' : 0
                             }}
                           >
-                            {expandedFases[`${faseNome}__${catNome}`] ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                            <span style={{ fontWeight: 600, fontSize: '13px', flex: 1 }}>{catNome}</span>
-                            <span style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
-                              {items.length} itens • {items.filter(i => i.status === 'concluido' || i.status === 'aprovado').length} ✓
-                            </span>
+                            <div
+                              onClick={() => toggleFase(`${faseNome}__${catNome}`)}
+                              style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, cursor: 'pointer' }}
+                            >
+                              {expandedFases[`${faseNome}__${catNome}`] ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                              <span style={{ fontWeight: 600, fontSize: '13px', flex: 1 }}>{catNome}</span>
+                              <span style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
+                                {items.length} itens  –  {items.filter(i => i.status === 'concluido' || i.status === 'aprovado').length} ✓
+                              </span>
+                            </div>
+                            {/* Botão Editar Subcategoria (toggle edit mode) */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                toggleSubcategoriaEditMode(faseNome, catNome)
+                              }}
+                              title={editingSubcategoriaMode[`${faseNome}__${catNome}`] ? 'Sair do modo edição' : 'Entrar no modo edição'}
+                              style={{
+                                background: editingSubcategoriaMode[`${faseNome}__${catNome}`] ? 'var(--info)' : 'var(--stone)',
+                                border: 'none',
+                                borderRadius: '4px',
+                                padding: '4px 8px',
+                                cursor: 'pointer',
+                                color: editingSubcategoriaMode[`${faseNome}__${catNome}`] ? 'white' : 'var(--brown)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '2px',
+                                fontSize: '10px',
+                                fontWeight: 500,
+                                transition: 'all 0.2s'
+                              }}
+                            >
+                              <Edit2 size={12} />
+                            </button>
+                            {/* Botão Adicionar Entregável */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleAddToFase(faseNome, catNome)
+                              }}
+                              title={`Adicionar entregável a ${catNome}`}
+                              style={{
+                                background: 'var(--stone)',
+                                border: 'none',
+                                borderRadius: '4px',
+                                padding: '4px 8px',
+                                cursor: 'pointer',
+                                color: 'var(--brown)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '2px',
+                                fontSize: '10px',
+                                fontWeight: 500,
+                                transition: 'all 0.2s'
+                              }}
+                              onMouseOver={(e) => e.currentTarget.style.background = 'var(--brown-light)'}
+                              onMouseOut={(e) => e.currentTarget.style.background = 'var(--stone)'}
+                            >
+                              <Plus size={12} />
+                            </button>
                           </div>
                           
                           {/* Lista de Items */}
                           {expandedFases[`${faseNome}__${catNome}`] && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '20px' }}>
                               {/* Cabeçalho das colunas */}
-                              <div style={{ 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                gap: '12px',
-                                padding: '6px 12px',
+                              <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: editingSubcategoriaMode[`${faseNome}__${catNome}`]
+                                  ? '24px 32px 80px 1fr 70px 100px 100px 70px 70px 50px 90px'
+                                  : '32px 80px 1fr 70px 100px 100px 70px 70px 50px 60px',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '8px 12px',
                                 fontSize: '10px',
                                 fontWeight: 600,
                                 color: 'var(--brown-light)',
                                 textTransform: 'uppercase',
                                 letterSpacing: '0.5px'
                               }}>
-                                <span style={{ minWidth: '70px' }}>Código</span>
-                                <span style={{ flex: 1 }}>Descrição</span>
-                                <span style={{ minWidth: '50px' }}>Escala</span>
-                                <span style={{ minWidth: '80px', textAlign: 'center' }}>Início</span>
-                                <span style={{ minWidth: '80px', textAlign: 'center' }}>Conclusão</span>
-                                <span style={{ minWidth: '80px', textAlign: 'center' }}>Executante</span>
-                                <span style={{ minWidth: '70px' }}>Estado</span>
-                                <span style={{ minWidth: '50px' }}></span>
+                                {editingSubcategoriaMode[`${faseNome}__${catNome}`] && <span></span>}
+                                <span
+                                  onClick={toggleSelectAll}
+                                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                  title="Selecionar todos"
+                                >
+                                  {selectedItems.size === entregaveis.length && entregaveis.length > 0 ? (
+                                    <CheckSquare size={14} style={{ color: 'var(--info)' }} />
+                                  ) : (
+                                    <Square size={14} />
+                                  )}
+                                </span>
+                                <span>Código</span>
+                                <span>Descrição</span>
+                                <span style={{ textAlign: 'center' }}>Escala</span>
+                                <span style={{ textAlign: 'center' }}>Estado</span>
+                                <span style={{ textAlign: 'center' }}>Executante</span>
+                                <span style={{ textAlign: 'center' }}>Início</span>
+                                <span style={{ textAlign: 'center' }}>Conclusão</span>
+                                <span style={{ textAlign: 'center' }}>Fich.</span>
+                                <span></span>
                               </div>
-                              {items.sort((a, b) => (a.codigo || '').localeCompare(b.codigo || '', undefined, { numeric: true })).map(item => (
-                                <div 
+                              {items.sort((a, b) => (a.codigo || '').localeCompare(b.codigo || '', undefined, { numeric: true })).map((item, itemIndex, sortedItems) => (
+                                <div
                                   key={item.id}
-                                  style={{ 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    gap: '12px',
-                                    padding: '8px 12px',
-                                    background: 'var(--white)',
-                                    border: '1px solid var(--stone)',
+                                  style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: editingSubcategoriaMode[`${faseNome}__${catNome}`]
+                                      ? '24px 32px 80px 1fr 70px 100px 100px 70px 70px 50px 90px'
+                                      : '32px 80px 1fr 70px 100px 100px 70px 70px 50px 60px',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    padding: '10px 12px',
+                                    background: selectedItems.has(item.id) ? 'rgba(138, 158, 184, 0.1)' : 'var(--white)',
+                                    border: selectedItems.has(item.id) ? '1px solid var(--info)' : '1px solid var(--stone)',
                                     borderRadius: '6px',
                                     fontSize: '13px'
                                   }}
                                 >
-                                  <span style={{ 
-                                    fontFamily: 'monospace', 
-                                    fontSize: '11px', 
-                                    color: 'var(--brown-light)',
-                                    minWidth: '70px'
-                                  }}>
+                                  {/* Drag Handle - só em modo edição */}
+                                  {editingSubcategoriaMode[`${faseNome}__${catNome}`] && (
+                                    <span
+                                      style={{
+                                        cursor: 'grab',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: 'var(--brown-light)'
+                                      }}
+                                      title="Arrastar para reordenar"
+                                    >
+                                      <GripVertical size={14} />
+                                    </span>
+                                  )}
+                                  {/* Checkbox */}
+                                  <span
+                                    onClick={() => toggleSelectItem(item.id)}
+                                    style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                  >
+                                    {selectedItems.has(item.id) ? (
+                                      <CheckSquare size={16} style={{ color: 'var(--info)' }} />
+                                    ) : (
+                                      <Square size={16} style={{ color: 'var(--brown-light)' }} />
+                                    )}
+                                  </span>
+                                  {/* Código */}
+                                  <span style={{ fontWeight: 500, fontSize: '11px', color: 'var(--brown-light)' }}>
                                     {item.codigo}
                                   </span>
-                                  <span style={{ flex: 1 }}>{item.nome}</span>
-                                  <span style={{ fontSize: '11px', color: 'var(--brown-light)', background: item.escala ? 'var(--stone)' : 'transparent', padding: item.escala ? '2px 6px' : '2px 0', borderRadius: '4px', minWidth: '50px', textAlign: 'center' }}>
+                                  {/* Descrição */}
+                                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.nome}</span>
+                                  {/* Escala */}
+                                  <span style={{ fontSize: '11px', color: 'var(--brown-light)', background: item.escala ? 'var(--stone)' : 'transparent', padding: '2px 6px', borderRadius: '4px', textAlign: 'center' }}>
                                     {item.escala || '-'}
                                   </span>
-                                  {/* Datas e Executante */}
-                                  <span style={{ fontSize: '10px', color: 'var(--brown-light)', minWidth: '80px', textAlign: 'center' }}>
-                                    {item.data_inicio ? new Date(item.data_inicio).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' }) : '-'}
+                                  {/* Estado - Edição Inline */}
+                                  {editingCell?.id === item.id && editingCell?.field === 'status' ? (
+                                    <select
+                                      autoFocus
+                                      value={item.status}
+                                      onChange={(e) => handleInlineUpdate(item.id, 'status', e.target.value)}
+                                      onBlur={() => setEditingCell(null)}
+                                      style={{
+                                        width: '100%',
+                                        padding: '4px 6px',
+                                        fontSize: '11px',
+                                        border: '1px solid var(--info)',
+                                        borderRadius: '6px',
+                                        background: 'var(--white)',
+                                        cursor: 'pointer'
+                                      }}
+                                    >
+                                      {Object.entries(statusConfig).map(([key, val]) => (
+                                        <option key={key} value={key}>{val.label}</option>
+                                      ))}
+                                    </select>
+                                  ) : (
+                                    <span
+                                      onClick={() => setEditingCell({ id: item.id, field: 'status' })}
+                                      style={{
+                                        padding: '4px 8px',
+                                        borderRadius: '10px',
+                                        fontSize: '10px',
+                                        fontWeight: 600,
+                                        background: statusConfig[item.status]?.bg,
+                                        color: statusConfig[item.status]?.color,
+                                        textAlign: 'center',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s'
+                                      }}
+                                      title="Clique para alterar"
+                                    >
+                                      {statusConfig[item.status]?.label}
+                                    </span>
+                                  )}
+                                  {/* Executante - Edição Inline (Dropdown de Recursos Humanos) */}
+                                  {editingCell?.id === item.id && editingCell?.field === 'executante' ? (
+                                    <select
+                                      autoFocus
+                                      value={item.executante || ''}
+                                      onChange={(e) => handleInlineUpdate(item.id, 'executante', e.target.value || null)}
+                                      onBlur={() => setEditingCell(null)}
+                                      style={{
+                                        width: '100%',
+                                        padding: '4px 6px',
+                                        fontSize: '11px',
+                                        border: '1px solid var(--info)',
+                                        borderRadius: '6px',
+                                        background: 'var(--white)',
+                                        cursor: 'pointer'
+                                      }}
+                                    >
+                                      <option value="">— Selecionar —</option>
+                                      {utilizadores.map(u => (
+                                        <option key={u.id} value={u.nome}>{u.nome}</option>
+                                      ))}
+                                    </select>
+                                  ) : (
+                                    <span
+                                      onClick={() => setEditingCell({ id: item.id, field: 'executante' })}
+                                      style={{
+                                        fontSize: '11px',
+                                        color: item.executante ? 'var(--info)' : 'var(--brown-light)',
+                                        textAlign: 'center',
+                                        cursor: 'pointer',
+                                        padding: '4px 6px',
+                                        borderRadius: '6px',
+                                        background: item.executante ? 'rgba(138, 158, 184, 0.1)' : 'transparent',
+                                        transition: 'all 0.2s'
+                                      }}
+                                      title="Clique para alterar"
+                                    >
+                                      {item.executante || '—'}
+                                    </span>
+                                  )}
+                                  {/* Início - Edição Inline */}
+                                  {editingCell?.id === item.id && editingCell?.field === 'data_inicio' ? (
+                                    <input
+                                      type="date"
+                                      autoFocus
+                                      value={item.data_inicio || ''}
+                                      onChange={(e) => handleInlineUpdate(item.id, 'data_inicio', e.target.value || null)}
+                                      onBlur={() => setEditingCell(null)}
+                                      style={{
+                                        width: '100%',
+                                        padding: '4px',
+                                        fontSize: '10px',
+                                        border: '1px solid var(--info)',
+                                        borderRadius: '4px',
+                                        background: 'var(--white)'
+                                      }}
+                                    />
+                                  ) : (
+                                    <span
+                                      onClick={() => setEditingCell({ id: item.id, field: 'data_inicio' })}
+                                      style={{
+                                        fontSize: '11px',
+                                        color: item.data_inicio ? 'var(--brown-light)' : 'var(--stone)',
+                                        textAlign: 'center',
+                                        cursor: 'pointer',
+                                        padding: '4px',
+                                        borderRadius: '4px',
+                                        transition: 'all 0.2s'
+                                      }}
+                                      title="Clique para alterar"
+                                    >
+                                      {item.data_inicio ? new Date(item.data_inicio).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' }) : '—'}
+                                    </span>
+                                  )}
+                                  {/* Conclusão - Edição Inline */}
+                                  {editingCell?.id === item.id && editingCell?.field === 'data_conclusao' ? (
+                                    <input
+                                      type="date"
+                                      autoFocus
+                                      value={item.data_conclusao || ''}
+                                      onChange={(e) => handleInlineUpdate(item.id, 'data_conclusao', e.target.value || null)}
+                                      onBlur={() => setEditingCell(null)}
+                                      style={{
+                                        width: '100%',
+                                        padding: '4px',
+                                        fontSize: '10px',
+                                        border: '1px solid var(--info)',
+                                        borderRadius: '4px',
+                                        background: 'var(--white)'
+                                      }}
+                                    />
+                                  ) : (
+                                    <span
+                                      onClick={() => setEditingCell({ id: item.id, field: 'data_conclusao' })}
+                                      style={{
+                                        fontSize: '11px',
+                                        color: item.data_conclusao ? 'var(--brown-light)' : 'var(--stone)',
+                                        textAlign: 'center',
+                                        cursor: 'pointer',
+                                        padding: '4px',
+                                        borderRadius: '4px',
+                                        transition: 'all 0.2s'
+                                      }}
+                                      title="Clique para alterar"
+                                    >
+                                      {item.data_conclusao ? new Date(item.data_conclusao).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' }) : '—'}
+                                    </span>
+                                  )}
+                                  {/* Ficheiro */}
+                                  <span
+                                    onClick={() => setFileModalItem(item)}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      cursor: 'pointer',
+                                      padding: '4px',
+                                      borderRadius: '4px',
+                                      transition: 'all 0.2s'
+                                    }}
+                                    title={filesCache[item.id]?.hasFile ? `v${filesCache[item.id].version}${filesCache[item.id].approved ? ' - Aprovado' : ''}` : 'Sem ficheiro'}
+                                  >
+                                    {filesCache[item.id]?.hasFile ? (
+                                      filesCache[item.id].approved ? (
+                                        <Shield size={14} style={{ color: 'var(--success)' }} />
+                                      ) : (
+                                        <Paperclip size={14} style={{ color: 'var(--info)' }} />
+                                      )
+                                    ) : (
+                                      <Paperclip size={14} style={{ color: 'var(--stone)', opacity: 0.5 }} />
+                                    )}
                                   </span>
-                                  <span style={{ fontSize: '10px', color: 'var(--brown-light)', minWidth: '80px', textAlign: 'center' }}>
-                                    {item.data_conclusao ? new Date(item.data_conclusao).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' }) : '-'}
-                                  </span>
-                                  <span style={{ fontSize: '10px', color: 'var(--info)', minWidth: '80px', textAlign: 'center' }}>
-                                    {item.executante || '-'}
-                                  </span>
-                                  <span style={{ 
-                                    padding: '3px 8px', 
-                                    borderRadius: '10px', 
-                                    fontSize: '10px', 
-                                    fontWeight: 600, 
-                                    background: statusConfig[item.status]?.bg, 
-                                    color: statusConfig[item.status]?.color,
-                                    minWidth: '70px',
-                                    textAlign: 'center'
-                                  }}>
-                                    {statusConfig[item.status]?.label}
-                                  </span>
-                                  <div style={{ display: 'flex', gap: '4px', minWidth: '50px' }}>
-                                    <button onClick={() => handleEdit(item)} className="btn btn-ghost btn-icon" style={{ padding: '4px' }}>
-                                      <Edit2 size={12} />
-                                    </button>
-                                    <button onClick={() => handleDelete(item)} className="btn btn-ghost btn-icon" style={{ padding: '4px', color: 'var(--error)' }}>
-                                      <Trash2 size={12} />
-                                    </button>
+                                  {/* Ações */}
+                                  <div style={{ display: 'flex', gap: '2px', justifyContent: 'center', alignItems: 'center' }}>
+                                    {editingSubcategoriaMode[`${faseNome}__${catNome}`] ? (
+                                      <>
+                                        {/* Setas Up/Down */}
+                                        <button
+                                          onClick={() => handleMoveItem(item, 'up', items)}
+                                          disabled={itemIndex === 0}
+                                          className="btn btn-ghost btn-icon"
+                                          style={{
+                                            padding: '4px',
+                                            opacity: itemIndex === 0 ? 0.3 : 1,
+                                            cursor: itemIndex === 0 ? 'not-allowed' : 'pointer'
+                                          }}
+                                          title="Mover para cima"
+                                        >
+                                          <ChevronUp size={12} />
+                                        </button>
+                                        <button
+                                          onClick={() => handleMoveItem(item, 'down', items)}
+                                          disabled={itemIndex === sortedItems.length - 1}
+                                          className="btn btn-ghost btn-icon"
+                                          style={{
+                                            padding: '4px',
+                                            opacity: itemIndex === sortedItems.length - 1 ? 0.3 : 1,
+                                            cursor: itemIndex === sortedItems.length - 1 ? 'not-allowed' : 'pointer'
+                                          }}
+                                          title="Mover para baixo"
+                                        >
+                                          <ChevronDown size={12} />
+                                        </button>
+                                        {/* Edit/Delete */}
+                                        <button onClick={() => handleEdit(item)} className="btn btn-ghost btn-icon" style={{ padding: '4px' }}>
+                                          <Edit2 size={12} />
+                                        </button>
+                                        <button onClick={() => handleDelete(item)} className="btn btn-ghost btn-icon" style={{ padding: '4px', color: 'var(--error)' }}>
+                                          <Trash2 size={12} />
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <button onClick={() => handleEdit(item)} className="btn btn-ghost btn-icon" style={{ padding: '4px' }}>
+                                          <Edit2 size={12} />
+                                        </button>
+                                        <button onClick={() => handleDelete(item)} className="btn btn-ghost btn-icon" style={{ padding: '4px', color: 'var(--error)' }}>
+                                          <Trash2 size={12} />
+                                        </button>
+                                      </>
+                                    )}
                                   </div>
                                 </div>
                               ))}
@@ -649,6 +1446,19 @@ export default function ProjetoEntregaveis({ projeto }) {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
               <tr style={{ background: 'var(--cream)', borderBottom: '2px solid var(--stone)' }}>
+                <th style={{ padding: '12px 16px', width: '40px' }}>
+                  <span
+                    onClick={toggleSelectAll}
+                    style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    title="Selecionar todos"
+                  >
+                    {selectedItems.size === entregaveis.length && entregaveis.length > 0 ? (
+                      <CheckSquare size={16} style={{ color: 'var(--info)' }} />
+                    ) : (
+                      <Square size={16} style={{ color: 'var(--brown-light)' }} />
+                    )}
+                  </span>
+                </th>
                 <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, width: '120px' }}>Código</th>
                 <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600 }}>Descrição</th>
                 <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 600, width: '80px' }}>Escala</th>
@@ -664,7 +1474,19 @@ export default function ProjetoEntregaveis({ projeto }) {
                 <>
                   {/* Grupo Principal (01, 02, etc.) */}
                   {group.item && (
-                    <tr key={group.item.id} style={{ background: 'rgba(201, 168, 130, 0.08)', borderBottom: '1px solid var(--stone)' }}>
+                    <tr key={group.item.id} style={{ background: selectedItems.has(group.item.id) ? 'rgba(138, 158, 184, 0.15)' : 'rgba(201, 168, 130, 0.08)', borderBottom: '1px solid var(--stone)' }}>
+                      <td style={{ padding: '12px 16px' }}>
+                        <span
+                          onClick={() => toggleSelectItem(group.item.id)}
+                          style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        >
+                          {selectedItems.has(group.item.id) ? (
+                            <CheckSquare size={16} style={{ color: 'var(--info)' }} />
+                          ) : (
+                            <Square size={16} style={{ color: 'var(--brown-light)' }} />
+                          )}
+                        </span>
+                      </td>
                       <td style={{ padding: '12px 16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           {Object.keys(group.children).length > 0 && (
@@ -672,7 +1494,7 @@ export default function ProjetoEntregaveis({ projeto }) {
                               {expandedGroups[groupCode] ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                             </button>
                           )}
-                          <span style={{ fontWeight: 700, fontFamily: 'monospace', color: 'var(--warning)' }}>{group.item.codigo}</span>
+                          <span style={{ fontWeight: 500, color: 'var(--warning)' }}>{group.item.codigo}</span>
                         </div>
                       </td>
                       <td style={{ padding: '12px 16px', fontWeight: 600 }}>{group.item.nome}</td>
@@ -698,7 +1520,19 @@ export default function ProjetoEntregaveis({ projeto }) {
                   {expandedGroups[groupCode] && Object.entries(group.children).sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true })).map(([subCode, subGroup]) => (
                     <>
                       {subGroup.item && (
-                        <tr key={subGroup.item.id} style={{ background: 'rgba(138, 158, 184, 0.05)', borderBottom: '1px solid var(--stone)' }}>
+                        <tr key={subGroup.item.id} style={{ background: selectedItems.has(subGroup.item.id) ? 'rgba(138, 158, 184, 0.15)' : 'rgba(138, 158, 184, 0.05)', borderBottom: '1px solid var(--stone)' }}>
+                          <td style={{ padding: '12px 16px' }}>
+                            <span
+                              onClick={() => toggleSelectItem(subGroup.item.id)}
+                              style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                            >
+                              {selectedItems.has(subGroup.item.id) ? (
+                                <CheckSquare size={16} style={{ color: 'var(--info)' }} />
+                              ) : (
+                                <Square size={16} style={{ color: 'var(--brown-light)' }} />
+                              )}
+                            </span>
+                          </td>
                           <td style={{ padding: '12px 16px', paddingLeft: '40px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                               {subGroup.children.length > 0 && (
@@ -706,7 +1540,7 @@ export default function ProjetoEntregaveis({ projeto }) {
                                   {expandedGroups[subCode] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                                 </button>
                               )}
-                              <span style={{ fontWeight: 600, fontFamily: 'monospace', color: 'var(--info)' }}>{subGroup.item.codigo}</span>
+                              <span style={{ fontWeight: 500, color: 'var(--info)' }}>{subGroup.item.codigo}</span>
                             </div>
                           </td>
                           <td style={{ padding: '12px 16px', fontWeight: 500 }}>{subGroup.item.nome}</td>
@@ -730,9 +1564,21 @@ export default function ProjetoEntregaveis({ projeto }) {
 
                       {/* Itens (01.01.01, 01.01.02, etc.) */}
                       {expandedGroups[subCode] && subGroup.children.sort((a, b) => a.codigo.localeCompare(b.codigo, undefined, { numeric: true })).map(item => (
-                        <tr key={item.id} style={{ borderBottom: '1px solid var(--stone)' }}>
+                        <tr key={item.id} style={{ borderBottom: '1px solid var(--stone)', background: selectedItems.has(item.id) ? 'rgba(138, 158, 184, 0.1)' : 'transparent' }}>
+                          <td style={{ padding: '12px 16px' }}>
+                            <span
+                              onClick={() => toggleSelectItem(item.id)}
+                              style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                            >
+                              {selectedItems.has(item.id) ? (
+                                <CheckSquare size={16} style={{ color: 'var(--info)' }} />
+                              ) : (
+                                <Square size={16} style={{ color: 'var(--brown-light)' }} />
+                              )}
+                            </span>
+                          </td>
                           <td style={{ padding: '12px 16px', paddingLeft: '64px' }}>
-                            <span style={{ fontFamily: 'monospace', fontSize: '12px', color: 'var(--brown-light)' }}>{item.codigo}</span>
+                            <span style={{ fontWeight: 500, fontSize: '12px', color: 'var(--brown-light)' }}>{item.codigo}</span>
                           </td>
                           <td style={{ padding: '12px 16px' }}>{item.nome}</td>
                           <td style={{ padding: '12px 16px', textAlign: 'center', color: 'var(--brown-light)', fontSize: '12px' }}>{item.escala || '-'}</td>
@@ -793,6 +1639,33 @@ export default function ProjetoEntregaveis({ projeto }) {
                 </div>
               </div>
 
+              {/* Fase e Categoria */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, marginBottom: '6px' }}>Fase</label>
+                  <select
+                    value={formData.fase}
+                    onChange={e => setFormData({ ...formData, fase: e.target.value })}
+                    style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
+                  >
+                    <option value="">— Selecionar Fase —</option>
+                    {FASES_OPCOES.map(f => (
+                      <option key={f} value={f}>{f}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, marginBottom: '6px' }}>Categoria</label>
+                  <input
+                    type="text"
+                    value={formData.categoria}
+                    onChange={e => setFormData({ ...formData, categoria: e.target.value })}
+                    placeholder="Arquitetura, Estruturas, MEP..."
+                    style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
+                  />
+                </div>
+              </div>
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, marginBottom: '6px' }}>Escala</label>
@@ -840,13 +1713,16 @@ export default function ProjetoEntregaveis({ projeto }) {
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, marginBottom: '6px' }}>Executante</label>
-                  <input
-                    type="text"
+                  <select
                     value={formData.executante}
                     onChange={e => setFormData({ ...formData, executante: e.target.value })}
-                    placeholder="Nome do executante"
                     style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
-                  />
+                  >
+                    <option value="">— Selecionar Executante —</option>
+                    {utilizadores.map(u => (
+                      <option key={u.id} value={u.nome}>{u.nome} {u.cargo ? `(${u.cargo})` : ''}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
@@ -865,6 +1741,441 @@ export default function ProjetoEntregaveis({ projeto }) {
               <button onClick={() => setShowModal(false)} className="btn btn-outline">Cancelar</button>
               <button onClick={handleSave} className="btn btn-primary" disabled={saving || !formData.codigo.trim() || !formData.nome.trim()}>
                 {saving ? <Loader2 size={16} className="spin" /> : <><Save size={16} /> Guardar</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Gestão de Ficheiros */}
+      {fileModalItem && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+          onClick={() => setFileModalItem(null)}
+        >
+          <div
+            style={{
+              background: 'white',
+              borderRadius: '16px',
+              width: '550px',
+              maxWidth: '90vw',
+              maxHeight: '85vh',
+              overflow: 'auto'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{
+              padding: '20px 24px',
+              borderBottom: '1px solid var(--stone)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
+                  Gestão de Ficheiros
+                </h3>
+                <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--brown-light)' }}>
+                  {fileModalItem.codigo} — {fileModalItem.nome}
+                </p>
+              </div>
+              <button
+                onClick={() => setFileModalItem(null)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--brown-light)',
+                  padding: '4px'
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div style={{ padding: '24px' }}>
+              <DeliveryFileSection
+                entregavel={{
+                  ...fileModalItem,
+                  descricao: fileModalItem.nome
+                }}
+                projetoId={projeto.id}
+                isAdmin={true}
+                compact={false}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Nova Fase */}
+      {showFaseModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+          onClick={() => setShowFaseModal(false)}
+        >
+          <div
+            style={{
+              background: 'white',
+              borderRadius: '16px',
+              width: '400px',
+              maxWidth: '90vw'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{
+              padding: '20px 24px',
+              borderBottom: '1px solid var(--stone)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
+                Nova Fase de Projeto
+              </h3>
+              <button
+                onClick={() => setShowFaseModal(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--brown-light)',
+                  padding: '4px'
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ padding: '24px' }}>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--brown)', marginBottom: '6px' }}>
+                  Nome da Fase *
+                </label>
+                <input
+                  type="text"
+                  value={newFaseName}
+                  onChange={(e) => setNewFaseName(e.target.value)}
+                  placeholder="Ex: Projeto de Interiores, MEP, etc."
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid var(--stone)',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    boxSizing: 'border-box'
+                  }}
+                  autoFocus
+                />
+              </div>
+
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '12px', color: 'var(--brown-light)', marginBottom: '8px' }}>
+                  Fases existentes:
+                </label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {[...new Set([...FASES_OPCOES, ...entregaveis.map(e => e.fase).filter(Boolean)])].map(fase => (
+                    <span
+                      key={fase}
+                      style={{
+                        padding: '4px 10px',
+                        background: 'var(--cream)',
+                        borderRadius: '12px',
+                        fontSize: '11px',
+                        color: 'var(--brown-light)'
+                      }}
+                    >
+                      {fase}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div style={{
+              padding: '16px 24px',
+              borderTop: '1px solid var(--stone)',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '12px',
+              background: 'var(--cream)'
+            }}>
+              <button
+                onClick={() => {
+                  setShowFaseModal(false)
+                  setNewFaseName('')
+                }}
+                className="btn btn-outline"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleCreateFase}
+                disabled={savingFase || !newFaseName.trim()}
+                className="btn btn-primary"
+              >
+                {savingFase ? <Loader2 size={16} className="spin" /> : <><Plus size={16} /> Criar Fase</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Editar Fase */}
+      {editingFase && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+          onClick={() => setEditingFase(null)}
+        >
+          <div
+            style={{
+              background: 'white',
+              borderRadius: '16px',
+              width: '400px',
+              maxWidth: '90vw'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{
+              padding: '20px 24px',
+              borderBottom: '1px solid var(--stone)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
+                Editar Fase
+              </h3>
+              <button
+                onClick={() => setEditingFase(null)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--brown-light)',
+                  padding: '4px'
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ padding: '24px' }}>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--brown)', marginBottom: '6px' }}>
+                  Nome da Fase *
+                </label>
+                <input
+                  type="text"
+                  value={editingFase.newName}
+                  onChange={(e) => setEditingFase(prev => ({ ...prev, newName: e.target.value }))}
+                  placeholder="Nome da fase"
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid var(--stone)',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    boxSizing: 'border-box'
+                  }}
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            <div style={{
+              padding: '16px 24px',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '12px',
+              background: 'var(--cream)'
+            }}>
+              <button
+                onClick={() => setEditingFase(null)}
+                className="btn btn-outline"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => handleEditFase(editingFase.nome, editingFase.newName)}
+                disabled={!editingFase.newName.trim()}
+                className="btn btn-primary"
+              >
+                <Save size={16} /> Guardar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Subcategoria */}
+      {showSubcategoriaModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+          onClick={() => setShowSubcategoriaModal(false)}
+        >
+          <div
+            style={{
+              background: 'white',
+              borderRadius: '16px',
+              width: '450px',
+              maxWidth: '90vw'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{
+              padding: '20px 24px',
+              borderBottom: '1px solid var(--stone)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
+                {subcategoriaData.isEditing ? 'Editar Subcategoria' : 'Nova Subcategoria'}
+              </h3>
+              <button
+                onClick={() => setShowSubcategoriaModal(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--brown-light)',
+                  padding: '4px'
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ padding: '24px' }}>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '12px', color: 'var(--brown-light)', marginBottom: '4px' }}>
+                  Fase
+                </label>
+                <div style={{
+                  padding: '10px 12px',
+                  background: 'var(--cream)',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  color: 'var(--brown)'
+                }}>
+                  {subcategoriaData.fase}
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--brown)', marginBottom: '6px' }}>
+                  Nome da Subcategoria *
+                </label>
+                <input
+                  type="text"
+                  value={subcategoriaData.nome}
+                  onChange={(e) => setSubcategoriaData(prev => ({ ...prev, nome: e.target.value }))}
+                  placeholder="Ex: Enquadramento urbano, Existente, Proposta..."
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid var(--stone)',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    boxSizing: 'border-box'
+                  }}
+                  autoFocus
+                />
+              </div>
+
+              {!subcategoriaData.isEditing && (
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--brown)', marginBottom: '6px' }}>
+                    Prefixo do Código
+                  </label>
+                  <input
+                    type="text"
+                    value={subcategoriaData.prefixoCodigo}
+                    onChange={(e) => setSubcategoriaData(prev => ({ ...prev, prefixoCodigo: e.target.value.toUpperCase() }))}
+                    placeholder="Ex: PEXA.413.03"
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      border: '1px solid var(--stone)',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      boxSizing: 'border-box',
+                      fontFamily: 'monospace'
+                    }}
+                  />
+                  <p style={{ fontSize: '11px', color: 'var(--brown-light)', marginTop: '6px' }}>
+                    Os novos entregáveis terão códigos como: {subcategoriaData.prefixoCodigo || 'PEXA.01'}.001, {subcategoriaData.prefixoCodigo || 'PEXA.01'}.002, etc.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div style={{
+              padding: '16px 24px',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '12px',
+              background: 'var(--cream)'
+            }}>
+              <button
+                onClick={() => {
+                  setShowSubcategoriaModal(false)
+                  setSubcategoriaData({ fase: '', nome: '', prefixoCodigo: '' })
+                }}
+                className="btn btn-outline"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveSubcategoria}
+                disabled={!subcategoriaData.nome.trim()}
+                className="btn btn-primary"
+              >
+                {subcategoriaData.isEditing ? <><Save size={16} /> Guardar</> : <><Plus size={16} /> Criar</>}
               </button>
             </div>
           </div>

@@ -346,6 +346,8 @@ export default function Perfil() {
   const roleBadge = getRoleBadge(profile.role)
   const resumoFerias = calcularResumoFerias()
   const isPrestador = profile.tipo_contrato === 'prestador'
+  const isRemoto = profile.regime === 'remoto' || profile.regime === 'hibrido'
+  const canSubmitRecibos = isRemoto // Equipa remota submete recibos aqui
 
   return (
     <div className="fade-in" style={{ maxWidth: '1000px', margin: '0 auto' }}>
@@ -714,15 +716,15 @@ export default function Perfil() {
       {/* TAB: Recibos */}
       {activeTab === 'recibos' && (
         <div>
-          {isPrestador ? (
+          {canSubmitRecibos ? (
             <>
-              {/* Prestador remoto - pode submeter recibos */}
+              {/* Equipa remota - pode submeter recibos */}
               <div className="card" style={{ marginBottom: '24px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                   <div>
                     <h2 style={{ fontSize: '18px', fontWeight: 600, margin: '0 0 4px 0' }}>Submissão de Recibos</h2>
                     <p style={{ fontSize: '13px', color: 'var(--brown-light)', margin: 0 }}>
-                      Como prestador remoto, submeta o seu recibo mensal para aprovação
+                      Submeta o seu recibo mensal para aprovação
                     </p>
                   </div>
                   <button className="btn btn-primary" onClick={() => setShowReciboModal(true)}>
@@ -803,13 +805,13 @@ export default function Perfil() {
               </div>
             </>
           ) : (
-            /* Colaborador interno - vê recibos gerados pela empresa */
+            /* Equipa presencial - recibos submetidos pela contabilidade */
             <div className="card">
               <h2 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '20px' }}>Recibos de Vencimento</h2>
               <div style={{ textAlign: 'center', padding: '40px', color: 'var(--brown-light)' }}>
                 <Euro size={48} style={{ opacity: 0.3, marginBottom: '12px' }} />
-                <p>Os recibos de vencimento são geridos pela administração.</p>
-                <p style={{ fontSize: '13px' }}>Contacte os RH para mais informações.</p>
+                <p>Os recibos são submetidos pela contabilidade no módulo Recursos Humanos.</p>
+                <p style={{ fontSize: '13px' }}>Contacte a equipa de RH para mais informações.</p>
               </div>
             </div>
           )}

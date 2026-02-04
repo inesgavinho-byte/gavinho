@@ -1,0 +1,32 @@
+{
+  "name": "Gavinho Obras",
+  "short_name": "Obras",
+  "description": "App de comunicação para equipas de obra",
+  "start_url": "/obra-app",
+  "display": "standalone",
+  "background_color": "#3d4349",
+  "theme_color": "#3d4349",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Chat da Obra",
+      "url": "/obra-app/chat",
+      "icons": [{ "src": "/icons/icon.svg", "sizes": "any" }]
+    }
+  ]
+}

@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { 
-  Users, 
+import {
+  Users,
   User,
-  Plus, 
+  Plus,
   Search,
   Filter,
   Calendar,
@@ -12,6 +12,7 @@ import {
   FileText,
   Upload,
   Download,
+  Loader,
   Check,
   X,
   ChevronRight,
@@ -34,7 +35,7 @@ import {
   UserCheck,
   Send,
   Shield,
-  Lock
+  Lock,
 } from 'lucide-react';
 
 export default function Equipa() {
@@ -116,6 +117,8 @@ export default function Equipa() {
     valor_bruto: '',
     notas: ''
   });
+  const [reciboPdf, setReciboPdf] = useState(null);
+  const [uploadingRecibo, setUploadingRecibo] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -359,6 +362,7 @@ export default function Equipa() {
       horario_fim: selectedUser.horario_fim || '18:00',
       dias_ferias_disponiveis: selectedUser.dias_ferias_disponiveis || 22,
       data_entrada: selectedUser.data_entrada || '',
+      data_saida: selectedUser.data_saida || '',
       data_nascimento: selectedUser.data_nascimento || ''
     });
     setIsEditing(true);
@@ -389,6 +393,7 @@ export default function Equipa() {
           horario_fim: editForm.horario_fim || null,
           dias_ferias_disponiveis: parseInt(editForm.dias_ferias_disponiveis) || 22,
           data_entrada: editForm.data_entrada || null,
+          data_saida: editForm.data_saida || null,
           data_nascimento: editForm.data_nascimento || null
         })
         .eq('id', selectedUser.id);
@@ -576,10 +581,32 @@ export default function Equipa() {
       return;
     }
 
+    setUploadingRecibo(true);
     const mesAtual = new Date().getMonth() + 1;
     const anoAtual = new Date().getFullYear();
 
     try {
+      let pdfUrl = null;
+
+      // Upload do PDF se existir
+      if (reciboPdf) {
+        const fileExt = reciboPdf.name.split('.').pop();
+        const fileName = `${selectedUser.id}/${anoAtual}-${String(mesAtual).padStart(2, '0')}_recibo.${fileExt}`;
+
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('recibos-prestadores')
+          .upload(fileName, reciboPdf, { upsert: true });
+
+        if (uploadError) {
+          console.error('Erro upload:', uploadError);
+        } else {
+          const { data: urlData } = supabase.storage
+            .from('recibos-prestadores')
+            .getPublicUrl(fileName);
+          pdfUrl = urlData?.publicUrl;
+        }
+      }
+
       const { data: existing } = await supabase
         .from('recibos_prestadores')
         .select('id')
@@ -588,16 +615,19 @@ export default function Equipa() {
         .eq('ano', anoAtual)
         .single();
 
+      const reciboData = {
+        valor_bruto: parseFloat(reciboForm.valor_bruto),
+        valor_liquido: parseFloat(reciboForm.valor_bruto),
+        status: 'submetido',
+        recibo_data_submissao: new Date().toISOString(),
+        notas: reciboForm.notas || null,
+        ...(pdfUrl && { pdf_url: pdfUrl })
+      };
+
       if (existing) {
         const { error } = await supabase
           .from('recibos_prestadores')
-          .update({
-            valor_bruto: parseFloat(reciboForm.valor_bruto),
-            valor_liquido: parseFloat(reciboForm.valor_bruto),
-            status: 'submetido',
-            recibo_data_submissao: new Date().toISOString(),
-            notas: reciboForm.notas || null
-          })
+          .update(reciboData)
           .eq('id', existing.id);
 
         if (error) throw error;
@@ -608,11 +638,7 @@ export default function Equipa() {
             utilizador_id: selectedUser.id,
             mes: mesAtual,
             ano: anoAtual,
-            valor_bruto: parseFloat(reciboForm.valor_bruto),
-            valor_liquido: parseFloat(reciboForm.valor_bruto),
-            status: 'submetido',
-            recibo_data_submissao: new Date().toISOString(),
-            notas: reciboForm.notas || null
+            ...reciboData
           });
 
         if (error) throw error;
@@ -620,10 +646,13 @@ export default function Equipa() {
 
       setShowModal(null);
       setReciboForm({ valor_bruto: '', notas: '' });
+      setReciboPdf(null);
       loadUserDetails(selectedUser);
     } catch (error) {
       console.error('Erro ao submeter recibo:', error);
       alert('Erro ao submeter recibo');
+    } finally {
+      setUploadingRecibo(false);
     }
   };
 
@@ -917,13 +946,13 @@ export default function Equipa() {
             <CalendarDays size={16} />
             Gestão RH
             {(pedidosAusenciaPendentes.length + recibosPendentes.length) > 0 && (
-              <span style={{ 
-                background: '#dc2626', 
-                color: 'white', 
-                padding: '2px 8px', 
-                borderRadius: '10px', 
-                fontSize: '11px', 
-                fontWeight: 600 
+              <span style={{
+                background: '#dc2626',
+                color: 'white',
+                padding: '2px 8px',
+                borderRadius: '10px',
+                fontSize: '11px',
+                fontWeight: 600
               }}>
                 {pedidosAusenciaPendentes.length + recibosPendentes.length}
               </span>
@@ -1116,23 +1145,27 @@ export default function Equipa() {
               {/* Feriados Portugal */}
               <div style={{ background: 'white', borderRadius: '12px', padding: '20px', border: '1px solid #e7e5e4' }}>
                 <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 600 }}>🇵🇹 Feriados Portugal {anoGestao}</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '300px', overflowY: 'auto' }}>
-                  {feriados.length > 0 ? feriados.map(fer => (
-                    <div key={fer.id} style={{ 
-                      display: 'flex', justifyContent: 'space-between',
-                      padding: '8px 12px', background: '#f5f5f4', borderRadius: '6px', fontSize: '13px'
-                    }}>
-                      <span>{fer.nome}</span>
-                      <span style={{ color: '#78716c' }}>
-                        {new Date(fer.data).toLocaleDateString('pt-PT', { weekday: 'short', day: 'numeric', month: 'short' })}
-                      </span>
-                    </div>
-                  )) : (
-                    <p style={{ color: '#78716c', textAlign: 'center', padding: '20px' }}>
-                      Feriados não carregados. Execute o SQL para adicionar.
-                    </p>
-                  )}
-                </div>
+                {feriados.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {feriados.map(fer => (
+                      <div key={fer.id} style={{
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        padding: '10px 12px',
+                        background: fer.tipo === 'municipal_lisboa' ? '#dbeafe' : '#f5f5f4',
+                        borderRadius: '6px', fontSize: '13px'
+                      }}>
+                        <span style={{ fontWeight: 500 }}>{fer.nome}</span>
+                        <span style={{ color: '#78716c' }}>
+                          {new Date(fer.data).toLocaleDateString('pt-PT', { weekday: 'short', day: 'numeric', month: 'short' })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p style={{ color: '#78716c', textAlign: 'center', padding: '20px' }}>
+                    Feriados não carregados. Execute o SQL para adicionar.
+                  </p>
+                )}
               </div>
             </div>
 
@@ -1514,8 +1547,15 @@ export default function Equipa() {
 
             {/* Data Entrada */}
             <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, marginBottom: '6px', color: '#78716c' }}>Data de Entrada</label>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, marginBottom: '6px', color: '#78716c' }}>Data de Entrada na Empresa</label>
               <input type="date" value={editForm.data_entrada} onChange={e => setEditForm({...editForm, data_entrada: e.target.value})} style={{ width: '100%', padding: '10px 12px', border: '1px solid #e7e5e4', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }} />
+            </div>
+
+            {/* Data Saída */}
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, marginBottom: '6px', color: '#78716c' }}>Data de Saída da Empresa</label>
+              <input type="date" value={editForm.data_saida} onChange={e => setEditForm({...editForm, data_saida: e.target.value})} style={{ width: '100%', padding: '10px 12px', border: '1px solid #e7e5e4', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }} />
+              <span style={{ fontSize: '11px', color: '#a8a29e', marginTop: '4px', display: 'block' }}>Deixe vazio se ainda colabora</span>
             </div>
 
             {/* Data Nascimento */}
@@ -1602,9 +1642,16 @@ export default function Equipa() {
             </div>
             <div style={styles.statBox}>
               <div style={styles.statValue}>
-                {selectedUser.data_entrada ? new Date(selectedUser.data_entrada).getFullYear() : '"”'}
+                {selectedUser.data_entrada ? new Date(selectedUser.data_entrada).toLocaleDateString('pt-PT', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
               </div>
-              <div style={styles.statLabel}>Na Empresa Desde</div>
+              <div style={styles.statLabel}>
+                {selectedUser.data_saida ? 'Colaborou de' : 'Na Empresa Desde'}
+              </div>
+              {selectedUser.data_saida && (
+                <div style={{ fontSize: '11px', color: '#dc2626', marginTop: '4px' }}>
+                  até {new Date(selectedUser.data_saida).toLocaleDateString('pt-PT', { day: '2-digit', month: 'short', year: 'numeric' })}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1651,7 +1698,19 @@ export default function Equipa() {
               </div>
               <div style={{ gridColumn: 'span 2' }}>
                 <div style={{ fontSize: '12px', color: '#a8a29e', marginBottom: '4px' }}>Morada</div>
-                <div style={{ fontSize: '14px', color: '#44403c' }}>{selectedUser.morada || '"”'}</div>
+                <div style={{ fontSize: '14px', color: '#44403c' }}>{selectedUser.morada || '""'}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '12px', color: '#a8a29e', marginBottom: '4px' }}>Data de Entrada</div>
+                <div style={{ fontSize: '14px', color: '#44403c' }}>
+                  {selectedUser.data_entrada ? new Date(selectedUser.data_entrada).toLocaleDateString('pt-PT') : '-'}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: '12px', color: '#a8a29e', marginBottom: '4px' }}>Data de Saída</div>
+                <div style={{ fontSize: '14px', color: selectedUser.data_saida ? '#dc2626' : '#44403c' }}>
+                  {selectedUser.data_saida ? new Date(selectedUser.data_saida).toLocaleDateString('pt-PT') : 'Em atividade'}
+                </div>
               </div>
               {selectedUser.horario_trabalho && (
                 <div>
@@ -2050,17 +2109,78 @@ export default function Equipa() {
                   placeholder="Notas ou observações..."
                 />
               </div>
-              <div style={{ background: '#fef3c7', borderRadius: '8px', padding: '12px', fontSize: '12px', color: '#b45309' }}>
-                <strong>Nota:</strong> Por favor anexe o PDF do recibo/fatura via email para financeiro@gavinho.pt
+
+              {/* Upload do Recibo PDF */}
+              <div style={styles.formGroup}>
+                <label style={styles.formLabel}>Anexar Recibo (PDF)</label>
+                <div
+                  style={{
+                    border: reciboPdf ? '2px solid #16a34a' : '2px dashed #d6d3d1',
+                    borderRadius: '8px',
+                    padding: '16px',
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    background: reciboPdf ? '#f0fdf4' : '#fafaf9',
+                    transition: 'all 0.2s'
+                  }}
+                  onClick={() => document.getElementById('recibo-pdf-input').click()}
+                >
+                  <input
+                    id="recibo-pdf-input"
+                    type="file"
+                    accept=".pdf"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) setReciboPdf(file);
+                    }}
+                    style={{ display: 'none' }}
+                  />
+                  {reciboPdf ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                      <FileText size={20} style={{ color: '#16a34a' }} />
+                      <span style={{ color: '#16a34a', fontWeight: 500 }}>{reciboPdf.name}</span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setReciboPdf(null); }}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', padding: '4px' }}
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <Upload size={24} style={{ color: '#a8a29e', marginBottom: '8px' }} />
+                      <p style={{ margin: 0, fontSize: '13px', color: '#78716c' }}>
+                        Clique para selecionar o PDF do recibo
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ background: '#dbeafe', borderRadius: '8px', padding: '12px', fontSize: '12px', color: '#1e40af' }}>
+                <strong>Nota:</strong> Ao anexar o recibo será enviada uma cópia automática para <strong>contabilidade@gavinhogroup.com</strong>
               </div>
             </div>
             <div style={styles.modalFooter}>
-              <button onClick={() => setShowModal(null)} style={{ padding: '10px 16px', background: 'transparent', border: 'none', color: '#78716c', cursor: 'pointer' }}>
+              <button
+                onClick={() => { setShowModal(null); setReciboPdf(null); }}
+                style={{ padding: '10px 16px', background: 'transparent', border: 'none', color: '#78716c', cursor: 'pointer' }}
+                disabled={uploadingRecibo}
+              >
                 Cancelar
               </button>
-              <button onClick={handleSubmitRecibo} style={styles.btnPrimary}>
-                <Send size={16} />
-                Submeter
+              <button onClick={handleSubmitRecibo} style={styles.btnPrimary} disabled={uploadingRecibo}>
+                {uploadingRecibo ? (
+                  <>
+                    <Loader size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                    A submeter...
+                  </>
+                ) : (
+                  <>
+                    <Send size={16} />
+                    Submeter
+                  </>
+                )}
               </button>
             </div>
           </div>
