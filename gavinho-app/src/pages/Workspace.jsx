@@ -409,7 +409,7 @@ export default function Workspace() {
           tipo: attachments.length > 0 ? (attachments[0].type === 'image' ? 'imagem' : 'ficheiro') : 'texto',
           autor_id: profile?.id,
           canal_id: canalAtivo?.id,
-          topico_id: null, // Workspace uses canal_id directly
+          topico_id: activeTopic || 'geral',
           parent_id: replyingTo?.id || null,
           ficheiro_url: attachments.length > 0 ? attachments[0].url : null,
           ficheiro_nome: attachments.length > 0 ? attachments[0].name : null,
