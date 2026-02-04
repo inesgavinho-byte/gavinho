@@ -160,7 +160,7 @@ export default function Workspace() {
     updateMyPresence, loadOnlineUsers, handleTyping, setUserTyping,
     isUserOnline, getUserStatus, getPresenceColor: getPresenceColorHook, getPresenceLabel,
     markMessageAsRead, getReadStatus, isMessageRead, updateUserStatus
-  } = usePresence(profile, membros)
+  } = usePresence(profile, membros, canalAtivo?.id)
 
   // Notifications Hook
   const {
@@ -553,11 +553,16 @@ export default function Workspace() {
     })
   }
 
-  // Handle message input change with mention detection
+  // Handle message input change with mention detection and typing indicator
   const handleMessageChange = (e) => {
     const value = e.target.value
     const cursorPos = e.target.selectionStart
     setMessageInput(value)
+
+    // Broadcast typing indicator
+    if (value.trim()) {
+      handleTyping()
+    }
 
     // Check for @ mention
     const textBeforeCursor = value.substring(0, cursorPos)

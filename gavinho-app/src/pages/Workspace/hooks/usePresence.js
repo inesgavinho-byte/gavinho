@@ -1,15 +1,18 @@
 // =====================================================
 // USE PRESENCE HOOK
 // Estado online/offline, typing indicators, read receipts
+// Uses Supabase Realtime for real-time typing indicators
 // =====================================================
 
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { supabase } from '../../../lib/supabase'
 
-export default function usePresence(profile, membros = []) {
+export default function usePresence(profile, membros = [], canalId = null) {
   // Typing
   const [typingUsers, setTypingUsers] = useState([])
   const typingTimeoutRef = useRef(null)
+  const typingChannelRef = useRef(null)
+  const typingCleanupRefs = useRef({}) // Track timeouts for each user
 
   // Online status
   const [onlineUsers, setOnlineUsers] = useState({})
@@ -68,16 +71,40 @@ export default function usePresence(profile, membros = []) {
     }
   }, [membros])
 
-  // ========== TYPING INDICATOR ==========
+  // ========== TYPING INDICATOR WITH REALTIME ==========
+
+  // Broadcast that current user is typing
+  const broadcastTyping = useCallback((isTyping = true) => {
+    if (!profile?.id || !profile?.nome || !typingChannelRef.current) return
+
+    typingChannelRef.current.send({
+      type: 'broadcast',
+      event: 'typing',
+      payload: {
+        userId: profile.id,
+        userName: profile.nome,
+        isTyping
+      }
+    })
+  }, [profile?.id, profile?.nome])
+
+  // Handle typing input - broadcasts typing and auto-stops after 3s
   const handleTyping = useCallback(() => {
+    // Clear previous timeout
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current)
     }
-    typingTimeoutRef.current = setTimeout(() => {
-      // Stop typing indicator after 3 seconds of no input
-    }, 3000)
-  }, [])
 
+    // Broadcast that user is typing
+    broadcastTyping(true)
+
+    // Set timeout to stop typing indicator after 3 seconds of no input
+    typingTimeoutRef.current = setTimeout(() => {
+      broadcastTyping(false)
+    }, 3000)
+  }, [broadcastTyping])
+
+  // Manual set typing (for external use)
   const setUserTyping = useCallback((userId, isTyping) => {
     setTypingUsers(prev => {
       if (isTyping && !prev.includes(userId)) {
@@ -89,6 +116,55 @@ export default function usePresence(profile, membros = []) {
       return prev
     })
   }, [])
+
+  // Subscribe to typing channel for a specific canal
+  const subscribeToTypingChannel = useCallback((channelId) => {
+    if (!channelId || !profile?.id) return
+
+    // Unsubscribe from previous channel
+    if (typingChannelRef.current) {
+      supabase.removeChannel(typingChannelRef.current)
+    }
+
+    // Create new channel
+    const channel = supabase.channel(`typing:${channelId}`)
+
+    channel
+      .on('broadcast', { event: 'typing' }, ({ payload }) => {
+        // Ignore own typing events
+        if (payload.userId === profile.id) return
+
+        if (payload.isTyping) {
+          // Add user to typing list
+          setTypingUsers(prev => {
+            if (prev.includes(payload.userName)) return prev
+            return [...prev, payload.userName]
+          })
+
+          // Clear previous timeout for this user
+          if (typingCleanupRefs.current[payload.userId]) {
+            clearTimeout(typingCleanupRefs.current[payload.userId])
+          }
+
+          // Set timeout to remove user from typing list after 4s (safety margin)
+          typingCleanupRefs.current[payload.userId] = setTimeout(() => {
+            setTypingUsers(prev => prev.filter(name => name !== payload.userName))
+          }, 4000)
+        } else {
+          // Remove user from typing list
+          setTypingUsers(prev => prev.filter(name => name !== payload.userName))
+
+          // Clear timeout
+          if (typingCleanupRefs.current[payload.userId]) {
+            clearTimeout(typingCleanupRefs.current[payload.userId])
+            delete typingCleanupRefs.current[payload.userId]
+          }
+        }
+      })
+      .subscribe()
+
+    typingChannelRef.current = channel
+  }, [profile?.id])
 
   // ========== ONLINE STATUS HELPERS ==========
   const isUserOnline = useCallback((userId) => {
@@ -184,6 +260,27 @@ export default function usePresence(profile, membros = []) {
     }
   }, [membros, loadOnlineUsers])
 
+  // ========== TYPING CHANNEL SUBSCRIPTION ==========
+  useEffect(() => {
+    if (canalId) {
+      subscribeToTypingChannel(canalId)
+    }
+
+    return () => {
+      // Cleanup typing channel
+      if (typingChannelRef.current) {
+        broadcastTyping(false) // Stop typing on unmount
+        supabase.removeChannel(typingChannelRef.current)
+        typingChannelRef.current = null
+      }
+      // Clear all typing cleanup timeouts
+      Object.values(typingCleanupRefs.current).forEach(clearTimeout)
+      typingCleanupRefs.current = {}
+      // Clear typing list
+      setTypingUsers([])
+    }
+  }, [canalId, subscribeToTypingChannel, broadcastTyping])
+
   return {
     // State
     typingUsers,
@@ -204,6 +301,8 @@ export default function usePresence(profile, membros = []) {
     loadOnlineUsers,
     handleTyping,
     setUserTyping,
+    broadcastTyping,
+    subscribeToTypingChannel,
     isUserOnline,
     getUserStatus,
     getPresenceColor,
