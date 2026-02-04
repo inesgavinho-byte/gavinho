@@ -66,7 +66,10 @@ const MessageItem = memo(function MessageItem({
   const urls = useMemo(() => extractUrls(post.conteudo), [post.conteudo])
 
   return (
-    <div
+    <article
+      role="article"
+      aria-label={`Mensagem de ${post.autor?.nome || 'Utilizador'} às ${formatDateTime(post.created_at)}`}
+      tabIndex={0}
       style={{
         padding: showAuthor ? '16px' : '4px 16px 4px 64px',
         borderRadius: '8px',
@@ -130,11 +133,17 @@ const MessageItem = memo(function MessageItem({
           </div>
 
           {/* Message actions */}
-          <div style={{ display: 'flex', gap: '2px', opacity: 0, position: 'relative' }} className="message-actions">
+          <div
+            role="toolbar"
+            aria-label="Ações da mensagem"
+            style={{ display: 'flex', gap: '2px', opacity: 0, position: 'relative' }}
+            className="message-actions"
+          >
             {REACTIONS.slice(0, 4).map(reaction => (
               <button
                 key={reaction.name}
                 onClick={() => onReaction?.(post.id, reaction.emoji)}
+                aria-label={`Reagir com ${reaction.name}`}
                 style={{
                   width: '28px',
                   height: '28px',
@@ -145,12 +154,13 @@ const MessageItem = memo(function MessageItem({
                   fontSize: '14px'
                 }}
               >
-                {reaction.emoji}
+                <span aria-hidden="true">{reaction.emoji}</span>
               </button>
             ))}
             <button
               onClick={() => onReply?.(post)}
               title="Responder"
+              aria-label="Responder a esta mensagem"
               style={{
                 width: '28px',
                 height: '28px',
@@ -161,11 +171,12 @@ const MessageItem = memo(function MessageItem({
                 color: 'var(--brown-light)'
               }}
             >
-              <CornerUpLeft size={16} />
+              <CornerUpLeft size={16} aria-hidden="true" />
             </button>
             <button
               onClick={() => onOpenThread?.(post)}
               title="Abrir conversa"
+              aria-label="Abrir conversa em thread"
               style={{
                 width: '28px',
                 height: '28px',
@@ -176,11 +187,13 @@ const MessageItem = memo(function MessageItem({
                 color: 'var(--brown-light)'
               }}
             >
-              <MessageSquare size={16} />
+              <MessageSquare size={16} aria-hidden="true" />
             </button>
             <button
               onClick={() => onSaveMessage?.(post)}
               title={isMessageSaved?.(post.id) ? 'Remover dos guardados' : 'Guardar mensagem'}
+              aria-label={isMessageSaved?.(post.id) ? 'Remover mensagem dos guardados' : 'Guardar mensagem'}
+              aria-pressed={isMessageSaved?.(post.id)}
               style={{
                 width: '28px',
                 height: '28px',
@@ -191,11 +204,14 @@ const MessageItem = memo(function MessageItem({
                 color: isMessageSaved?.(post.id) ? 'var(--warning)' : 'var(--brown-light)'
               }}
             >
-              {isMessageSaved?.(post.id) ? <BookmarkCheck size={16} /> : <Bookmark size={16} />}
+              {isMessageSaved?.(post.id) ? <BookmarkCheck size={16} aria-hidden="true" /> : <Bookmark size={16} aria-hidden="true" />}
             </button>
             <div style={{ position: 'relative' }}>
               <button
                 onClick={() => setShowMessageMenu(showMessageMenu === post.id ? null : post.id)}
+                aria-label="Mais opções"
+                aria-expanded={showMessageMenu === post.id}
+                aria-haspopup="menu"
                 style={{
                   width: '28px',
                   height: '28px',
@@ -206,23 +222,27 @@ const MessageItem = memo(function MessageItem({
                   color: 'var(--brown-light)'
                 }}
               >
-                <MoreHorizontal size={16} />
+                <MoreHorizontal size={16} aria-hidden="true" />
               </button>
 
               {showMessageMenu === post.id && (
-                <div style={{
-                  position: 'absolute',
-                  top: '100%',
-                  right: '0',
-                  marginTop: '4px',
-                  background: 'var(--white)',
-                  borderRadius: '8px',
-                  boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
-                  border: '1px solid var(--stone)',
-                  minWidth: '160px',
-                  zIndex: 1000,
-                  overflow: 'hidden'
-                }}>
+                <div
+                  role="menu"
+                  aria-label="Opções da mensagem"
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    right: '0',
+                    marginTop: '4px',
+                    background: 'var(--white)',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+                    border: '1px solid var(--stone)',
+                    minWidth: '160px',
+                    zIndex: 1000,
+                    overflow: 'hidden'
+                  }}
+                >
                   {[
                     { icon: CornerUpLeft, label: 'Responder', action: () => { onReply?.(post); setShowMessageMenu(null) } },
                     { icon: MessageSquare, label: 'Abrir conversa', action: () => { onOpenThread?.(post); setShowMessageMenu(null) } },
@@ -233,6 +253,7 @@ const MessageItem = memo(function MessageItem({
                   ].map((item, idx) => (
                     <button
                       key={idx}
+                      role="menuitem"
                       onClick={item.action}
                       style={{
                         width: '100%',
@@ -250,14 +271,15 @@ const MessageItem = memo(function MessageItem({
                       onMouseEnter={e => e.currentTarget.style.background = 'var(--cream)'}
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                     >
-                      <item.icon size={16} />
+                      <item.icon size={16} aria-hidden="true" />
                       {item.label}
                     </button>
                   ))}
                   {isOwnMessage && (
                     <>
-                      <div style={{ height: '1px', background: 'var(--stone)', margin: '4px 0' }} />
+                      <div role="separator" style={{ height: '1px', background: 'var(--stone)', margin: '4px 0' }} />
                       <button
+                        role="menuitem"
                         onClick={() => { onEditMessage?.(post); setShowMessageMenu(null) }}
                         style={{
                           width: '100%',
@@ -275,10 +297,11 @@ const MessageItem = memo(function MessageItem({
                         onMouseEnter={e => e.currentTarget.style.background = 'var(--cream)'}
                         onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                       >
-                        <Edit size={16} />
+                        <Edit size={16} aria-hidden="true" />
                         Editar
                       </button>
                       <button
+                        role="menuitem"
                         onClick={() => { onDeleteMessage?.(post.id); setShowMessageMenu(null) }}
                         style={{
                           width: '100%',
@@ -296,7 +319,7 @@ const MessageItem = memo(function MessageItem({
                         onMouseEnter={e => e.currentTarget.style.background = 'rgba(220,53,69,0.1)'}
                         onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                       >
-                        <Trash2 size={16} />
+                        <Trash2 size={16} aria-hidden="true" />
                         Eliminar
                       </button>
                     </>
@@ -505,7 +528,7 @@ const MessageItem = memo(function MessageItem({
           </button>
         )}
       </div>
-    </div>
+    </article>
   )
 })
 
@@ -595,18 +618,29 @@ function MessageList({
   }, [handleScroll, onLoadMore])
 
   return (
-    <div ref={containerRef} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+    <div
+      ref={containerRef}
+      role="log"
+      aria-label="Lista de mensagens"
+      aria-live="polite"
+      aria-relevant="additions"
+      style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}
+    >
       {/* Loading indicator at top */}
       {loadingMoreMessages && (
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '16px',
-          gap: '8px',
-          color: 'var(--brown-light)'
-        }}>
-          <Loader size={18} style={{ animation: 'spin 1s linear infinite' }} />
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px',
+            gap: '8px',
+            color: 'var(--brown-light)'
+          }}
+        >
+          <Loader size={18} aria-hidden="true" style={{ animation: 'spin 1s linear infinite' }} />
           <span style={{ fontSize: '13px' }}>A carregar mensagens anteriores...</span>
         </div>
       )}
@@ -615,6 +649,7 @@ function MessageList({
       {hasMoreMessages && !loadingMoreMessages && posts.length > 0 && (
         <button
           onClick={onLoadMore}
+          aria-label="Carregar mensagens mais antigas"
           style={{
             display: 'flex',
             alignItems: 'center',

@@ -100,14 +100,18 @@ const WorkspaceSidebar = ({
   equipaAtiva
 }) => {
   return (
-    <div style={{
-      width: '280px',
-      background: 'var(--off-white)',
-      borderRight: '1px solid var(--stone)',
-      display: 'flex',
-      flexDirection: 'column',
-      flexShrink: 0
-    }}>
+    <aside
+      role="navigation"
+      aria-label="Navegação de equipas e canais"
+      style={{
+        width: '280px',
+        background: 'var(--off-white)',
+        borderRight: '1px solid var(--stone)',
+        display: 'flex',
+        flexDirection: 'column',
+        flexShrink: 0
+      }}
+    >
       {/* Header */}
       <div style={{
         padding: '16px 20px',
@@ -490,7 +494,7 @@ const WorkspaceSidebar = ({
           )
         })}
       </div>
-    </div>
+    </aside>
   )
 }
 
