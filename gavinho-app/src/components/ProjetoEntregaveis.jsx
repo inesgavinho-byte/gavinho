@@ -10,10 +10,13 @@ import * as XLSX from 'xlsx'
 import { DeliveryFileSection } from './deliveries'
 
 const statusConfig = {
+  'nao_iniciado': { label: 'Não Iniciado', color: '#95a5a6', bg: 'rgba(149, 165, 166, 0.15)' },
   'pendente': { label: 'Pendente', color: 'var(--brown-light)', bg: 'var(--stone)' },
   'em_progresso': { label: 'Em Progresso', color: 'var(--info)', bg: 'rgba(138, 158, 184, 0.15)' },
+  'aguarda_gp': { label: 'Aguarda GP', color: '#9b59b6', bg: 'rgba(155, 89, 182, 0.25)', border: '2px solid #9b59b6' },
+  'bloqueado': { label: 'Bloqueado', color: '#e74c3c', bg: 'rgba(231, 76, 60, 0.2)', border: '2px solid #e74c3c' },
   'concluido': { label: 'Concluído', color: 'var(--success)', bg: 'rgba(122, 158, 122, 0.15)' },
-  'aprovado': { label: 'Aprovado', color: 'var(--warning)', bg: 'rgba(201, 168, 130, 0.15)' }
+  'aprovado': { label: 'Aprovado', color: '#27ae60', bg: 'rgba(39, 174, 96, 0.15)' }
 }
 
 export default function ProjetoEntregaveis({ projeto }) {
@@ -1120,8 +1123,8 @@ export default function ProjetoEntregaveis({ projeto }) {
                               <div style={{
                                 display: 'grid',
                                 gridTemplateColumns: editingSubcategoriaMode[`${faseNome}__${catNome}`]
-                                  ? '24px 32px 80px 1fr 70px 100px 100px 70px 70px 50px 90px'
-                                  : '32px 80px 1fr 70px 100px 100px 70px 70px 50px 60px',
+                                  ? '24px 32px 80px 1fr 120px 70px 100px 100px 70px 70px 50px 90px'
+                                  : '32px 80px 1fr 120px 70px 100px 100px 70px 70px 50px 60px',
                                 alignItems: 'center',
                                 gap: '8px',
                                 padding: '8px 12px',
@@ -1145,6 +1148,7 @@ export default function ProjetoEntregaveis({ projeto }) {
                                 </span>
                                 <span>Código</span>
                                 <span>Descrição</span>
+                                <span>Obs.</span>
                                 <span style={{ textAlign: 'center' }}>Escala</span>
                                 <span style={{ textAlign: 'center' }}>Estado</span>
                                 <span style={{ textAlign: 'center' }}>Executante</span>
@@ -1159,8 +1163,8 @@ export default function ProjetoEntregaveis({ projeto }) {
                                   style={{
                                     display: 'grid',
                                     gridTemplateColumns: editingSubcategoriaMode[`${faseNome}__${catNome}`]
-                                      ? '24px 32px 80px 1fr 70px 100px 100px 70px 70px 50px 90px'
-                                      : '32px 80px 1fr 70px 100px 100px 70px 70px 50px 60px',
+                                      ? '24px 32px 80px 1fr 120px 70px 100px 100px 70px 70px 50px 90px'
+                                      : '32px 80px 1fr 120px 70px 100px 100px 70px 70px 50px 60px',
                                     alignItems: 'center',
                                     gap: '8px',
                                     padding: '10px 12px',
@@ -1202,6 +1206,20 @@ export default function ProjetoEntregaveis({ projeto }) {
                                   </span>
                                   {/* Descrição */}
                                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.nome}</span>
+                                  {/* Observações */}
+                                  <span
+                                    style={{
+                                      fontSize: '11px',
+                                      color: item.notas ? 'var(--brown)' : 'var(--brown-light)',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      whiteSpace: 'nowrap',
+                                      opacity: item.notas ? 1 : 0.5
+                                    }}
+                                    title={item.notas || 'Sem observações'}
+                                  >
+                                    {item.notas || '—'}
+                                  </span>
                                   {/* Escala */}
                                   <span style={{ fontSize: '11px', color: 'var(--brown-light)', background: item.escala ? 'var(--stone)' : 'transparent', padding: '2px 6px', borderRadius: '4px', textAlign: 'center' }}>
                                     {item.escala || '-'}
@@ -1237,6 +1255,7 @@ export default function ProjetoEntregaveis({ projeto }) {
                                         fontWeight: 600,
                                         background: statusConfig[item.status]?.bg,
                                         color: statusConfig[item.status]?.color,
+                                        border: statusConfig[item.status]?.border || 'none',
                                         textAlign: 'center',
                                         cursor: 'pointer',
                                         transition: 'all 0.2s'
