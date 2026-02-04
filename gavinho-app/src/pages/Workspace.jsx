@@ -330,7 +330,11 @@ export default function Workspace() {
         filter: `canal_id=eq.${canalId}`
       }, (payload) => {
         if (!payload.new.parent_id) {
-          setPosts(prev => [...prev, { ...payload.new, replyCount: 0 }])
+          // Avoid duplicates - check if message already exists locally
+          setPosts(prev => {
+            if (prev.some(p => p.id === payload.new.id)) return prev
+            return [...prev, { ...payload.new, replyCount: 0 }]
+          })
         } else if (activeThread?.id === payload.new.parent_id) {
           setThreadReplies(prev => ({
             ...prev,

@@ -7,7 +7,8 @@ import { useState } from 'react'
 import {
   Pin, MoreHorizontal, CornerUpLeft, MessageSquare, Bookmark, BookmarkCheck,
   Forward, CheckSquare, Edit, Trash2, Quote, ExternalLink, FileText,
-  Check, CheckCheck, ChevronRight, X
+  Check, CheckCheck, ChevronRight, X, Download, Eye, FileSpreadsheet,
+  FileImage, File, Share2
 } from 'lucide-react'
 
 import { REACTIONS } from '../../utils/constants'
@@ -562,80 +563,271 @@ export default function MessageList({
                 </div>
               )}
 
-              {/* Attachments */}
-              {post.attachments?.length > 0 && (
-                <div style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
-                  {post.attachments.map((file, idx) => {
-                    const isImage = file.type === 'image' || file.name?.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i)
+              {/* Attachments - Teams-style preview */}
+              {(() => {
+                // Build attachments array from post.attachments or ficheiro_* fields
+                const allAttachments = post.attachments?.length > 0
+                  ? post.attachments
+                  : post.ficheiro_url
+                    ? [{
+                        url: post.ficheiro_url,
+                        name: post.ficheiro_nome || 'Ficheiro',
+                        size: post.ficheiro_tamanho,
+                        type: post.ficheiro_tipo || (post.tipo === 'imagem' ? 'image' : 'file')
+                      }]
+                    : []
 
-                    if (isImage && file.url) {
+                if (allAttachments.length === 0) return null
+
+                return (
+                  <div style={{ display: 'flex', gap: '12px', marginTop: '12px', flexWrap: 'wrap' }}>
+                    {allAttachments.map((file, idx) => {
+                      const isImage = file.type === 'image' || file.name?.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i)
+                      const isPDF = file.name?.match(/\.pdf$/i)
+                      const isSpreadsheet = file.name?.match(/\.(xlsx|xls|csv)$/i)
+
+                      // Get appropriate icon
+                      const FileIcon = isImage ? FileImage : isPDF ? FileText : isSpreadsheet ? FileSpreadsheet : File
+                      const iconColor = isPDF ? '#e74c3c' : isSpreadsheet ? '#27ae60' : 'var(--accent-olive)'
+
+                      // Image attachment - show full preview
+                      if (isImage && file.url) {
+                        return (
+                          <div
+                            key={idx}
+                            style={{
+                              maxWidth: '360px',
+                              borderRadius: '12px',
+                              overflow: 'hidden',
+                              border: '1px solid var(--stone)',
+                              background: 'var(--white)',
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
+                            }}
+                          >
+                            <a
+                              href={file.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ display: 'block' }}
+                            >
+                              <img
+                                src={file.url}
+                                alt={file.name}
+                                style={{
+                                  width: '100%',
+                                  maxHeight: '280px',
+                                  objectFit: 'cover',
+                                  display: 'block'
+                                }}
+                              />
+                            </a>
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '10px 14px',
+                              background: 'var(--cream)',
+                              borderTop: '1px solid var(--stone)'
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
+                                <FileImage size={20} style={{ color: '#9b59b6', flexShrink: 0 }} />
+                                <div style={{ minWidth: 0 }}>
+                                  <div style={{
+                                    fontSize: '13px',
+                                    fontWeight: 500,
+                                    color: 'var(--brown)',
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis'
+                                  }}>
+                                    {file.name}
+                                  </div>
+                                  <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
+                                    {typeof file.size === 'number' ? formatFileSize(file.size) : file.size || 'Imagem'}
+                                  </div>
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', gap: '4px' }}>
+                                <a
+                                  href={file.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  title="Ver"
+                                  style={{
+                                    width: '32px',
+                                    height: '32px',
+                                    borderRadius: '6px',
+                                    background: 'var(--white)',
+                                    border: '1px solid var(--stone)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: 'var(--brown-light)',
+                                    textDecoration: 'none'
+                                  }}
+                                >
+                                  <Eye size={16} />
+                                </a>
+                                <a
+                                  href={file.url}
+                                  download={file.name}
+                                  title="Descarregar"
+                                  style={{
+                                    width: '32px',
+                                    height: '32px',
+                                    borderRadius: '6px',
+                                    background: 'var(--white)',
+                                    border: '1px solid var(--stone)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: 'var(--brown-light)',
+                                    textDecoration: 'none'
+                                  }}
+                                >
+                                  <Download size={16} />
+                                </a>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      }
+
+                      // Document attachment - Teams-style card with preview area
                       return (
-                        <a
+                        <div
                           key={idx}
-                          href={file.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
                           style={{
-                            display: 'block',
-                            maxWidth: '300px',
-                            borderRadius: '8px',
+                            width: '320px',
+                            borderRadius: '12px',
                             overflow: 'hidden',
-                            border: '1px solid var(--stone)'
+                            border: '1px solid var(--stone)',
+                            background: 'var(--white)',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
                           }}
                         >
-                          <img
-                            src={file.url}
-                            alt={file.name}
+                          {/* Preview area - mimics document thumbnail */}
+                          <a
+                            href={file.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
                             style={{
-                              width: '100%',
-                              maxHeight: '200px',
-                              objectFit: 'cover',
-                              display: 'block'
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              height: '120px',
+                              background: isPDF ? 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)' :
+                                         isSpreadsheet ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)' :
+                                         'linear-gradient(135deg, var(--cream) 0%, var(--stone) 100%)',
+                              textDecoration: 'none',
+                              position: 'relative'
                             }}
-                          />
-                          <div style={{
-                            padding: '6px 10px',
-                            background: 'var(--cream)',
-                            fontSize: '11px',
-                            color: 'var(--brown-light)'
-                          }}>
-                            {file.name} • {file.sizeFormatted || (typeof file.size === 'number' ? formatFileSize(file.size) : file.size)}
-                          </div>
-                        </a>
-                      )
-                    }
+                          >
+                            <div style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              gap: '8px'
+                            }}>
+                              <div style={{
+                                width: '56px',
+                                height: '56px',
+                                borderRadius: '12px',
+                                background: 'white',
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}>
+                                <FileIcon size={28} style={{ color: iconColor }} />
+                              </div>
+                              <span style={{
+                                fontSize: '11px',
+                                color: 'var(--brown-light)',
+                                textTransform: 'uppercase',
+                                fontWeight: 600,
+                                letterSpacing: '0.5px'
+                              }}>
+                                {isPDF ? 'PDF' : isSpreadsheet ? 'Excel' : 'Documento'}
+                              </span>
+                            </div>
+                          </a>
 
-                    return (
-                      <a
-                        key={idx}
-                        href={file.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          padding: '10px 14px',
-                          background: 'var(--cream)',
-                          borderRadius: '8px',
-                          cursor: 'pointer',
-                          textDecoration: 'none'
-                        }}
-                      >
-                        <FileText size={18} style={{ color: 'var(--accent-olive)' }} />
-                        <div>
-                          <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--brown)' }}>
-                            {file.name}
-                          </div>
-                          <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
-                            {file.sizeFormatted || (typeof file.size === 'number' ? formatFileSize(file.size) : file.size)}
+                          {/* File info bar */}
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '12px 14px',
+                            background: 'var(--cream)',
+                            borderTop: '1px solid var(--stone)'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
+                              <FileIcon size={20} style={{ color: iconColor, flexShrink: 0 }} />
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{
+                                  fontSize: '13px',
+                                  fontWeight: 500,
+                                  color: 'var(--brown)',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis'
+                                }}>
+                                  {file.name}
+                                </div>
+                                <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
+                                  {typeof file.size === 'number' ? formatFileSize(file.size) : file.size || 'Ficheiro'}
+                                </div>
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', gap: '4px' }}>
+                              <a
+                                href={file.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title="Ver"
+                                style={{
+                                  width: '32px',
+                                  height: '32px',
+                                  borderRadius: '6px',
+                                  background: 'var(--white)',
+                                  border: '1px solid var(--stone)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  color: 'var(--brown-light)',
+                                  textDecoration: 'none'
+                                }}
+                              >
+                                <Eye size={16} />
+                              </a>
+                              <a
+                                href={file.url}
+                                download={file.name}
+                                title="Descarregar"
+                                style={{
+                                  width: '32px',
+                                  height: '32px',
+                                  borderRadius: '6px',
+                                  background: 'var(--white)',
+                                  border: '1px solid var(--stone)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  color: 'var(--brown-light)',
+                                  textDecoration: 'none'
+                                }}
+                              >
+                                <Download size={16} />
+                              </a>
+                            </div>
                           </div>
                         </div>
-                      </a>
-                    )
-                  })}
-                </div>
-              )}
+                      )
+                    })}
+                  </div>
+                )
+              })()}
 
               {/* Reactions */}
               {post.reacoes?.length > 0 && (
