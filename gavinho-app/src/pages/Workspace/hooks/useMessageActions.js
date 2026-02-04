@@ -452,6 +452,7 @@ export default function useMessageActions(profile) {
     setShowMessageMenu,
     setActiveThread,
     setSelectedFiles,
+    setUploading,
     setShowEmojiPicker,
     setEmojiCategory,
     setShowMentions,

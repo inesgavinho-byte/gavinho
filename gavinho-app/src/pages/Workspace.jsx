@@ -94,6 +94,7 @@ import {
 } from './Workspace/hooks'
 
 import { ConfirmModal, ToastContainer } from './Workspace/components/Modals'
+import CentralEntregasChat from './Workspace/components/CentralEntregasChat'
 
 export default function Workspace() {
   // Handle OAuth callback in popup
@@ -144,8 +145,8 @@ export default function Workspace() {
     showEmojiPicker, emojiCategory, showMentions, mentionQuery, mentionStartIndex,
     showFormattingToolbar, savedMessages, messageTags, showTagSelector,
     setPosts, setMessageInput, setReplyInput, setEditingMessage, setEditingContent,
-    setReplyingTo, setShowMessageMenu, setActiveThread, setSelectedFiles, setShowEmojiPicker,
-    setEmojiCategory, setShowMentions, setMentionQuery, setMentionStartIndex,
+    setReplyingTo, setShowMessageMenu, setActiveThread, setSelectedFiles, setUploading,
+    setShowEmojiPicker, setEmojiCategory, setShowMentions, setMentionQuery, setMentionStartIndex,
     setShowFormattingToolbar, setShowTagSelector, loadPosts, loadThreadReplies,
     sendMessage, sendReply, editMessage, deleteMessage, addReaction,
     toggleSaveMessage, isMessageSaved, forwardMessage, tagMessage, removeTag,
@@ -1666,11 +1667,13 @@ export default function Workspace() {
             )}
 
             {activeTab === 'ficheiros' && (
-              <div style={{ padding: '40px', textAlign: 'center', color: 'var(--brown-light)' }}>
-                <FileText size={56} style={{ opacity: 0.3, marginBottom: '16px' }} />
-                <h3 style={{ margin: '0 0 8px 0', color: 'var(--brown)' }}>Ficheiros do Canal</h3>
-                <p>Todos os ficheiros partilhados neste canal aparecerão aqui</p>
-              </div>
+              <CentralEntregasChat
+                canalAtivo={canalAtivo}
+                onNavigateToEntregaveis={(canal) => {
+                  // Navigate to project page with entregaveis tab
+                  window.open(`/projetos/${canal.id}?tab=entregaveis`, '_blank')
+                }}
+              />
             )}
 
             {activeTab === 'wiki' && (
