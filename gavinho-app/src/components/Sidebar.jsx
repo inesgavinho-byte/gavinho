@@ -24,7 +24,7 @@ import {
   Shield,
   FileSearch,
   Mail,
-  Layers,
+  MessageSquare,
   Eye,
   EyeOff,
   Check
@@ -37,7 +37,7 @@ const navigation = [
     items: [
       { name: 'Dashboard Projetos', href: '/dashboard-projetos', icon: LayoutDashboard },
       { name: 'Projetos', href: '/projetos', icon: FolderKanban },
-      { name: 'Workspace', href: '/workspace', icon: Layers },
+      { name: 'Team Chat', href: '/workspace', icon: MessageSquare },
       { name: 'Calendário', href: '/calendario', icon: Calendar },
       { name: 'Biblioteca', href: '/biblioteca', icon: Library },
     ]

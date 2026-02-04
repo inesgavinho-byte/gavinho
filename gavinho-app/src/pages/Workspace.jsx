@@ -1901,7 +1901,7 @@ export default function Workspace() {
             {aiMessages.length === 0 && (
               <div style={{ textAlign: 'center', padding: '20px', color: 'var(--brown-light)' }}>
                 <Bot size={48} style={{ opacity: 0.5, marginBottom: '12px' }} />
-                <p style={{ fontSize: '14px' }}>Olá! Sou o assistente IA do Workspace.</p>
+                <p style={{ fontSize: '14px' }}>Olá! Sou o assistente IA do Team Chat.</p>
                 <p style={{ fontSize: '12px' }}>Posso ajudar-te a resumir conversas, encontrar informação ou responder a questões.</p>
               </div>
             )}
