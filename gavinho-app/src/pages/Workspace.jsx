@@ -88,8 +88,12 @@ import {
   useMessageActions,
   usePresence,
   useNotifications,
-  useTeamsImport
+  useTeamsImport,
+  useToast,
+  useConfirm
 } from './Workspace/hooks'
+
+import { ConfirmModal, ToastContainer } from './Workspace/components/Modals'
 
 export default function Workspace() {
   // Handle OAuth callback in popup
@@ -169,6 +173,10 @@ export default function Workspace() {
     updateDndSchedule, isDndActive, addReminder, removeReminder,
     markReminderComplete, getActiveReminders, openReminderModal
   } = useNotifications()
+
+  // Toast & Confirm Hooks (replacing alert/confirm)
+  const { toasts, success: toastSuccess, error: toastError, info: toastInfo, dismissToast } = useToast()
+  const { confirmState, confirm, closeConfirm, confirmArchive } = useConfirm()
 
   // ========== REMAINING LOCAL STATE ==========
 
@@ -447,7 +455,7 @@ export default function Workspace() {
       setReplyingTo(null)
 
     } catch (err) {
-      alert('Erro ao enviar mensagem: ' + err.message)
+      toastError(err.message, 'Erro ao enviar mensagem')
     } finally {
       setUploading(false)
     }
@@ -796,7 +804,7 @@ export default function Workspace() {
     // TODO: In production, would insert into tasks table
     setShowCreateTaskModal(false)
     setTaskFromMessage(null)
-    alert('Tarefa criada com sucesso!')
+    toastSuccess('Tarefa criada com sucesso!')
   }
 
   // ========== FORWARD MESSAGE ==========
@@ -814,7 +822,7 @@ export default function Workspace() {
     // TODO: In production, would insert forwarded message
     setShowForwardModal(false)
     setMessageToForward(null)
-    alert(`Mensagem reencaminhada para ${targetChannel?.nome}`)
+    toastSuccess(`Mensagem reencaminhada para ${targetChannel?.nome}`)
   }
 
   // ========== DRAG & DROP FILES ==========
@@ -1095,7 +1103,7 @@ export default function Workspace() {
     }
     setReminders(prev => [...prev, reminder])
     setShowMessageMenu(null)
-    alert(`Lembrete definido para ${reminderTime.toLocaleString('pt-PT')}`)
+    toastSuccess(`Lembrete definido para ${reminderTime.toLocaleString('pt-PT')}`, 'Lembrete criado')
   }
 
   const deleteReminder = (reminderId) => {
@@ -1117,7 +1125,7 @@ export default function Workspace() {
 
   const createMeeting = () => {
     // TODO: In production, would integrate with Google Calendar/Outlook
-    alert(`Reunião "${meetingDetails.title}" agendada para ${meetingDetails.date} às ${meetingDetails.time}`)
+    toastSuccess(`Reunião "${meetingDetails.title}" agendada para ${meetingDetails.date} às ${meetingDetails.time}`, 'Reunião agendada')
     setShowScheduleMeetingModal(false)
     setMeetingDetails({ title: '', date: '', time: '', duration: '30', participants: [], description: '' })
   }
@@ -1175,14 +1183,18 @@ export default function Workspace() {
   }
 
   // ========== ARCHIVE CHANNELS ==========
-  const archiveChannel = (channelId) => {
+  const archiveChannel = async (channelId) => {
     const channel = canais.find(c => c.id === channelId)
-    if (channel && window.confirm(`Arquivar canal ${channel.codigo}?`)) {
+    if (!channel) return
+
+    const confirmed = await confirmArchive(`canal "${channel.codigo}"`)
+    if (confirmed) {
       setArchivedChannels(prev => [...prev, { ...channel, archivedAt: new Date().toISOString() }])
       setCanais(prev => prev.filter(c => c.id !== channelId))
       if (canalAtivo?.id === channelId) {
         setCanalAtivo(canais[0] || null)
       }
+      toastSuccess(`Canal "${channel.codigo}" arquivado`)
     }
   }
 
@@ -1271,7 +1283,7 @@ export default function Workspace() {
       })
       setShowAnalytics(true)
     } catch (err) {
-      console.error('Erro ao carregar analytics:', err)
+      toastError('Não foi possível carregar as estatísticas')
       setShowAnalytics(true)
     }
   }
@@ -1417,7 +1429,7 @@ export default function Workspace() {
   const toggleEmailSync = () => {
     setEmailSyncEnabled(!emailSyncEnabled)
     if (!emailSyncEnabled) {
-      alert('Sincronização de email ativada. Receberás resumos diários das conversas.')
+      toastSuccess('Receberás resumos diários das conversas.', 'Sincronização de email ativada')
     }
   }
 
@@ -2365,6 +2377,22 @@ export default function Workspace() {
           </div>
         </div>
       )}
+
+      {/* Toast Notifications */}
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmState.isOpen}
+        onClose={closeConfirm}
+        onConfirm={confirmState.onConfirm}
+        title={confirmState.title}
+        message={confirmState.message}
+        type={confirmState.type}
+        confirmText={confirmState.confirmText}
+        cancelText={confirmState.cancelText}
+        isLoading={confirmState.isLoading}
+      />
 
       <style>{`
         @keyframes spin {

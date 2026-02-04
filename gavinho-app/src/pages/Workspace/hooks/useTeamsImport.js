@@ -303,8 +303,7 @@ const useTeamsImport = ({ onChannelImported } = {}) => {
    */
   const startTeamsImport = useCallback(async () => {
     if (selectedChannelsToImport.length === 0) {
-      alert('Selecione pelo menos um canal para importar')
-      return
+      throw new Error('Selecione pelo menos um canal para importar')
     }
 
     setImportStep(4)

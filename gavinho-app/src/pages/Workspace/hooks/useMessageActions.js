@@ -103,7 +103,7 @@ export default function useMessageActions(profile) {
         setPosts([])
       }
     } catch (err) {
-      console.error('Error loading posts:', err)
+      // Silent error - could be sent to error tracking service in production
       setPosts([])
     }
   }, [])
@@ -127,7 +127,7 @@ export default function useMessageActions(profile) {
         setThreadReplies(prev => ({ ...prev, [postId]: data }))
       }
     } catch (err) {
-      console.error('Error loading thread replies:', err)
+      // Silent error - could be sent to error tracking service in production
     }
   }, [threadReplies])
 
@@ -214,8 +214,8 @@ export default function useMessageActions(profile) {
 
       return true
     } catch (err) {
-      alert('Erro ao enviar mensagem: ' + err.message)
-      return false
+      // Error will be handled by the calling component via onError callback
+      throw new Error('Erro ao enviar mensagem: ' + err.message)
     } finally {
       setUploading(false)
     }
@@ -270,7 +270,7 @@ export default function useMessageActions(profile) {
       setEditingContent('')
       return true
     } catch (err) {
-      console.error('Error editing message:', err)
+      // Silent error - could be sent to error tracking service in production
       return false
     }
   }, [])
@@ -288,7 +288,7 @@ export default function useMessageActions(profile) {
       setPosts(prev => prev.filter(p => p.id !== messageId))
       return true
     } catch (err) {
-      console.error('Error deleting message:', err)
+      // Silent error - could be sent to error tracking service in production
       return false
     }
   }, [])
@@ -353,7 +353,7 @@ export default function useMessageActions(profile) {
       if (error) throw error
       return true
     } catch (err) {
-      console.error('Error forwarding message:', err)
+      // Silent error - could be sent to error tracking service in production
       return false
     }
   }, [profile])

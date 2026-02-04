@@ -98,7 +98,7 @@ export default function useChannelData() {
 
       return []
     } catch (err) {
-      console.error('Error loading data:', err)
+      // Silent error - could be sent to error tracking service in production
       return []
     } finally {
       setLoading(false)
@@ -148,7 +148,7 @@ export default function useChannelData() {
         }
       }
     } catch (err) {
-      console.error('Error loading topics:', err)
+      // Silent error - could be sent to error tracking service in production
     }
   }, [])
 
@@ -179,7 +179,7 @@ export default function useChannelData() {
       }
       return false
     } catch (err) {
-      console.error('Error adding topic:', err)
+      // Silent error - could be sent to error tracking service in production
       return false
     }
   }, [])
