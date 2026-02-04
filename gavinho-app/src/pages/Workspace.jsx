@@ -79,8 +79,12 @@ import {
   ChannelHeader,
   ThreadPanel,
   ActivityLogPanel,
-  SavedMessagesPanel
+  SavedMessagesPanel,
+  ThemeToggle
 } from './Workspace/components'
+
+// Import theme context
+import { ThemeProvider, useTheme } from './Workspace/context'
 
 // Import custom hooks
 import {
@@ -144,10 +148,11 @@ export default function Workspace() {
     replyingTo, showMessageMenu, activeThread, threadReplies, selectedFiles, uploading,
     showEmojiPicker, emojiCategory, showMentions, mentionQuery, mentionStartIndex,
     showFormattingToolbar, savedMessages, messageTags, showTagSelector,
+    hasMoreMessages, loadingMoreMessages,
     setPosts, setMessageInput, setReplyInput, setEditingMessage, setEditingContent,
     setReplyingTo, setShowMessageMenu, setActiveThread, setSelectedFiles, setUploading,
     setShowEmojiPicker, setEmojiCategory, setShowMentions, setMentionQuery, setMentionStartIndex,
-    setShowFormattingToolbar, setShowTagSelector, loadPosts, loadThreadReplies,
+    setShowFormattingToolbar, setShowTagSelector, loadPosts, loadMorePosts, loadThreadReplies,
     sendMessage, sendReply, editMessage, deleteMessage, addReaction,
     toggleSaveMessage, isMessageSaved, forwardMessage, tagMessage, removeTag,
     openThread, closeThread, handleFileSelect, removeFile, insertEmoji
@@ -1455,6 +1460,7 @@ export default function Workspace() {
   }
 
   return (
+    <ThemeProvider>
     <div className="fade-in workspace-container" style={{
       height: '100%',
       width: '100%',
@@ -1645,6 +1651,9 @@ export default function Workspace() {
                     isMessagePinned={isMessagePinned}
                     getReadStatus={getReadStatus}
                     messagesEndRef={messagesEndRef}
+                    hasMoreMessages={hasMoreMessages}
+                    loadingMoreMessages={loadingMoreMessages}
+                    onLoadMore={loadMorePosts}
                   />
                 </div>
 
@@ -2419,5 +2428,6 @@ export default function Workspace() {
         }
       `}</style>
     </div>
+    </ThemeProvider>
   )
 }

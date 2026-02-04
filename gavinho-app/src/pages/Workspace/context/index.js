@@ -9,3 +9,9 @@ export {
   useWorkspace,
   ActionTypes
 } from './WorkspaceContext'
+
+export {
+  ThemeProvider,
+  useTheme,
+  THEMES
+} from './ThemeContext'

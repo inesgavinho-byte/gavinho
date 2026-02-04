@@ -14,8 +14,37 @@ import {
   CloudDownload,
   ChevronRight,
   Star,
-  Hash
+  Hash,
+  Sun,
+  Moon
 } from 'lucide-react'
+import { useTheme } from '../../context'
+
+// Theme toggle button component (uses hook so must be separate)
+function ThemeToggleButton() {
+  const { isDarkMode, toggleTheme } = useTheme()
+
+  return (
+    <button
+      onClick={toggleTheme}
+      title={isDarkMode ? 'Modo claro' : 'Modo escuro'}
+      style={{
+        width: '32px',
+        height: '32px',
+        borderRadius: '6px',
+        background: 'transparent',
+        border: 'none',
+        cursor: 'pointer',
+        color: 'var(--brown-light)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}
+    >
+      {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+    </button>
+  )
+}
 
 /**
  * WorkspaceSidebar - Main sidebar component for the workspace
@@ -227,6 +256,8 @@ const WorkspaceSidebar = ({
           >
             {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
           </button>
+          {/* Theme toggle */}
+          <ThemeToggleButton />
           {/* Teams Import */}
           <button
             onClick={() => setShowTeamsImport(true)}

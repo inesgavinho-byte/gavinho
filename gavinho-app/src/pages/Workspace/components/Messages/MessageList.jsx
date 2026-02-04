@@ -4,18 +4,20 @@
 // Optimized with React.memo and useMemo for performance
 // =====================================================
 
-import { useState, memo, useMemo, useCallback } from 'react'
+import { useState, memo, useMemo, useCallback, useEffect, useRef } from 'react'
 import {
   Pin, MoreHorizontal, CornerUpLeft, MessageSquare, Bookmark, BookmarkCheck,
   Forward, CheckSquare, Edit, Trash2, Quote, ExternalLink, FileText,
   Check, CheckCheck, ChevronRight, X, Download, Eye, FileSpreadsheet,
-  FileImage, File, Share2
+  FileImage, File, Share2, Loader
 } from 'lucide-react'
 
 import { REACTIONS } from '../../utils/constants'
 import { formatDateTime, formatFileSize, getInitials, extractUrls } from '../../utils/formatters'
 import { renderFormattedText, isOwnMessage as checkOwnMessage } from '../../utils/messageUtils'
 import { getPresenceColor } from '../../utils/presenceUtils'
+import LinkPreview from './LinkPreview'
+import { generateFallbackPreview } from '../../hooks/useLinkPreview'
 
 // Memoized single message item component for performance
 const MessageItem = memo(function MessageItem({
@@ -365,15 +367,10 @@ const MessageItem = memo(function MessageItem({
             </p>
 
             {urls.slice(0, 1).map((url, idx) => (
-              <div key={idx} style={{ marginTop: '10px', padding: '12px', background: 'var(--cream)', borderRadius: '8px', borderLeft: '3px solid var(--accent-olive)', maxWidth: '400px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                  <ExternalLink size={14} style={{ color: 'var(--brown-light)' }} />
-                  <span style={{ fontSize: '11px', color: 'var(--brown-light)' }}>{new URL(url).hostname}</span>
-                </div>
-                <a href={url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '13px', color: 'var(--accent-olive)', textDecoration: 'none', fontWeight: 500 }}>
-                  {url.length > 60 ? url.substring(0, 60) + '...' : url}
-                </a>
-              </div>
+              <LinkPreview
+                key={idx}
+                preview={generateFallbackPreview(url)}
+              />
             ))}
 
             {isOwnMessage && getReadStatus && (
@@ -512,7 +509,7 @@ const MessageItem = memo(function MessageItem({
   )
 })
 
-// Main MessageList component with memoized rendering
+// Main MessageList component with memoized rendering and infinite scroll
 function MessageList({
   posts = [],
   profile,
@@ -534,9 +531,16 @@ function MessageList({
   isMessageSaved,
   isMessagePinned,
   getReadStatus,
-  messagesEndRef
+  messagesEndRef,
+  // Pagination props
+  hasMoreMessages = false,
+  loadingMoreMessages = false,
+  onLoadMore
 }) {
   const [showMessageMenu, setShowMessageMenu] = useState(null)
+  const containerRef = useRef(null)
+  const previousScrollHeightRef = useRef(0)
+  const previousPostCountRef = useRef(0)
 
   // Memoize showAuthor calculation for each post
   const postsWithShowAuthor = useMemo(() => {
@@ -553,8 +557,84 @@ function MessageList({
     setShowMessageMenu(value)
   }, [])
 
+  // Maintain scroll position when older messages are prepended
+  useEffect(() => {
+    const container = containerRef.current?.parentElement
+    if (!container) return
+
+    // If posts were added at the beginning (older messages loaded)
+    if (posts.length > previousPostCountRef.current && previousPostCountRef.current > 0) {
+      const scrollHeightDiff = container.scrollHeight - previousScrollHeightRef.current
+      if (scrollHeightDiff > 0 && container.scrollTop < 100) {
+        // Restore scroll position relative to where user was
+        container.scrollTop = scrollHeightDiff
+      }
+    }
+
+    previousScrollHeightRef.current = container.scrollHeight
+    previousPostCountRef.current = posts.length
+  }, [posts.length])
+
+  // Handle scroll to load more messages
+  const handleScroll = useCallback((e) => {
+    const container = e.target
+    // Trigger load more when scrolled near the top (100px threshold)
+    if (container.scrollTop < 100 && hasMoreMessages && !loadingMoreMessages && onLoadMore) {
+      previousScrollHeightRef.current = container.scrollHeight
+      onLoadMore()
+    }
+  }, [hasMoreMessages, loadingMoreMessages, onLoadMore])
+
+  // Attach scroll listener to parent container
+  useEffect(() => {
+    const container = containerRef.current?.parentElement
+    if (!container || !onLoadMore) return
+
+    container.addEventListener('scroll', handleScroll)
+    return () => container.removeEventListener('scroll', handleScroll)
+  }, [handleScroll, onLoadMore])
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+    <div ref={containerRef} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+      {/* Loading indicator at top */}
+      {loadingMoreMessages && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '16px',
+          gap: '8px',
+          color: 'var(--brown-light)'
+        }}>
+          <Loader size={18} style={{ animation: 'spin 1s linear infinite' }} />
+          <span style={{ fontSize: '13px' }}>A carregar mensagens anteriores...</span>
+        </div>
+      )}
+
+      {/* "Load more" button when there are more messages */}
+      {hasMoreMessages && !loadingMoreMessages && posts.length > 0 && (
+        <button
+          onClick={onLoadMore}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '12px',
+            gap: '8px',
+            background: 'var(--cream)',
+            border: '1px dashed var(--stone)',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            color: 'var(--accent-olive)',
+            fontSize: '13px',
+            fontWeight: 500,
+            marginBottom: '8px'
+          }}
+        >
+          Carregar mensagens anteriores
+        </button>
+      )}
+
       {postsWithShowAuthor.map(({ post, showAuthor }) => (
         <MessageItem
           key={post.id}
@@ -584,7 +664,7 @@ function MessageList({
         />
       ))}
 
-      {posts.length === 0 && (
+      {posts.length === 0 && !loadingMoreMessages && (
         <div style={{ textAlign: 'center', padding: '80px 20px', color: 'var(--brown-light)' }}>
           <MessageSquare size={56} style={{ opacity: 0.3, marginBottom: '16px' }} />
           <h3 style={{ margin: '0 0 8px 0', color: 'var(--brown)' }}>Sem mensagens</h3>

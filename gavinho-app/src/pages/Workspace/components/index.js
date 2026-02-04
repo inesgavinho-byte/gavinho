@@ -14,3 +14,6 @@ export * from './Messages'
 
 // Channel Header
 export { default as ChannelHeader } from './ChannelHeader'
+
+// Theme
+export { default as ThemeToggle } from './ThemeToggle'

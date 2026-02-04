@@ -6,9 +6,17 @@
 import { useState, useCallback, useRef } from 'react'
 import { supabase } from '../../../lib/supabase'
 
+const MESSAGES_PER_PAGE = 50
+
 export default function useMessageActions(profile) {
   // Posts/Messages
   const [posts, setPosts] = useState([])
+
+  // Pagination
+  const [hasMoreMessages, setHasMoreMessages] = useState(true)
+  const [loadingMoreMessages, setLoadingMoreMessages] = useState(false)
+  const [oldestMessageDate, setOldestMessageDate] = useState(null)
+  const [currentChannelId, setCurrentChannelId] = useState(null)
 
   // Input
   const [messageInput, setMessageInput] = useState('')
@@ -48,9 +56,69 @@ export default function useMessageActions(profile) {
   const [messageTags, setMessageTags] = useState({})
   const [showTagSelector, setShowTagSelector] = useState(null)
 
-  // ========== LOAD POSTS ==========
+  // ========== HELPER: ENRICH POST WITH REPLIES AND REACTIONS ==========
+  const enrichPost = useCallback(async (post) => {
+    // Get reply count
+    const { count } = await supabase
+      .from('chat_mensagens')
+      .select('*', { count: 'exact', head: true })
+      .eq('parent_id', post.id)
+      .eq('eliminado', false)
+
+    // Get reactions for this post
+    let reacoes = []
+    try {
+      const { data: reactionData } = await supabase
+        .from('chat_reacoes')
+        .select(`
+          emoji,
+          utilizador:utilizador_id(id, nome)
+        `)
+        .eq('mensagem_id', post.id)
+
+      if (reactionData && reactionData.length > 0) {
+        // Group reactions by emoji
+        const reactionMap = {}
+        reactionData.forEach(r => {
+          if (!reactionMap[r.emoji]) {
+            reactionMap[r.emoji] = { emoji: r.emoji, users: [] }
+          }
+          reactionMap[r.emoji].users.push(r.utilizador?.nome || 'Utilizador')
+        })
+        reacoes = Object.values(reactionMap)
+      }
+    } catch (err) {
+      // Silent fail - reactions table might not exist
+    }
+
+    // Build attachments array from file fields
+    let attachments = []
+    if (post.ficheiro_url) {
+      const isImage = post.tipo === 'imagem' || post.ficheiro_nome?.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i)
+      attachments.push({
+        name: post.ficheiro_nome || 'Ficheiro',
+        url: post.ficheiro_url,
+        type: isImage ? 'image' : 'file',
+        size: post.ficheiro_tamanho
+      })
+    }
+
+    return {
+      ...post,
+      replyCount: count || 0,
+      reacoes: reacoes.length > 0 ? reacoes : post.reacoes || [],
+      attachments: attachments.length > 0 ? attachments : undefined
+    }
+  }, [])
+
+  // ========== LOAD POSTS (Initial load - most recent messages) ==========
   const loadPosts = useCallback(async (canalId) => {
     if (!canalId) return
+
+    // Reset pagination state for new channel
+    setCurrentChannelId(canalId)
+    setHasMoreMessages(true)
+    setOldestMessageDate(null)
 
     try {
       const { data, error } = await supabase
@@ -62,8 +130,8 @@ export default function useMessageActions(profile) {
         .eq('canal_id', canalId)
         .is('parent_id', null)
         .eq('eliminado', false)
-        .order('created_at', { ascending: true })
-        .limit(100)
+        .order('created_at', { ascending: false })
+        .limit(MESSAGES_PER_PAGE)
 
       if (error) {
         setPosts([])
@@ -71,70 +139,80 @@ export default function useMessageActions(profile) {
       }
 
       if (data && data.length > 0) {
+        // Reverse to show oldest first (ascending)
+        const sortedData = [...data].reverse()
+
         // Load reply counts, reactions, and format attachments
-        const postsWithReplies = await Promise.all(data.map(async (post) => {
-          // Get reply count
-          const { count } = await supabase
-            .from('chat_mensagens')
-            .select('*', { count: 'exact', head: true })
-            .eq('parent_id', post.id)
-            .eq('eliminado', false)
-
-          // Get reactions for this post
-          let reacoes = []
-          try {
-            const { data: reactionData } = await supabase
-              .from('chat_reacoes')
-              .select(`
-                emoji,
-                utilizador:utilizador_id(id, nome)
-              `)
-              .eq('mensagem_id', post.id)
-
-            if (reactionData && reactionData.length > 0) {
-              // Group reactions by emoji
-              const reactionMap = {}
-              reactionData.forEach(r => {
-                if (!reactionMap[r.emoji]) {
-                  reactionMap[r.emoji] = { emoji: r.emoji, users: [] }
-                }
-                reactionMap[r.emoji].users.push(r.utilizador?.nome || 'Utilizador')
-              })
-              reacoes = Object.values(reactionMap)
-            }
-          } catch (err) {
-            // Silent fail - reactions table might not exist
-          }
-
-          // Build attachments array from file fields
-          let attachments = []
-          if (post.ficheiro_url) {
-            const isImage = post.tipo === 'imagem' || post.ficheiro_nome?.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i)
-            attachments.push({
-              name: post.ficheiro_nome || 'Ficheiro',
-              url: post.ficheiro_url,
-              type: isImage ? 'image' : 'file',
-              size: post.ficheiro_tamanho
-            })
-          }
-
-          return {
-            ...post,
-            replyCount: count || 0,
-            reacoes: reacoes.length > 0 ? reacoes : post.reacoes || [],
-            attachments: attachments.length > 0 ? attachments : undefined
-          }
-        }))
+        const postsWithReplies = await Promise.all(sortedData.map(enrichPost))
 
         setPosts(postsWithReplies)
+
+        // Store oldest message date for pagination
+        setOldestMessageDate(sortedData[0].created_at)
+
+        // Check if there might be more messages
+        setHasMoreMessages(data.length === MESSAGES_PER_PAGE)
       } else {
         setPosts([])
+        setHasMoreMessages(false)
       }
     } catch (err) {
       // Silent error - could be sent to error tracking service in production
       setPosts([])
     }
-  }, [])
+  }, [enrichPost])
+
+  // ========== LOAD MORE POSTS (Older messages on scroll up) ==========
+  const loadMorePosts = useCallback(async () => {
+    if (!currentChannelId || !hasMoreMessages || loadingMoreMessages || !oldestMessageDate) {
+      return
+    }
+
+    setLoadingMoreMessages(true)
+
+    try {
+      const { data, error } = await supabase
+        .from('chat_mensagens')
+        .select(`
+          *,
+          autor:autor_id(id, nome, avatar_url, funcao)
+        `)
+        .eq('canal_id', currentChannelId)
+        .is('parent_id', null)
+        .eq('eliminado', false)
+        .lt('created_at', oldestMessageDate)
+        .order('created_at', { ascending: false })
+        .limit(MESSAGES_PER_PAGE)
+
+      if (error) {
+        setLoadingMoreMessages(false)
+        return
+      }
+
+      if (data && data.length > 0) {
+        // Reverse to show oldest first
+        const sortedData = [...data].reverse()
+
+        // Load reply counts, reactions, and format attachments
+        const postsWithReplies = await Promise.all(sortedData.map(enrichPost))
+
+        // Prepend older messages to the beginning
+        setPosts(prev => [...postsWithReplies, ...prev])
+
+        // Update oldest message date
+        setOldestMessageDate(sortedData[0].created_at)
+
+        // Check if there might be more
+        setHasMoreMessages(data.length === MESSAGES_PER_PAGE)
+      } else {
+        setHasMoreMessages(false)
+      }
+    } catch (err) {
+      // Silent error
+    } finally {
+      setLoadingMoreMessages(false)
+    }
+  }, [currentChannelId, hasMoreMessages, loadingMoreMessages, oldestMessageDate, enrichPost])
 
   // ========== LOAD THREAD REPLIES ==========
   const loadThreadReplies = useCallback(async (postId) => {
@@ -544,6 +622,10 @@ export default function useMessageActions(profile) {
     messageTags,
     showTagSelector,
 
+    // Pagination state
+    hasMoreMessages,
+    loadingMoreMessages,
+
     // Setters
     setPosts,
     setMessageInput,
@@ -565,6 +647,7 @@ export default function useMessageActions(profile) {
 
     // Actions
     loadPosts,
+    loadMorePosts,
     loadThreadReplies,
     sendMessage,
     sendReply,
