@@ -1,10 +1,11 @@
 // =====================================================
 // WORKSPACE MESSAGE UTILITIES
 // Funções utilitárias para mensagens
-// Enhanced markdown rendering support
+// Enhanced markdown rendering support with syntax highlighting
 // =====================================================
 
 import { createElement } from 'react'
+import { highlightCode, isLanguageSupported } from './syntaxHighlighter'
 
 // Escape HTML to prevent XSS
 const escapeHtml = (text) => {
@@ -34,10 +35,10 @@ export const renderFormattedText = (text, options = {}) => {
 
   let result = text
 
-  // 1. Extract and protect code blocks
+  // 1. Extract and protect code blocks (don't escape yet - highlighter handles it)
   result = result.replace(/```(\w*)\n?([\s\S]*?)```/g, (match, lang, code) => {
     const index = codeBlocks.length
-    codeBlocks.push({ lang: lang || '', code: escapeHtml(code.trim()) })
+    codeBlocks.push({ lang: lang || '', code: code.trim() })
     return `__CODEBLOCK_${index}__`
   })
 
@@ -100,13 +101,17 @@ export const renderFormattedText = (text, options = {}) => {
   result = result.replace(/^\d+\. (.+)$/gm, '<li class="md-li-num">$1</li>')
   result = result.replace(/(<li class="md-li-num">.*<\/li>\n?)+/g, '<ol class="md-ol">$&</ol>')
 
-  // 15. Restore code blocks with syntax highlighting styles
+  // 15. Restore code blocks with syntax highlighting
   codeBlocks.forEach((block, index) => {
     const langClass = block.lang ? ` lang-${block.lang}` : ''
     const langLabel = block.lang ? `<span class="code-lang">${block.lang}</span>` : ''
+    // Apply syntax highlighting if language is supported, otherwise escape HTML
+    const highlightedCode = isLanguageSupported(block.lang)
+      ? highlightCode(block.code, block.lang)
+      : escapeHtml(block.code)
     result = result.replace(
       `__CODEBLOCK_${index}__`,
-      `<div class="md-codeblock${langClass}">${langLabel}<pre><code>${block.code}</code></pre></div>`
+      `<div class="md-codeblock${langClass}">${langLabel}<pre><code>${highlightedCode}</code></pre></div>`
     )
   })
 

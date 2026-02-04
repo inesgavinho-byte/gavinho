@@ -3269,6 +3269,76 @@ tbody tr:last-child td {
   padding: 0;
 }
 
+/* Syntax Highlighting - Dark theme (VS Code inspired) */
+.sh-keyword {
+  color: #569cd6;
+  font-weight: 500;
+}
+
+.sh-string {
+  color: #ce9178;
+}
+
+.sh-number {
+  color: #b5cea8;
+}
+
+.sh-comment {
+  color: #6a9955;
+  font-style: italic;
+}
+
+.sh-function {
+  color: #dcdcaa;
+}
+
+.sh-operator {
+  color: #d4d4d4;
+}
+
+.sh-punctuation {
+  color: #d4d4d4;
+}
+
+.sh-property {
+  color: #9cdcfe;
+}
+
+.sh-class {
+  color: #4ec9b0;
+}
+
+.sh-builtin {
+  color: #c586c0;
+}
+
+.sh-variable {
+  color: #9cdcfe;
+}
+
+.sh-tag {
+  color: #569cd6;
+}
+
+.sh-attribute {
+  color: #9cdcfe;
+}
+
+.sh-selector {
+  color: #d7ba7d;
+}
+
+.sh-regex {
+  color: #d16969;
+}
+
+/* Dark mode adjustments for syntax highlighting */
+[data-theme="dark"] .md-code {
+  background: var(--stone);
+  border-color: var(--stone-dark);
+  color: #d4d4d4;
+}
+
 /* Inline code */
 .md-code {
   padding: 2px 6px;
