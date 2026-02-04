@@ -141,13 +141,16 @@ export default function useMessageActions(profile) {
 
       // Upload files
       let attachments = []
+      let uploadErrors = []
       for (const file of selectedFiles) {
         const fileName = `${canalAtivo.id}/${Date.now()}_${file.name}`
         const { error: uploadError } = await supabase.storage
           .from('chat-files')
           .upload(fileName, file.file)
 
-        if (!uploadError) {
+        if (uploadError) {
+          uploadErrors.push(`${file.name}: ${uploadError.message}`)
+        } else {
           const { data: { publicUrl } } = supabase.storage
             .from('chat-files')
             .getPublicUrl(fileName)
@@ -158,6 +161,11 @@ export default function useMessageActions(profile) {
             size: file.size
           })
         }
+      }
+
+      // If all uploads failed and no message text, throw error
+      if (uploadErrors.length > 0 && attachments.length === 0 && !messageInput.trim()) {
+        throw new Error('Erro ao carregar ficheiro(s): ' + uploadErrors.join(', '))
       }
 
       // Insert message
