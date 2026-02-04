@@ -1,11 +1,13 @@
 // =====================================================
 // USE NOTIFICATIONS HOOK
 // Muted channels, pinned messages, sound, DND, reminders
+// Mention notifications with real-time updates
 // =====================================================
 
 import { useState, useCallback, useEffect } from 'react'
+import { supabase } from '../../../lib/supabase'
 
-export default function useNotifications() {
+export default function useNotifications(profile) {
   // Muted channels
   const [mutedChannels, setMutedChannels] = useState([])
 
@@ -29,6 +31,10 @@ export default function useNotifications() {
   const [showReminderModal, setShowReminderModal] = useState(false)
   const [reminderMessage, setReminderMessage] = useState(null)
   const [customReminderDate, setCustomReminderDate] = useState('')
+
+  // Mention notifications
+  const [mentionNotifications, setMentionNotifications] = useState([])
+  const [unreadMentionsCount, setUnreadMentionsCount] = useState(0)
 
   // ========== MUTED CHANNELS ==========
   const toggleMuteChannel = useCallback((channelId) => {
@@ -167,6 +173,157 @@ export default function useNotifications() {
     setShowReminderModal(true)
   }, [])
 
+  // ========== MENTION NOTIFICATIONS ==========
+
+  // Parse mentions from message text - returns array of names
+  const parseMentions = useCallback((text) => {
+    if (!text) return []
+    // Match @Name or @FirstName LastName patterns
+    const mentionRegex = /@([A-Za-zÀ-ÿ]+(?:\s[A-Za-zÀ-ÿ]+)?)/g
+    const matches = []
+    let match
+    while ((match = mentionRegex.exec(text)) !== null) {
+      matches.push(match[1])
+    }
+    return matches
+  }, [])
+
+  // Find user IDs from mentioned names
+  const findMentionedUserIds = useCallback((mentionedNames, membros) => {
+    if (!mentionedNames.length || !membros.length) return []
+
+    return mentionedNames.map(name => {
+      const member = membros.find(m => {
+        const memberName = m.nome?.toLowerCase() || ''
+        const mentionName = name.toLowerCase()
+        // Match full name or first name
+        return memberName === mentionName ||
+               memberName.startsWith(mentionName + ' ') ||
+               memberName.split(' ')[0] === mentionName
+      })
+      return member?.id
+    }).filter(Boolean)
+  }, [])
+
+  // Create mention notifications for a message
+  const createMentionNotifications = useCallback(async (message, mentionedUserIds, canalInfo) => {
+    if (!mentionedUserIds.length || !profile?.id) return
+
+    try {
+      // Insert notifications for each mentioned user (except self)
+      const notificationsToInsert = mentionedUserIds
+        .filter(userId => userId !== profile.id)
+        .map(userId => ({
+          utilizador_id: userId,
+          tipo: 'mention',
+          mensagem_id: message.id,
+          canal_id: message.canal_id,
+          remetente_id: profile.id,
+          conteudo: `${profile.nome || 'Alguém'} mencionou-te em ${canalInfo?.nome || 'uma conversa'}`,
+          lido: false
+        }))
+
+      if (notificationsToInsert.length > 0) {
+        await supabase.from('notificacoes').insert(notificationsToInsert)
+      }
+    } catch (err) {
+      // Silent fail - notifications table might not exist
+      console.warn('Could not create mention notifications:', err.message)
+    }
+  }, [profile])
+
+  // Load mention notifications for current user
+  const loadMentionNotifications = useCallback(async () => {
+    if (!profile?.id) return
+
+    try {
+      const { data, error } = await supabase
+        .from('notificacoes')
+        .select(`
+          *,
+          remetente:remetente_id(id, nome, avatar_url),
+          mensagem:mensagem_id(id, conteudo)
+        `)
+        .eq('utilizador_id', profile.id)
+        .eq('tipo', 'mention')
+        .order('created_at', { ascending: false })
+        .limit(50)
+
+      if (!error && data) {
+        setMentionNotifications(data)
+        setUnreadMentionsCount(data.filter(n => !n.lido).length)
+      }
+    } catch (err) {
+      // Silent fail
+    }
+  }, [profile?.id])
+
+  // Mark mention as read
+  const markMentionAsRead = useCallback(async (notificationId) => {
+    if (!notificationId) return
+
+    try {
+      await supabase
+        .from('notificacoes')
+        .update({ lido: true })
+        .eq('id', notificationId)
+
+      setMentionNotifications(prev =>
+        prev.map(n => n.id === notificationId ? { ...n, lido: true } : n)
+      )
+      setUnreadMentionsCount(prev => Math.max(0, prev - 1))
+    } catch (err) {
+      // Silent fail
+    }
+  }, [])
+
+  // Mark all mentions as read
+  const markAllMentionsAsRead = useCallback(async () => {
+    if (!profile?.id) return
+
+    try {
+      await supabase
+        .from('notificacoes')
+        .update({ lido: true })
+        .eq('utilizador_id', profile.id)
+        .eq('tipo', 'mention')
+        .eq('lido', false)
+
+      setMentionNotifications(prev => prev.map(n => ({ ...n, lido: true })))
+      setUnreadMentionsCount(0)
+    } catch (err) {
+      // Silent fail
+    }
+  }, [profile?.id])
+
+  // Subscribe to new mention notifications
+  useEffect(() => {
+    if (!profile?.id) return
+
+    loadMentionNotifications()
+
+    // Subscribe to new notifications
+    const subscription = supabase
+      .channel(`notifications:${profile.id}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'notificacoes',
+        filter: `utilizador_id=eq.${profile.id}`
+      }, (payload) => {
+        if (payload.new.tipo === 'mention') {
+          setMentionNotifications(prev => [payload.new, ...prev])
+          setUnreadMentionsCount(prev => prev + 1)
+          playNotificationSound()
+        }
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(subscription)
+    }
+  }, [profile?.id, loadMentionNotifications, playNotificationSound])
+
   // ========== CHECK DUE REMINDERS ==========
   useEffect(() => {
     const checkReminders = () => {
@@ -229,6 +386,16 @@ export default function useNotifications() {
     removeReminder,
     markReminderComplete,
     getActiveReminders,
-    openReminderModal
+    openReminderModal,
+
+    // Mention notifications
+    mentionNotifications,
+    unreadMentionsCount,
+    parseMentions,
+    findMentionedUserIds,
+    createMentionNotifications,
+    loadMentionNotifications,
+    markMentionAsRead,
+    markAllMentionsAsRead
   }
 }

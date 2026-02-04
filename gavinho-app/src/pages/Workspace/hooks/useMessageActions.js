@@ -71,13 +71,40 @@ export default function useMessageActions(profile) {
       }
 
       if (data && data.length > 0) {
-        // Load reply counts and format attachments
+        // Load reply counts, reactions, and format attachments
         const postsWithReplies = await Promise.all(data.map(async (post) => {
+          // Get reply count
           const { count } = await supabase
             .from('chat_mensagens')
             .select('*', { count: 'exact', head: true })
             .eq('parent_id', post.id)
             .eq('eliminado', false)
+
+          // Get reactions for this post
+          let reacoes = []
+          try {
+            const { data: reactionData } = await supabase
+              .from('chat_reacoes')
+              .select(`
+                emoji,
+                utilizador:utilizador_id(id, nome)
+              `)
+              .eq('mensagem_id', post.id)
+
+            if (reactionData && reactionData.length > 0) {
+              // Group reactions by emoji
+              const reactionMap = {}
+              reactionData.forEach(r => {
+                if (!reactionMap[r.emoji]) {
+                  reactionMap[r.emoji] = { emoji: r.emoji, users: [] }
+                }
+                reactionMap[r.emoji].users.push(r.utilizador?.nome || 'Utilizador')
+              })
+              reacoes = Object.values(reactionMap)
+            }
+          } catch (err) {
+            // Silent fail - reactions table might not exist
+          }
 
           // Build attachments array from file fields
           let attachments = []
@@ -94,6 +121,7 @@ export default function useMessageActions(profile) {
           return {
             ...post,
             replyCount: count || 0,
+            reacoes: reacoes.length > 0 ? reacoes : post.reacoes || [],
             attachments: attachments.length > 0 ? attachments : undefined
           }
         }))
@@ -229,33 +257,46 @@ export default function useMessageActions(profile) {
     }
   }, [messageInput, selectedFiles, profile, replyingTo])
 
-  // ========== SEND REPLY ==========
-  const sendReply = useCallback(async (postId) => {
+  // ========== SEND REPLY (Thread) ==========
+  const sendReply = useCallback(async (postId, canalId) => {
     if (!replyInput.trim()) return false
 
-    const newReply = {
-      id: `${postId}-r${Date.now()}`,
-      conteudo: replyInput,
-      autor: {
-        nome: profile?.nome || 'Utilizador',
-        avatar_url: profile?.avatar_url,
-        funcao: profile?.funcao || 'Equipa'
-      },
-      created_at: new Date().toISOString()
+    try {
+      // Insert reply to database with parent_id
+      const { data: insertedReply, error: insertError } = await supabase
+        .from('chat_mensagens')
+        .insert({
+          conteudo: replyInput,
+          tipo: 'texto',
+          autor_id: profile?.id,
+          canal_id: canalId,
+          parent_id: postId,
+          topico_id: null
+        })
+        .select(`
+          *,
+          autor:autor_id(id, nome, avatar_url, funcao)
+        `)
+        .single()
+
+      if (insertError) throw insertError
+
+      // Update local thread replies
+      setThreadReplies(prev => ({
+        ...prev,
+        [postId]: [...(prev[postId] || []), insertedReply]
+      }))
+
+      // Update reply count in posts
+      setPosts(prev => prev.map(p =>
+        p.id === postId ? { ...p, replyCount: (p.replyCount || 0) + 1 } : p
+      ))
+
+      setReplyInput('')
+      return true
+    } catch (err) {
+      throw new Error('Erro ao enviar resposta: ' + err.message)
     }
-
-    setThreadReplies(prev => ({
-      ...prev,
-      [postId]: [...(prev[postId] || []), newReply]
-    }))
-
-    // Update reply count
-    setPosts(prev => prev.map(p =>
-      p.id === postId ? { ...p, replyCount: (p.replyCount || 0) + 1 } : p
-    ))
-
-    setReplyInput('')
-    return true
   }, [replyInput, profile])
 
   // ========== EDIT MESSAGE ==========
@@ -301,33 +342,86 @@ export default function useMessageActions(profile) {
     }
   }, [])
 
-  // ========== REACT TO MESSAGE ==========
-  const addReaction = useCallback((messageId, emoji) => {
-    setPosts(prev => prev.map(p => {
-      if (p.id !== messageId) return p
-      const reactions = p.reactions || []
-      const existing = reactions.find(r => r.emoji === emoji)
+  // ========== REACT TO MESSAGE (with DB persistence) ==========
+  const addReaction = useCallback(async (messageId, emoji) => {
+    if (!profile?.id || !messageId) return
 
-      if (existing) {
-        // Toggle own reaction
-        if (existing.users?.includes(profile?.id)) {
-          existing.count--
-          existing.users = existing.users.filter(u => u !== profile?.id)
-          if (existing.count === 0) {
-            return { ...p, reactions: reactions.filter(r => r.emoji !== emoji) }
-          }
-        } else {
-          existing.count++
-          existing.users = [...(existing.users || []), profile?.id]
-        }
-        return { ...p, reactions: [...reactions] }
+    try {
+      // Check if user already reacted with this emoji
+      const { data: existingReaction } = await supabase
+        .from('chat_reacoes')
+        .select('id')
+        .eq('mensagem_id', messageId)
+        .eq('utilizador_id', profile.id)
+        .eq('emoji', emoji)
+        .single()
+
+      if (existingReaction) {
+        // Remove reaction
+        await supabase
+          .from('chat_reacoes')
+          .delete()
+          .eq('id', existingReaction.id)
       } else {
-        return {
-          ...p,
-          reactions: [...reactions, { emoji, count: 1, users: [profile?.id] }]
-        }
+        // Add reaction
+        await supabase
+          .from('chat_reacoes')
+          .insert({
+            mensagem_id: messageId,
+            utilizador_id: profile.id,
+            emoji
+          })
       }
-    }))
+
+      // Update local state
+      setPosts(prev => prev.map(p => {
+        if (p.id !== messageId) return p
+        const reacoes = p.reacoes || []
+        const existing = reacoes.find(r => r.emoji === emoji)
+
+        if (existing) {
+          // Toggle own reaction
+          if (existing.users?.includes(profile?.nome || profile?.id)) {
+            existing.users = existing.users.filter(u => u !== profile?.nome && u !== profile?.id)
+            if (existing.users.length === 0) {
+              return { ...p, reacoes: reacoes.filter(r => r.emoji !== emoji) }
+            }
+          } else {
+            existing.users = [...(existing.users || []), profile?.nome || profile?.id]
+          }
+          return { ...p, reacoes: [...reacoes] }
+        } else {
+          return {
+            ...p,
+            reacoes: [...reacoes, { emoji, users: [profile?.nome || profile?.id] }]
+          }
+        }
+      }))
+    } catch (err) {
+      // Fallback to local-only reaction if DB fails
+      setPosts(prev => prev.map(p => {
+        if (p.id !== messageId) return p
+        const reacoes = p.reacoes || []
+        const existing = reacoes.find(r => r.emoji === emoji)
+
+        if (existing) {
+          if (existing.users?.includes(profile?.nome || profile?.id)) {
+            existing.users = existing.users.filter(u => u !== profile?.nome && u !== profile?.id)
+            if (existing.users.length === 0) {
+              return { ...p, reacoes: reacoes.filter(r => r.emoji !== emoji) }
+            }
+          } else {
+            existing.users = [...(existing.users || []), profile?.nome || profile?.id]
+          }
+          return { ...p, reacoes: [...reacoes] }
+        } else {
+          return {
+            ...p,
+            reacoes: [...reacoes, { emoji, users: [profile?.nome || profile?.id] }]
+          }
+        }
+      }))
+    }
   }, [profile])
 
   // ========== SAVE/BOOKMARK MESSAGE ==========
