@@ -331,13 +331,13 @@ export default function ObraChat({ obra, user }) {
         setUploadingPhoto(false)
       }
 
+      // Note: autor_avatar is NOT stored in DB, only for local display
       const { data, error } = await supabase
         .from('obra_mensagens')
         .insert({
           obra_id: obra.id,
           autor_id: user.id,
           autor_nome: user.nome,
-          autor_avatar: user.avatar || null,
           conteudo: messageText || (photoUrl ? '📷 Foto' : ''),
           tipo: photoUrl ? 'foto' : 'texto',
           anexos: photoUrl ? [{ url: photoUrl, tipo: 'image' }] : null
@@ -347,9 +347,9 @@ export default function ObraChat({ obra, user }) {
 
       if (error) throw error
 
-      // Replace temp message with real one
+      // Replace temp message with real one, preserving avatar for display
       setMessages(prev => prev.map(m =>
-        m.id === tempId ? { ...data, pending: false } : m
+        m.id === tempId ? { ...data, autor_avatar: user.avatar || null, pending: false } : m
       ))
     } catch (err) {
       console.error('Erro ao enviar:', err)
