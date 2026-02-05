@@ -77,7 +77,10 @@ export const styles = {
   obraNome: {
     margin: 0,
     fontSize: 12,
-    opacity: 0.7
+    opacity: 1,
+    fontWeight: 500,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5
   },
   headerActions: {
     display: 'flex',

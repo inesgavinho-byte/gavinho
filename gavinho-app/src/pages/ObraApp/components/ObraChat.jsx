@@ -622,10 +622,8 @@ export default function ObraChat({ obra, user }) {
               {/* Messages for this date */}
               {dateMessages.map((msg, msgIndex) => {
                 const isOwn = msg.autor_id === user.id
-                const showAvatar = !isOwn && (
-                  msgIndex === 0 ||
-                  dateMessages[msgIndex - 1]?.autor_id !== msg.autor_id
-                )
+                const prevMsg = dateMessages[msgIndex - 1]
+                const showAvatar = msgIndex === 0 || prevMsg?.autor_id !== msg.autor_id
 
                 return (
                 <div
@@ -635,13 +633,12 @@ export default function ObraChat({ obra, user }) {
                     ...(isOwn ? chatStyles.messageRowOwn : {})
                   }}
                 >
-                  {/* Avatar for other users */}
-                  {!isOwn && (
-                    showAvatar ? (
-                      <div
-                        style={{
-                          ...chatStyles.avatar,
-                          background: getAvatarColor(msg.autor_id)
+                  {/* Avatar - show for all users */}
+                  {showAvatar ? (
+                    <div
+                      style={{
+                        ...chatStyles.avatar,
+                        background: getAvatarColor(msg.autor_id)
                         }}
                         title={msg.autor_nome}
                       >
@@ -649,8 +646,7 @@ export default function ObraChat({ obra, user }) {
                       </div>
                     ) : (
                       <div style={chatStyles.avatarPlaceholder} />
-                    )
-                  )}
+                    )}
 
                   {/* Message bubble */}
                   <div
