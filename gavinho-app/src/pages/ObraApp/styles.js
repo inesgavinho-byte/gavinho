@@ -203,12 +203,12 @@ export const styles = {
   },
   messageOwn: {
     alignSelf: 'flex-end',
-    background: '#d4d6d8',
+    background: '#c8d3dc',
     borderBottomRightRadius: 0
   },
   messageOther: {
     alignSelf: 'flex-start',
-    background: 'white',
+    background: '#ffffff',
     borderBottomLeftRadius: 0
   },
   messageAuthor: {

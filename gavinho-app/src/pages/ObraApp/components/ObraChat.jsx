@@ -311,6 +311,7 @@ export default function ObraChat({ obra, user }) {
       obra_id: obra.id,
       autor_id: user.id,
       autor_nome: user.nome,
+      autor_avatar: user.avatar || null,
       conteudo: messageText,
       tipo: selectedPhoto ? 'foto' : 'texto',
       anexos: photoPreview ? [{ url: photoPreview, tipo: 'image' }] : null,
@@ -336,6 +337,7 @@ export default function ObraChat({ obra, user }) {
           obra_id: obra.id,
           autor_id: user.id,
           autor_nome: user.nome,
+          autor_avatar: user.avatar || null,
           conteudo: messageText || (photoUrl ? '📷 Foto' : ''),
           tipo: photoUrl ? 'foto' : 'texto',
           anexos: photoUrl ? [{ url: photoUrl, tipo: 'image' }] : null
@@ -638,15 +640,24 @@ export default function ObraChat({ obra, user }) {
                     <div
                       style={{
                         ...chatStyles.avatar,
-                        background: getAvatarColor(msg.autor_id)
-                        }}
-                        title={msg.autor_nome}
-                      >
-                        {getInitials(msg.autor_nome)}
-                      </div>
-                    ) : (
-                      <div style={chatStyles.avatarPlaceholder} />
-                    )}
+                        background: msg.autor_avatar ? 'transparent' : getAvatarColor(msg.autor_id),
+                        overflow: 'hidden'
+                      }}
+                      title={msg.autor_nome}
+                    >
+                      {msg.autor_avatar ? (
+                        <img
+                          src={msg.autor_avatar}
+                          alt=""
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      ) : (
+                        getInitials(msg.autor_nome)
+                      )}
+                    </div>
+                  ) : (
+                    <div style={chatStyles.avatarPlaceholder} />
+                  )}
 
                   {/* Message bubble */}
                   <div

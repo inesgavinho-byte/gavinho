@@ -3,12 +3,13 @@
 // PWA for construction workers - refactored version
 // =====================================================
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   Menu, Clock, Package, LogOut, Bell, BellOff, HardHat,
   MessageSquare, Users, Loader2, CheckSquare, Image,
-  WifiOff, BookOpen, X, RefreshCw, ChevronDown, Check
+  WifiOff, BookOpen, X, RefreshCw, ChevronDown, Check, Camera
 } from 'lucide-react'
+import { supabase } from '../../lib/supabase'
 
 // Import extracted components
 import {
@@ -39,6 +40,9 @@ export default function ObraApp() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
   const [showObraDropdown, setShowObraDropdown] = useState(false)
+  const [showAvatarModal, setShowAvatarModal] = useState(false)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const avatarInputRef = useRef(null)
 
   // Push notifications
   const { permission, requestPermission, subscribe } = usePushNotifications()
@@ -126,6 +130,85 @@ export default function ObraApp() {
     setUser(null)
     setObras([])
     setObra(null)
+  }
+
+  // ========== AVATAR UPLOAD ==========
+  const handleAvatarSelect = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+      alert('Por favor seleciona uma imagem')
+      return
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert('A imagem deve ter no máximo 5MB')
+      return
+    }
+
+    setUploadingAvatar(true)
+    try {
+      // Upload to Supabase Storage
+      const fileExt = file.name.split('.').pop()
+      const fileName = `avatars/${user.id}_${Date.now()}.${fileExt}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('obra-fotos')
+        .upload(fileName, file, { upsert: true })
+
+      if (uploadError) throw uploadError
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('obra-fotos')
+        .getPublicUrl(fileName)
+
+      // Update user object with avatar
+      const updatedUser = { ...user, avatar: publicUrl }
+      setUser(updatedUser)
+      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(updatedUser))
+
+      // Try to update in database (trabalhadores or profiles)
+      if (user.tipo === 'trabalhador') {
+        await supabase
+          .from('trabalhadores')
+          .update({ avatar: publicUrl })
+          .eq('id', user.id)
+      } else {
+        await supabase
+          .from('profiles')
+          .update({ avatar: publicUrl })
+          .eq('id', user.id)
+      }
+
+      setShowAvatarModal(false)
+      alert('Foto de perfil atualizada!')
+    } catch (err) {
+      console.error('Erro ao fazer upload:', err)
+      alert('Erro ao fazer upload da foto')
+    } finally {
+      setUploadingAvatar(false)
+      if (avatarInputRef.current) avatarInputRef.current.value = ''
+    }
+  }
+
+  const removeAvatar = async () => {
+    try {
+      const updatedUser = { ...user, avatar: null }
+      setUser(updatedUser)
+      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(updatedUser))
+
+      // Update in database
+      if (user.tipo === 'trabalhador') {
+        await supabase.from('trabalhadores').update({ avatar: null }).eq('id', user.id)
+      } else {
+        await supabase.from('profiles').update({ avatar: null }).eq('id', user.id)
+      }
+
+      setShowAvatarModal(false)
+    } catch (err) {
+      console.error('Erro ao remover avatar:', err)
+    }
   }
 
   // ========== NOTIFICATIONS ==========
@@ -554,7 +637,42 @@ export default function ObraApp() {
         <div style={styles.menuOverlay} onClick={() => setMenuOpen(false)}>
           <div style={styles.menu} onClick={e => e.stopPropagation()}>
             <div style={styles.menuHeader}>
-              <HardHat size={32} />
+              <div
+                onClick={() => setShowAvatarModal(true)}
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: '50%',
+                  background: user.avatar ? 'transparent' : colors.primary,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  border: '2px solid rgba(255,255,255,0.3)'
+                }}
+              >
+                {user.avatar ? (
+                  <img src={user.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <span style={{ color: 'white', fontWeight: 600, fontSize: 16 }}>
+                    {user.nome?.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()}
+                  </span>
+                )}
+                <div style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  background: 'rgba(0,0,0,0.5)',
+                  padding: '2px 0',
+                  display: 'flex',
+                  justifyContent: 'center'
+                }}>
+                  <Camera size={10} color="white" />
+                </div>
+              </div>
               <div>
                 <strong>{user.nome}</strong>
                 <p style={{ margin: 0, fontSize: 12, opacity: 0.7 }}>{user.cargo || 'Equipa'}</p>
@@ -749,6 +867,123 @@ export default function ObraApp() {
           to { transform: translateX(0); }
         }
       `}</style>
+
+      {/* Avatar Upload Modal */}
+      {showAvatarModal && (
+        <>
+          <div
+            style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 300 }}
+            onClick={() => setShowAvatarModal(false)}
+          />
+          <div style={{
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            background: 'white',
+            borderRadius: 16,
+            padding: 24,
+            width: '90%',
+            maxWidth: 320,
+            zIndex: 301,
+            textAlign: 'center'
+          }}>
+            <h3 style={{ margin: '0 0 16px', fontSize: 18 }}>Foto de Perfil</h3>
+
+            {/* Current Avatar Preview */}
+            <div style={{
+              width: 100,
+              height: 100,
+              borderRadius: '50%',
+              margin: '0 auto 16px',
+              background: user.avatar ? 'transparent' : colors.primary,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              overflow: 'hidden',
+              border: `3px solid ${colors.primary}`
+            }}>
+              {user.avatar ? (
+                <img src={user.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <span style={{ color: 'white', fontWeight: 600, fontSize: 32 }}>
+                  {user.nome?.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()}
+                </span>
+              )}
+            </div>
+
+            {/* Hidden file input */}
+            <input
+              type="file"
+              ref={avatarInputRef}
+              accept="image/*"
+              onChange={handleAvatarSelect}
+              style={{ display: 'none' }}
+            />
+
+            {/* Action buttons */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button
+                onClick={() => avatarInputRef.current?.click()}
+                disabled={uploadingAvatar}
+                style={{
+                  padding: 12,
+                  background: colors.primary,
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 8,
+                  fontSize: 14,
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8
+                }}
+              >
+                {uploadingAvatar ? (
+                  <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
+                ) : (
+                  <Camera size={18} />
+                )}
+                {uploadingAvatar ? 'A enviar...' : 'Escolher Foto'}
+              </button>
+
+              {user.avatar && (
+                <button
+                  onClick={removeAvatar}
+                  style={{
+                    padding: 12,
+                    background: '#fee2e2',
+                    color: '#dc2626',
+                    border: 'none',
+                    borderRadius: 8,
+                    fontSize: 14,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Remover Foto
+                </button>
+              )}
+
+              <button
+                onClick={() => setShowAvatarModal(false)}
+                style={{
+                  padding: 12,
+                  background: '#f3f4f6',
+                  color: '#374151',
+                  border: 'none',
+                  borderRadius: 8,
+                  fontSize: 14,
+                  cursor: 'pointer'
+                }}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }
