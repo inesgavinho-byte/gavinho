@@ -211,13 +211,11 @@ export default function DiarioObra({ obra, user }) {
 
       const today = new Date().toISOString().split('T')[0]
 
-      // Build entry data with ONLY the basic columns that definitely exist
-      // The obra_diario table appears to have a minimal schema
+      // Build entry data - ABSOLUTE MINIMUM
+      // The obra_diario table schema is unknown
       const entryData = {
         obra_id: obra.id,
-        data: today,
-        trabalhadores_gavinho: parseInt(formData.trabalhadores_gavinho) || 0,
-        trabalhadores_subempreiteiros: parseInt(formData.trabalhadores_subempreiteiros) || 0
+        data: today
       }
 
       console.log('Saving diario entry:', entryData)
