@@ -1,7 +1,7 @@
 // =====================================================
 // OBRA CHAT COMPONENT
 // Real-time chat for obra team with photo sharing
-// Features: Typing indicator, emoji reactions
+// Features: Typing indicator, emoji reactions, avatars
 // =====================================================
 
 import { useState, useEffect, useRef, useCallback } from 'react'
@@ -14,6 +14,37 @@ import { styles } from '../styles'
 
 // Quick emoji reactions
 const EMOJI_REACTIONS = ['👍', '❤️', '😂', '👏', '🔥', '✅']
+
+// Avatar colors for different users
+const AVATAR_COLORS = [
+  '#3b82f6', // blue
+  '#10b981', // green
+  '#f59e0b', // amber
+  '#ef4444', // red
+  '#8b5cf6', // purple
+  '#ec4899', // pink
+  '#06b6d4', // cyan
+  '#f97316', // orange
+]
+
+// Get initials from name
+const getInitials = (name) => {
+  if (!name) return '?'
+  const parts = name.trim().split(' ')
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
+  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
+}
+
+// Get consistent color for user based on their ID
+const getAvatarColor = (userId) => {
+  if (!userId) return AVATAR_COLORS[0]
+  // Simple hash to get consistent color
+  let hash = 0
+  for (let i = 0; i < userId.length; i++) {
+    hash = userId.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
+}
 
 export default function ObraChat({ obra, user }) {
   const [messages, setMessages] = useState([])
@@ -515,6 +546,32 @@ export default function ObraChat({ obra, user }) {
     reactionBadgeActive: {
       background: '#dbeafe',
       borderColor: '#3b82f6'
+    },
+    // Avatar styles
+    messageRow: {
+      display: 'flex',
+      alignItems: 'flex-end',
+      gap: 8,
+      marginBottom: 4
+    },
+    messageRowOwn: {
+      flexDirection: 'row-reverse'
+    },
+    avatar: {
+      width: 32,
+      height: 32,
+      borderRadius: '50%',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontSize: 12,
+      fontWeight: 600,
+      color: 'white',
+      flexShrink: 0
+    },
+    avatarPlaceholder: {
+      width: 32,
+      flexShrink: 0
     }
   }
 
@@ -563,28 +620,59 @@ export default function ObraChat({ obra, user }) {
               </div>
 
               {/* Messages for this date */}
-              {dateMessages.map((msg) => (
+              {dateMessages.map((msg, msgIndex) => {
+                const isOwn = msg.autor_id === user.id
+                const showAvatar = !isOwn && (
+                  msgIndex === 0 ||
+                  dateMessages[msgIndex - 1]?.autor_id !== msg.autor_id
+                )
+
+                return (
                 <div
                   key={msg.id}
                   style={{
-                    ...styles.message,
-                    ...(msg.autor_id === user.id ? styles.messageOwn : styles.messageOther),
-                    ...(msg.failed ? chatStyles.failedMessage : {}),
-                    opacity: msg.pending ? 0.6 : 1,
-                    position: 'relative'
-                  }}
-                  onMouseEnter={(e) => {
-                    const btn = e.currentTarget.querySelector('.emoji-btn')
-                    if (btn) btn.style.opacity = '1'
-                  }}
-                  onMouseLeave={(e) => {
-                    const btn = e.currentTarget.querySelector('.emoji-btn')
-                    if (btn) btn.style.opacity = '0'
+                    ...chatStyles.messageRow,
+                    ...(isOwn ? chatStyles.messageRowOwn : {})
                   }}
                 >
-                  {msg.autor_id !== user.id && (
-                    <span style={styles.messageAuthor}>{msg.autor_nome}</span>
+                  {/* Avatar for other users */}
+                  {!isOwn && (
+                    showAvatar ? (
+                      <div
+                        style={{
+                          ...chatStyles.avatar,
+                          background: getAvatarColor(msg.autor_id)
+                        }}
+                        title={msg.autor_nome}
+                      >
+                        {getInitials(msg.autor_nome)}
+                      </div>
+                    ) : (
+                      <div style={chatStyles.avatarPlaceholder} />
+                    )
                   )}
+
+                  {/* Message bubble */}
+                  <div
+                    style={{
+                      ...styles.message,
+                      ...(isOwn ? styles.messageOwn : styles.messageOther),
+                      ...(msg.failed ? chatStyles.failedMessage : {}),
+                      opacity: msg.pending ? 0.6 : 1,
+                      position: 'relative'
+                    }}
+                    onMouseEnter={(e) => {
+                      const btn = e.currentTarget.querySelector('.emoji-btn')
+                      if (btn) btn.style.opacity = '1'
+                    }}
+                    onMouseLeave={(e) => {
+                      const btn = e.currentTarget.querySelector('.emoji-btn')
+                      if (btn) btn.style.opacity = '0'
+                    }}
+                  >
+                    {!isOwn && showAvatar && (
+                      <span style={styles.messageAuthor}>{msg.autor_nome}</span>
+                    )}
                   {msg.anexos && msg.anexos.length > 0 && msg.anexos[0]?.url && (
                     <img
                       src={msg.anexos[0].url}
@@ -665,8 +753,9 @@ export default function ObraChat({ obra, user }) {
                       Tentar novamente
                     </button>
                   )}
+                  </div>
                 </div>
-              ))}
+              )})}
             </div>
           ))
         )}
