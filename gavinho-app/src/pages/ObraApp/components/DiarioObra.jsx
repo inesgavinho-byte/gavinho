@@ -99,8 +99,9 @@ export default function DiarioObra({ obra, user }) {
         condicoes_meteo: data.condicoes_meteo || 'sol',
         temperatura: data.temperatura || '',
         observacoes_meteo: data.observacoes_meteo || '',
-        trabalhadores_gavinho: data.trabalhadores_gavinho || 0,
-        trabalhadores_subempreiteiros: data.trabalhadores_subempreiteiros || 0,
+        // Map from DB column names to form field names
+        trabalhadores_gavinho: data.mao_obra_propria || 0,
+        trabalhadores_subempreiteiros: data.mao_obra_subempreiteiro || 0,
         tarefas: data.tarefas || [],
         ocorrencias: data.ocorrencias || [],
         fotos: data.fotos || [],
@@ -211,11 +212,23 @@ export default function DiarioObra({ obra, user }) {
 
       const today = new Date().toISOString().split('T')[0]
 
-      // Build entry data - ABSOLUTE MINIMUM
-      // The obra_diario table schema is unknown
+      // Build entry data using correct column names from schema
+      // Note: trabalhadores_gavinho → mao_obra_propria
+      //       trabalhadores_subempreiteiros → mao_obra_subempreiteiro
       const entryData = {
         obra_id: obra.id,
-        data: today
+        data: today,
+        condicoes_meteo: formData.condicoes_meteo || 'sol',
+        temperatura: formData.temperatura ? parseFloat(formData.temperatura) : null,
+        observacoes_meteo: formData.observacoes_meteo || null,
+        mao_obra_propria: parseInt(formData.trabalhadores_gavinho) || 0,
+        mao_obra_subempreiteiro: parseInt(formData.trabalhadores_subempreiteiros) || 0,
+        tarefas: formData.tarefas || [],
+        ocorrencias: formData.ocorrencias || [],
+        fotos: photoUrls,
+        proximos_passos: formData.proximos_passos || [],
+        status: 'rascunho',
+        updated_at: new Date().toISOString()
       }
 
       console.log('Saving diario entry:', entryData)
@@ -298,8 +311,9 @@ export default function DiarioObra({ obra, user }) {
         condicoes_meteo: data.condicoes_meteo || 'sol',
         temperatura: '',
         observacoes_meteo: '',
-        trabalhadores_gavinho: data.trabalhadores_gavinho || 0,
-        trabalhadores_subempreiteiros: data.trabalhadores_subempreiteiros || 0,
+        // Map from DB column names to form field names
+        trabalhadores_gavinho: data.mao_obra_propria || 0,
+        trabalhadores_subempreiteiros: data.mao_obra_subempreiteiro || 0,
         tarefas: data.tarefas || [],
         ocorrencias: [],
         fotos: [],
@@ -711,7 +725,8 @@ export default function DiarioObra({ obra, user }) {
           entries.map(entry => {
             const weather = WEATHER_OPTIONS.find(w => w.key === entry.condicoes_meteo)
             const WeatherIcon = weather?.icon || Sun
-            const totalWorkers = (entry.trabalhadores_gavinho || 0) + (entry.trabalhadores_subempreiteiros || 0)
+            // Use correct DB column names
+            const totalWorkers = (entry.mao_obra_propria || 0) + (entry.mao_obra_subempreiteiro || 0)
 
             return (
               <div
@@ -1061,10 +1076,10 @@ export default function DiarioObra({ obra, user }) {
                 }}>
                   {selectedEntry.status === 'submetido' ? 'Submetido' : 'Rascunho'}
                 </span>
-                {((selectedEntry.trabalhadores_gavinho || 0) + (selectedEntry.trabalhadores_subempreiteiros || 0)) > 0 && (
+                {((selectedEntry.mao_obra_propria || 0) + (selectedEntry.mao_obra_subempreiteiro || 0)) > 0 && (
                   <span style={diarioStyles.metaItem}>
                     <Users size={14} />
-                    {(selectedEntry.trabalhadores_gavinho || 0) + (selectedEntry.trabalhadores_subempreiteiros || 0)} trabalhadores
+                    {(selectedEntry.mao_obra_propria || 0) + (selectedEntry.mao_obra_subempreiteiro || 0)} trabalhadores
                   </span>
                 )}
               </div>
