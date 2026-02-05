@@ -3,12 +3,11 @@
 // PWA for construction workers - refactored version
 // =====================================================
 
-import { useState, useEffect, useRef } from 'react'
-import { supabase } from '../../lib/supabase'
+import { useState, useEffect } from 'react'
 import {
-  Send, Camera, Menu, Check, CheckCheck, Clock,
-  Package, LogOut, Bell, BellOff, HardHat,
-  MessageSquare, Users, Loader2
+  Menu, Clock, Package, LogOut, Bell, BellOff, HardHat,
+  MessageSquare, Users, Loader2, CheckSquare, Image,
+  WifiOff, Wifi
 } from 'lucide-react'
 
 // Import extracted components
@@ -17,14 +16,17 @@ import {
   ObraSelector,
   PedirMateriais,
   RegistoPresenca,
-  Equipa
+  Equipa,
+  ObraChat,
+  Tarefas,
+  Galeria
 } from './components'
 
 // Import hooks
 import { usePushNotifications } from './hooks'
 
 // Import styles and utilities
-import { styles } from './styles'
+import { styles, colors } from './styles'
 import { STORAGE_KEYS } from './utils'
 
 export default function ObraApp() {
@@ -35,18 +37,7 @@ export default function ObraApp() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('chat')
   const [menuOpen, setMenuOpen] = useState(false)
-
-  // Chat state
-  const [messages, setMessages] = useState([])
-  const [newMessage, setNewMessage] = useState('')
-  const [sending, setSending] = useState(false)
-  const [selectedPhoto, setSelectedPhoto] = useState(null)
-  const [photoPreview, setPhotoPreview] = useState(null)
-  const [uploadingPhoto, setUploadingPhoto] = useState(false)
-
-  // Refs
-  const fileInputRef = useRef(null)
-  const messagesEndRef = useRef(null)
+  const [isOnline, setIsOnline] = useState(navigator.onLine)
 
   // Push notifications
   const { permission, requestPermission, subscribe } = usePushNotifications()
@@ -55,21 +46,18 @@ export default function ObraApp() {
   useEffect(() => {
     checkSession()
     registerServiceWorker()
-  }, [])
 
-  // Load messages when obra changes
-  useEffect(() => {
-    if (obra) {
-      loadMessages()
-      const unsubscribe = subscribeToMessages()
-      return unsubscribe
+    // Online/offline listeners
+    const handleOnline = () => setIsOnline(true)
+    const handleOffline = () => setIsOnline(false)
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
     }
-  }, [obra])
-
-  // Scroll to last message
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [])
 
   // ========== SERVICE WORKER ==========
   const registerServiceWorker = async () => {
@@ -140,149 +128,6 @@ export default function ObraApp() {
     setObra(null)
   }
 
-  // ========== CHAT FUNCTIONALITY ==========
-  const loadMessages = async () => {
-    if (!obra) return
-
-    try {
-      const { data, error } = await supabase
-        .from('obra_mensagens')
-        .select('*')
-        .eq('obra_id', obra.id)
-        .order('created_at', { ascending: true })
-        .limit(100)
-
-      if (error) throw error
-      setMessages(data || [])
-    } catch (err) {
-      console.error('Erro ao carregar mensagens:', err)
-    }
-  }
-
-  const subscribeToMessages = () => {
-    const channel = supabase
-      .channel(`obra_chat_${obra.id}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'obra_mensagens',
-        filter: `obra_id=eq.${obra.id}`
-      }, (payload) => {
-        setMessages(prev => [...prev, payload.new])
-      })
-      .subscribe()
-
-    return () => supabase.removeChannel(channel)
-  }
-
-  // Photo handling
-  const handlePhotoSelect = (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    if (!file.type.startsWith('image/')) {
-      alert('Por favor seleciona uma imagem')
-      return
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-      alert('A imagem deve ter no máximo 10MB')
-      return
-    }
-
-    setSelectedPhoto(file)
-    setPhotoPreview(URL.createObjectURL(file))
-  }
-
-  const uploadPhoto = async (file) => {
-    const fileExt = file.name.split('.').pop()
-    const fileName = `${obra.id}/${Date.now()}.${fileExt}`
-
-    const { error } = await supabase.storage
-      .from('obra-fotos')
-      .upload(fileName, file, {
-        cacheControl: '3600',
-        upsert: false
-      })
-
-    if (error) throw error
-
-    const { data: { publicUrl } } = supabase.storage
-      .from('obra-fotos')
-      .getPublicUrl(fileName)
-
-    return publicUrl
-  }
-
-  const cancelPhoto = () => {
-    setSelectedPhoto(null)
-    setPhotoPreview(null)
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ''
-    }
-  }
-
-  const handleSendMessage = async () => {
-    if ((!newMessage.trim() && !selectedPhoto) || !obra || !user) return
-
-    setSending(true)
-    const messageText = newMessage.trim()
-    setNewMessage('')
-
-    // Optimistic update
-    const tempMessage = {
-      id: Date.now(),
-      obra_id: obra.id,
-      autor_id: user.id,
-      autor_nome: user.nome,
-      conteudo: messageText,
-      tipo: selectedPhoto ? 'foto' : 'texto',
-      anexos: photoPreview ? [{ url: photoPreview, tipo: 'image' }] : null,
-      created_at: new Date().toISOString(),
-      pending: true
-    }
-    setMessages(prev => [...prev, tempMessage])
-
-    const photoToUpload = selectedPhoto
-    cancelPhoto()
-
-    try {
-      let photoUrl = null
-      if (photoToUpload) {
-        setUploadingPhoto(true)
-        photoUrl = await uploadPhoto(photoToUpload)
-        setUploadingPhoto(false)
-      }
-
-      const { error } = await supabase
-        .from('obra_mensagens')
-        .insert({
-          obra_id: obra.id,
-          autor_id: user.id,
-          autor_nome: user.nome,
-          conteudo: messageText || (photoUrl ? '📷 Foto' : ''),
-          tipo: photoUrl ? 'foto' : 'texto',
-          anexos: photoUrl ? [{ url: photoUrl, tipo: 'image' }] : null
-        })
-
-      if (error) throw error
-
-      setMessages(prev => prev.map(m =>
-        m.id === tempMessage.id
-          ? { ...m, pending: false, anexos: photoUrl ? [{ url: photoUrl, tipo: 'image' }] : null }
-          : m
-      ))
-    } catch (err) {
-      console.error('Erro ao enviar:', err)
-      setUploadingPhoto(false)
-      setMessages(prev => prev.map(m =>
-        m.id === tempMessage.id ? { ...m, failed: true, pending: false } : m
-      ))
-    } finally {
-      setSending(false)
-    }
-  }
-
   // ========== NOTIFICATIONS ==========
   const enableNotifications = async () => {
     const granted = await requestPermission()
@@ -294,12 +139,45 @@ export default function ObraApp() {
 
   // ========== RENDER ==========
 
+  // Local styles for offline banner
+  const localStyles = {
+    offlineBanner: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      padding: '8px 16px',
+      background: '#fef3c7',
+      color: '#92400e',
+      fontSize: 13,
+      fontWeight: 500
+    },
+    onlineBanner: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      padding: '8px 16px',
+      background: '#d1fae5',
+      color: '#065f46',
+      fontSize: 13,
+      fontWeight: 500,
+      animation: 'fadeOut 3s forwards'
+    }
+  }
+
   // Loading state
   if (loading) {
     return (
       <div style={styles.loadingContainer}>
         <Loader2 style={{ ...styles.spinner, animation: 'spin 1s linear infinite' }} />
         <p>A carregar...</p>
+        <style>{`
+          @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
       </div>
     )
   }
@@ -335,8 +213,33 @@ export default function ObraApp() {
     )
   }
 
+  // Navigation tabs configuration
+  const tabs = [
+    { key: 'chat', label: 'Chat', icon: MessageSquare },
+    { key: 'tarefas', label: 'Tarefas', icon: CheckSquare },
+    { key: 'materiais', label: 'Materiais', icon: Package },
+    { key: 'galeria', label: 'Galeria', icon: Image }
+  ]
+
+  const menuItems = [
+    { key: 'chat', label: 'Chat da Obra', icon: MessageSquare },
+    { key: 'tarefas', label: 'Tarefas', icon: CheckSquare },
+    { key: 'materiais', label: 'Pedir Materiais', icon: Package },
+    { key: 'galeria', label: 'Galeria', icon: Image },
+    { key: 'presencas', label: 'Presenças', icon: Clock },
+    { key: 'equipa', label: 'Equipa', icon: Users }
+  ]
+
   return (
     <div style={styles.container}>
+      {/* Offline Banner */}
+      {!isOnline && (
+        <div style={localStyles.offlineBanner}>
+          <WifiOff size={16} />
+          Sem ligação à internet
+        </div>
+      )}
+
       {/* Header */}
       <header style={styles.header}>
         <button onClick={() => setMenuOpen(!menuOpen)} style={styles.menuButton}>
@@ -369,18 +272,18 @@ export default function ObraApp() {
               </div>
             </div>
             <nav style={styles.menuNav}>
-              <button onClick={() => { setActiveTab('chat'); setMenuOpen(false) }} style={styles.menuItem}>
-                <MessageSquare size={20} /> Chat da Obra
-              </button>
-              <button onClick={() => { setActiveTab('materiais'); setMenuOpen(false) }} style={styles.menuItem}>
-                <Package size={20} /> Pedir Materiais
-              </button>
-              <button onClick={() => { setActiveTab('presencas'); setMenuOpen(false) }} style={styles.menuItem}>
-                <Clock size={20} /> Presenças
-              </button>
-              <button onClick={() => { setActiveTab('equipa'); setMenuOpen(false) }} style={styles.menuItem}>
-                <Users size={20} /> Equipa
-              </button>
+              {menuItems.map(item => (
+                <button
+                  key={item.key}
+                  onClick={() => { setActiveTab(item.key); setMenuOpen(false) }}
+                  style={{
+                    ...styles.menuItem,
+                    ...(activeTab === item.key ? { background: `${colors.primary}10`, color: colors.primary } : {})
+                  }}
+                >
+                  <item.icon size={20} /> {item.label}
+                </button>
+              ))}
             </nav>
             {obras.length > 1 && (
               <button onClick={() => { handleSwitchObra(); setMenuOpen(false) }} style={styles.menuItem}>
@@ -396,149 +299,41 @@ export default function ObraApp() {
 
       {/* Main Content */}
       <main style={styles.main}>
-        {activeTab === 'chat' && (
-          <div style={styles.chatContainer}>
-            {/* Messages */}
-            <div style={styles.messagesContainer}>
-              {messages.length === 0 ? (
-                <div style={styles.emptyChat}>
-                  <MessageSquare size={48} style={{ opacity: 0.3 }} />
-                  <p>Ainda não há mensagens</p>
-                  <p style={{ fontSize: 12 }}>Começa a conversa!</p>
-                </div>
-              ) : (
-                messages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    style={{
-                      ...styles.message,
-                      ...(msg.autor_id === user.id ? styles.messageOwn : styles.messageOther),
-                      opacity: msg.pending ? 0.6 : 1
-                    }}
-                  >
-                    {msg.autor_id !== user.id && (
-                      <span style={styles.messageAuthor}>{msg.autor_nome}</span>
-                    )}
-                    {msg.anexos && msg.anexos.length > 0 && msg.anexos[0]?.url && (
-                      <img
-                        src={msg.anexos[0].url}
-                        alt="Foto"
-                        style={styles.messagePhoto}
-                        onClick={() => window.open(msg.anexos[0].url, '_blank')}
-                      />
-                    )}
-                    {msg.conteudo && msg.conteudo !== '📷 Foto' && (
-                      <p style={styles.messageText}>{msg.conteudo}</p>
-                    )}
-                    <span style={styles.messageTime}>
-                      {new Date(msg.created_at).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
-                      {msg.autor_id === user.id && (
-                        msg.pending ? <Clock size={12} /> : <CheckCheck size={12} style={{ color: '#6b7280' }} />
-                      )}
-                    </span>
-                  </div>
-                ))
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-
-            {/* Photo Preview */}
-            {photoPreview && (
-              <div style={styles.photoPreviewContainer}>
-                <img src={photoPreview} alt="Preview" style={styles.photoPreview} />
-                <button onClick={cancelPhoto} style={styles.cancelPhotoButton}>
-                  ✕
-                </button>
-              </div>
-            )}
-
-            {/* Input */}
-            <div style={styles.inputContainer}>
-              <input
-                type="file"
-                ref={fileInputRef}
-                accept="image/*"
-                capture="environment"
-                onChange={handlePhotoSelect}
-                style={{ display: 'none' }}
-              />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                style={styles.attachButton}
-                disabled={uploadingPhoto}
-              >
-                <Camera size={24} />
-              </button>
-              <input
-                type="text"
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                placeholder={photoPreview ? "Adiciona uma legenda..." : "Escreve uma mensagem..."}
-                style={styles.input}
-              />
-              <button
-                onClick={handleSendMessage}
-                disabled={(!newMessage.trim() && !selectedPhoto) || sending || uploadingPhoto}
-                style={{
-                  ...styles.sendButton,
-                  opacity: (newMessage.trim() || selectedPhoto) ? 1 : 0.5
-                }}
-              >
-                {uploadingPhoto ? <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={20} />}
-              </button>
-            </div>
-          </div>
-        )}
-
+        {activeTab === 'chat' && <ObraChat obra={obra} user={user} />}
+        {activeTab === 'tarefas' && <Tarefas obra={obra} user={user} />}
         {activeTab === 'materiais' && <PedirMateriais obra={obra} user={user} />}
+        {activeTab === 'galeria' && <Galeria obra={obra} user={user} />}
         {activeTab === 'presencas' && <RegistoPresenca obra={obra} user={user} />}
         {activeTab === 'equipa' && <Equipa obra={obra} />}
       </main>
 
       {/* Bottom Navigation */}
       <nav style={styles.bottomNav}>
-        <button
-          onClick={() => setActiveTab('chat')}
-          style={{
-            ...styles.navButton,
-            ...(activeTab === 'chat' ? styles.navButtonActive : {})
-          }}
-        >
-          <MessageSquare size={20} />
-          Chat
-        </button>
-        <button
-          onClick={() => setActiveTab('materiais')}
-          style={{
-            ...styles.navButton,
-            ...(activeTab === 'materiais' ? styles.navButtonActive : {})
-          }}
-        >
-          <Package size={20} />
-          Materiais
-        </button>
-        <button
-          onClick={() => setActiveTab('presencas')}
-          style={{
-            ...styles.navButton,
-            ...(activeTab === 'presencas' ? styles.navButtonActive : {})
-          }}
-        >
-          <Clock size={20} />
-          Presenças
-        </button>
-        <button
-          onClick={() => setActiveTab('equipa')}
-          style={{
-            ...styles.navButton,
-            ...(activeTab === 'equipa' ? styles.navButtonActive : {})
-          }}
-        >
-          <Users size={20} />
-          Equipa
-        </button>
+        {tabs.map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            style={{
+              ...styles.navButton,
+              ...(activeTab === tab.key ? styles.navButtonActive : {})
+            }}
+          >
+            <tab.icon size={20} />
+            {tab.label}
+          </button>
+        ))}
       </nav>
+
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        @keyframes fadeOut {
+          0%, 80% { opacity: 1; }
+          100% { opacity: 0; display: none; }
+        }
+      `}</style>
     </div>
   )
 }
