@@ -7,13 +7,12 @@ import { useState, useEffect } from 'react'
 import {
   Menu, Clock, Package, LogOut, Bell, BellOff, HardHat,
   MessageSquare, Users, Loader2, CheckSquare, Image,
-  WifiOff, BookOpen, X, RefreshCw
+  WifiOff, BookOpen, X, RefreshCw, ChevronDown, Check
 } from 'lucide-react'
 
 // Import extracted components
 import {
   WorkerLogin,
-  ObraSelector,
   PedirMateriais,
   RegistoPresenca,
   Equipa,
@@ -39,6 +38,7 @@ export default function ObraApp() {
   const [activeTab, setActiveTab] = useState('chat')
   const [menuOpen, setMenuOpen] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
+  const [showObraDropdown, setShowObraDropdown] = useState(false)
 
   // Push notifications
   const { permission, requestPermission, subscribe } = usePushNotifications()
@@ -61,6 +61,13 @@ export default function ObraApp() {
     checkSession()
     registerServiceWorker()
   }, [])
+
+  // Auto-select if only one obra
+  useEffect(() => {
+    if (obras.length === 1 && !obra) {
+      handleSelectObra(obras[0])
+    }
+  }, [obras])
 
   // ========== SERVICE WORKER ==========
   const registerServiceWorker = async () => {
@@ -89,9 +96,7 @@ export default function ObraApp() {
           const obrasData = JSON.parse(savedObras)
           setObras(obrasData)
 
-          if (obrasData.length === 1) {
-            setObra(obrasData[0])
-          } else if (savedObra) {
+          if (savedObra) {
             setObra(JSON.parse(savedObra))
           }
         }
@@ -106,14 +111,11 @@ export default function ObraApp() {
   const handleLogin = (userData, obrasData) => {
     setUser(userData)
     setObras(obrasData)
-    if (obrasData.length === 1) {
-      setObra(obrasData[0])
-      localStorage.setItem(STORAGE_KEYS.OBRA, JSON.stringify(obrasData[0]))
-    }
   }
 
   const handleSelectObra = (selectedObra) => {
     setObra(selectedObra)
+    setShowObraDropdown(false)
     localStorage.setItem(STORAGE_KEYS.OBRA, JSON.stringify(selectedObra))
   }
 
@@ -123,11 +125,6 @@ export default function ObraApp() {
     localStorage.removeItem(STORAGE_KEYS.OBRA)
     setUser(null)
     setObras([])
-    setObra(null)
-  }
-
-  const handleSwitchObra = () => {
-    localStorage.removeItem(STORAGE_KEYS.OBRA)
     setObra(null)
   }
 
@@ -184,6 +181,115 @@ export default function ObraApp() {
       alignItems: 'center',
       justifyContent: 'center'
     },
+    // Obra dropdown
+    obraSelector: {
+      position: 'relative',
+      cursor: 'pointer'
+    },
+    obraSelectorButton: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 4,
+      padding: '4px 8px',
+      background: 'rgba(255,255,255,0.1)',
+      borderRadius: 8,
+      border: 'none',
+      cursor: 'pointer'
+    },
+    obraDropdown: {
+      position: 'absolute',
+      top: '100%',
+      left: 0,
+      right: 0,
+      marginTop: 8,
+      background: 'white',
+      borderRadius: 12,
+      boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+      zIndex: 100,
+      overflow: 'hidden',
+      minWidth: 200
+    },
+    obraDropdownItem: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 12,
+      padding: '12px 16px',
+      border: 'none',
+      background: 'none',
+      width: '100%',
+      textAlign: 'left',
+      cursor: 'pointer',
+      borderBottom: '1px solid #f3f4f6',
+      transition: 'background 0.2s'
+    },
+    obraDropdownItemActive: {
+      background: '#f0f9ff'
+    },
+    // Welcome/select obra screen
+    welcomeContainer: {
+      flex: 1,
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 24,
+      textAlign: 'center'
+    },
+    welcomeTitle: {
+      fontSize: 20,
+      fontWeight: 600,
+      margin: '16px 0 8px',
+      color: '#374151'
+    },
+    welcomeSubtitle: {
+      fontSize: 14,
+      color: '#6b7280',
+      marginBottom: 24
+    },
+    obraCards: {
+      width: '100%',
+      maxWidth: 400,
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 12
+    },
+    obraCard: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 16,
+      padding: 16,
+      background: 'white',
+      borderRadius: 12,
+      border: '1px solid #e5e7eb',
+      cursor: 'pointer',
+      transition: 'all 0.2s',
+      textAlign: 'left'
+    },
+    obraCardIcon: {
+      width: 48,
+      height: 48,
+      borderRadius: 12,
+      background: `${colors.primary}15`,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      color: colors.primary
+    },
+    obraCardInfo: {
+      flex: 1
+    },
+    obraCardCode: {
+      fontSize: 14,
+      fontWeight: 600,
+      color: '#374151',
+      margin: 0
+    },
+    obraCardName: {
+      fontSize: 13,
+      color: '#6b7280',
+      margin: '4px 0 0'
+    },
+    // Toast
     toast: {
       position: 'fixed',
       top: 70,
@@ -275,32 +381,6 @@ export default function ObraApp() {
     return <WorkerLogin onLogin={handleLogin} />
   }
 
-  // Obra selector
-  if (!obra && obras.length > 1) {
-    return <ObraSelector obras={obras} onSelect={handleSelectObra} />
-  }
-
-  // No obras assigned
-  if (!obra && obras.length === 0) {
-    return (
-      <div style={styles.loginContainer}>
-        <div style={styles.loginCard}>
-          <div style={styles.loginHeader}>
-            <HardHat size={48} style={{ color: '#6b7280' }} />
-            <h1 style={{ margin: '12px 0 4px' }}>Olá, {user.nome}</h1>
-            <p style={{ margin: 0, opacity: 0.7 }}>Não tens obras atribuídas</p>
-          </div>
-          <p style={{ textAlign: 'center', color: '#666' }}>
-            Fala com o teu encarregado para seres adicionado a uma obra.
-          </p>
-          <button onClick={handleLogout} style={styles.loginButton}>
-            Sair
-          </button>
-        </div>
-      </div>
-    )
-  }
-
   // Navigation tabs configuration
   const tabs = [
     { key: 'chat', label: 'Chat', icon: MessageSquare },
@@ -318,6 +398,48 @@ export default function ObraApp() {
     { key: 'presencas', label: 'Presenças', icon: Clock },
     { key: 'equipa', label: 'Equipa', icon: Users }
   ]
+
+  // Render obra selector in welcome screen
+  const renderWelcomeScreen = () => (
+    <div style={localStyles.welcomeContainer}>
+      <HardHat size={56} color={colors.primary} />
+      <h1 style={localStyles.welcomeTitle}>Olá, {user.nome}!</h1>
+      {obras.length === 0 ? (
+        <>
+          <p style={localStyles.welcomeSubtitle}>
+            Não tens obras atribuídas de momento.
+          </p>
+          <p style={{ fontSize: 13, color: '#9ca3af' }}>
+            Fala com o teu encarregado para seres adicionado a uma obra.
+          </p>
+        </>
+      ) : (
+        <>
+          <p style={localStyles.welcomeSubtitle}>
+            Seleciona a obra onde vais trabalhar
+          </p>
+          <div style={localStyles.obraCards}>
+            {obras.map(o => (
+              <div
+                key={o.id}
+                style={localStyles.obraCard}
+                onClick={() => handleSelectObra(o)}
+              >
+                <div style={localStyles.obraCardIcon}>
+                  <HardHat size={24} />
+                </div>
+                <div style={localStyles.obraCardInfo}>
+                  <p style={localStyles.obraCardCode}>{o.codigo}</p>
+                  <p style={localStyles.obraCardName}>{o.nome}</p>
+                </div>
+                <ChevronDown size={20} color="#9ca3af" style={{ transform: 'rotate(-90deg)' }} />
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
 
   return (
     <div style={styles.container}>
@@ -342,10 +464,68 @@ export default function ObraApp() {
         <button onClick={() => setMenuOpen(!menuOpen)} style={styles.menuButton}>
           <Menu size={24} />
         </button>
-        <div style={styles.headerTitle}>
-          <h1 style={styles.obraCode}>{obra.codigo}</h1>
-          <p style={styles.obraNome}>{obra.nome}</p>
+
+        {/* Obra Selector in Header */}
+        <div style={localStyles.obraSelector}>
+          <button
+            onClick={() => obras.length > 1 && setShowObraDropdown(!showObraDropdown)}
+            style={localStyles.obraSelectorButton}
+          >
+            <div style={styles.headerTitle}>
+              {obra ? (
+                <>
+                  <h1 style={styles.obraCode}>{obra.codigo}</h1>
+                  <p style={styles.obraNome}>{obra.nome}</p>
+                </>
+              ) : (
+                <>
+                  <h1 style={styles.obraCode}>Gavinho</h1>
+                  <p style={styles.obraNome}>Seleciona uma obra</p>
+                </>
+              )}
+            </div>
+            {obras.length > 1 && (
+              <ChevronDown
+                size={16}
+                color="white"
+                style={{
+                  transition: 'transform 0.2s',
+                  transform: showObraDropdown ? 'rotate(180deg)' : 'rotate(0deg)'
+                }}
+              />
+            )}
+          </button>
+
+          {/* Dropdown */}
+          {showObraDropdown && (
+            <>
+              <div
+                style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 99 }}
+                onClick={() => setShowObraDropdown(false)}
+              />
+              <div style={localStyles.obraDropdown}>
+                {obras.map(o => (
+                  <button
+                    key={o.id}
+                    onClick={() => handleSelectObra(o)}
+                    style={{
+                      ...localStyles.obraDropdownItem,
+                      ...(obra?.id === o.id ? localStyles.obraDropdownItemActive : {})
+                    }}
+                  >
+                    <HardHat size={20} color={colors.primary} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600, fontSize: 14, color: '#374151' }}>{o.codigo}</div>
+                      <div style={{ fontSize: 12, color: '#6b7280' }}>{o.nome}</div>
+                    </div>
+                    {obra?.id === o.id && <Check size={18} color={colors.primary} />}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
+
         <div style={styles.headerActions}>
           {/* Notifications bell */}
           <button
@@ -380,25 +560,61 @@ export default function ObraApp() {
                 <p style={{ margin: 0, fontSize: 12, opacity: 0.7 }}>{user.cargo || 'Equipa'}</p>
               </div>
             </div>
+
+            {/* Obra selector in menu */}
+            {obras.length > 0 && (
+              <div style={{ padding: '0 16px 16px', borderBottom: '1px solid #e5e7eb' }}>
+                <p style={{ fontSize: 11, color: '#9ca3af', marginBottom: 8, textTransform: 'uppercase' }}>
+                  Obra Ativa
+                </p>
+                {obras.map(o => (
+                  <button
+                    key={o.id}
+                    onClick={() => { handleSelectObra(o); setMenuOpen(false) }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 12,
+                      width: '100%',
+                      padding: '10px 12px',
+                      marginBottom: 4,
+                      background: obra?.id === o.id ? `${colors.primary}15` : '#f9fafb',
+                      border: obra?.id === o.id ? `1px solid ${colors.primary}` : '1px solid transparent',
+                      borderRadius: 8,
+                      cursor: 'pointer',
+                      textAlign: 'left'
+                    }}
+                  >
+                    <HardHat size={18} color={obra?.id === o.id ? colors.primary : '#6b7280'} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: obra?.id === o.id ? colors.primary : '#374151' }}>
+                        {o.codigo}
+                      </div>
+                      <div style={{ fontSize: 11, color: '#6b7280' }}>{o.nome}</div>
+                    </div>
+                    {obra?.id === o.id && <Check size={16} color={colors.primary} />}
+                  </button>
+                ))}
+              </div>
+            )}
+
             <nav style={styles.menuNav}>
               {menuItems.map(item => (
                 <button
                   key={item.key}
                   onClick={() => { setActiveTab(item.key); setMenuOpen(false) }}
+                  disabled={!obra}
                   style={{
                     ...styles.menuItem,
-                    ...(activeTab === item.key ? { background: `${colors.primary}10`, color: colors.primary } : {})
+                    ...(activeTab === item.key ? { background: `${colors.primary}10`, color: colors.primary } : {}),
+                    opacity: obra ? 1 : 0.5,
+                    cursor: obra ? 'pointer' : 'not-allowed'
                   }}
                 >
                   <item.icon size={20} /> {item.label}
                 </button>
               ))}
             </nav>
-            {obras.length > 1 && (
-              <button onClick={() => { handleSwitchObra(); setMenuOpen(false) }} style={styles.menuItem}>
-                <HardHat size={20} /> Mudar de Obra
-              </button>
-            )}
             <button onClick={handleLogout} style={styles.logoutButton}>
               <LogOut size={20} /> Sair
             </button>
@@ -408,31 +624,39 @@ export default function ObraApp() {
 
       {/* Main Content */}
       <main style={styles.main}>
-        {activeTab === 'chat' && <ObraChat obra={obra} user={user} />}
-        {activeTab === 'tarefas' && <Tarefas obra={obra} user={user} />}
-        {activeTab === 'diario' && <DiarioObra obra={obra} user={user} />}
-        {activeTab === 'materiais' && <PedirMateriais obra={obra} user={user} />}
-        {activeTab === 'galeria' && <Galeria obra={obra} user={user} />}
-        {activeTab === 'presencas' && <RegistoPresenca obra={obra} user={user} />}
-        {activeTab === 'equipa' && <Equipa obra={obra} />}
+        {!obra ? (
+          renderWelcomeScreen()
+        ) : (
+          <>
+            {activeTab === 'chat' && <ObraChat obra={obra} user={user} />}
+            {activeTab === 'tarefas' && <Tarefas obra={obra} user={user} />}
+            {activeTab === 'diario' && <DiarioObra obra={obra} user={user} />}
+            {activeTab === 'materiais' && <PedirMateriais obra={obra} user={user} />}
+            {activeTab === 'galeria' && <Galeria obra={obra} user={user} />}
+            {activeTab === 'presencas' && <RegistoPresenca obra={obra} user={user} />}
+            {activeTab === 'equipa' && <Equipa obra={obra} />}
+          </>
+        )}
       </main>
 
-      {/* Bottom Navigation */}
-      <nav style={styles.bottomNav}>
-        {tabs.map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            style={{
-              ...styles.navButton,
-              ...(activeTab === tab.key ? styles.navButtonActive : {})
-            }}
-          >
-            <tab.icon size={20} />
-            {tab.label}
-          </button>
-        ))}
-      </nav>
+      {/* Bottom Navigation - only show if obra is selected */}
+      {obra && (
+        <nav style={styles.bottomNav}>
+          {tabs.map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              style={{
+                ...styles.navButton,
+                ...(activeTab === tab.key ? styles.navButtonActive : {})
+              }}
+            >
+              <tab.icon size={20} />
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+      )}
 
       {/* Toast Notification */}
       {showToast && (
