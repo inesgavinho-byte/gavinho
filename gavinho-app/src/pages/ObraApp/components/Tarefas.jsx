@@ -1,13 +1,15 @@
 // =====================================================
 // TAREFAS COMPONENT
 // Task management for obra workers
+// Features: Due-soon alerts, Quick status buttons
 // =====================================================
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../../../lib/supabase'
 import {
   CheckCircle2, Circle, Clock, AlertCircle, User,
-  Calendar, ChevronRight, Loader2, Filter, Search
+  Calendar, ChevronRight, Loader2, Filter, Search,
+  AlertTriangle, Play, Bell
 } from 'lucide-react'
 import { styles, colors } from '../styles'
 import { formatDate, formatDateTime } from '../utils'
@@ -25,13 +27,27 @@ const PRIORITY_COLORS = {
   baixa: '#6b7280'
 }
 
+// Check if task is due soon (within 24h or 48h)
+const getDueSoonStatus = (tarefa) => {
+  if (!tarefa.data_limite || tarefa.estado === 'concluida') return null
+  const now = new Date()
+  const dueDate = new Date(tarefa.data_limite)
+  const hoursUntilDue = (dueDate - now) / (1000 * 60 * 60)
+
+  if (hoursUntilDue < 0) return 'overdue'
+  if (hoursUntilDue <= 24) return 'urgent' // Due within 24h
+  if (hoursUntilDue <= 48) return 'soon' // Due within 48h
+  return null
+}
+
 export default function Tarefas({ obra, user }) {
   const [tarefas, setTarefas] = useState([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState('todas') // todas, minhas, pendentes
+  const [filter, setFilter] = useState('todas') // todas, minhas, pendentes, urgentes
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedTarefa, setSelectedTarefa] = useState(null)
   const [updating, setUpdating] = useState(false)
+  const [showDueAlert, setShowDueAlert] = useState(true)
 
   useEffect(() => {
     if (obra) {
@@ -134,7 +150,18 @@ export default function Tarefas({ obra, user }) {
     if (filter === 'pendentes') {
       return t.estado !== 'concluida'
     }
+    if (filter === 'urgentes') {
+      const status = getDueSoonStatus(t)
+      return status === 'overdue' || status === 'urgent' || status === 'soon'
+    }
     return true
+  })
+
+  // Get urgent tasks for alert banner
+  const urgentTasks = tarefas.filter(t => {
+    if (t.responsavel_id !== user.id) return false
+    const status = getDueSoonStatus(t)
+    return status === 'overdue' || status === 'urgent'
   })
 
   // Group by status
@@ -356,6 +383,103 @@ export default function Tarefas({ obra, user }) {
       textAlign: 'center',
       padding: 40,
       color: '#6b7280'
+    },
+    // Due-soon alert banner
+    alertBanner: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 12,
+      padding: '12px 16px',
+      background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+      borderBottom: '1px solid #f59e0b',
+      cursor: 'pointer'
+    },
+    alertBannerUrgent: {
+      background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+      borderColor: '#ef4444'
+    },
+    alertIcon: {
+      width: 36,
+      height: 36,
+      borderRadius: '50%',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: '#f59e0b',
+      color: 'white',
+      flexShrink: 0
+    },
+    alertIconUrgent: {
+      background: '#ef4444'
+    },
+    alertText: {
+      flex: 1,
+      fontSize: 13
+    },
+    alertTitle: {
+      fontWeight: 600,
+      color: '#92400e',
+      marginBottom: 2
+    },
+    alertTitleUrgent: {
+      color: '#991b1b'
+    },
+    alertDesc: {
+      color: '#b45309',
+      fontSize: 12
+    },
+    alertDescUrgent: {
+      color: '#dc2626'
+    },
+    alertDismiss: {
+      background: 'none',
+      border: 'none',
+      color: '#9ca3af',
+      cursor: 'pointer',
+      padding: 4
+    },
+    // Quick status buttons in card
+    quickActions: {
+      display: 'flex',
+      gap: 6,
+      marginTop: 8,
+      paddingTop: 8,
+      borderTop: '1px solid #f3f4f6'
+    },
+    quickButton: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 4,
+      padding: '6px 10px',
+      border: '1px solid #e5e7eb',
+      borderRadius: 6,
+      fontSize: 11,
+      background: 'white',
+      cursor: 'pointer',
+      transition: 'all 0.2s'
+    },
+    quickButtonActive: {
+      borderColor: '#3b82f6',
+      background: '#eff6ff',
+      color: '#2563eb'
+    },
+    // Due soon badge styles
+    dueSoonBadge: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 4,
+      padding: '2px 8px',
+      borderRadius: 10,
+      fontSize: 10,
+      fontWeight: 600
+    },
+    dueSoonUrgent: {
+      background: '#fee2e2',
+      color: '#dc2626'
+    },
+    dueSoonSoon: {
+      background: '#fef3c7',
+      color: '#d97706'
     }
   }
 
@@ -401,7 +525,8 @@ export default function Tarefas({ obra, user }) {
           {[
             { key: 'todas', label: 'Todas' },
             { key: 'minhas', label: 'Minhas' },
-            { key: 'pendentes', label: 'Pendentes' }
+            { key: 'pendentes', label: 'Pendentes' },
+            { key: 'urgentes', label: 'Urgentes' }
           ].map(f => (
             <button
               key={f.key}
@@ -413,10 +538,55 @@ export default function Tarefas({ obra, user }) {
             >
               {f.label}
               {f.key === 'minhas' && ` (${tarefas.filter(t => t.responsavel_id === user.id).length})`}
+              {f.key === 'urgentes' && urgentTasks.length > 0 && ` (${urgentTasks.length})`}
             </button>
           ))}
         </div>
       </div>
+
+      {/* Due-soon alert banner */}
+      {showDueAlert && urgentTasks.length > 0 && (
+        <div
+          style={{
+            ...tarefaStyles.alertBanner,
+            ...(urgentTasks.some(t => getDueSoonStatus(t) === 'overdue') ? tarefaStyles.alertBannerUrgent : {})
+          }}
+          onClick={() => setFilter('urgentes')}
+        >
+          <div style={{
+            ...tarefaStyles.alertIcon,
+            ...(urgentTasks.some(t => getDueSoonStatus(t) === 'overdue') ? tarefaStyles.alertIconUrgent : {})
+          }}>
+            {urgentTasks.some(t => getDueSoonStatus(t) === 'overdue')
+              ? <AlertTriangle size={18} />
+              : <Bell size={18} />
+            }
+          </div>
+          <div style={tarefaStyles.alertText}>
+            <div style={{
+              ...tarefaStyles.alertTitle,
+              ...(urgentTasks.some(t => getDueSoonStatus(t) === 'overdue') ? tarefaStyles.alertTitleUrgent : {})
+            }}>
+              {urgentTasks.some(t => getDueSoonStatus(t) === 'overdue')
+                ? `${urgentTasks.filter(t => getDueSoonStatus(t) === 'overdue').length} tarefa(s) atrasada(s)!`
+                : `${urgentTasks.length} tarefa(s) a vencer em 24h`
+              }
+            </div>
+            <div style={{
+              ...tarefaStyles.alertDesc,
+              ...(urgentTasks.some(t => getDueSoonStatus(t) === 'overdue') ? tarefaStyles.alertDescUrgent : {})
+            }}>
+              Toca para ver
+            </div>
+          </div>
+          <button
+            style={tarefaStyles.alertDismiss}
+            onClick={(e) => { e.stopPropagation(); setShowDueAlert(false); }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Task list */}
       <div style={tarefaStyles.list}>
@@ -445,44 +615,117 @@ export default function Tarefas({ obra, user }) {
                   </span>
                 </div>
 
-                {tasks.map(tarefa => (
-                  <div
-                    key={tarefa.id}
-                    style={tarefaStyles.card}
-                    onClick={() => setSelectedTarefa(tarefa)}
-                  >
-                    <div style={tarefaStyles.cardHeader}>
-                      <h4 style={tarefaStyles.cardTitle}>{tarefa.titulo}</h4>
-                      {tarefa.prioridade && (
-                        <span
-                          style={{
-                            ...tarefaStyles.priorityDot,
-                            background: PRIORITY_COLORS[tarefa.prioridade]
-                          }}
-                          title={`Prioridade ${tarefa.prioridade}`}
-                        />
+                {tasks.map(tarefa => {
+                  const dueSoonStatus = getDueSoonStatus(tarefa)
+                  const isMyTask = tarefa.responsavel_id === user.id
+
+                  return (
+                    <div
+                      key={tarefa.id}
+                      style={tarefaStyles.card}
+                    >
+                      <div onClick={() => setSelectedTarefa(tarefa)}>
+                        <div style={tarefaStyles.cardHeader}>
+                          <h4 style={tarefaStyles.cardTitle}>{tarefa.titulo}</h4>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            {dueSoonStatus && (
+                              <span style={{
+                                ...tarefaStyles.dueSoonBadge,
+                                ...(dueSoonStatus === 'overdue' || dueSoonStatus === 'urgent'
+                                  ? tarefaStyles.dueSoonUrgent
+                                  : tarefaStyles.dueSoonSoon)
+                              }}>
+                                <AlertTriangle size={10} />
+                                {dueSoonStatus === 'overdue' ? 'Atrasada' :
+                                 dueSoonStatus === 'urgent' ? '<24h' : '<48h'}
+                              </span>
+                            )}
+                            {tarefa.prioridade && (
+                              <span
+                                style={{
+                                  ...tarefaStyles.priorityDot,
+                                  background: PRIORITY_COLORS[tarefa.prioridade]
+                                }}
+                                title={`Prioridade ${tarefa.prioridade}`}
+                              />
+                            )}
+                          </div>
+                        </div>
+                        <div style={tarefaStyles.cardMeta}>
+                          {tarefa.responsavel && (
+                            <span style={tarefaStyles.metaItem}>
+                              <User size={12} />
+                              {tarefa.responsavel.nome}
+                            </span>
+                          )}
+                          {tarefa.data_limite && (
+                            <span style={{
+                              ...tarefaStyles.metaItem,
+                              ...(isOverdue(tarefa) ? tarefaStyles.overdue : {})
+                            }}>
+                              <Calendar size={12} />
+                              {formatDate(tarefa.data_limite)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Quick status buttons for user's tasks */}
+                      {isMyTask && tarefa.estado !== 'concluida' && (
+                        <div style={tarefaStyles.quickActions}>
+                          {tarefa.estado === 'pendente' && (
+                            <button
+                              style={tarefaStyles.quickButton}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                updateTarefaStatus(tarefa, 'em_progresso')
+                              }}
+                              disabled={updating}
+                            >
+                              <Play size={12} /> Iniciar
+                            </button>
+                          )}
+                          {tarefa.estado === 'em_progresso' && (
+                            <>
+                              <button
+                                style={tarefaStyles.quickButton}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  updateTarefaStatus(tarefa, 'concluida')
+                                }}
+                                disabled={updating}
+                              >
+                                <CheckCircle2 size={12} /> Concluir
+                              </button>
+                              <button
+                                style={tarefaStyles.quickButton}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  updateTarefaStatus(tarefa, 'bloqueada')
+                                }}
+                                disabled={updating}
+                              >
+                                <AlertCircle size={12} /> Bloquear
+                              </button>
+                            </>
+                          )}
+                          {tarefa.estado === 'bloqueada' && (
+                            <button
+                              style={tarefaStyles.quickButton}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                updateTarefaStatus(tarefa, 'em_progresso')
+                              }}
+                              disabled={updating}
+                            >
+                              <Play size={12} /> Retomar
+                            </button>
+                          )}
+                        </div>
                       )}
                     </div>
-                    <div style={tarefaStyles.cardMeta}>
-                      {tarefa.responsavel && (
-                        <span style={tarefaStyles.metaItem}>
-                          <User size={12} />
-                          {tarefa.responsavel.nome}
-                        </span>
-                      )}
-                      {tarefa.data_limite && (
-                        <span style={{
-                          ...tarefaStyles.metaItem,
-                          ...(isOverdue(tarefa) ? tarefaStyles.overdue : {})
-                        }}>
-                          <Calendar size={12} />
-                          {formatDate(tarefa.data_limite)}
-                          {isOverdue(tarefa) && ' (atrasada)'}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )
           })

@@ -1,16 +1,20 @@
 // =====================================================
 // REGISTO PRESENCA COMPONENT
 // Check-in/Check-out attendance tracking
+// Features: Weekly summary, >12h warning
 // =====================================================
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import {
   Clock, CalendarDays, LogIn, LogOut as LogOutIcon,
-  Check, CheckCheck, Loader2
+  Check, CheckCheck, Loader2, AlertTriangle, TrendingUp,
+  BarChart3
 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import { styles } from '../styles'
 import { formatTime as formatTimeUtil, calculateDuration } from '../utils'
+
+const OVERTIME_THRESHOLD = 12 // Hours threshold for warning
 
 // Component-specific styles
 const localStyles = {
@@ -208,6 +212,107 @@ const localStyles = {
     fontSize: 13,
     fontWeight: 500,
     color: '#3d4349'
+  },
+  // Weekly summary styles
+  weeklySummary: {
+    background: 'white',
+    borderRadius: 16,
+    overflow: 'hidden',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+    marginBottom: 24
+  },
+  weeklySummaryHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    padding: '12px 16px',
+    background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+    color: 'white',
+    fontSize: 14,
+    fontWeight: 500
+  },
+  weeklySummaryBody: {
+    padding: 16
+  },
+  summaryStats: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(3, 1fr)',
+    gap: 12,
+    marginBottom: 16
+  },
+  statCard: {
+    textAlign: 'center',
+    padding: 12,
+    background: '#f8fafc',
+    borderRadius: 12
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: 700,
+    color: '#1e293b'
+  },
+  statLabel: {
+    fontSize: 11,
+    color: '#64748b',
+    textTransform: 'uppercase',
+    marginTop: 4
+  },
+  weekBar: {
+    display: 'flex',
+    gap: 4,
+    alignItems: 'flex-end',
+    height: 60,
+    marginBottom: 8
+  },
+  dayBar: {
+    flex: 1,
+    borderRadius: '4px 4px 0 0',
+    minHeight: 4,
+    transition: 'all 0.3s ease'
+  },
+  dayLabels: {
+    display: 'flex',
+    gap: 4
+  },
+  dayLabel: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 10,
+    color: '#94a3b8'
+  },
+  // Overtime warning styles
+  overtimeWarning: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+    padding: '12px 16px',
+    background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+    borderRadius: 12,
+    marginBottom: 16
+  },
+  overtimeWarningIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: '50%',
+    background: '#f59e0b',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: 'white',
+    flexShrink: 0
+  },
+  overtimeWarningText: {
+    flex: 1
+  },
+  overtimeWarningTitle: {
+    fontWeight: 600,
+    color: '#92400e',
+    fontSize: 14,
+    marginBottom: 2
+  },
+  overtimeWarningDesc: {
+    fontSize: 12,
+    color: '#b45309'
   }
 }
 
@@ -217,8 +322,81 @@ export default function RegistoPresenca({ obra, user }) {
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
   const [notas, setNotas] = useState('')
+  const [showWeeklySummary, setShowWeeklySummary] = useState(true)
 
   const hoje = new Date().toISOString().split('T')[0]
+
+  // Calculate weekly stats
+  const weeklyStats = useMemo(() => {
+    const now = new Date()
+    const startOfWeek = new Date(now)
+    startOfWeek.setDate(now.getDate() - now.getDay() + 1) // Monday
+    startOfWeek.setHours(0, 0, 0, 0)
+
+    // Get this week's records
+    const weekRecords = historico.filter(h => {
+      const recordDate = new Date(h.data)
+      return recordDate >= startOfWeek
+    })
+
+    // Calculate daily hours for bar chart
+    const dailyHours = []
+    const dayNames = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
+
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(startOfWeek)
+      day.setDate(startOfWeek.getDate() + i)
+      const dayStr = day.toISOString().split('T')[0]
+
+      const record = weekRecords.find(r => r.data === dayStr)
+      let hours = 0
+      if (record && record.hora_entrada && record.hora_saida) {
+        hours = (new Date(record.hora_saida) - new Date(record.hora_entrada)) / (1000 * 60 * 60)
+      }
+
+      dailyHours.push({
+        day: dayNames[i],
+        hours: parseFloat(hours.toFixed(1)),
+        date: dayStr,
+        isToday: dayStr === hoje,
+        isPast: day < now && dayStr !== hoje
+      })
+    }
+
+    // Total hours this week
+    const totalHours = dailyHours.reduce((sum, d) => sum + d.hours, 0)
+
+    // Days worked this week
+    const daysWorked = dailyHours.filter(d => d.hours > 0).length
+
+    // Average hours per day worked
+    const avgHours = daysWorked > 0 ? totalHours / daysWorked : 0
+
+    // Max hours for scaling bar chart
+    const maxHours = Math.max(...dailyHours.map(d => d.hours), 8)
+
+    return {
+      dailyHours,
+      totalHours: parseFloat(totalHours.toFixed(1)),
+      daysWorked,
+      avgHours: parseFloat(avgHours.toFixed(1)),
+      maxHours
+    }
+  }, [historico, hoje])
+
+  // Check if today's shift is over threshold
+  const todayOvertime = useMemo(() => {
+    if (!presencaHoje || !presencaHoje.hora_entrada) return null
+
+    const entrada = new Date(presencaHoje.hora_entrada)
+    const saida = presencaHoje.hora_saida ? new Date(presencaHoje.hora_saida) : new Date()
+    const hoursWorked = (saida - entrada) / (1000 * 60 * 60)
+
+    if (hoursWorked >= OVERTIME_THRESHOLD) {
+      return parseFloat(hoursWorked.toFixed(1))
+    }
+    return null
+  }, [presencaHoje])
 
   useEffect(() => {
     loadPresencas()
@@ -373,6 +551,92 @@ export default function RegistoPresenca({ obra, user }) {
       <h2 style={styles.formTitle}>
         <Clock size={24} /> Registo de Presença
       </h2>
+
+      {/* Overtime Warning */}
+      {todayOvertime && (
+        <div style={localStyles.overtimeWarning}>
+          <div style={localStyles.overtimeWarningIcon}>
+            <AlertTriangle size={20} />
+          </div>
+          <div style={localStyles.overtimeWarningText}>
+            <div style={localStyles.overtimeWarningTitle}>
+              Atenção: Já trabalhas há {todayOvertime}h hoje
+            </div>
+            <div style={localStyles.overtimeWarningDesc}>
+              Turnos superiores a {OVERTIME_THRESHOLD}h podem afetar a saúde e segurança
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Weekly Summary */}
+      {showWeeklySummary && historico.length > 0 && (
+        <div style={localStyles.weeklySummary}>
+          <div style={localStyles.weeklySummaryHeader}>
+            <BarChart3 size={18} />
+            <span>Resumo Semanal</span>
+          </div>
+          <div style={localStyles.weeklySummaryBody}>
+            {/* Stats cards */}
+            <div style={localStyles.summaryStats}>
+              <div style={localStyles.statCard}>
+                <div style={localStyles.statValue}>{weeklyStats.totalHours}h</div>
+                <div style={localStyles.statLabel}>Total</div>
+              </div>
+              <div style={localStyles.statCard}>
+                <div style={localStyles.statValue}>{weeklyStats.daysWorked}</div>
+                <div style={localStyles.statLabel}>Dias</div>
+              </div>
+              <div style={localStyles.statCard}>
+                <div style={localStyles.statValue}>{weeklyStats.avgHours}h</div>
+                <div style={localStyles.statLabel}>Média/Dia</div>
+              </div>
+            </div>
+
+            {/* Bar chart */}
+            <div style={localStyles.weekBar}>
+              {weeklyStats.dailyHours.map((d, i) => {
+                const height = d.hours > 0
+                  ? Math.max(8, (d.hours / weeklyStats.maxHours) * 60)
+                  : 4
+                const isOvertime = d.hours >= OVERTIME_THRESHOLD
+
+                return (
+                  <div
+                    key={i}
+                    style={{
+                      ...localStyles.dayBar,
+                      height,
+                      background: d.hours === 0
+                        ? '#e5e7eb'
+                        : isOvertime
+                          ? '#f59e0b'
+                          : d.isToday
+                            ? '#10b981'
+                            : '#3b82f6'
+                    }}
+                    title={`${d.day}: ${d.hours}h`}
+                  />
+                )
+              })}
+            </div>
+            <div style={localStyles.dayLabels}>
+              {weeklyStats.dailyHours.map((d, i) => (
+                <div
+                  key={i}
+                  style={{
+                    ...localStyles.dayLabel,
+                    fontWeight: d.isToday ? 600 : 400,
+                    color: d.isToday ? '#1e293b' : '#94a3b8'
+                  }}
+                >
+                  {d.day}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Status Card */}
       <div style={localStyles.statusCard}>

@@ -1,14 +1,15 @@
 // =====================================================
 // GALERIA COMPONENT
 // Photo gallery for obra - from chat and diario
+// Features: Before/after slider for progress comparison
 // =====================================================
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../../../lib/supabase'
 import {
   Image as ImageIcon, X, ChevronLeft, ChevronRight,
   Camera, Upload, Loader2, Calendar, MessageSquare,
-  Download, ZoomIn
+  Download, ZoomIn, Layers, ArrowLeftRight
 } from 'lucide-react'
 import { styles, colors } from '../styles'
 import { formatDate, formatDateTime } from '../utils'
@@ -19,9 +20,14 @@ export default function Galeria({ obra, user }) {
   const [uploading, setUploading] = useState(false)
   const [selectedPhoto, setSelectedPhoto] = useState(null)
   const [selectedIndex, setSelectedIndex] = useState(0)
-  const [filter, setFilter] = useState('todas') // todas, chat, diario, minhas
+  const [filter, setFilter] = useState('todas') // todas, chat, diario, minhas, compare
+  const [compareMode, setCompareMode] = useState(false)
+  const [comparePhotos, setComparePhotos] = useState({ before: null, after: null })
+  const [sliderPosition, setSliderPosition] = useState(50)
+  const [isDragging, setIsDragging] = useState(false)
 
   const fileInputRef = useRef(null)
+  const sliderContainerRef = useRef(null)
 
   useEffect(() => {
     if (obra) {
@@ -193,6 +199,77 @@ export default function Galeria({ obra, user }) {
   const downloadPhoto = (url) => {
     window.open(url, '_blank')
   }
+
+  // Compare mode handlers
+  const toggleCompareMode = () => {
+    if (compareMode) {
+      setCompareMode(false)
+      setComparePhotos({ before: null, after: null })
+    } else {
+      setCompareMode(true)
+    }
+  }
+
+  const selectForCompare = (photo) => {
+    if (!comparePhotos.before) {
+      setComparePhotos({ before: photo, after: null })
+    } else if (!comparePhotos.after) {
+      // Ensure "before" is the older photo
+      const beforeDate = new Date(comparePhotos.before.created_at)
+      const afterDate = new Date(photo.created_at)
+
+      if (beforeDate > afterDate) {
+        setComparePhotos({ before: photo, after: comparePhotos.before })
+      } else {
+        setComparePhotos({ before: comparePhotos.before, after: photo })
+      }
+    } else {
+      // Reset and start over
+      setComparePhotos({ before: photo, after: null })
+    }
+  }
+
+  // Slider drag handlers
+  const handleSliderMove = useCallback((clientX) => {
+    if (!sliderContainerRef.current) return
+
+    const rect = sliderContainerRef.current.getBoundingClientRect()
+    const x = clientX - rect.left
+    const percentage = Math.min(100, Math.max(0, (x / rect.width) * 100))
+    setSliderPosition(percentage)
+  }, [])
+
+  const handleMouseMove = useCallback((e) => {
+    if (isDragging) {
+      handleSliderMove(e.clientX)
+    }
+  }, [isDragging, handleSliderMove])
+
+  const handleTouchMove = useCallback((e) => {
+    if (isDragging && e.touches[0]) {
+      handleSliderMove(e.touches[0].clientX)
+    }
+  }, [isDragging, handleSliderMove])
+
+  const handleDragEnd = useCallback(() => {
+    setIsDragging(false)
+  }, [])
+
+  useEffect(() => {
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMouseMove)
+      window.addEventListener('mouseup', handleDragEnd)
+      window.addEventListener('touchmove', handleTouchMove)
+      window.addEventListener('touchend', handleDragEnd)
+
+      return () => {
+        window.removeEventListener('mousemove', handleMouseMove)
+        window.removeEventListener('mouseup', handleDragEnd)
+        window.removeEventListener('touchmove', handleTouchMove)
+        window.removeEventListener('touchend', handleDragEnd)
+      }
+    }
+  }, [isDragging, handleMouseMove, handleTouchMove, handleDragEnd])
 
   // Filter photos
   const getFilteredPhotos = () => {
@@ -425,6 +502,179 @@ export default function Galeria({ obra, user }) {
       background: '#e5e7eb',
       borderRadius: 8,
       animation: 'pulse 1.5s ease-in-out infinite'
+    },
+    // Compare mode styles
+    compareButton: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 6,
+      padding: '8px 12px',
+      background: '#6366f1',
+      color: 'white',
+      border: 'none',
+      borderRadius: 8,
+      fontSize: 13,
+      cursor: 'pointer'
+    },
+    compareButtonActive: {
+      background: '#4f46e5'
+    },
+    compareInfo: {
+      padding: '12px 16px',
+      background: '#eef2ff',
+      borderBottom: '1px solid #c7d2fe',
+      display: 'flex',
+      alignItems: 'center',
+      gap: 12
+    },
+    compareInfoText: {
+      flex: 1,
+      fontSize: 13,
+      color: '#4338ca'
+    },
+    compareSelection: {
+      display: 'flex',
+      gap: 8
+    },
+    compareThumb: {
+      width: 40,
+      height: 40,
+      borderRadius: 8,
+      objectFit: 'cover',
+      border: '2px solid #6366f1'
+    },
+    compareThumbPlaceholder: {
+      width: 40,
+      height: 40,
+      borderRadius: 8,
+      background: '#e0e7ff',
+      border: '2px dashed #a5b4fc',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      color: '#6366f1',
+      fontSize: 12
+    },
+    selectedOverlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'rgba(99, 102, 241, 0.4)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 8
+    },
+    selectedBadge: {
+      background: '#6366f1',
+      color: 'white',
+      padding: '4px 10px',
+      borderRadius: 20,
+      fontSize: 11,
+      fontWeight: 600
+    },
+    // Comparison slider modal
+    compareModal: {
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'rgba(0,0,0,0.95)',
+      display: 'flex',
+      flexDirection: 'column',
+      zIndex: 1000
+    },
+    compareHeader: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 16,
+      color: 'white'
+    },
+    compareTitle: {
+      fontSize: 16,
+      fontWeight: 500,
+      display: 'flex',
+      alignItems: 'center',
+      gap: 8
+    },
+    sliderContainer: {
+      flex: 1,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 16,
+      position: 'relative',
+      overflow: 'hidden'
+    },
+    sliderWrapper: {
+      position: 'relative',
+      maxWidth: '100%',
+      maxHeight: '100%',
+      aspectRatio: '1',
+      overflow: 'hidden'
+    },
+    sliderImageBefore: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      width: '100%',
+      height: '100%',
+      objectFit: 'cover'
+    },
+    sliderImageAfter: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      height: '100%',
+      objectFit: 'cover',
+      objectPosition: 'left'
+    },
+    sliderDivider: {
+      position: 'absolute',
+      top: 0,
+      bottom: 0,
+      width: 4,
+      background: 'white',
+      cursor: 'ew-resize',
+      zIndex: 10,
+      boxShadow: '0 0 10px rgba(0,0,0,0.5)'
+    },
+    sliderHandle: {
+      position: 'absolute',
+      top: '50%',
+      left: '50%',
+      transform: 'translate(-50%, -50%)',
+      width: 40,
+      height: 40,
+      borderRadius: '50%',
+      background: 'white',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+      cursor: 'ew-resize'
+    },
+    sliderLabels: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      display: 'flex',
+      justifyContent: 'space-between',
+      padding: 8,
+      background: 'linear-gradient(transparent, rgba(0,0,0,0.5))'
+    },
+    sliderLabel: {
+      color: 'white',
+      fontSize: 12,
+      fontWeight: 500,
+      padding: '4px 8px',
+      background: 'rgba(0,0,0,0.5)',
+      borderRadius: 4
     }
   }
 
@@ -458,21 +708,32 @@ export default function Galeria({ obra, user }) {
           <h3 style={galeriaStyles.title}>
             <ImageIcon size={20} /> Galeria ({filteredPhotos.length})
           </h3>
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            style={{
-              ...galeriaStyles.uploadButton,
-              opacity: uploading ? 0.7 : 1
-            }}
-          >
-            {uploading ? (
-              <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
-            ) : (
-              <Camera size={16} />
-            )}
-            {uploading ? 'A enviar...' : 'Adicionar'}
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={toggleCompareMode}
+              style={{
+                ...galeriaStyles.compareButton,
+                ...(compareMode ? galeriaStyles.compareButtonActive : {})
+              }}
+            >
+              <Layers size={16} />
+              {compareMode ? 'Cancelar' : 'Comparar'}
+            </button>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              style={{
+                ...galeriaStyles.uploadButton,
+                opacity: uploading ? 0.7 : 1
+              }}
+            >
+              {uploading ? (
+                <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+              ) : (
+                <Camera size={16} />
+              )}
+            </button>
+          </div>
           <input
             type="file"
             ref={fileInputRef}
@@ -483,26 +744,63 @@ export default function Galeria({ obra, user }) {
           />
         </div>
 
-        <div style={galeriaStyles.filters}>
-          {[
-            { key: 'todas', label: 'Todas' },
-            { key: 'chat', label: 'Chat' },
-            { key: 'diario', label: 'Diário' },
-            { key: 'minhas', label: 'Minhas' }
-          ].map(f => (
-            <button
-              key={f.key}
-              onClick={() => setFilter(f.key)}
-              style={{
-                ...galeriaStyles.filterButton,
-                ...(filter === f.key ? galeriaStyles.filterActive : galeriaStyles.filterInactive)
-              }}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
+        {!compareMode && (
+          <div style={galeriaStyles.filters}>
+            {[
+              { key: 'todas', label: 'Todas' },
+              { key: 'chat', label: 'Chat' },
+              { key: 'diario', label: 'Diário' },
+              { key: 'minhas', label: 'Minhas' }
+            ].map(f => (
+              <button
+                key={f.key}
+                onClick={() => setFilter(f.key)}
+                style={{
+                  ...galeriaStyles.filterButton,
+                  ...(filter === f.key ? galeriaStyles.filterActive : galeriaStyles.filterInactive)
+                }}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
+
+      {/* Compare mode info bar */}
+      {compareMode && (
+        <div style={galeriaStyles.compareInfo}>
+          <ArrowLeftRight size={18} style={{ color: '#6366f1' }} />
+          <div style={galeriaStyles.compareInfoText}>
+            {!comparePhotos.before
+              ? 'Seleciona a 1ª foto (Antes)'
+              : !comparePhotos.after
+                ? 'Seleciona a 2ª foto (Depois)'
+                : 'Toca em "Ver Comparação" para comparar'
+            }
+          </div>
+          <div style={galeriaStyles.compareSelection}>
+            {comparePhotos.before ? (
+              <img src={comparePhotos.before.url} alt="Antes" style={galeriaStyles.compareThumb} />
+            ) : (
+              <div style={galeriaStyles.compareThumbPlaceholder}>1</div>
+            )}
+            {comparePhotos.after ? (
+              <img src={comparePhotos.after.url} alt="Depois" style={galeriaStyles.compareThumb} />
+            ) : (
+              <div style={galeriaStyles.compareThumbPlaceholder}>2</div>
+            )}
+          </div>
+          {comparePhotos.before && comparePhotos.after && (
+            <button
+              style={{ ...galeriaStyles.compareButton, marginLeft: 8 }}
+              onClick={() => setSliderPosition(50)}
+            >
+              Ver
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Photo grid */}
       <div style={galeriaStyles.content}>
@@ -522,11 +820,14 @@ export default function Galeria({ obra, user }) {
               <div style={galeriaStyles.grid}>
                 {datePhotos.map((photo, idx) => {
                   const globalIndex = filteredPhotos.indexOf(photo)
+                  const isSelectedForCompare = comparePhotos.before?.id === photo.id || comparePhotos.after?.id === photo.id
+                  const selectionNumber = comparePhotos.before?.id === photo.id ? 1 : comparePhotos.after?.id === photo.id ? 2 : null
+
                   return (
                     <div
                       key={photo.id}
                       style={galeriaStyles.photoWrapper}
-                      onClick={() => openPhoto(photo, globalIndex)}
+                      onClick={() => compareMode ? selectForCompare(photo) : openPhoto(photo, globalIndex)}
                     >
                       <img
                         src={photo.url}
@@ -534,10 +835,19 @@ export default function Galeria({ obra, user }) {
                         style={galeriaStyles.photo}
                         loading="lazy"
                       />
-                      <span style={galeriaStyles.sourceBadge}>
-                        {photo.source === 'chat' ? <MessageSquare size={10} /> : <Calendar size={10} />}
-                        {photo.source === 'chat' ? 'Chat' : 'Diário'}
-                      </span>
+                      {!compareMode && (
+                        <span style={galeriaStyles.sourceBadge}>
+                          {photo.source === 'chat' ? <MessageSquare size={10} /> : <Calendar size={10} />}
+                          {photo.source === 'chat' ? 'Chat' : 'Diário'}
+                        </span>
+                      )}
+                      {compareMode && isSelectedForCompare && (
+                        <div style={galeriaStyles.selectedOverlay}>
+                          <span style={galeriaStyles.selectedBadge}>
+                            {selectionNumber === 1 ? 'Antes' : 'Depois'}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   )
                 })}
@@ -599,6 +909,83 @@ export default function Galeria({ obra, user }) {
 
           <div style={galeriaStyles.counter}>
             {selectedIndex + 1} / {filteredPhotos.length}
+          </div>
+        </div>
+      )}
+
+      {/* Comparison Slider Modal */}
+      {compareMode && comparePhotos.before && comparePhotos.after && (
+        <div style={galeriaStyles.compareModal}>
+          <div style={galeriaStyles.compareHeader}>
+            <div style={galeriaStyles.compareTitle}>
+              <ArrowLeftRight size={20} />
+              Comparação de Progresso
+            </div>
+            <button
+              style={galeriaStyles.modalButton}
+              onClick={() => setComparePhotos({ before: null, after: null })}
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          <div
+            ref={sliderContainerRef}
+            style={galeriaStyles.sliderContainer}
+          >
+            <div style={{ ...galeriaStyles.sliderWrapper, width: '100%', maxWidth: 500 }}>
+              {/* After image (full) */}
+              <img
+                src={comparePhotos.after.url}
+                alt="Depois"
+                style={galeriaStyles.sliderImageBefore}
+              />
+
+              {/* Before image (clipped) */}
+              <div style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: `${sliderPosition}%`,
+                height: '100%',
+                overflow: 'hidden'
+              }}>
+                <img
+                  src={comparePhotos.before.url}
+                  alt="Antes"
+                  style={{
+                    ...galeriaStyles.sliderImageAfter,
+                    width: `${100 / (sliderPosition / 100)}%`,
+                    maxWidth: 'none'
+                  }}
+                />
+              </div>
+
+              {/* Slider divider */}
+              <div
+                style={{
+                  ...galeriaStyles.sliderDivider,
+                  left: `${sliderPosition}%`,
+                  transform: 'translateX(-50%)'
+                }}
+                onMouseDown={() => setIsDragging(true)}
+                onTouchStart={() => setIsDragging(true)}
+              >
+                <div style={galeriaStyles.sliderHandle}>
+                  <ArrowLeftRight size={18} color="#6366f1" />
+                </div>
+              </div>
+
+              {/* Labels */}
+              <div style={galeriaStyles.sliderLabels}>
+                <span style={galeriaStyles.sliderLabel}>
+                  Antes - {formatDate(comparePhotos.before.created_at)}
+                </span>
+                <span style={galeriaStyles.sliderLabel}>
+                  Depois - {formatDate(comparePhotos.after.created_at)}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       )}

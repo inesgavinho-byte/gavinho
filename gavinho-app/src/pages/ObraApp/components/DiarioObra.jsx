@@ -1,6 +1,7 @@
 // =====================================================
 // DIARIO OBRA COMPONENT
-// Daily logs for construction site
+// Daily logs for construction site - Mobile version
+// Uses obra_diario table (same as admin version)
 // =====================================================
 
 import { useState, useEffect, useRef } from 'react'
@@ -8,8 +9,8 @@ import { supabase } from '../../../lib/supabase'
 import {
   Calendar, Plus, ChevronLeft, ChevronRight, Sun, Cloud,
   CloudRain, CloudSnow, Wind, Loader2, Camera, X, Save,
-  AlertTriangle, CheckCircle2, Clock, Users, Wrench,
-  FileText, Image as ImageIcon
+  AlertTriangle, CheckCircle2, Clock, Users, Copy,
+  FileText, Image as ImageIcon, Thermometer
 } from 'lucide-react'
 import { styles, colors } from '../styles'
 import { formatDate, formatDateTime } from '../utils'
@@ -22,12 +23,6 @@ const WEATHER_OPTIONS = [
   { key: 'vento', label: 'Vento', icon: Wind, color: '#8b5cf6' }
 ]
 
-const WORK_STATUS = [
-  { key: 'normal', label: 'Trabalho Normal', color: '#10b981' },
-  { key: 'parcial', label: 'Trabalho Parcial', color: '#f59e0b' },
-  { key: 'parado', label: 'Trabalho Parado', color: '#ef4444' }
-]
-
 export default function DiarioObra({ obra, user }) {
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
@@ -35,18 +30,25 @@ export default function DiarioObra({ obra, user }) {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [selectedEntry, setSelectedEntry] = useState(null)
+  const [diarioId, setDiarioId] = useState(null)
 
-  // Form state
+  // Form state - mapped to obra_diario table
   const [formData, setFormData] = useState({
-    tempo: 'sol',
-    estado_trabalho: 'normal',
-    trabalhadores_presentes: 0,
-    descricao: '',
-    trabalhos_realizados: '',
-    incidentes: '',
-    observacoes: '',
-    fotos: []
+    condicoes_meteo: 'sol',
+    temperatura: '',
+    observacoes_meteo: '',
+    trabalhadores_gavinho: 0,
+    trabalhadores_subempreiteiros: 0,
+    tarefas: [],
+    ocorrencias: [],
+    fotos: [],
+    proximos_passos: []
   })
+
+  // Simple text inputs for mobile
+  const [tarefaText, setTarefaText] = useState('')
+  const [ocorrenciaText, setOcorrenciaText] = useState('')
+
   const [photoFiles, setPhotoFiles] = useState([])
   const [photoPreviews, setPhotoPreviews] = useState([])
 
@@ -61,12 +63,11 @@ export default function DiarioObra({ obra, user }) {
   const loadEntries = async () => {
     setLoading(true)
     try {
-      // Get entries for current month
       const startOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1)
       const endOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0)
 
       const { data, error } = await supabase
-        .from('diario_obra')
+        .from('obra_diario')
         .select('*')
         .eq('obra_id', obra.id)
         .gte('data', startOfMonth.toISOString().split('T')[0])
@@ -79,6 +80,35 @@ export default function DiarioObra({ obra, user }) {
       console.error('Erro ao carregar diário:', err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadTodayEntry = async () => {
+    const today = new Date().toISOString().split('T')[0]
+
+    const { data, error } = await supabase
+      .from('obra_diario')
+      .select('*')
+      .eq('obra_id', obra.id)
+      .eq('data', today)
+      .maybeSingle()
+
+    if (data) {
+      setDiarioId(data.id)
+      setFormData({
+        condicoes_meteo: data.condicoes_meteo || 'sol',
+        temperatura: data.temperatura || '',
+        observacoes_meteo: data.observacoes_meteo || '',
+        trabalhadores_gavinho: data.trabalhadores_gavinho || 0,
+        trabalhadores_subempreiteiros: data.trabalhadores_subempreiteiros || 0,
+        tarefas: data.tarefas || [],
+        ocorrencias: data.ocorrencias || [],
+        fotos: data.fotos || [],
+        proximos_passos: data.proximos_passos || []
+      })
+    } else {
+      setDiarioId(null)
+      resetForm()
     }
   }
 
@@ -96,7 +126,6 @@ export default function DiarioObra({ obra, user }) {
 
     setPhotoFiles(prev => [...prev, ...validFiles])
 
-    // Create previews
     validFiles.forEach(file => {
       const reader = new FileReader()
       reader.onload = (e) => {
@@ -109,6 +138,13 @@ export default function DiarioObra({ obra, user }) {
   const removePhoto = (index) => {
     setPhotoFiles(prev => prev.filter((_, i) => i !== index))
     setPhotoPreviews(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const removeExistingPhoto = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      fotos: prev.fotos.filter((_, i) => i !== index)
+    }))
   }
 
   const uploadPhotos = async () => {
@@ -132,69 +168,96 @@ export default function DiarioObra({ obra, user }) {
     return urls
   }
 
-  const handleSubmit = async () => {
-    if (!formData.descricao.trim()) {
-      alert('Preenche a descrição do dia')
-      return
-    }
+  const addTarefa = () => {
+    if (!tarefaText.trim()) return
+    setFormData(prev => ({
+      ...prev,
+      tarefas: [...prev.tarefas, { descricao: tarefaText.trim(), estado: 'em_curso' }]
+    }))
+    setTarefaText('')
+  }
 
+  const removeTarefa = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      tarefas: prev.tarefas.filter((_, i) => i !== index)
+    }))
+  }
+
+  const addOcorrencia = () => {
+    if (!ocorrenciaText.trim()) return
+    setFormData(prev => ({
+      ...prev,
+      ocorrencias: [...prev.ocorrencias, { descricao: ocorrenciaText.trim(), tipo: 'info' }]
+    }))
+    setOcorrenciaText('')
+  }
+
+  const removeOcorrencia = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      ocorrencias: prev.ocorrencias.filter((_, i) => i !== index)
+    }))
+  }
+
+  const handleSubmit = async () => {
     setSaving(true)
     try {
-      let photoUrls = []
+      let photoUrls = [...formData.fotos]
       if (photoFiles.length > 0) {
-        photoUrls = await uploadPhotos()
+        const newUrls = await uploadPhotos()
+        photoUrls = [...photoUrls, ...newUrls]
       }
 
       const today = new Date().toISOString().split('T')[0]
 
-      // Check if entry already exists for today
-      const { data: existing } = await supabase
-        .from('diario_obra')
-        .select('id')
-        .eq('obra_id', obra.id)
-        .eq('data', today)
-        .single()
-
       const entryData = {
         obra_id: obra.id,
         data: today,
-        autor_id: user.id,
-        autor_nome: user.nome,
-        tempo: formData.tempo,
-        estado_trabalho: formData.estado_trabalho,
-        trabalhadores_presentes: formData.trabalhadores_presentes || 0,
-        descricao: formData.descricao,
-        trabalhos_realizados: formData.trabalhos_realizados,
-        incidentes: formData.incidentes,
-        observacoes: formData.observacoes,
-        fotos: photoUrls.length > 0 ? photoUrls : null,
+        condicoes_meteo: formData.condicoes_meteo,
+        temperatura: formData.temperatura ? parseFloat(formData.temperatura) : null,
+        observacoes_meteo: formData.observacoes_meteo || null,
+        trabalhadores_gavinho: formData.trabalhadores_gavinho || 0,
+        trabalhadores_subempreiteiros: formData.trabalhadores_subempreiteiros || 0,
+        tarefas: formData.tarefas,
+        ocorrencias: formData.ocorrencias,
+        fotos: photoUrls,
+        proximos_passos: formData.proximos_passos,
+        status: 'rascunho',
         updated_at: new Date().toISOString()
       }
 
-      if (existing) {
-        // Update existing entry
+      if (diarioId) {
         const { error } = await supabase
-          .from('diario_obra')
+          .from('obra_diario')
           .update(entryData)
-          .eq('id', existing.id)
+          .eq('id', diarioId)
 
-        if (error) throw error
+        if (error) {
+          console.error('Erro ao atualizar:', error)
+          throw error
+        }
       } else {
-        // Create new entry
-        const { error } = await supabase
-          .from('diario_obra')
-          .insert(entryData)
+        const { data, error } = await supabase
+          .from('obra_diario')
+          .insert([entryData])
+          .select()
+          .single()
 
-        if (error) throw error
+        if (error) {
+          console.error('Erro ao inserir:', error)
+          throw error
+        }
+        if (data) setDiarioId(data.id)
       }
 
-      // Reset form and reload
-      resetForm()
+      setPhotoFiles([])
+      setPhotoPreviews([])
       setShowForm(false)
       loadEntries()
     } catch (err) {
       console.error('Erro ao guardar:', err)
-      alert('Erro ao guardar registo')
+      alert('Erro ao guardar registo: ' + (err.message || 'Erro desconhecido'))
     } finally {
       setSaving(false)
     }
@@ -202,22 +265,57 @@ export default function DiarioObra({ obra, user }) {
 
   const resetForm = () => {
     setFormData({
-      tempo: 'sol',
-      estado_trabalho: 'normal',
-      trabalhadores_presentes: 0,
-      descricao: '',
-      trabalhos_realizados: '',
-      incidentes: '',
-      observacoes: '',
-      fotos: []
+      condicoes_meteo: 'sol',
+      temperatura: '',
+      observacoes_meteo: '',
+      trabalhadores_gavinho: 0,
+      trabalhadores_subempreiteiros: 0,
+      tarefas: [],
+      ocorrencias: [],
+      fotos: [],
+      proximos_passos: []
     })
+    setTarefaText('')
+    setOcorrenciaText('')
     setPhotoFiles([])
     setPhotoPreviews([])
+    setDiarioId(null)
   }
 
-  const openNewEntry = () => {
-    resetForm()
+  const openNewEntry = async () => {
+    await loadTodayEntry()
     setShowForm(true)
+  }
+
+  // Copy yesterday's entry
+  const copyYesterday = async () => {
+    const yesterday = new Date()
+    yesterday.setDate(yesterday.getDate() - 1)
+    const yesterdayStr = yesterday.toISOString().split('T')[0]
+
+    const { data } = await supabase
+      .from('obra_diario')
+      .select('*')
+      .eq('obra_id', obra.id)
+      .eq('data', yesterdayStr)
+      .maybeSingle()
+
+    if (data) {
+      setFormData({
+        condicoes_meteo: data.condicoes_meteo || 'sol',
+        temperatura: '',
+        observacoes_meteo: '',
+        trabalhadores_gavinho: data.trabalhadores_gavinho || 0,
+        trabalhadores_subempreiteiros: data.trabalhadores_subempreiteiros || 0,
+        tarefas: data.tarefas || [],
+        ocorrencias: [],
+        fotos: [],
+        proximos_passos: data.proximos_passos || []
+      })
+      alert('Dados de ontem copiados!')
+    } else {
+      alert('Não existe registo de ontem')
+    }
   }
 
   const navigateMonth = (direction) => {
@@ -228,15 +326,9 @@ export default function DiarioObra({ obra, user }) {
     })
   }
 
-  // Check if today's entry exists
   const today = new Date().toISOString().split('T')[0]
   const todayEntry = entries.find(e => e.data === today)
-
-  // Get entries by date for calendar dots
-  const entriesByDate = entries.reduce((acc, entry) => {
-    acc[entry.data] = entry
-    return acc
-  }, {})
+  const totalTrabalhadores = (formData.trabalhadores_gavinho || 0) + (formData.trabalhadores_subempreiteiros || 0)
 
   // Local styles
   const diarioStyles = {
@@ -323,17 +415,8 @@ export default function DiarioObra({ obra, user }) {
       gap: 4,
       padding: '4px 8px',
       borderRadius: 12,
-      fontSize: 12,
-      marginBottom: 8
-    },
-    entryDescription: {
-      fontSize: 14,
-      color: '#6b7280',
-      lineHeight: 1.4,
-      display: '-webkit-box',
-      WebkitLineClamp: 2,
-      WebkitBoxOrient: 'vertical',
-      overflow: 'hidden'
+      fontSize: 11,
+      marginRight: 8
     },
     entryMeta: {
       display: 'flex',
@@ -416,19 +499,19 @@ export default function DiarioObra({ obra, user }) {
       borderColor: colors.primary,
       background: `${colors.primary}10`
     },
-    statusGrid: {
-      display: 'grid',
-      gridTemplateColumns: 'repeat(3, 1fr)',
-      gap: 8
-    },
-    statusOption: {
-      padding: '10px 8px',
-      border: '2px solid #e5e7eb',
+    input: {
+      width: '100%',
+      padding: '10px 12px',
+      border: '1px solid #e5e7eb',
       borderRadius: 8,
-      cursor: 'pointer',
-      textAlign: 'center',
-      fontSize: 12,
-      transition: 'all 0.2s'
+      fontSize: 14
+    },
+    inputRow: {
+      display: 'flex',
+      gap: 12
+    },
+    inputHalf: {
+      flex: 1
     },
     textarea: {
       width: '100%',
@@ -437,16 +520,41 @@ export default function DiarioObra({ obra, user }) {
       borderRadius: 8,
       fontSize: 14,
       resize: 'vertical',
-      minHeight: 80,
+      minHeight: 60,
       fontFamily: 'inherit'
     },
-    numberInput: {
-      width: 80,
-      padding: '8px 12px',
-      border: '1px solid #e5e7eb',
+    addItemRow: {
+      display: 'flex',
+      gap: 8
+    },
+    addButton: {
+      padding: '10px 16px',
+      background: colors.primary,
+      color: 'white',
+      border: 'none',
       borderRadius: 8,
-      fontSize: 14,
-      textAlign: 'center'
+      cursor: 'pointer',
+      fontSize: 14
+    },
+    itemList: {
+      marginTop: 8
+    },
+    itemChip: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: '8px 12px',
+      background: '#f3f4f6',
+      borderRadius: 8,
+      marginBottom: 6,
+      fontSize: 13
+    },
+    removeChip: {
+      background: 'none',
+      border: 'none',
+      cursor: 'pointer',
+      padding: 4,
+      color: '#9ca3af'
     },
     photoGrid: {
       display: 'grid',
@@ -500,6 +608,18 @@ export default function DiarioObra({ obra, user }) {
       transform: 'translate(-50%, -50%)',
       color: '#9ca3af'
     },
+    copyButton: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 6,
+      padding: '8px 12px',
+      background: '#f3f4f6',
+      color: '#374151',
+      border: 'none',
+      borderRadius: 8,
+      fontSize: 12,
+      cursor: 'pointer'
+    },
     submitButton: {
       width: '100%',
       padding: 14,
@@ -514,52 +634,6 @@ export default function DiarioObra({ obra, user }) {
       alignItems: 'center',
       justifyContent: 'center',
       gap: 8
-    },
-    // Detail modal
-    detailOverlay: {
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: 'rgba(0,0,0,0.5)',
-      display: 'flex',
-      alignItems: 'flex-end',
-      zIndex: 100
-    },
-    detailContainer: {
-      background: 'white',
-      borderRadius: '16px 16px 0 0',
-      width: '100%',
-      maxHeight: '85vh',
-      overflow: 'auto'
-    },
-    detailSection: {
-      marginBottom: 16
-    },
-    detailLabel: {
-      fontSize: 12,
-      color: '#6b7280',
-      marginBottom: 4,
-      textTransform: 'uppercase',
-      fontWeight: 500
-    },
-    detailText: {
-      fontSize: 14,
-      color: '#374151',
-      lineHeight: 1.5,
-      whiteSpace: 'pre-wrap'
-    },
-    detailPhotos: {
-      display: 'grid',
-      gridTemplateColumns: 'repeat(3, 1fr)',
-      gap: 8
-    },
-    detailPhoto: {
-      paddingBottom: '100%',
-      position: 'relative',
-      borderRadius: 8,
-      overflow: 'hidden'
     },
     empty: {
       textAlign: 'center',
@@ -642,9 +716,9 @@ export default function DiarioObra({ obra, user }) {
           </div>
         ) : (
           entries.map(entry => {
-            const weather = WEATHER_OPTIONS.find(w => w.key === entry.tempo)
-            const status = WORK_STATUS.find(s => s.key === entry.estado_trabalho)
+            const weather = WEATHER_OPTIONS.find(w => w.key === entry.condicoes_meteo)
             const WeatherIcon = weather?.icon || Sun
+            const totalWorkers = (entry.trabalhadores_gavinho || 0) + (entry.trabalhadores_subempreiteiros || 0)
 
             return (
               <div
@@ -672,35 +746,40 @@ export default function DiarioObra({ obra, user }) {
                   )}
                 </div>
 
-                {status && (
+                <div>
                   <span style={{
                     ...diarioStyles.statusBadge,
-                    background: `${status.color}20`,
-                    color: status.color
+                    background: entry.status === 'submetido' ? '#d1fae5' : '#fef3c7',
+                    color: entry.status === 'submetido' ? '#065f46' : '#92400e'
                   }}>
-                    {status.label}
+                    {entry.status === 'submetido' ? 'Submetido' : 'Rascunho'}
                   </span>
-                )}
-
-                <p style={diarioStyles.entryDescription}>{entry.descricao}</p>
-
-                <div style={diarioStyles.entryMeta}>
-                  {entry.trabalhadores_presentes > 0 && (
-                    <span style={diarioStyles.metaItem}>
-                      <Users size={12} />
-                      {entry.trabalhadores_presentes} trabalhadores
+                  {entry.tarefas?.length > 0 && (
+                    <span style={{ fontSize: 13, color: '#6b7280' }}>
+                      {entry.tarefas.length} tarefa{entry.tarefas.length !== 1 ? 's' : ''}
                     </span>
                   )}
-                  {entry.fotos && entry.fotos.length > 0 && (
+                </div>
+
+                <div style={diarioStyles.entryMeta}>
+                  {totalWorkers > 0 && (
+                    <span style={diarioStyles.metaItem}>
+                      <Users size={12} />
+                      {totalWorkers} trabalhadores
+                    </span>
+                  )}
+                  {entry.fotos?.length > 0 && (
                     <span style={diarioStyles.metaItem}>
                       <ImageIcon size={12} />
                       {entry.fotos.length} fotos
                     </span>
                   )}
-                  <span style={diarioStyles.metaItem}>
-                    <Clock size={12} />
-                    {entry.autor_nome}
-                  </span>
+                  {entry.ocorrencias?.length > 0 && (
+                    <span style={{ ...diarioStyles.metaItem, color: '#f59e0b' }}>
+                      <AlertTriangle size={12} />
+                      {entry.ocorrencias.length} ocorrência{entry.ocorrencias.length !== 1 ? 's' : ''}
+                    </span>
+                  )}
                 </div>
               </div>
             )
@@ -714,14 +793,19 @@ export default function DiarioObra({ obra, user }) {
           <div style={diarioStyles.formContainer} onClick={e => e.stopPropagation()}>
             <div style={diarioStyles.formHeader}>
               <h3 style={diarioStyles.formTitle}>
-                {todayEntry ? 'Editar Registo' : 'Novo Registo'} - {formatDate(new Date())}
+                {diarioId ? 'Editar' : 'Novo'} Registo - {formatDate(new Date())}
               </h3>
-              <button
-                onClick={() => setShowForm(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer' }}
-              >
-                <X size={24} color="#6b7280" />
-              </button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={copyYesterday} style={diarioStyles.copyButton}>
+                  <Copy size={14} /> Copiar ontem
+                </button>
+                <button
+                  onClick={() => setShowForm(false)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+                >
+                  <X size={24} color="#6b7280" />
+                </button>
+              </div>
             </div>
 
             <div style={diarioStyles.formBody}>
@@ -734,10 +818,10 @@ export default function DiarioObra({ obra, user }) {
                     return (
                       <div
                         key={weather.key}
-                        onClick={() => setFormData(prev => ({ ...prev, tempo: weather.key }))}
+                        onClick={() => setFormData(prev => ({ ...prev, condicoes_meteo: weather.key }))}
                         style={{
                           ...diarioStyles.weatherOption,
-                          ...(formData.tempo === weather.key ? diarioStyles.weatherSelected : {})
+                          ...(formData.condicoes_meteo === weather.key ? diarioStyles.weatherSelected : {})
                         }}
                       >
                         <Icon size={20} color={weather.color} />
@@ -748,75 +832,124 @@ export default function DiarioObra({ obra, user }) {
                 </div>
               </div>
 
-              {/* Work status */}
+              {/* Temperature */}
               <div style={diarioStyles.fieldGroup}>
-                <label style={diarioStyles.fieldLabel}>Estado do Trabalho</label>
-                <div style={diarioStyles.statusGrid}>
-                  {WORK_STATUS.map(status => (
-                    <div
-                      key={status.key}
-                      onClick={() => setFormData(prev => ({ ...prev, estado_trabalho: status.key }))}
-                      style={{
-                        ...diarioStyles.statusOption,
-                        borderColor: formData.estado_trabalho === status.key ? status.color : '#e5e7eb',
-                        background: formData.estado_trabalho === status.key ? `${status.color}10` : 'white',
-                        color: formData.estado_trabalho === status.key ? status.color : '#374151'
-                      }}
-                    >
-                      {status.label}
-                    </div>
-                  ))}
+                <label style={diarioStyles.fieldLabel}>
+                  <Thermometer size={14} style={{ marginRight: 4 }} />
+                  Temperatura (°C)
+                </label>
+                <input
+                  type="number"
+                  value={formData.temperatura}
+                  onChange={(e) => setFormData(prev => ({ ...prev, temperatura: e.target.value }))}
+                  placeholder="Ex: 22"
+                  style={{ ...diarioStyles.input, width: 100 }}
+                />
+              </div>
+
+              {/* Workers */}
+              <div style={diarioStyles.fieldGroup}>
+                <label style={diarioStyles.fieldLabel}>Trabalhadores Presentes</label>
+                <div style={diarioStyles.inputRow}>
+                  <div style={diarioStyles.inputHalf}>
+                    <label style={{ fontSize: 11, color: '#6b7280' }}>Equipa Gavinho</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={formData.trabalhadores_gavinho}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        trabalhadores_gavinho: parseInt(e.target.value) || 0
+                      }))}
+                      style={diarioStyles.input}
+                    />
+                  </div>
+                  <div style={diarioStyles.inputHalf}>
+                    <label style={{ fontSize: 11, color: '#6b7280' }}>Subempreiteiros</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={formData.trabalhadores_subempreiteiros}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        trabalhadores_subempreiteiros: parseInt(e.target.value) || 0
+                      }))}
+                      style={diarioStyles.input}
+                    />
+                  </div>
+                </div>
+                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+                  Total: {totalTrabalhadores} trabalhadores
                 </div>
               </div>
 
-              {/* Workers present */}
+              {/* Tasks */}
               <div style={diarioStyles.fieldGroup}>
-                <label style={diarioStyles.fieldLabel}>Trabalhadores Presentes</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={formData.trabalhadores_presentes}
-                  onChange={(e) => setFormData(prev => ({
-                    ...prev,
-                    trabalhadores_presentes: parseInt(e.target.value) || 0
-                  }))}
-                  style={diarioStyles.numberInput}
-                />
+                <label style={diarioStyles.fieldLabel}>Tarefas Realizadas</label>
+                <div style={diarioStyles.addItemRow}>
+                  <input
+                    type="text"
+                    value={tarefaText}
+                    onChange={(e) => setTarefaText(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && addTarefa()}
+                    placeholder="Adicionar tarefa..."
+                    style={{ ...diarioStyles.input, flex: 1 }}
+                  />
+                  <button onClick={addTarefa} style={diarioStyles.addButton}>+</button>
+                </div>
+                {formData.tarefas.length > 0 && (
+                  <div style={diarioStyles.itemList}>
+                    {formData.tarefas.map((t, i) => (
+                      <div key={i} style={diarioStyles.itemChip}>
+                        <span>{t.descricao}</span>
+                        <button onClick={() => removeTarefa(i)} style={diarioStyles.removeChip}>
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              {/* Description */}
-              <div style={diarioStyles.fieldGroup}>
-                <label style={diarioStyles.fieldLabel}>Descrição do Dia *</label>
-                <textarea
-                  value={formData.descricao}
-                  onChange={(e) => setFormData(prev => ({ ...prev, descricao: e.target.value }))}
-                  placeholder="Descreve resumidamente o que aconteceu hoje na obra..."
-                  style={diarioStyles.textarea}
-                />
-              </div>
-
-              {/* Work done */}
-              <div style={diarioStyles.fieldGroup}>
-                <label style={diarioStyles.fieldLabel}>Trabalhos Realizados</label>
-                <textarea
-                  value={formData.trabalhos_realizados}
-                  onChange={(e) => setFormData(prev => ({ ...prev, trabalhos_realizados: e.target.value }))}
-                  placeholder="Lista os principais trabalhos realizados..."
-                  style={{ ...diarioStyles.textarea, minHeight: 60 }}
-                />
-              </div>
-
-              {/* Incidents */}
+              {/* Occurrences */}
               <div style={diarioStyles.fieldGroup}>
                 <label style={diarioStyles.fieldLabel}>
-                  <AlertTriangle size={14} style={{ marginRight: 4 }} />
-                  Incidentes / Problemas
+                  <AlertTriangle size={14} style={{ marginRight: 4, color: '#f59e0b' }} />
+                  Ocorrências / Incidentes
                 </label>
+                <div style={diarioStyles.addItemRow}>
+                  <input
+                    type="text"
+                    value={ocorrenciaText}
+                    onChange={(e) => setOcorrenciaText(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && addOcorrencia()}
+                    placeholder="Registar ocorrência..."
+                    style={{ ...diarioStyles.input, flex: 1 }}
+                  />
+                  <button onClick={addOcorrencia} style={diarioStyles.addButton}>+</button>
+                </div>
+                {formData.ocorrencias.length > 0 && (
+                  <div style={diarioStyles.itemList}>
+                    {formData.ocorrencias.map((o, i) => (
+                      <div key={i} style={{ ...diarioStyles.itemChip, background: '#fef3c7' }}>
+                        <span>{o.descricao}</span>
+                        <button onClick={() => removeOcorrencia(i)} style={diarioStyles.removeChip}>
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Observations */}
+              <div style={diarioStyles.fieldGroup}>
+                <label style={diarioStyles.fieldLabel}>Observações</label>
                 <textarea
-                  value={formData.incidentes}
-                  onChange={(e) => setFormData(prev => ({ ...prev, incidentes: e.target.value }))}
-                  placeholder="Regista qualquer incidente ou problema..."
-                  style={{ ...diarioStyles.textarea, minHeight: 60 }}
+                  value={formData.observacoes_meteo}
+                  onChange={(e) => setFormData(prev => ({ ...prev, observacoes_meteo: e.target.value }))}
+                  placeholder="Notas adicionais..."
+                  style={diarioStyles.textarea}
                 />
               </div>
 
@@ -824,8 +957,21 @@ export default function DiarioObra({ obra, user }) {
               <div style={diarioStyles.fieldGroup}>
                 <label style={diarioStyles.fieldLabel}>Fotos</label>
                 <div style={diarioStyles.photoGrid}>
+                  {/* Existing photos */}
+                  {formData.fotos.map((url, idx) => (
+                    <div key={`existing-${idx}`} style={diarioStyles.photoPreview}>
+                      <img src={url} alt="" style={diarioStyles.photoImage} />
+                      <button
+                        onClick={() => removeExistingPhoto(idx)}
+                        style={diarioStyles.removePhotoButton}
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                  {/* New photo previews */}
                   {photoPreviews.map((preview, idx) => (
-                    <div key={idx} style={diarioStyles.photoPreview}>
+                    <div key={`new-${idx}`} style={diarioStyles.photoPreview}>
                       <img src={preview} alt="" style={diarioStyles.photoImage} />
                       <button
                         onClick={() => removePhoto(idx)}
@@ -835,6 +981,7 @@ export default function DiarioObra({ obra, user }) {
                       </button>
                     </div>
                   ))}
+                  {/* Add photo button */}
                   <div
                     style={diarioStyles.addPhotoButton}
                     onClick={() => fileInputRef.current?.click()}
@@ -876,8 +1023,8 @@ export default function DiarioObra({ obra, user }) {
 
       {/* Entry Detail Modal */}
       {selectedEntry && (
-        <div style={diarioStyles.detailOverlay} onClick={() => setSelectedEntry(null)}>
-          <div style={diarioStyles.detailContainer} onClick={e => e.stopPropagation()}>
+        <div style={diarioStyles.formOverlay} onClick={() => setSelectedEntry(null)}>
+          <div style={diarioStyles.formContainer} onClick={e => e.stopPropagation()}>
             <div style={diarioStyles.formHeader}>
               <h3 style={diarioStyles.formTitle}>
                 {new Date(selectedEntry.data).toLocaleDateString('pt-PT', {
@@ -897,9 +1044,9 @@ export default function DiarioObra({ obra, user }) {
 
             <div style={diarioStyles.formBody}>
               {/* Weather & Status */}
-              <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+              <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
                 {(() => {
-                  const weather = WEATHER_OPTIONS.find(w => w.key === selectedEntry.tempo)
+                  const weather = WEATHER_OPTIONS.find(w => w.key === selectedEntry.condicoes_meteo)
                   const WeatherIcon = weather?.icon || Sun
                   return weather ? (
                     <span style={{
@@ -909,72 +1056,78 @@ export default function DiarioObra({ obra, user }) {
                     }}>
                       <WeatherIcon size={14} />
                       {weather.label}
+                      {selectedEntry.temperatura && ` ${selectedEntry.temperatura}°C`}
                     </span>
                   ) : null
                 })()}
-                {(() => {
-                  const status = WORK_STATUS.find(s => s.key === selectedEntry.estado_trabalho)
-                  return status ? (
-                    <span style={{
-                      ...diarioStyles.statusBadge,
-                      background: `${status.color}20`,
-                      color: status.color,
-                      margin: 0
-                    }}>
-                      {status.label}
-                    </span>
-                  ) : null
-                })()}
-                {selectedEntry.trabalhadores_presentes > 0 && (
+                <span style={{
+                  ...diarioStyles.statusBadge,
+                  background: selectedEntry.status === 'submetido' ? '#d1fae5' : '#fef3c7',
+                  color: selectedEntry.status === 'submetido' ? '#065f46' : '#92400e',
+                  margin: 0
+                }}>
+                  {selectedEntry.status === 'submetido' ? 'Submetido' : 'Rascunho'}
+                </span>
+                {((selectedEntry.trabalhadores_gavinho || 0) + (selectedEntry.trabalhadores_subempreiteiros || 0)) > 0 && (
                   <span style={diarioStyles.metaItem}>
                     <Users size={14} />
-                    {selectedEntry.trabalhadores_presentes} trabalhadores
+                    {(selectedEntry.trabalhadores_gavinho || 0) + (selectedEntry.trabalhadores_subempreiteiros || 0)} trabalhadores
                   </span>
                 )}
               </div>
 
-              {/* Description */}
-              <div style={diarioStyles.detailSection}>
-                <div style={diarioStyles.detailLabel}>Descrição</div>
-                <p style={diarioStyles.detailText}>{selectedEntry.descricao}</p>
-              </div>
-
-              {/* Work done */}
-              {selectedEntry.trabalhos_realizados && (
-                <div style={diarioStyles.detailSection}>
-                  <div style={diarioStyles.detailLabel}>Trabalhos Realizados</div>
-                  <p style={diarioStyles.detailText}>{selectedEntry.trabalhos_realizados}</p>
+              {/* Tasks */}
+              {selectedEntry.tarefas?.length > 0 && (
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8, textTransform: 'uppercase', fontWeight: 500 }}>
+                    Tarefas ({selectedEntry.tarefas.length})
+                  </div>
+                  {selectedEntry.tarefas.map((t, i) => (
+                    <div key={i} style={diarioStyles.itemChip}>
+                      {t.descricao}
+                    </div>
+                  ))}
                 </div>
               )}
 
-              {/* Incidents */}
-              {selectedEntry.incidentes && (
-                <div style={diarioStyles.detailSection}>
-                  <div style={diarioStyles.detailLabel}>
-                    <AlertTriangle size={12} style={{ marginRight: 4, color: '#ef4444' }} />
-                    Incidentes
+              {/* Occurrences */}
+              {selectedEntry.ocorrencias?.length > 0 && (
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 12, color: '#f59e0b', marginBottom: 8, textTransform: 'uppercase', fontWeight: 500 }}>
+                    <AlertTriangle size={12} style={{ marginRight: 4 }} />
+                    Ocorrências ({selectedEntry.ocorrencias.length})
                   </div>
-                  <p style={diarioStyles.detailText}>{selectedEntry.incidentes}</p>
+                  {selectedEntry.ocorrencias.map((o, i) => (
+                    <div key={i} style={{ ...diarioStyles.itemChip, background: '#fef3c7' }}>
+                      {o.descricao}
+                    </div>
+                  ))}
                 </div>
               )}
 
               {/* Observations */}
-              {selectedEntry.observacoes && (
-                <div style={diarioStyles.detailSection}>
-                  <div style={diarioStyles.detailLabel}>Observações</div>
-                  <p style={diarioStyles.detailText}>{selectedEntry.observacoes}</p>
+              {selectedEntry.observacoes_meteo && (
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8, textTransform: 'uppercase', fontWeight: 500 }}>
+                    Observações
+                  </div>
+                  <p style={{ fontSize: 14, color: '#374151', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                    {selectedEntry.observacoes_meteo}
+                  </p>
                 </div>
               )}
 
               {/* Photos */}
-              {selectedEntry.fotos && selectedEntry.fotos.length > 0 && (
-                <div style={diarioStyles.detailSection}>
-                  <div style={diarioStyles.detailLabel}>Fotos ({selectedEntry.fotos.length})</div>
-                  <div style={diarioStyles.detailPhotos}>
+              {selectedEntry.fotos?.length > 0 && (
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8, textTransform: 'uppercase', fontWeight: 500 }}>
+                    Fotos ({selectedEntry.fotos.length})
+                  </div>
+                  <div style={{ ...diarioStyles.photoGrid, gridTemplateColumns: 'repeat(3, 1fr)' }}>
                     {selectedEntry.fotos.map((foto, idx) => (
                       <div
                         key={idx}
-                        style={diarioStyles.detailPhoto}
+                        style={diarioStyles.photoPreview}
                         onClick={() => window.open(foto, '_blank')}
                       >
                         <img src={foto} alt="" style={diarioStyles.photoImage} />
@@ -984,9 +1137,9 @@ export default function DiarioObra({ obra, user }) {
                 </div>
               )}
 
-              {/* Author */}
+              {/* Timestamp */}
               <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 16 }}>
-                Registado por {selectedEntry.autor_nome} em {formatDateTime(selectedEntry.created_at)}
+                Última atualização: {formatDateTime(selectedEntry.updated_at)}
               </div>
             </div>
           </div>

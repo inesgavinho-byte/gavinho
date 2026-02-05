@@ -1,13 +1,17 @@
 // =====================================================
 // PEDIR MATERIAIS COMPONENT
 // Material request form with approval workflow
+// Features: Recent/favorite materials dropdown
 // =====================================================
 
-import { useState, useEffect } from 'react'
-import { Package, Plus, Check, CheckCheck, AlertTriangle, Loader2 } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Package, Plus, Check, CheckCheck, AlertTriangle, Loader2, Clock, Star, ChevronDown } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import { styles } from '../styles'
 import { formatDateTime, MATERIAL_UNITS, REQUEST_STATUS_LABELS } from '../utils'
+
+const STORAGE_KEY = 'obra_app_recent_materials'
+const FAVORITES_KEY = 'obra_app_favorite_materials'
 
 // Component-specific styles
 const localStyles = {
@@ -118,6 +122,84 @@ const localStyles = {
     marginTop: 8,
     padding: '6px 0',
     borderTop: '1px solid #f0f0f0'
+  },
+  // Material dropdown styles
+  materialInputWrapper: {
+    position: 'relative'
+  },
+  materialInput: {
+    paddingRight: 36
+  },
+  dropdownToggle: {
+    position: 'absolute',
+    right: 8,
+    top: '50%',
+    transform: 'translateY(-50%)',
+    background: 'none',
+    border: 'none',
+    padding: 4,
+    cursor: 'pointer',
+    color: '#9ca3af',
+    display: 'flex',
+    alignItems: 'center'
+  },
+  materialDropdown: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    background: 'white',
+    borderRadius: 8,
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+    zIndex: 100,
+    maxHeight: 250,
+    overflow: 'auto',
+    marginTop: 4
+  },
+  dropdownSection: {
+    padding: '8px 0'
+  },
+  dropdownSectionTitle: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    padding: '4px 12px',
+    fontSize: 11,
+    fontWeight: 600,
+    color: '#6b7280',
+    textTransform: 'uppercase'
+  },
+  dropdownItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    padding: '10px 12px',
+    cursor: 'pointer',
+    fontSize: 14,
+    transition: 'background 0.15s'
+  },
+  dropdownItemText: {
+    flex: 1
+  },
+  dropdownItemUnit: {
+    fontSize: 12,
+    color: '#9ca3af'
+  },
+  starButton: {
+    background: 'none',
+    border: 'none',
+    padding: 4,
+    cursor: 'pointer',
+    color: '#d1d5db'
+  },
+  starButtonActive: {
+    color: '#f59e0b'
+  },
+  dropdownEmpty: {
+    padding: '16px 12px',
+    textAlign: 'center',
+    color: '#9ca3af',
+    fontSize: 13
   }
 }
 
@@ -149,6 +231,76 @@ export default function PedirMateriais({ obra, user }) {
   const [requisicoes, setRequisicoes] = useState([])
   const [loadingReqs, setLoadingReqs] = useState(true)
   const [showForm, setShowForm] = useState(false)
+  const [recentMaterials, setRecentMaterials] = useState([])
+  const [favoriteMaterials, setFavoriteMaterials] = useState([])
+  const [showMaterialDropdown, setShowMaterialDropdown] = useState(false)
+
+  const materialInputRef = useRef(null)
+  const dropdownRef = useRef(null)
+
+  // Load recent and favorite materials from localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(`${STORAGE_KEY}_${user?.id}`)
+      if (saved) setRecentMaterials(JSON.parse(saved))
+
+      const favorites = localStorage.getItem(`${FAVORITES_KEY}_${user?.id}`)
+      if (favorites) setFavoriteMaterials(JSON.parse(favorites))
+    } catch (err) {
+      console.error('Error loading materials:', err)
+    }
+  }, [user?.id])
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target) &&
+          materialInputRef.current && !materialInputRef.current.contains(e.target)) {
+        setShowMaterialDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // Save recent material
+  const saveRecentMaterial = (materialName, unit) => {
+    const item = { name: materialName, unit, usedAt: new Date().toISOString() }
+    const updated = [item, ...recentMaterials.filter(m => m.name !== materialName)].slice(0, 10)
+    setRecentMaterials(updated)
+    try {
+      localStorage.setItem(`${STORAGE_KEY}_${user?.id}`, JSON.stringify(updated))
+    } catch (err) {
+      console.error('Error saving recent material:', err)
+    }
+  }
+
+  // Toggle favorite material
+  const toggleFavorite = (materialName) => {
+    const isFavorite = favoriteMaterials.includes(materialName)
+    const updated = isFavorite
+      ? favoriteMaterials.filter(m => m !== materialName)
+      : [...favoriteMaterials, materialName]
+
+    setFavoriteMaterials(updated)
+    try {
+      localStorage.setItem(`${FAVORITES_KEY}_${user?.id}`, JSON.stringify(updated))
+    } catch (err) {
+      console.error('Error saving favorites:', err)
+    }
+  }
+
+  // Select material from dropdown
+  const selectMaterial = (item) => {
+    setMaterial(item.name)
+    if (item.unit) setUnidade(item.unit)
+    setShowMaterialDropdown(false)
+    // Focus on quantity after selecting material
+    setTimeout(() => {
+      const qtyInput = document.querySelector('input[type="number"]')
+      if (qtyInput) qtyInput.focus()
+    }, 100)
+  }
 
   useEffect(() => {
     loadRequisicoes()
@@ -192,6 +344,9 @@ export default function PedirMateriais({ obra, user }) {
       })
 
       if (error) throw error
+
+      // Save to recent materials
+      saveRecentMaterial(material.trim(), unidade)
 
       // Send notification in chat
       await supabase.from('obra_mensagens').insert({
@@ -257,13 +412,103 @@ export default function PedirMateriais({ obra, user }) {
 
           <div style={styles.formField}>
             <label>Material *</label>
-            <input
-              type="text"
-              value={material}
-              onChange={(e) => setMaterial(e.target.value)}
-              placeholder="Ex: Cimento Portland"
-              style={styles.formInput}
-            />
+            <div style={localStyles.materialInputWrapper}>
+              <input
+                ref={materialInputRef}
+                type="text"
+                value={material}
+                onChange={(e) => setMaterial(e.target.value)}
+                onFocus={() => setShowMaterialDropdown(true)}
+                placeholder="Ex: Cimento Portland"
+                style={{ ...styles.formInput, ...localStyles.materialInput }}
+                autoComplete="off"
+              />
+              <button
+                type="button"
+                style={localStyles.dropdownToggle}
+                onClick={() => setShowMaterialDropdown(!showMaterialDropdown)}
+              >
+                <ChevronDown size={18} style={{ transform: showMaterialDropdown ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+              </button>
+
+              {/* Materials dropdown */}
+              {showMaterialDropdown && (
+                <div ref={dropdownRef} style={localStyles.materialDropdown}>
+                  {/* Favorites section */}
+                  {favoriteMaterials.length > 0 && (
+                    <div style={localStyles.dropdownSection}>
+                      <div style={localStyles.dropdownSectionTitle}>
+                        <Star size={12} /> Favoritos
+                      </div>
+                      {favoriteMaterials.map(name => {
+                        const recentItem = recentMaterials.find(m => m.name === name)
+                        return (
+                          <div
+                            key={`fav_${name}`}
+                            style={localStyles.dropdownItem}
+                            onClick={() => selectMaterial({ name, unit: recentItem?.unit })}
+                          >
+                            <Star size={14} style={{ color: '#f59e0b' }} />
+                            <span style={localStyles.dropdownItemText}>{name}</span>
+                            {recentItem?.unit && (
+                              <span style={localStyles.dropdownItemUnit}>{recentItem.unit}</span>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+
+                  {/* Recent section */}
+                  {recentMaterials.length > 0 && (
+                    <div style={{
+                      ...localStyles.dropdownSection,
+                      borderTop: favoriteMaterials.length > 0 ? '1px solid #f3f4f6' : 'none'
+                    }}>
+                      <div style={localStyles.dropdownSectionTitle}>
+                        <Clock size={12} /> Recentes
+                      </div>
+                      {recentMaterials.filter(m => !favoriteMaterials.includes(m.name)).map(item => (
+                        <div
+                          key={`recent_${item.name}`}
+                          style={localStyles.dropdownItem}
+                        >
+                          <Clock size={14} style={{ color: '#9ca3af' }} />
+                          <span
+                            style={localStyles.dropdownItemText}
+                            onClick={() => selectMaterial(item)}
+                          >
+                            {item.name}
+                          </span>
+                          <span style={localStyles.dropdownItemUnit}>{item.unit}</span>
+                          <button
+                            type="button"
+                            style={{
+                              ...localStyles.starButton,
+                              ...(favoriteMaterials.includes(item.name) ? localStyles.starButtonActive : {})
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              toggleFavorite(item.name)
+                            }}
+                          >
+                            <Star size={14} fill={favoriteMaterials.includes(item.name) ? '#f59e0b' : 'none'} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Empty state */}
+                  {recentMaterials.length === 0 && favoriteMaterials.length === 0 && (
+                    <div style={localStyles.dropdownEmpty}>
+                      Sem materiais recentes.<br />
+                      Os teus pedidos ficarão guardados aqui.
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           <div style={styles.formRow}>

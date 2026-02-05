@@ -1,15 +1,19 @@
 // =====================================================
 // OBRA CHAT COMPONENT
 // Real-time chat for obra team with photo sharing
+// Features: Typing indicator, emoji reactions
 // =====================================================
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../../../lib/supabase'
 import {
   Send, Camera, MessageSquare, Check, CheckCheck,
-  Clock, Loader2, X, Image as ImageIcon
+  Clock, Loader2, X, Image as ImageIcon, Smile
 } from 'lucide-react'
 import { styles } from '../styles'
+
+// Quick emoji reactions
+const EMOJI_REACTIONS = ['👍', '❤️', '😂', '👏', '🔥', '✅']
 
 export default function ObraChat({ obra, user }) {
   const [messages, setMessages] = useState([])
@@ -20,10 +24,14 @@ export default function ObraChat({ obra, user }) {
   const [photoPreview, setPhotoPreview] = useState(null)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [imageModal, setImageModal] = useState(null)
+  const [typingUsers, setTypingUsers] = useState([])
+  const [showEmojiPicker, setShowEmojiPicker] = useState(null) // message id or null
+  const [isTyping, setIsTyping] = useState(false)
 
   const fileInputRef = useRef(null)
   const messagesEndRef = useRef(null)
   const messagesContainerRef = useRef(null)
+  const typingTimeoutRef = useRef(null)
 
   // Load messages on mount
   useEffect(() => {
@@ -80,9 +88,135 @@ export default function ObraChat({ obra, user }) {
           return [...filtered, payload.new]
         })
       })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'obra_mensagens',
+        filter: `obra_id=eq.${obra.id}`
+      }, (payload) => {
+        // Update message (for reactions)
+        setMessages(prev => prev.map(m =>
+          m.id === payload.new.id ? { ...m, ...payload.new } : m
+        ))
+      })
       .subscribe()
 
     return () => supabase.removeChannel(channel)
+  }
+
+  // Typing indicator - broadcast presence
+  useEffect(() => {
+    if (!obra || !user) return
+
+    const presenceChannel = supabase.channel(`typing_${obra.id}`)
+
+    presenceChannel
+      .on('presence', { event: 'sync' }, () => {
+        const state = presenceChannel.presenceState()
+        const users = Object.values(state).flat()
+          .filter(u => u.user_id !== user.id && u.typing)
+          .map(u => u.nome)
+        setTypingUsers(users)
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await presenceChannel.track({
+            user_id: user.id,
+            nome: user.nome,
+            typing: false
+          })
+        }
+      })
+
+    return () => {
+      supabase.removeChannel(presenceChannel)
+    }
+  }, [obra, user])
+
+  // Broadcast typing status
+  const broadcastTyping = useCallback(async (typing) => {
+    if (!obra || !user) return
+    const channel = supabase.channel(`typing_${obra.id}`)
+    try {
+      await channel.track({
+        user_id: user.id,
+        nome: user.nome,
+        typing
+      })
+    } catch (err) {
+      // Ignore - channel might not be ready
+    }
+  }, [obra, user])
+
+  // Handle typing indicator
+  const handleTyping = useCallback(() => {
+    if (!isTyping) {
+      setIsTyping(true)
+      broadcastTyping(true)
+    }
+
+    // Clear previous timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current)
+    }
+
+    // Stop typing after 2 seconds of inactivity
+    typingTimeoutRef.current = setTimeout(() => {
+      setIsTyping(false)
+      broadcastTyping(false)
+    }, 2000)
+  }, [isTyping, broadcastTyping])
+
+  // Add reaction to message
+  const addReaction = async (messageId, emoji) => {
+    setShowEmojiPicker(null)
+
+    // Find the message
+    const message = messages.find(m => m.id === messageId)
+    if (!message || message.pending) return
+
+    // Get existing reactions or create new object
+    const existingReactions = message.reactions || {}
+    const reactionUsers = existingReactions[emoji] || []
+
+    // Toggle reaction
+    let newReactionUsers
+    if (reactionUsers.includes(user.id)) {
+      newReactionUsers = reactionUsers.filter(id => id !== user.id)
+    } else {
+      newReactionUsers = [...reactionUsers, user.id]
+    }
+
+    const newReactions = {
+      ...existingReactions,
+      [emoji]: newReactionUsers
+    }
+
+    // Remove empty reactions
+    Object.keys(newReactions).forEach(key => {
+      if (newReactions[key].length === 0) {
+        delete newReactions[key]
+      }
+    })
+
+    // Optimistic update
+    setMessages(prev => prev.map(m =>
+      m.id === messageId ? { ...m, reactions: newReactions } : m
+    ))
+
+    // Update in database
+    try {
+      await supabase
+        .from('obra_mensagens')
+        .update({ reactions: Object.keys(newReactions).length > 0 ? newReactions : null })
+        .eq('id', messageId)
+    } catch (err) {
+      console.error('Erro ao adicionar reação:', err)
+      // Revert on error
+      setMessages(prev => prev.map(m =>
+        m.id === messageId ? { ...m, reactions: existingReactions } : m
+      ))
+    }
   }
 
   // Photo handling
@@ -309,6 +443,78 @@ export default function ObraChat({ obra, user }) {
       background: '#e5e7eb',
       borderRadius: 4,
       marginBottom: 4,
+    },
+    typingIndicator: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 8,
+      padding: '8px 16px',
+      fontSize: 12,
+      color: '#6b7280',
+      fontStyle: 'italic'
+    },
+    typingDots: {
+      display: 'flex',
+      gap: 4
+    },
+    typingDot: {
+      width: 6,
+      height: 6,
+      borderRadius: '50%',
+      background: '#9ca3af',
+      animation: 'typingBounce 1.4s infinite ease-in-out'
+    },
+    emojiButton: {
+      background: 'none',
+      border: 'none',
+      padding: 4,
+      cursor: 'pointer',
+      opacity: 0,
+      transition: 'opacity 0.2s',
+      fontSize: 14
+    },
+    emojiPicker: {
+      position: 'absolute',
+      bottom: '100%',
+      right: 0,
+      background: 'white',
+      borderRadius: 12,
+      padding: 8,
+      boxShadow: '0 2px 12px rgba(0,0,0,0.15)',
+      display: 'flex',
+      gap: 4,
+      zIndex: 10
+    },
+    emojiOption: {
+      background: 'none',
+      border: 'none',
+      fontSize: 20,
+      padding: 6,
+      cursor: 'pointer',
+      borderRadius: 8,
+      transition: 'background 0.2s'
+    },
+    reactionsContainer: {
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: 4,
+      marginTop: 6
+    },
+    reactionBadge: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 4,
+      padding: '2px 8px',
+      background: '#f3f4f6',
+      borderRadius: 12,
+      fontSize: 12,
+      cursor: 'pointer',
+      border: '1px solid transparent',
+      transition: 'all 0.2s'
+    },
+    reactionBadgeActive: {
+      background: '#dbeafe',
+      borderColor: '#3b82f6'
     }
   }
 
@@ -364,7 +570,16 @@ export default function ObraChat({ obra, user }) {
                     ...styles.message,
                     ...(msg.autor_id === user.id ? styles.messageOwn : styles.messageOther),
                     ...(msg.failed ? chatStyles.failedMessage : {}),
-                    opacity: msg.pending ? 0.6 : 1
+                    opacity: msg.pending ? 0.6 : 1,
+                    position: 'relative'
+                  }}
+                  onMouseEnter={(e) => {
+                    const btn = e.currentTarget.querySelector('.emoji-btn')
+                    if (btn) btn.style.opacity = '1'
+                  }}
+                  onMouseLeave={(e) => {
+                    const btn = e.currentTarget.querySelector('.emoji-btn')
+                    if (btn) btn.style.opacity = '0'
                   }}
                 >
                   {msg.autor_id !== user.id && (
@@ -381,6 +596,25 @@ export default function ObraChat({ obra, user }) {
                   {msg.conteudo && msg.conteudo !== '📷 Foto' && (
                     <p style={styles.messageText}>{msg.conteudo}</p>
                   )}
+
+                  {/* Reactions display */}
+                  {msg.reactions && Object.keys(msg.reactions).length > 0 && (
+                    <div style={chatStyles.reactionsContainer}>
+                      {Object.entries(msg.reactions).map(([emoji, userIds]) => (
+                        <button
+                          key={emoji}
+                          style={{
+                            ...chatStyles.reactionBadge,
+                            ...(userIds.includes(user.id) ? chatStyles.reactionBadgeActive : {})
+                          }}
+                          onClick={() => addReaction(msg.id, emoji)}
+                        >
+                          {emoji} {userIds.length}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
                   <span style={styles.messageTime}>
                     {formatTime(msg.created_at)}
                     {msg.autor_id === user.id && (
@@ -393,6 +627,39 @@ export default function ObraChat({ obra, user }) {
                       )
                     )}
                   </span>
+
+                  {/* Emoji reaction button */}
+                  {!msg.pending && !msg.failed && (
+                    <button
+                      className="emoji-btn"
+                      style={{
+                        ...chatStyles.emojiButton,
+                        position: 'absolute',
+                        top: 4,
+                        right: msg.autor_id === user.id ? 'auto' : 4,
+                        left: msg.autor_id === user.id ? 4 : 'auto'
+                      }}
+                      onClick={() => setShowEmojiPicker(showEmojiPicker === msg.id ? null : msg.id)}
+                    >
+                      <Smile size={14} />
+                    </button>
+                  )}
+
+                  {/* Emoji picker popup */}
+                  {showEmojiPicker === msg.id && (
+                    <div style={chatStyles.emojiPicker}>
+                      {EMOJI_REACTIONS.map(emoji => (
+                        <button
+                          key={emoji}
+                          style={chatStyles.emojiOption}
+                          onClick={() => addReaction(msg.id, emoji)}
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
                   {msg.failed && (
                     <button onClick={() => retryMessage(msg)} style={chatStyles.retryButton}>
                       Tentar novamente
@@ -405,6 +672,23 @@ export default function ObraChat({ obra, user }) {
         )}
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Typing indicator */}
+      {typingUsers.length > 0 && (
+        <div style={chatStyles.typingIndicator}>
+          <div style={chatStyles.typingDots}>
+            <span style={{ ...chatStyles.typingDot, animationDelay: '0s' }} />
+            <span style={{ ...chatStyles.typingDot, animationDelay: '0.2s' }} />
+            <span style={{ ...chatStyles.typingDot, animationDelay: '0.4s' }} />
+          </div>
+          <span>
+            {typingUsers.length === 1
+              ? `${typingUsers[0]} está a escrever...`
+              : `${typingUsers.slice(0, -1).join(', ')} e ${typingUsers[typingUsers.length - 1]} estão a escrever...`
+            }
+          </span>
+        </div>
+      )}
 
       {/* Photo Preview */}
       {photoPreview && (
@@ -436,7 +720,10 @@ export default function ObraChat({ obra, user }) {
         <input
           type="text"
           value={newMessage}
-          onChange={(e) => setNewMessage(e.target.value)}
+          onChange={(e) => {
+            setNewMessage(e.target.value)
+            handleTyping()
+          }}
           onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
           placeholder={photoPreview ? "Adiciona uma legenda..." : "Escreve uma mensagem..."}
           style={styles.input}
@@ -466,6 +753,18 @@ export default function ObraChat({ obra, user }) {
           <img src={imageModal} alt="Foto" style={chatStyles.modalImage} />
         </div>
       )}
+
+      {/* CSS Animations */}
+      <style>{`
+        @keyframes typingBounce {
+          0%, 60%, 100% { transform: translateY(0); }
+          30% { transform: translateY(-4px); }
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   )
 }
