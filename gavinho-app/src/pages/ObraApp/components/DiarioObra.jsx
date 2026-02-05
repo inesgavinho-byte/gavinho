@@ -211,25 +211,22 @@ export default function DiarioObra({ obra, user }) {
 
       const today = new Date().toISOString().split('T')[0]
 
-      // Build entry data - only include non-null values to avoid schema issues
+      // Build entry data with only confirmed columns
+      // Note: condicoes_meteo, temperatura, observacoes_meteo removed due to schema issues
       const entryData = {
         obra_id: obra.id,
         data: today,
+        trabalhadores_gavinho: parseInt(formData.trabalhadores_gavinho) || 0,
+        trabalhadores_subempreiteiros: parseInt(formData.trabalhadores_subempreiteiros) || 0,
+        status: 'rascunho',
         updated_at: new Date().toISOString()
       }
 
-      // Add optional fields only if they have values
-      if (user.cargo) entryData.funcao = user.cargo
-      if (formData.condicoes_meteo) entryData.condicoes_meteo = formData.condicoes_meteo
-      if (formData.temperatura) entryData.temperatura = parseFloat(formData.temperatura)
-      if (formData.observacoes_meteo) entryData.observacoes_meteo = formData.observacoes_meteo
-      if (formData.trabalhadores_gavinho) entryData.trabalhadores_gavinho = parseInt(formData.trabalhadores_gavinho)
-      if (formData.trabalhadores_subempreiteiros) entryData.trabalhadores_subempreiteiros = parseInt(formData.trabalhadores_subempreiteiros)
+      // Add array fields if they have content
       if (formData.tarefas?.length > 0) entryData.tarefas = formData.tarefas
       if (formData.ocorrencias?.length > 0) entryData.ocorrencias = formData.ocorrencias
       if (photoUrls.length > 0) entryData.fotos = photoUrls
       if (formData.proximos_passos?.length > 0) entryData.proximos_passos = formData.proximos_passos
-      entryData.status = 'rascunho'
 
       console.log('Saving diario entry:', entryData)
 
