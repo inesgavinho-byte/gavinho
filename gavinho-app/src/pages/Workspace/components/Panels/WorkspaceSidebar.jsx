@@ -14,8 +14,40 @@ import {
   CloudDownload,
   ChevronRight,
   Star,
-  Hash
+  Hash,
+  Sun,
+  Moon,
+  Lock,
+  Plus,
+  MessageCircle
 } from 'lucide-react'
+import { useTheme } from '../../context'
+
+// Theme toggle button component (uses hook so must be separate)
+function ThemeToggleButton() {
+  const { isDarkMode, toggleTheme } = useTheme()
+
+  return (
+    <button
+      onClick={toggleTheme}
+      title={isDarkMode ? 'Modo claro' : 'Modo escuro'}
+      style={{
+        width: '32px',
+        height: '32px',
+        borderRadius: '6px',
+        background: 'transparent',
+        border: 'none',
+        cursor: 'pointer',
+        color: 'var(--brown-light)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}
+    >
+      {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+    </button>
+  )
+}
 
 /**
  * WorkspaceSidebar - Main sidebar component for the workspace
@@ -68,17 +100,25 @@ const WorkspaceSidebar = ({
   getTotalUnreadCount,
   getUnreadActivityCount,
   savedMessages,
-  equipaAtiva
+  equipaAtiva,
+  // Private channels
+  privateChannels = [],
+  onCreatePrivateChannel,
+  selectPrivateChannel
 }) => {
   return (
-    <div style={{
-      width: '280px',
-      background: 'var(--off-white)',
-      borderRight: '1px solid var(--stone)',
-      display: 'flex',
-      flexDirection: 'column',
-      flexShrink: 0
-    }}>
+    <aside
+      role="navigation"
+      aria-label="Navegação de equipas e canais"
+      style={{
+        width: '280px',
+        background: 'var(--off-white)',
+        borderRight: '1px solid var(--stone)',
+        display: 'flex',
+        flexDirection: 'column',
+        flexShrink: 0
+      }}
+    >
       {/* Header */}
       <div style={{
         padding: '16px 20px',
@@ -227,6 +267,8 @@ const WorkspaceSidebar = ({
           >
             {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
           </button>
+          {/* Theme toggle */}
+          <ThemeToggleButton />
           {/* Teams Import */}
           <button
             onClick={() => setShowTeamsImport(true)}
@@ -458,8 +500,144 @@ const WorkspaceSidebar = ({
             </div>
           )
         })}
+
+        {/* Private Channels Section */}
+        <div style={{ borderTop: '1px solid var(--stone)', marginTop: '8px', paddingTop: '8px' }}>
+          {/* Header */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '8px 16px'
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <Lock size={14} style={{ color: 'var(--brown-light)' }} />
+              <span style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: 'var(--brown-light)',
+                textTransform: 'uppercase'
+              }}>
+                Conversas Privadas
+              </span>
+              {privateChannels.length > 0 && (
+                <span style={{
+                  fontSize: '11px',
+                  color: 'var(--brown-light)',
+                  background: 'var(--stone)',
+                  padding: '2px 6px',
+                  borderRadius: '10px'
+                }}>
+                  {privateChannels.length}
+                </span>
+              )}
+            </div>
+            <button
+              onClick={onCreatePrivateChannel}
+              title="Nova conversa privada"
+              style={{
+                width: '24px',
+                height: '24px',
+                borderRadius: '4px',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                color: 'var(--brown-light)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <Plus size={16} />
+            </button>
+          </div>
+
+          {/* Private Channels List */}
+          <div style={{ paddingLeft: '16px' }}>
+            {privateChannels.length === 0 ? (
+              <div style={{
+                padding: '12px 16px',
+                fontSize: '12px',
+                color: 'var(--brown-light)',
+                fontStyle: 'italic'
+              }}>
+                Sem conversas privadas
+              </div>
+            ) : (
+              privateChannels.map(channel => {
+                const isActive = canalAtivo?.id === channel.id
+                const isDM = channel.type === 'dm'
+                return (
+                  <button
+                    key={channel.id}
+                    onClick={() => selectPrivateChannel?.(channel)}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '8px 12px',
+                      marginRight: '8px',
+                      background: isActive ? 'var(--stone)' : 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      borderRadius: '6px',
+                      transition: 'background 0.15s'
+                    }}
+                  >
+                    {isDM ? (
+                      <MessageCircle
+                        size={16}
+                        style={{ color: isActive ? 'var(--brown)' : 'var(--brown-light)', flexShrink: 0 }}
+                      />
+                    ) : (
+                      <Lock
+                        size={16}
+                        style={{ color: isActive ? 'var(--brown)' : 'var(--brown-light)', flexShrink: 0 }}
+                      />
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        fontSize: '13px',
+                        fontWeight: isActive ? 600 : 400,
+                        color: isActive ? 'var(--brown)' : 'var(--brown-light)',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}>
+                        {channel.nome}
+                      </div>
+                      {channel.members?.length > 0 && !isDM && (
+                        <div style={{
+                          fontSize: '11px',
+                          color: 'var(--brown-light)'
+                        }}>
+                          {channel.members.length} membros
+                        </div>
+                      )}
+                    </div>
+                    {channel.unreadCount > 0 && (
+                      <span style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        background: 'var(--accent-olive)',
+                        flexShrink: 0
+                      }} />
+                    )}
+                  </button>
+                )
+              })
+            )}
+          </div>
+        </div>
       </div>
-    </div>
+    </aside>
   )
 }
 

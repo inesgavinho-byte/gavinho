@@ -6,9 +6,17 @@
 import { useState, useCallback, useRef } from 'react'
 import { supabase } from '../../../lib/supabase'
 
+const MESSAGES_PER_PAGE = 50
+
 export default function useMessageActions(profile) {
   // Posts/Messages
   const [posts, setPosts] = useState([])
+
+  // Pagination
+  const [hasMoreMessages, setHasMoreMessages] = useState(true)
+  const [loadingMoreMessages, setLoadingMoreMessages] = useState(false)
+  const [oldestMessageDate, setOldestMessageDate] = useState(null)
+  const [currentChannelId, setCurrentChannelId] = useState(null)
 
   // Input
   const [messageInput, setMessageInput] = useState('')
@@ -48,9 +56,69 @@ export default function useMessageActions(profile) {
   const [messageTags, setMessageTags] = useState({})
   const [showTagSelector, setShowTagSelector] = useState(null)
 
-  // ========== LOAD POSTS ==========
+  // ========== HELPER: ENRICH POST WITH REPLIES AND REACTIONS ==========
+  const enrichPost = useCallback(async (post) => {
+    // Get reply count
+    const { count } = await supabase
+      .from('chat_mensagens')
+      .select('*', { count: 'exact', head: true })
+      .eq('parent_id', post.id)
+      .eq('eliminado', false)
+
+    // Get reactions for this post
+    let reacoes = []
+    try {
+      const { data: reactionData } = await supabase
+        .from('chat_reacoes')
+        .select(`
+          emoji,
+          utilizador:utilizador_id(id, nome)
+        `)
+        .eq('mensagem_id', post.id)
+
+      if (reactionData && reactionData.length > 0) {
+        // Group reactions by emoji
+        const reactionMap = {}
+        reactionData.forEach(r => {
+          if (!reactionMap[r.emoji]) {
+            reactionMap[r.emoji] = { emoji: r.emoji, users: [] }
+          }
+          reactionMap[r.emoji].users.push(r.utilizador?.nome || 'Utilizador')
+        })
+        reacoes = Object.values(reactionMap)
+      }
+    } catch (err) {
+      // Silent fail - reactions table might not exist
+    }
+
+    // Build attachments array from file fields
+    let attachments = []
+    if (post.ficheiro_url) {
+      const isImage = post.tipo === 'imagem' || post.ficheiro_nome?.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i)
+      attachments.push({
+        name: post.ficheiro_nome || 'Ficheiro',
+        url: post.ficheiro_url,
+        type: isImage ? 'image' : 'file',
+        size: post.ficheiro_tamanho
+      })
+    }
+
+    return {
+      ...post,
+      replyCount: count || 0,
+      reacoes: reacoes.length > 0 ? reacoes : post.reacoes || [],
+      attachments: attachments.length > 0 ? attachments : undefined
+    }
+  }, [])
+
+  // ========== LOAD POSTS (Initial load - most recent messages) ==========
   const loadPosts = useCallback(async (canalId) => {
     if (!canalId) return
+
+    // Reset pagination state for new channel
+    setCurrentChannelId(canalId)
+    setHasMoreMessages(true)
+    setOldestMessageDate(null)
 
     try {
       const { data, error } = await supabase
@@ -62,8 +130,8 @@ export default function useMessageActions(profile) {
         .eq('canal_id', canalId)
         .is('parent_id', null)
         .eq('eliminado', false)
-        .order('created_at', { ascending: true })
-        .limit(100)
+        .order('created_at', { ascending: false })
+        .limit(MESSAGES_PER_PAGE)
 
       if (error) {
         setPosts([])
@@ -71,42 +139,80 @@ export default function useMessageActions(profile) {
       }
 
       if (data && data.length > 0) {
-        // Load reply counts and format attachments
-        const postsWithReplies = await Promise.all(data.map(async (post) => {
-          const { count } = await supabase
-            .from('chat_mensagens')
-            .select('*', { count: 'exact', head: true })
-            .eq('parent_id', post.id)
-            .eq('eliminado', false)
+        // Reverse to show oldest first (ascending)
+        const sortedData = [...data].reverse()
 
-          // Build attachments array from file fields
-          let attachments = []
-          if (post.ficheiro_url) {
-            const isImage = post.tipo === 'imagem' || post.ficheiro_nome?.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i)
-            attachments.push({
-              name: post.ficheiro_nome || 'Ficheiro',
-              url: post.ficheiro_url,
-              type: isImage ? 'image' : 'file',
-              size: post.ficheiro_tamanho
-            })
-          }
-
-          return {
-            ...post,
-            replyCount: count || 0,
-            attachments: attachments.length > 0 ? attachments : undefined
-          }
-        }))
+        // Load reply counts, reactions, and format attachments
+        const postsWithReplies = await Promise.all(sortedData.map(enrichPost))
 
         setPosts(postsWithReplies)
+
+        // Store oldest message date for pagination
+        setOldestMessageDate(sortedData[0].created_at)
+
+        // Check if there might be more messages
+        setHasMoreMessages(data.length === MESSAGES_PER_PAGE)
       } else {
         setPosts([])
+        setHasMoreMessages(false)
       }
     } catch (err) {
       // Silent error - could be sent to error tracking service in production
       setPosts([])
     }
-  }, [])
+  }, [enrichPost])
+
+  // ========== LOAD MORE POSTS (Older messages on scroll up) ==========
+  const loadMorePosts = useCallback(async () => {
+    if (!currentChannelId || !hasMoreMessages || loadingMoreMessages || !oldestMessageDate) {
+      return
+    }
+
+    setLoadingMoreMessages(true)
+
+    try {
+      const { data, error } = await supabase
+        .from('chat_mensagens')
+        .select(`
+          *,
+          autor:autor_id(id, nome, avatar_url, funcao)
+        `)
+        .eq('canal_id', currentChannelId)
+        .is('parent_id', null)
+        .eq('eliminado', false)
+        .lt('created_at', oldestMessageDate)
+        .order('created_at', { ascending: false })
+        .limit(MESSAGES_PER_PAGE)
+
+      if (error) {
+        setLoadingMoreMessages(false)
+        return
+      }
+
+      if (data && data.length > 0) {
+        // Reverse to show oldest first
+        const sortedData = [...data].reverse()
+
+        // Load reply counts, reactions, and format attachments
+        const postsWithReplies = await Promise.all(sortedData.map(enrichPost))
+
+        // Prepend older messages to the beginning
+        setPosts(prev => [...postsWithReplies, ...prev])
+
+        // Update oldest message date
+        setOldestMessageDate(sortedData[0].created_at)
+
+        // Check if there might be more
+        setHasMoreMessages(data.length === MESSAGES_PER_PAGE)
+      } else {
+        setHasMoreMessages(false)
+      }
+    } catch (err) {
+      // Silent error
+    } finally {
+      setLoadingMoreMessages(false)
+    }
+  }, [currentChannelId, hasMoreMessages, loadingMoreMessages, oldestMessageDate, enrichPost])
 
   // ========== LOAD THREAD REPLIES ==========
   const loadThreadReplies = useCallback(async (postId) => {
@@ -141,13 +247,16 @@ export default function useMessageActions(profile) {
 
       // Upload files
       let attachments = []
+      let uploadErrors = []
       for (const file of selectedFiles) {
         const fileName = `${canalAtivo.id}/${Date.now()}_${file.name}`
         const { error: uploadError } = await supabase.storage
           .from('chat-files')
           .upload(fileName, file.file)
 
-        if (!uploadError) {
+        if (uploadError) {
+          uploadErrors.push(`${file.name}: ${uploadError.message}`)
+        } else {
           const { data: { publicUrl } } = supabase.storage
             .from('chat-files')
             .getPublicUrl(fileName)
@@ -158,6 +267,11 @@ export default function useMessageActions(profile) {
             size: file.size
           })
         }
+      }
+
+      // If all uploads failed and no message text, throw error
+      if (uploadErrors.length > 0 && attachments.length === 0 && !messageInput.trim()) {
+        throw new Error('Erro ao carregar ficheiro(s): ' + uploadErrors.join(', '))
       }
 
       // Insert message
@@ -221,33 +335,46 @@ export default function useMessageActions(profile) {
     }
   }, [messageInput, selectedFiles, profile, replyingTo])
 
-  // ========== SEND REPLY ==========
-  const sendReply = useCallback(async (postId) => {
+  // ========== SEND REPLY (Thread) ==========
+  const sendReply = useCallback(async (postId, canalId) => {
     if (!replyInput.trim()) return false
 
-    const newReply = {
-      id: `${postId}-r${Date.now()}`,
-      conteudo: replyInput,
-      autor: {
-        nome: profile?.nome || 'Utilizador',
-        avatar_url: profile?.avatar_url,
-        funcao: profile?.funcao || 'Equipa'
-      },
-      created_at: new Date().toISOString()
+    try {
+      // Insert reply to database with parent_id
+      const { data: insertedReply, error: insertError } = await supabase
+        .from('chat_mensagens')
+        .insert({
+          conteudo: replyInput,
+          tipo: 'texto',
+          autor_id: profile?.id,
+          canal_id: canalId,
+          parent_id: postId,
+          topico_id: null
+        })
+        .select(`
+          *,
+          autor:autor_id(id, nome, avatar_url, funcao)
+        `)
+        .single()
+
+      if (insertError) throw insertError
+
+      // Update local thread replies
+      setThreadReplies(prev => ({
+        ...prev,
+        [postId]: [...(prev[postId] || []), insertedReply]
+      }))
+
+      // Update reply count in posts
+      setPosts(prev => prev.map(p =>
+        p.id === postId ? { ...p, replyCount: (p.replyCount || 0) + 1 } : p
+      ))
+
+      setReplyInput('')
+      return true
+    } catch (err) {
+      throw new Error('Erro ao enviar resposta: ' + err.message)
     }
-
-    setThreadReplies(prev => ({
-      ...prev,
-      [postId]: [...(prev[postId] || []), newReply]
-    }))
-
-    // Update reply count
-    setPosts(prev => prev.map(p =>
-      p.id === postId ? { ...p, replyCount: (p.replyCount || 0) + 1 } : p
-    ))
-
-    setReplyInput('')
-    return true
   }, [replyInput, profile])
 
   // ========== EDIT MESSAGE ==========
@@ -293,33 +420,86 @@ export default function useMessageActions(profile) {
     }
   }, [])
 
-  // ========== REACT TO MESSAGE ==========
-  const addReaction = useCallback((messageId, emoji) => {
-    setPosts(prev => prev.map(p => {
-      if (p.id !== messageId) return p
-      const reactions = p.reactions || []
-      const existing = reactions.find(r => r.emoji === emoji)
+  // ========== REACT TO MESSAGE (with DB persistence) ==========
+  const addReaction = useCallback(async (messageId, emoji) => {
+    if (!profile?.id || !messageId) return
 
-      if (existing) {
-        // Toggle own reaction
-        if (existing.users?.includes(profile?.id)) {
-          existing.count--
-          existing.users = existing.users.filter(u => u !== profile?.id)
-          if (existing.count === 0) {
-            return { ...p, reactions: reactions.filter(r => r.emoji !== emoji) }
-          }
-        } else {
-          existing.count++
-          existing.users = [...(existing.users || []), profile?.id]
-        }
-        return { ...p, reactions: [...reactions] }
+    try {
+      // Check if user already reacted with this emoji
+      const { data: existingReaction } = await supabase
+        .from('chat_reacoes')
+        .select('id')
+        .eq('mensagem_id', messageId)
+        .eq('utilizador_id', profile.id)
+        .eq('emoji', emoji)
+        .single()
+
+      if (existingReaction) {
+        // Remove reaction
+        await supabase
+          .from('chat_reacoes')
+          .delete()
+          .eq('id', existingReaction.id)
       } else {
-        return {
-          ...p,
-          reactions: [...reactions, { emoji, count: 1, users: [profile?.id] }]
-        }
+        // Add reaction
+        await supabase
+          .from('chat_reacoes')
+          .insert({
+            mensagem_id: messageId,
+            utilizador_id: profile.id,
+            emoji
+          })
       }
-    }))
+
+      // Update local state
+      setPosts(prev => prev.map(p => {
+        if (p.id !== messageId) return p
+        const reacoes = p.reacoes || []
+        const existing = reacoes.find(r => r.emoji === emoji)
+
+        if (existing) {
+          // Toggle own reaction
+          if (existing.users?.includes(profile?.nome || profile?.id)) {
+            existing.users = existing.users.filter(u => u !== profile?.nome && u !== profile?.id)
+            if (existing.users.length === 0) {
+              return { ...p, reacoes: reacoes.filter(r => r.emoji !== emoji) }
+            }
+          } else {
+            existing.users = [...(existing.users || []), profile?.nome || profile?.id]
+          }
+          return { ...p, reacoes: [...reacoes] }
+        } else {
+          return {
+            ...p,
+            reacoes: [...reacoes, { emoji, users: [profile?.nome || profile?.id] }]
+          }
+        }
+      }))
+    } catch (err) {
+      // Fallback to local-only reaction if DB fails
+      setPosts(prev => prev.map(p => {
+        if (p.id !== messageId) return p
+        const reacoes = p.reacoes || []
+        const existing = reacoes.find(r => r.emoji === emoji)
+
+        if (existing) {
+          if (existing.users?.includes(profile?.nome || profile?.id)) {
+            existing.users = existing.users.filter(u => u !== profile?.nome && u !== profile?.id)
+            if (existing.users.length === 0) {
+              return { ...p, reacoes: reacoes.filter(r => r.emoji !== emoji) }
+            }
+          } else {
+            existing.users = [...(existing.users || []), profile?.nome || profile?.id]
+          }
+          return { ...p, reacoes: [...reacoes] }
+        } else {
+          return {
+            ...p,
+            reacoes: [...reacoes, { emoji, users: [profile?.nome || profile?.id] }]
+          }
+        }
+      }))
+    }
   }, [profile])
 
   // ========== SAVE/BOOKMARK MESSAGE ==========
@@ -442,6 +622,10 @@ export default function useMessageActions(profile) {
     messageTags,
     showTagSelector,
 
+    // Pagination state
+    hasMoreMessages,
+    loadingMoreMessages,
+
     // Setters
     setPosts,
     setMessageInput,
@@ -452,6 +636,7 @@ export default function useMessageActions(profile) {
     setShowMessageMenu,
     setActiveThread,
     setSelectedFiles,
+    setUploading,
     setShowEmojiPicker,
     setEmojiCategory,
     setShowMentions,
@@ -462,6 +647,7 @@ export default function useMessageActions(profile) {
 
     // Actions
     loadPosts,
+    loadMorePosts,
     loadThreadReplies,
     sendMessage,
     sendReply,

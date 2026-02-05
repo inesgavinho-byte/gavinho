@@ -8,7 +8,7 @@ import {
   MessageSquare, FileText, StickyNote, CheckSquare,
   Check, Link2, Video, Phone, MessageCircle, Sparkles,
   BarChart3, FileDown, CalendarPlus, Settings, Plus, X,
-  SlidersHorizontal, User, CalendarDays, Paperclip, AtSign, Pin
+  SlidersHorizontal, User, CalendarDays, Paperclip, AtSign, Pin, Clock, Mail
 } from 'lucide-react'
 
 import { FILTER_OPTIONS } from '../utils/constants'
@@ -35,6 +35,8 @@ export default function ChannelHeader({
   onLoadAnalytics,
   onShowExportModal,
   onScheduleMeeting,
+  onScheduleMessage,
+  onEmailSettings,
   onStartCall,
 
   // Tabs
@@ -199,6 +201,24 @@ export default function ChannelHeader({
             style={{ width: '36px', height: '36px', borderRadius: '6px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--brown-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
             <FileDown size={18} />
+          </button>
+
+          {/* Schedule Message */}
+          <button
+            onClick={onScheduleMessage}
+            title="Agendar mensagem"
+            style={{ width: '36px', height: '36px', borderRadius: '6px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--brown-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Clock size={18} />
+          </button>
+
+          {/* Email Settings */}
+          <button
+            onClick={onEmailSettings}
+            title="Definições de email"
+            style={{ width: '36px', height: '36px', borderRadius: '6px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--brown-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Mail size={18} />
           </button>
 
           {/* Schedule Meeting */}

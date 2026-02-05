@@ -79,8 +79,12 @@ import {
   ChannelHeader,
   ThreadPanel,
   ActivityLogPanel,
-  SavedMessagesPanel
+  SavedMessagesPanel,
+  ThemeToggle
 } from './Workspace/components'
+
+// Import theme context
+import { ThemeProvider, useTheme } from './Workspace/context'
 
 // Import custom hooks
 import {
@@ -93,7 +97,8 @@ import {
   useConfirm
 } from './Workspace/hooks'
 
-import { ConfirmModal, ToastContainer } from './Workspace/components/Modals'
+import { ConfirmModal, ToastContainer, ExportModal, CreatePrivateChannelModal, WebhookSettingsModal, ScheduleMessageModal, EmailSettingsModal } from './Workspace/components/Modals'
+import CentralEntregasChat from './Workspace/components/CentralEntregasChat'
 
 export default function Workspace() {
   // Handle OAuth callback in popup
@@ -143,10 +148,11 @@ export default function Workspace() {
     replyingTo, showMessageMenu, activeThread, threadReplies, selectedFiles, uploading,
     showEmojiPicker, emojiCategory, showMentions, mentionQuery, mentionStartIndex,
     showFormattingToolbar, savedMessages, messageTags, showTagSelector,
+    hasMoreMessages, loadingMoreMessages,
     setPosts, setMessageInput, setReplyInput, setEditingMessage, setEditingContent,
-    setReplyingTo, setShowMessageMenu, setActiveThread, setSelectedFiles, setShowEmojiPicker,
-    setEmojiCategory, setShowMentions, setMentionQuery, setMentionStartIndex,
-    setShowFormattingToolbar, setShowTagSelector, loadPosts, loadThreadReplies,
+    setReplyingTo, setShowMessageMenu, setActiveThread, setSelectedFiles, setUploading,
+    setShowEmojiPicker, setEmojiCategory, setShowMentions, setMentionQuery, setMentionStartIndex,
+    setShowFormattingToolbar, setShowTagSelector, loadPosts, loadMorePosts, loadThreadReplies,
     sendMessage, sendReply, editMessage, deleteMessage, addReaction,
     toggleSaveMessage, isMessageSaved, forwardMessage, tagMessage, removeTag,
     openThread, closeThread, handleFileSelect, removeFile, insertEmoji
@@ -159,7 +165,7 @@ export default function Workspace() {
     updateMyPresence, loadOnlineUsers, handleTyping, setUserTyping,
     isUserOnline, getUserStatus, getPresenceColor: getPresenceColorHook, getPresenceLabel,
     markMessageAsRead, getReadStatus, isMessageRead, updateUserStatus
-  } = usePresence(profile, membros)
+  } = usePresence(profile, membros, canalAtivo?.id)
 
   // Notifications Hook
   const {
@@ -256,8 +262,6 @@ export default function Workspace() {
 
   // Export
   const [showExportModal, setShowExportModal] = useState(false)
-  const [exportFormat, setExportFormat] = useState('pdf')
-  const [exportDateRange, setExportDateRange] = useState({ from: '', to: '' })
 
   // Webhooks & Email
   const [webhooks, setWebhooks] = useState([])
@@ -266,6 +270,10 @@ export default function Workspace() {
   const [emailSyncEnabled, setEmailSyncEnabled] = useState(false)
   const [emailDigestFrequency, setEmailDigestFrequency] = useState('daily')
   const [showEmailSettings, setShowEmailSettings] = useState(false)
+
+  // Scheduled Messages
+  const [scheduledMessages, setScheduledMessages] = useState([])
+  const [showScheduleMessage, setShowScheduleMessage] = useState(false)
 
   // Teams Import Hook
   const {
@@ -329,7 +337,11 @@ export default function Workspace() {
         filter: `canal_id=eq.${canalId}`
       }, (payload) => {
         if (!payload.new.parent_id) {
-          setPosts(prev => [...prev, { ...payload.new, replyCount: 0 }])
+          // Avoid duplicates - check if message already exists locally
+          setPosts(prev => {
+            if (prev.some(p => p.id === payload.new.id)) return prev
+            return [...prev, { ...payload.new, replyCount: 0 }]
+          })
         } else if (activeThread?.id === payload.new.parent_id) {
           setThreadReplies(prev => ({
             ...prev,
@@ -401,6 +413,9 @@ export default function Workspace() {
       }
 
       // Inserir mensagem na base de dados
+      // Check if activeTopic is a valid UUID (not the default 'geral' string)
+      const isValidUUID = activeTopic && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(activeTopic)
+
       const { data: insertedMessage, error: insertError } = await supabase
         .from('chat_mensagens')
         .insert({
@@ -408,7 +423,7 @@ export default function Workspace() {
           tipo: attachments.length > 0 ? (attachments[0].type === 'image' ? 'imagem' : 'ficheiro') : 'texto',
           autor_id: profile?.id,
           canal_id: canalAtivo?.id,
-          topico_id: null, // Workspace uses canal_id directly
+          ...(isValidUUID && { topico_id: activeTopic }),
           parent_id: replyingTo?.id || null,
           ficheiro_url: attachments.length > 0 ? attachments[0].url : null,
           ficheiro_nome: attachments.length > 0 ? attachments[0].name : null,
@@ -545,11 +560,16 @@ export default function Workspace() {
     })
   }
 
-  // Handle message input change with mention detection
+  // Handle message input change with mention detection and typing indicator
   const handleMessageChange = (e) => {
     const value = e.target.value
     const cursorPos = e.target.selectionStart
     setMessageInput(value)
+
+    // Broadcast typing indicator
+    if (value.trim()) {
+      handleTyping()
+    }
 
     // Check for @ mention
     const textBeforeCursor = value.substring(0, cursorPos)
@@ -1369,60 +1389,84 @@ export default function Workspace() {
     }
   }
 
-  // ========== EXPORT CONVERSATION ==========
-  const exportConversation = () => {
-    const content = posts.map(p =>
-      `[${formatDateTime(p.created_at)}] ${p.autor?.nome}: ${p.conteudo}`
-    ).join('\n\n')
-
-    if (exportFormat === 'txt') {
-      const blob = new Blob([content], { type: 'text/plain' })
-      downloadBlob(blob, `${canalAtivo?.codigo || 'chat'}_export.txt`)
-    } else {
-      // For PDF, create a simple HTML-based export
-      const htmlContent = `
-        <html><head><title>Exportação - ${canalAtivo?.codigo}</title>
-        <style>body{font-family:Arial;padding:40px;}h1{color:#3D3D3D;}.msg{margin:20px 0;padding:15px;border-left:3px solid #7A8B6E;}.time{color:#888;font-size:12px;}.author{font-weight:bold;}</style></head>
-        <body><h1>${canalAtivo?.codigo} - ${canalAtivo?.nome}</h1>
-        ${posts.map(p => `<div class="msg"><div class="time">${formatDateTime(p.created_at)}</div><div class="author">${p.autor?.nome}</div><div>${p.conteudo}</div></div>`).join('')}
-        </body></html>
-      `
-      const blob = new Blob([htmlContent], { type: 'text/html' })
-      downloadBlob(blob, `${canalAtivo?.codigo || 'chat'}_export.html`)
-    }
-    setShowExportModal(false)
-  }
-
-  const downloadBlob = (blob, filename) => {
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
   // ========== WEBHOOKS ==========
-  const addWebhook = () => {
-    if (!newWebhook.url.trim()) return
+  const addWebhook = (webhookData) => {
     const webhook = {
       id: `webhook-${Date.now()}`,
-      ...newWebhook,
+      url: webhookData.url,
+      name: webhookData.name || 'Webhook',
+      events: webhookData.events || [],
       created_at: new Date().toISOString(),
       active: true
     }
     setWebhooks(prev => [...prev, webhook])
-    setNewWebhook({ url: '', events: [] })
+    showToast(`Webhook "${webhook.name}" adicionado`, 'success')
   }
 
   const deleteWebhook = (webhookId) => {
     setWebhooks(prev => prev.filter(w => w.id !== webhookId))
+    showToast('Webhook removido', 'success')
   }
 
-  const triggerWebhook = (event, data) => {
-    webhooks.filter(w => w.active && w.events.includes(event)).forEach(webhook => {
-      // TODO: In production, would POST to webhook.url
-    })
+  const toggleWebhook = (webhookId) => {
+    setWebhooks(prev => prev.map(w =>
+      w.id === webhookId ? { ...w, active: !w.active } : w
+    ))
+  }
+
+  const testWebhook = async (webhook) => {
+    const payload = {
+      type: 'test',
+      timestamp: new Date().toISOString(),
+      channel: {
+        id: canalAtivo?.id,
+        code: canalAtivo?.codigo,
+        name: canalAtivo?.nome
+      },
+      message: 'Este é um teste do webhook'
+    }
+
+    try {
+      const response = await fetch(webhook.url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload),
+        mode: 'no-cors' // For cross-origin requests
+      })
+      return { success: true }
+    } catch (err) {
+      throw new Error('Não foi possível contactar o webhook')
+    }
+  }
+
+  const triggerWebhook = async (event, data) => {
+    const payload = {
+      type: event,
+      timestamp: new Date().toISOString(),
+      channel: {
+        id: canalAtivo?.id,
+        code: canalAtivo?.codigo,
+        name: canalAtivo?.nome
+      },
+      data
+    }
+
+    webhooks
+      .filter(w => w.active && w.events.includes(event))
+      .forEach(async (webhook) => {
+        try {
+          await fetch(webhook.url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            mode: 'no-cors'
+          })
+        } catch (err) {
+          console.error(`Webhook ${webhook.name} failed:`, err)
+        }
+      })
   }
 
   // ========== EMAIL SYNC ==========
@@ -1433,6 +1477,68 @@ export default function Workspace() {
     }
   }
 
+  // ========== SCHEDULED MESSAGES ==========
+  const scheduleMessage = (scheduleData) => {
+    const scheduled = {
+      id: `scheduled-${Date.now()}`,
+      message: scheduleData.message,
+      scheduledFor: scheduleData.scheduledFor,
+      channelId: scheduleData.channelId || canalAtivo?.id,
+      channelName: canalAtivo?.nome,
+      channelCode: canalAtivo?.codigo,
+      created_at: new Date().toISOString(),
+      status: 'pending',
+      authorId: profile?.id,
+      authorName: profile?.nome
+    }
+    setScheduledMessages(prev => [...prev, scheduled])
+    toastSuccess(`Mensagem agendada para ${new Date(scheduleData.scheduledFor).toLocaleString('pt-PT')}`)
+  }
+
+  const cancelScheduledMessage = (scheduledId) => {
+    setScheduledMessages(prev => prev.filter(s => s.id !== scheduledId))
+    toastInfo('Mensagem agendada cancelada')
+  }
+
+  const sendScheduledMessage = async (scheduled) => {
+    if (scheduled.status !== 'pending') return
+
+    try {
+      // Mark as sending
+      setScheduledMessages(prev => prev.map(s =>
+        s.id === scheduled.id ? { ...s, status: 'sending' } : s
+      ))
+
+      // Send the message using existing sendMessage function
+      await sendMessage(scheduled.message, scheduled.channelId)
+
+      // Mark as sent
+      setScheduledMessages(prev => prev.map(s =>
+        s.id === scheduled.id ? { ...s, status: 'sent' } : s
+      ))
+      toastSuccess('Mensagem agendada enviada com sucesso')
+    } catch (err) {
+      setScheduledMessages(prev => prev.map(s =>
+        s.id === scheduled.id ? { ...s, status: 'failed' } : s
+      ))
+      toastError('Erro ao enviar mensagem agendada')
+    }
+  }
+
+  // Check for scheduled messages that need to be sent
+  useEffect(() => {
+    const checkScheduled = setInterval(() => {
+      const now = new Date()
+      scheduledMessages
+        .filter(s => s.status === 'pending' && new Date(s.scheduledFor) <= now)
+        .forEach(scheduled => {
+          sendScheduledMessage(scheduled)
+        })
+    }, 30000) // Check every 30 seconds
+
+    return () => clearInterval(checkScheduled)
+  }, [scheduledMessages])
+
   if (loading) {
     return (
       <div className="fade-in" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
@@ -1442,6 +1548,7 @@ export default function Workspace() {
   }
 
   return (
+    <ThemeProvider>
     <div className="fade-in workspace-container" style={{
       height: '100%',
       width: '100%',
@@ -1474,6 +1581,9 @@ export default function Workspace() {
         getUnreadActivityCount={getUnreadActivityCount}
         savedMessages={savedMessages}
         equipaAtiva={equipaAtiva}
+        privateChannels={privateChannels}
+        onCreatePrivateChannel={() => setShowCreatePrivateChannel(true)}
+        selectPrivateChannel={selectCanal}
       />
 
       {/* ========== ACTIVITY LOG PANEL ========== */}
@@ -1548,6 +1658,8 @@ export default function Workspace() {
           onLoadAnalytics={loadChannelAnalytics}
           onShowExportModal={() => setShowExportModal(true)}
           onScheduleMeeting={() => setShowScheduleMeetingModal(true)}
+          onScheduleMessage={() => setShowScheduleMessage(true)}
+          onEmailSettings={() => setShowEmailSettings(true)}
           onStartCall={() => startCall('audio')}
           activeTab={activeTab}
           setActiveTab={setActiveTab}
@@ -1631,7 +1743,11 @@ export default function Workspace() {
                     isMessageSaved={isMessageSaved}
                     isMessagePinned={isMessagePinned}
                     getReadStatus={getReadStatus}
+                    markMessageAsRead={markMessageAsRead}
                     messagesEndRef={messagesEndRef}
+                    hasMoreMessages={hasMoreMessages}
+                    loadingMoreMessages={loadingMoreMessages}
+                    onLoadMore={loadMorePosts}
                   />
                 </div>
 
@@ -1666,11 +1782,13 @@ export default function Workspace() {
             )}
 
             {activeTab === 'ficheiros' && (
-              <div style={{ padding: '40px', textAlign: 'center', color: 'var(--brown-light)' }}>
-                <FileText size={56} style={{ opacity: 0.3, marginBottom: '16px' }} />
-                <h3 style={{ margin: '0 0 8px 0', color: 'var(--brown)' }}>Ficheiros do Canal</h3>
-                <p>Todos os ficheiros partilhados neste canal aparecerão aqui</p>
-              </div>
+              <CentralEntregasChat
+                canalAtivo={canalAtivo}
+                onNavigateToEntregaveis={(canal) => {
+                  // Navigate to project page with entregaveis tab
+                  window.open(`/projetos/${canal.id}?tab=entregaveis`, '_blank')
+                }}
+              />
             )}
 
             {activeTab === 'wiki' && (
@@ -1891,7 +2009,7 @@ export default function Workspace() {
             {aiMessages.length === 0 && (
               <div style={{ textAlign: 'center', padding: '20px', color: 'var(--brown-light)' }}>
                 <Bot size={48} style={{ opacity: 0.5, marginBottom: '12px' }} />
-                <p style={{ fontSize: '14px' }}>Olá! Sou o assistente IA do Workspace.</p>
+                <p style={{ fontSize: '14px' }}>Olá! Sou o assistente IA do Team Chat.</p>
                 <p style={{ fontSize: '12px' }}>Posso ajudar-te a resumir conversas, encontrar informação ou responder a questões.</p>
               </div>
             )}
@@ -1989,30 +2107,70 @@ export default function Workspace() {
       )}
 
       {/* ========== EXPORT MODAL ========== */}
-      {showExportModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }} onClick={() => setShowExportModal(false)}>
-          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--white)', borderRadius: '16px', padding: '24px', width: '400px' }}>
-            <h3 style={{ margin: '0 0 20px 0', fontSize: '18px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <FileDown size={20} style={{ color: 'var(--accent-olive)' }} /> Exportar Conversa
-            </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--brown-light)', display: 'block', marginBottom: '8px' }}>Formato</label>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  {['txt', 'html'].map(fmt => (
-                    <button key={fmt} onClick={() => setExportFormat(fmt)} style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid', borderColor: exportFormat === fmt ? 'var(--accent-olive)' : 'var(--stone)', background: exportFormat === fmt ? 'var(--success-bg)' : 'transparent', cursor: 'pointer', fontWeight: exportFormat === fmt ? 600 : 400 }}>
-                      {fmt.toUpperCase()}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <button onClick={exportConversation} style={{ padding: '14px', background: 'var(--accent-olive)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                <Download size={18} /> Exportar {posts.length} mensagens
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ExportModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        channelInfo={canalAtivo}
+        messages={posts}
+        onSuccess={(result) => {
+          showToast(`Exportação concluída: ${result.filename}`, 'success')
+        }}
+        onError={(error) => {
+          showToast(`Erro na exportação: ${error}`, 'error')
+        }}
+      />
+
+      {/* ========== CREATE PRIVATE CHANNEL MODAL ========== */}
+      <CreatePrivateChannelModal
+        isOpen={showCreatePrivateChannel}
+        onClose={() => setShowCreatePrivateChannel(false)}
+        membros={membros}
+        currentUserId={profile?.id}
+        onCreateChannel={(channelData) => {
+          const channel = {
+            id: `private-${Date.now()}`,
+            nome: channelData.name,
+            members: channelData.members,
+            type: channelData.type,
+            isPrivate: true,
+            created_at: new Date().toISOString(),
+            createdBy: profile?.id
+          }
+          setPrivateChannels(prev => [...prev, channel])
+          showToast(`Canal privado "${channelData.name}" criado`, 'success')
+        }}
+      />
+
+      {/* ========== WEBHOOK SETTINGS MODAL ========== */}
+      <WebhookSettingsModal
+        isOpen={showWebhookSettings}
+        onClose={() => setShowWebhookSettings(false)}
+        webhooks={webhooks}
+        onAddWebhook={addWebhook}
+        onDeleteWebhook={deleteWebhook}
+        onToggleWebhook={toggleWebhook}
+        onTestWebhook={testWebhook}
+        channelInfo={canalAtivo}
+      />
+
+      {/* ========== SCHEDULE MESSAGE MODAL ========== */}
+      <ScheduleMessageModal
+        isOpen={showScheduleMessage}
+        onClose={() => setShowScheduleMessage(false)}
+        onSchedule={scheduleMessage}
+        channelInfo={canalAtivo}
+      />
+
+      {/* ========== EMAIL SETTINGS MODAL ========== */}
+      <EmailSettingsModal
+        isOpen={showEmailSettings}
+        onClose={() => setShowEmailSettings(false)}
+        emailSyncEnabled={emailSyncEnabled}
+        onToggleEmailSync={toggleEmailSync}
+        emailDigestFrequency={emailDigestFrequency}
+        onSetDigestFrequency={setEmailDigestFrequency}
+        email={profile?.email}
+      />
 
       {/* ========== STATUS MENU ========== */}
       {showStatusMenu && (
@@ -2404,5 +2562,6 @@ export default function Workspace() {
         }
       `}</style>
     </div>
+    </ThemeProvider>
   )
 }
