@@ -33,12 +33,33 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 
-    <!-- PWA -->
-    <link rel="manifest" href="/manifest.json" />
+    <!-- PWA - Manifest loaded dynamically based on path -->
+    <link rel="manifest" id="app-manifest" href="/manifest-platform.json" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Gavinho Obras" />
+    <meta name="apple-mobile-web-app-title" id="apple-app-title" content="Gavinho" />
+
+    <!-- Dynamic manifest and service worker based on path -->
+    <script>
+      (function() {
+        var isObraApp = window.location.pathname.startsWith('/obra-app');
+        var manifestLink = document.getElementById('app-manifest');
+        var appleTitle = document.getElementById('apple-app-title');
+
+        if (isObraApp) {
+          manifestLink.href = '/manifest-obras.json';
+          appleTitle.content = 'Gavinho Obras';
+
+          // Register service worker only for obra-app
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js')
+              .then(function(reg) { console.log('SW registered for Obra App'); })
+              .catch(function(err) { console.log('SW registration failed:', err); });
+          }
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
