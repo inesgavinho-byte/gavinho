@@ -97,7 +97,7 @@ import {
   useConfirm
 } from './Workspace/hooks'
 
-import { ConfirmModal, ToastContainer, ExportModal } from './Workspace/components/Modals'
+import { ConfirmModal, ToastContainer, ExportModal, CreatePrivateChannelModal, WebhookSettingsModal, ScheduleMessageModal, EmailSettingsModal } from './Workspace/components/Modals'
 import CentralEntregasChat from './Workspace/components/CentralEntregasChat'
 
 export default function Workspace() {
@@ -270,6 +270,10 @@ export default function Workspace() {
   const [emailSyncEnabled, setEmailSyncEnabled] = useState(false)
   const [emailDigestFrequency, setEmailDigestFrequency] = useState('daily')
   const [showEmailSettings, setShowEmailSettings] = useState(false)
+
+  // Scheduled Messages
+  const [scheduledMessages, setScheduledMessages] = useState([])
+  const [showScheduleMessage, setShowScheduleMessage] = useState(false)
 
   // Teams Import Hook
   const {
@@ -1386,26 +1390,83 @@ export default function Workspace() {
   }
 
   // ========== WEBHOOKS ==========
-  const addWebhook = () => {
-    if (!newWebhook.url.trim()) return
+  const addWebhook = (webhookData) => {
     const webhook = {
       id: `webhook-${Date.now()}`,
-      ...newWebhook,
+      url: webhookData.url,
+      name: webhookData.name || 'Webhook',
+      events: webhookData.events || [],
       created_at: new Date().toISOString(),
       active: true
     }
     setWebhooks(prev => [...prev, webhook])
-    setNewWebhook({ url: '', events: [] })
+    showToast(`Webhook "${webhook.name}" adicionado`, 'success')
   }
 
   const deleteWebhook = (webhookId) => {
     setWebhooks(prev => prev.filter(w => w.id !== webhookId))
+    showToast('Webhook removido', 'success')
   }
 
-  const triggerWebhook = (event, data) => {
-    webhooks.filter(w => w.active && w.events.includes(event)).forEach(webhook => {
-      // TODO: In production, would POST to webhook.url
-    })
+  const toggleWebhook = (webhookId) => {
+    setWebhooks(prev => prev.map(w =>
+      w.id === webhookId ? { ...w, active: !w.active } : w
+    ))
+  }
+
+  const testWebhook = async (webhook) => {
+    const payload = {
+      type: 'test',
+      timestamp: new Date().toISOString(),
+      channel: {
+        id: canalAtivo?.id,
+        code: canalAtivo?.codigo,
+        name: canalAtivo?.nome
+      },
+      message: 'Este é um teste do webhook'
+    }
+
+    try {
+      const response = await fetch(webhook.url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload),
+        mode: 'no-cors' // For cross-origin requests
+      })
+      return { success: true }
+    } catch (err) {
+      throw new Error('Não foi possível contactar o webhook')
+    }
+  }
+
+  const triggerWebhook = async (event, data) => {
+    const payload = {
+      type: event,
+      timestamp: new Date().toISOString(),
+      channel: {
+        id: canalAtivo?.id,
+        code: canalAtivo?.codigo,
+        name: canalAtivo?.nome
+      },
+      data
+    }
+
+    webhooks
+      .filter(w => w.active && w.events.includes(event))
+      .forEach(async (webhook) => {
+        try {
+          await fetch(webhook.url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            mode: 'no-cors'
+          })
+        } catch (err) {
+          console.error(`Webhook ${webhook.name} failed:`, err)
+        }
+      })
   }
 
   // ========== EMAIL SYNC ==========
@@ -1415,6 +1476,68 @@ export default function Workspace() {
       toastSuccess('Receberás resumos diários das conversas.', 'Sincronização de email ativada')
     }
   }
+
+  // ========== SCHEDULED MESSAGES ==========
+  const scheduleMessage = (scheduleData) => {
+    const scheduled = {
+      id: `scheduled-${Date.now()}`,
+      message: scheduleData.message,
+      scheduledFor: scheduleData.scheduledFor,
+      channelId: scheduleData.channelId || canalAtivo?.id,
+      channelName: canalAtivo?.nome,
+      channelCode: canalAtivo?.codigo,
+      created_at: new Date().toISOString(),
+      status: 'pending',
+      authorId: profile?.id,
+      authorName: profile?.nome
+    }
+    setScheduledMessages(prev => [...prev, scheduled])
+    toastSuccess(`Mensagem agendada para ${new Date(scheduleData.scheduledFor).toLocaleString('pt-PT')}`)
+  }
+
+  const cancelScheduledMessage = (scheduledId) => {
+    setScheduledMessages(prev => prev.filter(s => s.id !== scheduledId))
+    toastInfo('Mensagem agendada cancelada')
+  }
+
+  const sendScheduledMessage = async (scheduled) => {
+    if (scheduled.status !== 'pending') return
+
+    try {
+      // Mark as sending
+      setScheduledMessages(prev => prev.map(s =>
+        s.id === scheduled.id ? { ...s, status: 'sending' } : s
+      ))
+
+      // Send the message using existing sendMessage function
+      await sendMessage(scheduled.message, scheduled.channelId)
+
+      // Mark as sent
+      setScheduledMessages(prev => prev.map(s =>
+        s.id === scheduled.id ? { ...s, status: 'sent' } : s
+      ))
+      toastSuccess('Mensagem agendada enviada com sucesso')
+    } catch (err) {
+      setScheduledMessages(prev => prev.map(s =>
+        s.id === scheduled.id ? { ...s, status: 'failed' } : s
+      ))
+      toastError('Erro ao enviar mensagem agendada')
+    }
+  }
+
+  // Check for scheduled messages that need to be sent
+  useEffect(() => {
+    const checkScheduled = setInterval(() => {
+      const now = new Date()
+      scheduledMessages
+        .filter(s => s.status === 'pending' && new Date(s.scheduledFor) <= now)
+        .forEach(scheduled => {
+          sendScheduledMessage(scheduled)
+        })
+    }, 30000) // Check every 30 seconds
+
+    return () => clearInterval(checkScheduled)
+  }, [scheduledMessages])
 
   if (loading) {
     return (
@@ -1458,6 +1581,9 @@ export default function Workspace() {
         getUnreadActivityCount={getUnreadActivityCount}
         savedMessages={savedMessages}
         equipaAtiva={equipaAtiva}
+        privateChannels={privateChannels}
+        onCreatePrivateChannel={() => setShowCreatePrivateChannel(true)}
+        selectPrivateChannel={selectCanal}
       />
 
       {/* ========== ACTIVITY LOG PANEL ========== */}
@@ -1532,6 +1658,8 @@ export default function Workspace() {
           onLoadAnalytics={loadChannelAnalytics}
           onShowExportModal={() => setShowExportModal(true)}
           onScheduleMeeting={() => setShowScheduleMeetingModal(true)}
+          onScheduleMessage={() => setShowScheduleMessage(true)}
+          onEmailSettings={() => setShowEmailSettings(true)}
           onStartCall={() => startCall('audio')}
           activeTab={activeTab}
           setActiveTab={setActiveTab}
@@ -1615,6 +1743,7 @@ export default function Workspace() {
                     isMessageSaved={isMessageSaved}
                     isMessagePinned={isMessagePinned}
                     getReadStatus={getReadStatus}
+                    markMessageAsRead={markMessageAsRead}
                     messagesEndRef={messagesEndRef}
                     hasMoreMessages={hasMoreMessages}
                     loadingMoreMessages={loadingMoreMessages}
@@ -1989,6 +2118,58 @@ export default function Workspace() {
         onError={(error) => {
           showToast(`Erro na exportação: ${error}`, 'error')
         }}
+      />
+
+      {/* ========== CREATE PRIVATE CHANNEL MODAL ========== */}
+      <CreatePrivateChannelModal
+        isOpen={showCreatePrivateChannel}
+        onClose={() => setShowCreatePrivateChannel(false)}
+        membros={membros}
+        currentUserId={profile?.id}
+        onCreateChannel={(channelData) => {
+          const channel = {
+            id: `private-${Date.now()}`,
+            nome: channelData.name,
+            members: channelData.members,
+            type: channelData.type,
+            isPrivate: true,
+            created_at: new Date().toISOString(),
+            createdBy: profile?.id
+          }
+          setPrivateChannels(prev => [...prev, channel])
+          showToast(`Canal privado "${channelData.name}" criado`, 'success')
+        }}
+      />
+
+      {/* ========== WEBHOOK SETTINGS MODAL ========== */}
+      <WebhookSettingsModal
+        isOpen={showWebhookSettings}
+        onClose={() => setShowWebhookSettings(false)}
+        webhooks={webhooks}
+        onAddWebhook={addWebhook}
+        onDeleteWebhook={deleteWebhook}
+        onToggleWebhook={toggleWebhook}
+        onTestWebhook={testWebhook}
+        channelInfo={canalAtivo}
+      />
+
+      {/* ========== SCHEDULE MESSAGE MODAL ========== */}
+      <ScheduleMessageModal
+        isOpen={showScheduleMessage}
+        onClose={() => setShowScheduleMessage(false)}
+        onSchedule={scheduleMessage}
+        channelInfo={canalAtivo}
+      />
+
+      {/* ========== EMAIL SETTINGS MODAL ========== */}
+      <EmailSettingsModal
+        isOpen={showEmailSettings}
+        onClose={() => setShowEmailSettings(false)}
+        emailSyncEnabled={emailSyncEnabled}
+        onToggleEmailSync={toggleEmailSync}
+        emailDigestFrequency={emailDigestFrequency}
+        onSetDigestFrequency={setEmailDigestFrequency}
+        email={profile?.email}
       />
 
       {/* ========== STATUS MENU ========== */}

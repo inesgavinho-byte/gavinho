@@ -554,6 +554,7 @@ function MessageList({
   isMessageSaved,
   isMessagePinned,
   getReadStatus,
+  markMessageAsRead,
   messagesEndRef,
   // Pagination props
   hasMoreMessages = false,
@@ -564,6 +565,8 @@ function MessageList({
   const containerRef = useRef(null)
   const previousScrollHeightRef = useRef(0)
   const previousPostCountRef = useRef(0)
+  const observerRef = useRef(null)
+  const observedMessagesRef = useRef(new Set())
 
   // Memoize showAuthor calculation for each post
   const postsWithShowAuthor = useMemo(() => {
@@ -616,6 +619,47 @@ function MessageList({
     container.addEventListener('scroll', handleScroll)
     return () => container.removeEventListener('scroll', handleScroll)
   }, [handleScroll, onLoadMore])
+
+  // IntersectionObserver to mark messages as read when visible
+  useEffect(() => {
+    if (!markMessageAsRead || !profile?.id) return
+
+    // Create observer to track visible messages
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            const messageId = entry.target.dataset.messageId
+            const authorId = entry.target.dataset.authorId
+
+            // Only mark as read if it's not our own message and not already marked
+            if (messageId && authorId !== profile?.id && !observedMessagesRef.current.has(messageId)) {
+              observedMessagesRef.current.add(messageId)
+              // Small delay to simulate "reading" time
+              setTimeout(() => {
+                markMessageAsRead(messageId)
+              }, 500)
+            }
+          }
+        })
+      },
+      {
+        root: containerRef.current?.parentElement,
+        rootMargin: '0px',
+        threshold: 0.5 // 50% visibility required
+      }
+    )
+
+    // Observe all message elements
+    const messageElements = containerRef.current?.querySelectorAll('[data-message-id]')
+    messageElements?.forEach((el) => {
+      observerRef.current?.observe(el)
+    })
+
+    return () => {
+      observerRef.current?.disconnect()
+    }
+  }, [posts, markMessageAsRead, profile?.id])
 
   return (
     <div
@@ -671,18 +715,22 @@ function MessageList({
       )}
 
       {postsWithShowAuthor.map(({ post, showAuthor }) => (
-        <MessageItem
+        <div
           key={post.id}
-          post={post}
-          showAuthor={showAuthor}
-          profile={profile}
-          onlineUsers={onlineUsers}
-          editingMessage={editingMessage}
-          editingContent={editingContent}
-          setEditingContent={setEditingContent}
-          onSaveEdit={onSaveEdit}
-          onCancelEdit={onCancelEdit}
-          onReaction={onReaction}
+          data-message-id={post.id}
+          data-author-id={post.autor_id || post.autor?.id}
+        >
+          <MessageItem
+            post={post}
+            showAuthor={showAuthor}
+            profile={profile}
+            onlineUsers={onlineUsers}
+            editingMessage={editingMessage}
+            editingContent={editingContent}
+            setEditingContent={setEditingContent}
+            onSaveEdit={onSaveEdit}
+            onCancelEdit={onCancelEdit}
+            onReaction={onReaction}
           onReply={onReply}
           onOpenThread={onOpenThread}
           onSaveMessage={onSaveMessage}
@@ -697,6 +745,7 @@ function MessageList({
           showMessageMenu={showMessageMenu}
           setShowMessageMenu={handleSetShowMessageMenu}
         />
+        </div>
       ))}
 
       {posts.length === 0 && !loadingMoreMessages && (
