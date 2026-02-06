@@ -82,6 +82,7 @@ import ProjetoChatIA from '../components/projeto/ProjetoChatIA'
 import ProjetoAtas from '../components/ProjetoAtas'
 import ProjetoMoodboards from '../components/ProjetoMoodboards'
 import ProjetoLevantamento from '../components/ProjetoLevantamento'
+import ProjetoInspiracoes from '../components/ProjetoInspiracoes'
 
 // Importar constantes de ficheiros separados
 import {
@@ -2631,10 +2632,13 @@ export default function ProjetoDetalhe() {
 
           {/* Inspirações & Referências */}
           {activeArchvizSection === 'inspiracoes' && (
-            <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
-              <Palette size={48} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '16px' }} />
-              <h3 style={{ margin: '0 0 8px', color: 'var(--brown)' }}>Inspirações & Referências</h3>
-              <p style={{ color: 'var(--brown-light)', margin: 0 }}>Galeria de inspirações e referências visuais em desenvolvimento</p>
+            <div className="card">
+              <ProjetoInspiracoes
+                projeto={project}
+                userId={user?.id}
+                userName={user?.nome || user?.email}
+                compartimentosProjeto={projetoCompartimentos}
+              />
             </div>
           )}
 
