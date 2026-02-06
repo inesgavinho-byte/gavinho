@@ -7,8 +7,8 @@ import { useState, useEffect, useRef } from 'react'
 import {
   Menu, Clock, Package, LogOut, Bell, BellOff, HardHat,
   MessageSquare, Users, Loader2, CheckSquare, Image,
-  WifiOff, BookOpen, X, RefreshCw, ChevronDown, Check, Camera,
-  User, Settings
+  WifiOff, BookOpen, X, RefreshCw, ChevronDown, ChevronUp, Check, Camera,
+  User, Settings, Shield
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 
@@ -45,6 +45,8 @@ export default function ObraApp() {
   const [showAvatarModal, setShowAvatarModal] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [showProfilePage, setShowProfilePage] = useState(false)
+  const [obrasExpanded, setObrasExpanded] = useState(true)
+  const [refreshingObras, setRefreshingObras] = useState(false)
   const avatarInputRef = useRef(null)
 
   // Push notifications
@@ -139,6 +141,57 @@ export default function ObraApp() {
     setUser(updatedUser)
     localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(updatedUser))
   }
+
+  // Refresh obras from database (for admin/gestor users)
+  const refreshObras = async () => {
+    if (!user || refreshingObras) return
+
+    setRefreshingObras(true)
+    try {
+      let obrasData = []
+
+      if (user.tipo === 'gestao') {
+        // Gestão users get all obras
+        const { data, error } = await supabase
+          .from('obras')
+          .select('id, codigo, nome, status')
+          .order('codigo', { ascending: false })
+
+        if (error) throw error
+        obrasData = data || []
+      } else {
+        // Workers get only assigned obras
+        const { data, error } = await supabase
+          .from('trabalhador_obras')
+          .select('obra_id, obras(id, codigo, nome, status)')
+          .eq('trabalhador_id', user.id)
+
+        if (error) throw error
+        obrasData = data?.map(o => o.obras).filter(Boolean) || []
+      }
+
+      console.log(`[Refresh] Loaded ${obrasData.length} obras for user type: ${user.tipo}`)
+      setObras(obrasData)
+      localStorage.setItem(STORAGE_KEYS.OBRAS, JSON.stringify(obrasData))
+
+      // If current obra is no longer in the list, clear selection
+      if (obra && !obrasData.find(o => o.id === obra.id)) {
+        setObra(null)
+        localStorage.removeItem(STORAGE_KEYS.OBRA)
+      }
+    } catch (err) {
+      console.error('Erro ao atualizar obras:', err)
+    } finally {
+      setRefreshingObras(false)
+    }
+  }
+
+  // Auto-refresh obras for admin/gestor on mount
+  useEffect(() => {
+    if (user && user.tipo === 'gestao') {
+      refreshObras()
+    }
+  }, [user?.id])
 
   // ========== AVATAR UPLOAD ==========
   const handleAvatarSelect = async (e) => {
@@ -685,46 +738,143 @@ export default function ObraApp() {
                 </div>
               </div>
               <div style={{ flex: 1 }}>
-                <strong>{user.nome}</strong>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <strong>{user.nome}</strong>
+                  {user.isAdmin && (
+                    <span style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 2,
+                      background: '#fef3c7',
+                      color: '#d97706',
+                      fontSize: 9,
+                      padding: '2px 6px',
+                      borderRadius: 4,
+                      fontWeight: 600
+                    }}>
+                      <Shield size={10} /> Admin
+                    </span>
+                  )}
+                </div>
                 <p style={{ margin: 0, fontSize: 12, opacity: 0.7 }}>{user.cargo || 'Equipa'}</p>
+                {user.role && user.role !== 'user' && (
+                  <p style={{ margin: '2px 0 0', fontSize: 10, opacity: 0.5 }}>
+                    Nível: {user.role}
+                  </p>
+                )}
               </div>
               <Settings size={18} style={{ opacity: 0.6 }} />
             </div>
 
-            {/* Obra selector in menu */}
+            {/* Obra selector in menu - collapsible */}
             {obras.length > 0 && (
-              <div style={{ padding: '0 16px 16px', borderBottom: '1px solid #e5e7eb' }}>
-                <p style={{ fontSize: 11, color: '#9ca3af', marginBottom: 8, textTransform: 'uppercase' }}>
-                  Obra Ativa
-                </p>
-                {obras.map(o => (
-                  <button
-                    key={o.id}
-                    onClick={() => { handleSelectObra(o); setMenuOpen(false) }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 12,
-                      width: '100%',
-                      padding: '10px 12px',
-                      marginBottom: 4,
-                      background: obra?.id === o.id ? `${colors.primary}15` : '#f9fafb',
-                      border: obra?.id === o.id ? `1px solid ${colors.primary}` : '1px solid transparent',
-                      borderRadius: 8,
-                      cursor: 'pointer',
-                      textAlign: 'left'
-                    }}
+              <div style={{ borderBottom: '1px solid #e5e7eb' }}>
+                {/* Header with collapse toggle and refresh */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 16px',
+                  cursor: 'pointer',
+                  background: '#f9fafb'
+                }}>
+                  <div
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}
+                    onClick={() => setObrasExpanded(!obrasExpanded)}
                   >
-                    <HardHat size={18} color={obra?.id === o.id ? colors.primary : '#6b7280'} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: obra?.id === o.id ? colors.primary : '#374151' }}>
-                        {o.codigo}
-                      </div>
-                      <div style={{ fontSize: 11, color: '#6b7280' }}>{o.nome}</div>
-                    </div>
-                    {obra?.id === o.id && <Check size={16} color={colors.primary} />}
-                  </button>
-                ))}
+                    {obrasExpanded ? <ChevronUp size={16} color="#6b7280" /> : <ChevronDown size={16} color="#6b7280" />}
+                    <span style={{ fontSize: 11, color: '#6b7280', textTransform: 'uppercase', fontWeight: 600 }}>
+                      Obras ({obras.length})
+                    </span>
+                  </div>
+                  {user?.tipo === 'gestao' && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); refreshObras() }}
+                      disabled={refreshingObras}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        padding: 4,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
+                      title="Atualizar lista de obras"
+                    >
+                      <RefreshCw
+                        size={14}
+                        color="#6b7280"
+                        style={refreshingObras ? { animation: 'spin 1s linear infinite' } : {}}
+                      />
+                    </button>
+                  )}
+                </div>
+
+                {/* Collapsible obras list */}
+                {obrasExpanded && (
+                  <div style={{ padding: '0 16px 16px', maxHeight: 300, overflowY: 'auto' }}>
+                    {obras.map(o => (
+                      <button
+                        key={o.id}
+                        onClick={() => { handleSelectObra(o); setMenuOpen(false) }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 12,
+                          width: '100%',
+                          padding: '10px 12px',
+                          marginBottom: 4,
+                          background: obra?.id === o.id ? `${colors.primary}15` : 'white',
+                          border: obra?.id === o.id ? `1px solid ${colors.primary}` : '1px solid #e5e7eb',
+                          borderRadius: 8,
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <HardHat size={18} color={obra?.id === o.id ? colors.primary : '#6b7280'} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{
+                            fontSize: 13,
+                            fontWeight: 600,
+                            color: obra?.id === o.id ? colors.primary : '#374151',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                          }}>
+                            {o.codigo}
+                          </div>
+                          <div style={{
+                            fontSize: 11,
+                            color: '#6b7280',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                          }}>{o.nome}</div>
+                          {o.status && (
+                            <span style={{
+                              fontSize: 9,
+                              padding: '2px 6px',
+                              borderRadius: 4,
+                              background: o.status === 'em_curso' ? '#dcfce7' :
+                                         o.status === 'concluída' ? '#dbeafe' :
+                                         o.status === 'pausada' ? '#fef3c7' : '#f3f4f6',
+                              color: o.status === 'em_curso' ? '#16a34a' :
+                                    o.status === 'concluída' ? '#2563eb' :
+                                    o.status === 'pausada' ? '#d97706' : '#6b7280',
+                              textTransform: 'capitalize',
+                              marginTop: 4,
+                              display: 'inline-block'
+                            }}>
+                              {o.status.replace('_', ' ')}
+                            </span>
+                          )}
+                        </div>
+                        {obra?.id === o.id && <Check size={16} color={colors.primary} />}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 

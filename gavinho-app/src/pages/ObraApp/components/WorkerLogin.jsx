@@ -99,14 +99,25 @@ export default function WorkerLogin({ onLogin }) {
           : authError.message)
       }
 
-      // Get user profile
+      // Get user profile from profiles table
       const { data: profile } = await supabase
         .from('profiles')
         .select('id, nome, email, cargo')
         .eq('id', authData.user.id)
         .single()
 
-      // Get all obras (managers can access all)
+      // Also check utilizadores table for role (admin, gestor, tecnico, user)
+      const { data: utilizador } = await supabase
+        .from('utilizadores')
+        .select('role, nome, cargo')
+        .eq('email', authData.user.email)
+        .eq('ativo', true)
+        .single()
+
+      const isAdmin = utilizador?.role === 'admin'
+      const isGestor = ['admin', 'gestor'].includes(utilizador?.role)
+
+      // Get ALL obras for admin/gestor users (no status filter)
       const { data: obrasData, error: obrasError } = await supabase
         .from('obras')
         .select('id, codigo, nome, status')
@@ -114,12 +125,17 @@ export default function WorkerLogin({ onLogin }) {
 
       if (obrasError) throw obrasError
 
+      console.log(`[Login] User role: ${utilizador?.role}, Obras loaded: ${obrasData?.length}`)
+
       const user = {
         id: authData.user.id,
-        nome: profile?.nome || authData.user.email.split('@')[0],
+        nome: utilizador?.nome || profile?.nome || authData.user.email.split('@')[0],
         email: authData.user.email,
-        cargo: profile?.cargo || 'Gestão',
-        tipo: 'gestao'
+        cargo: utilizador?.cargo || profile?.cargo || 'Gestão',
+        role: utilizador?.role || 'user',
+        tipo: 'gestao',
+        isAdmin,
+        isGestor
       }
 
       localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user))
