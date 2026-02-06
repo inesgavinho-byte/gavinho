@@ -322,6 +322,8 @@ export default function ProjetoDetalhe() {
         setActiveArchvizSection(urlSubtab)
       } else if (urlTab === 'gestao') {
         setActiveGestaoSection(urlSubtab)
+      } else if (urlTab === 'briefing') {
+        setActiveBriefingSection(urlSubtab)
       }
     }
   }, [urlTab, urlSubtab])
