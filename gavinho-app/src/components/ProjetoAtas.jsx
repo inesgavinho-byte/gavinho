@@ -163,9 +163,18 @@ function SimpleRichEditor({ value, onChange, placeholder, minHeight = '300px' })
   )
 }
 
-// Document Separator Item in sidebar
+// Document Separator Item in sidebar with smooth collapse/expand animation
 function SeparatorItem({ section, atas, isExpanded, onToggle, onSelectAta, selectedAtaId, onAddAta }) {
   const sectionAtas = atas.filter(a => a.secao === section.id)
+  const contentRef = useRef(null)
+  const [contentHeight, setContentHeight] = useState(0)
+
+  // Calculate content height for smooth animation
+  useEffect(() => {
+    if (contentRef.current) {
+      setContentHeight(contentRef.current.scrollHeight)
+    }
+  }, [sectionAtas.length, isExpanded])
 
   return (
     <div style={{ marginBottom: '4px' }}>
@@ -184,11 +193,15 @@ function SeparatorItem({ section, atas, isExpanded, onToggle, onSelectAta, selec
         onMouseEnter={(e) => !isExpanded && (e.currentTarget.style.background = 'rgba(90, 74, 58, 0.05)')}
         onMouseLeave={(e) => !isExpanded && (e.currentTarget.style.background = 'transparent')}
       >
-        {isExpanded ? (
-          <ChevronDown size={14} style={{ color: 'var(--brown-light)' }} />
-        ) : (
+        <div style={{
+          transition: 'transform 0.2s ease-out',
+          transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
           <ChevronRight size={14} style={{ color: 'var(--brown-light)' }} />
-        )}
+        </div>
         <Hash size={14} style={{ color: 'var(--brown)' }} />
         <span style={{
           flex: 1,
@@ -210,8 +223,14 @@ function SeparatorItem({ section, atas, isExpanded, onToggle, onSelectAta, selec
         </span>
       </div>
 
-      {isExpanded && (
-        <div style={{ paddingLeft: '20px' }}>
+      {/* Animated collapsible content */}
+      <div style={{
+        overflow: 'hidden',
+        transition: 'max-height 0.25s ease-out, opacity 0.2s ease-out',
+        maxHeight: isExpanded ? `${contentHeight + 20}px` : '0px',
+        opacity: isExpanded ? 1 : 0
+      }}>
+        <div ref={contentRef} style={{ paddingLeft: '20px' }}>
           {sectionAtas.map(ata => (
             <div
               key={ata.id}
@@ -270,7 +289,7 @@ function SeparatorItem({ section, atas, isExpanded, onToggle, onSelectAta, selec
             <span>Nova ata</span>
           </div>
         </div>
-      )}
+      </div>
     </div>
   )
 }
@@ -984,6 +1003,9 @@ function AtaPreview({ ata, projeto, onClose }) {
   )
 }
 
+// LocalStorage key for expanded sections
+const STORAGE_KEY_PREFIX = 'gavinho_atas_expanded_'
+
 // Main Component
 export default function ProjetoAtas({ projeto }) {
   const [atas, setAtas] = useState([])
@@ -992,7 +1014,21 @@ export default function ProjetoAtas({ projeto }) {
   const [selectedAta, setSelectedAta] = useState(null)
   const [previewAta, setPreviewAta] = useState(null)
   const [sections, setSections] = useState(defaultSections)
-  const [expandedSections, setExpandedSections] = useState(['diario_bordo', 'reunioes_equipa', 'reunioes_cliente'])
+
+  // Initialize expanded sections from localStorage or use defaults
+  const [expandedSections, setExpandedSections] = useState(() => {
+    if (typeof window !== 'undefined' && projeto?.id) {
+      const stored = localStorage.getItem(`${STORAGE_KEY_PREFIX}${projeto.id}`)
+      if (stored) {
+        try {
+          return JSON.parse(stored)
+        } catch {
+          return ['diario_bordo', 'reunioes_equipa', 'reunioes_cliente']
+        }
+      }
+    }
+    return ['diario_bordo', 'reunioes_equipa', 'reunioes_cliente']
+  })
   const [hasChanges, setHasChanges] = useState(false)
 
   // Auto-save timer ref
@@ -1001,8 +1037,24 @@ export default function ProjetoAtas({ projeto }) {
   useEffect(() => {
     if (projeto?.id) {
       loadAtas()
+      // Load expanded sections from localStorage when project changes
+      const stored = localStorage.getItem(`${STORAGE_KEY_PREFIX}${projeto.id}`)
+      if (stored) {
+        try {
+          setExpandedSections(JSON.parse(stored))
+        } catch {
+          // Keep default if parse fails
+        }
+      }
     }
   }, [projeto?.id])
+
+  // Save expanded sections to localStorage whenever they change
+  useEffect(() => {
+    if (projeto?.id && typeof window !== 'undefined') {
+      localStorage.setItem(`${STORAGE_KEY_PREFIX}${projeto.id}`, JSON.stringify(expandedSections))
+    }
+  }, [expandedSections, projeto?.id])
 
   // Auto-save when ata changes
   useEffect(() => {
