@@ -128,18 +128,30 @@ export default function Configuracoes() {
 
     setSaving(true)
     try {
+      // Garantir que configuracoes existe e merge com existente
+      const currentConfig = profile.configuracoes || {}
+      const newConfig = {
+        ...currentConfig,
+        notificacoes
+      }
+
       const { error } = await supabase
         .from('utilizadores')
         .update({
-          configuracoes: {
-            ...profile.configuracoes,
-            notificacoes
-          },
+          configuracoes: newConfig,
           updated_at: new Date().toISOString()
         })
         .eq('id', profile.id)
 
-      if (error) throw error
+      if (error) {
+        // Se a coluna nao existe, informar o utilizador
+        if (error.code === '42703' || error.message?.includes('column')) {
+          showMessage('Coluna de configuracoes nao existe. Contacta o administrador.', 'error')
+        } else {
+          throw error
+        }
+        return
+      }
       showMessage('Preferencias de notificacoes atualizadas!')
     } catch (err) {
       console.error('Erro ao guardar notificacoes:', err)

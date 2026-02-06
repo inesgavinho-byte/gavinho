@@ -138,7 +138,7 @@ export default function Workspace() {
     loading, equipas, equipaAtiva, equipasExpanded, canais, canalAtivo,
     channelTopics, activeTopic, showAddTopic, newTopicName, activeTab, membros, favoriteChannels,
     setEquipaAtiva, setEquipasExpanded, setCanalAtivo, setActiveTopic, setShowAddTopic,
-    setNewTopicName, setActiveTab, setMembros, loadData, loadTopics, addTopic,
+    setNewTopicName, setActiveTab, setMembros, loadData, loadTopics, addTopic, renameTopic, removeTopic,
     getEquipaCanais, toggleEquipa, selectCanal, toggleFavorite, isFavorite, getChannelLink
   } = useChannelData()
 
@@ -177,8 +177,10 @@ export default function Workspace() {
     toggleMuteChannel, isChannelMuted, toggleSound, playNotificationSound,
     togglePinMessage, isMessagePinned, getChannelPinnedMessages, toggleDnd,
     updateDndSchedule, isDndActive, addReminder, removeReminder,
-    markReminderComplete, getActiveReminders, openReminderModal
-  } = useNotifications()
+    markReminderComplete, getActiveReminders, openReminderModal,
+    // Mention notifications
+    parseMentions, findMentionedUserIds, createMentionNotifications
+  } = useNotifications(profile)
 
   // Toast & Confirm Hooks (replacing alert/confirm)
   const { toasts, success: toastSuccess, error: toastError, info: toastInfo, dismissToast } = useToast()
@@ -465,6 +467,18 @@ export default function Workspace() {
       }
 
       setPosts(prev => [...prev, newPost])
+
+      // Criar notificações para @menções
+      if (parseMentions && findMentionedUserIds && createMentionNotifications) {
+        const mentionedNames = parseMentions(messageInput)
+        if (mentionedNames.length > 0) {
+          const mentionedUserIds = findMentionedUserIds(mentionedNames, membros)
+          if (mentionedUserIds.length > 0) {
+            await createMentionNotifications(insertedMessage, mentionedUserIds, canalAtivo)
+          }
+        }
+      }
+
       setMessageInput('')
       setSelectedFiles([])
       setReplyingTo(null)
@@ -1067,6 +1081,17 @@ export default function Workspace() {
     if (activeTopic === topicId) {
       setActiveTopic('geral')
     }
+  }
+
+  // Rename custom topic
+  const renameCustomTopic = (topicId, newName) => {
+    if (!canalAtivo || !newName.trim()) return
+    setChannelTopics(prev => ({
+      ...prev,
+      [canalAtivo.id]: (prev[canalAtivo.id] || DEFAULT_TOPICS).map(t =>
+        t.id === topicId ? { ...t, nome: newName.trim() } : t
+      )
+    }))
   }
 
   // Get topic icon component
@@ -1753,6 +1778,7 @@ export default function Workspace() {
           setNewTopicName={setNewTopicName}
           onAddCustomTopic={addCustomTopic}
           onRemoveCustomTopic={removeCustomTopic}
+          onRenameCustomTopic={renameCustomTopic}
           showPinnedMessages={showPinnedMessages}
           setShowPinnedMessages={setShowPinnedMessages}
           getCurrentChannelPinnedMessages={getCurrentChannelPinnedMessages}

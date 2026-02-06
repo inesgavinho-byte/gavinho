@@ -4,11 +4,12 @@
 // Includes tabs, filters, topics bar, and pinned messages bar
 // =====================================================
 
+import { useState } from 'react'
 import {
   MessageSquare, FileText, StickyNote, CheckSquare,
   Check, Link2, Video, Phone, MessageCircle, Sparkles,
   BarChart3, FileDown, CalendarPlus, Settings, Plus, X,
-  SlidersHorizontal, User, CalendarDays, Paperclip, AtSign, Pin, Clock, Mail
+  SlidersHorizontal, User, CalendarDays, Paperclip, AtSign, Pin, Clock, Mail, Edit
 } from 'lucide-react'
 
 import { FILTER_OPTIONS } from '../utils/constants'
@@ -64,16 +65,40 @@ export default function ChannelHeader({
   setNewTopicName,
   onAddCustomTopic,
   onRemoveCustomTopic,
+  onRenameCustomTopic,
 
   // Pinned messages
   showPinnedMessages,
   setShowPinnedMessages,
   getCurrentChannelPinnedMessages
 }) {
+  // State for topic editing
+  const [editingTopicId, setEditingTopicId] = useState(null)
+  const [editingTopicName, setEditingTopicName] = useState('')
+
   if (!canalAtivo) return null
 
   const equipa = equipas.find(e => e.id === canalAtivo.equipa)
   const pinnedMessages = getCurrentChannelPinnedMessages?.() || []
+
+  // Handle topic rename
+  const handleStartEditTopic = (topic) => {
+    setEditingTopicId(topic.id)
+    setEditingTopicName(topic.nome)
+  }
+
+  const handleSaveEditTopic = () => {
+    if (editingTopicId && editingTopicName.trim()) {
+      onRenameCustomTopic?.(editingTopicId, editingTopicName.trim())
+    }
+    setEditingTopicId(null)
+    setEditingTopicName('')
+  }
+
+  const handleCancelEditTopic = () => {
+    setEditingTopicId(null)
+    setEditingTopicName('')
+  }
 
   return (
     <>
@@ -378,39 +403,118 @@ export default function ChannelHeader({
           {getCurrentChannelTopics().map(topic => {
             const IconComponent = getTopicIcon(topic.icon)
             const isActive = activeTopic === topic.id
-            return (
-              <button
-                key={topic.id}
-                onClick={() => setActiveTopic(topic.id)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '6px 12px',
-                  borderRadius: '16px',
-                  background: isActive ? topic.cor : 'var(--white)',
-                  border: isActive ? 'none' : '1px solid var(--stone)',
-                  cursor: 'pointer',
-                  color: isActive ? 'white' : 'var(--brown)',
-                  fontSize: '12px',
-                  fontWeight: isActive ? 600 : 400,
-                  whiteSpace: 'nowrap',
-                  transition: 'all 0.15s'
-                }}
-              >
-                <IconComponent size={14} />
-                {topic.nome}
-                {topic.custom && isActive && (
-                  <X
-                    size={12}
-                    style={{ marginLeft: '4px', cursor: 'pointer' }}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onRemoveCustomTopic?.(topic.id)
+            const isEditing = editingTopicId === topic.id
+
+            // Render editing input
+            if (isEditing) {
+              return (
+                <div key={topic.id} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <input
+                    type="text"
+                    value={editingTopicName}
+                    onChange={(e) => setEditingTopicName(e.target.value)}
+                    style={{
+                      padding: '6px 10px',
+                      border: '1px solid var(--accent-olive)',
+                      borderRadius: '16px',
+                      fontSize: '12px',
+                      width: '120px',
+                      outline: 'none'
+                    }}
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSaveEditTopic()
+                      if (e.key === 'Escape') handleCancelEditTopic()
                     }}
                   />
-                )}
-              </button>
+                  <button
+                    onClick={handleSaveEditTopic}
+                    style={{
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      background: 'var(--accent-olive)',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: 'white',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    <Check size={12} />
+                  </button>
+                  <button
+                    onClick={handleCancelEditTopic}
+                    style={{
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      background: 'var(--stone)',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: 'var(--brown-light)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              )
+            }
+
+            return (
+              <div
+                key={topic.id}
+                style={{ position: 'relative', display: 'inline-flex' }}
+                className="topic-item"
+              >
+                <button
+                  onClick={() => setActiveTopic(topic.id)}
+                  onDoubleClick={() => topic.custom && handleStartEditTopic(topic)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 12px',
+                    borderRadius: '16px',
+                    background: isActive ? topic.cor : 'var(--white)',
+                    border: isActive ? 'none' : '1px solid var(--stone)',
+                    cursor: 'pointer',
+                    color: isActive ? 'white' : 'var(--brown)',
+                    fontSize: '12px',
+                    fontWeight: isActive ? 600 : 400,
+                    whiteSpace: 'nowrap',
+                    transition: 'all 0.15s'
+                  }}
+                  title={topic.custom ? 'Duplo-clique para editar' : undefined}
+                >
+                  <IconComponent size={14} />
+                  {topic.nome}
+                  {topic.custom && isActive && (
+                    <>
+                      <Edit
+                        size={12}
+                        style={{ marginLeft: '2px', cursor: 'pointer', opacity: 0.8 }}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleStartEditTopic(topic)
+                        }}
+                      />
+                      <X
+                        size={12}
+                        style={{ cursor: 'pointer', opacity: 0.8 }}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onRemoveCustomTopic?.(topic.id)
+                        }}
+                      />
+                    </>
+                  )}
+                </button>
+              </div>
             )
           })}
 

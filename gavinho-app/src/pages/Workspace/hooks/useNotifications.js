@@ -214,17 +214,24 @@ export default function useNotifications(profile) {
       const notificationsToInsert = mentionedUserIds
         .filter(userId => userId !== profile.id)
         .map(userId => ({
-          utilizador_id: userId,
-          tipo: 'mention',
-          mensagem_id: message.id,
-          canal_id: message.canal_id,
-          remetente_id: profile.id,
-          conteudo: `${profile.nome || 'Alguém'} mencionou-te em ${canalInfo?.nome || 'uma conversa'}`,
-          lido: false
+          user_id: userId,
+          sender_id: profile.id,
+          type: 'mention',
+          title: '@Menção',
+          message: `${profile.nome || 'Alguém'} mencionou-te: "${message.conteudo?.substring(0, 50)}${message.conteudo?.length > 50 ? '...' : ''}"`,
+          context: {
+            project: canalInfo?.codigo || canalInfo?.nome,
+            channel: canalInfo?.nome,
+            message_id: message.id,
+            canal_id: message.canal_id
+          },
+          link: `/workspace?canal=${message.canal_id}`,
+          read: false
         }))
 
       if (notificationsToInsert.length > 0) {
-        await supabase.from('notificacoes').insert(notificationsToInsert)
+        const { error } = await supabase.from('notificacoes').insert(notificationsToInsert)
+        if (error) throw error
       }
     } catch (err) {
       // Silent fail - notifications table might not exist
