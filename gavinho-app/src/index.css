@@ -3567,9 +3567,9 @@ tbody tr:last-child td {
   color: var(--brown-light);
 }
 
-/* Final Image Border */
+/* Final Images - Clean minimal style like Pinterest */
 .masonry-card.is-final {
-  border: 3px solid var(--success);
+  /* No border - clean minimalist look */
 }
 
 /* Loading Placeholder */

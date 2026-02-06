@@ -2975,7 +2975,6 @@ export default function ProjetoDetalhe() {
                   key={render.id}
                   className="masonry-card"
                   style={{
-                    border: '3px solid var(--success)',
                     cursor: render.imagem_url ? 'pointer' : 'default'
                   }}
                   onClick={() => render.imagem_url && openLightbox(render, imagensFinais)}
