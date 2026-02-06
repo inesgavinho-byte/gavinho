@@ -760,3 +760,250 @@ obra_acoes (1) ──── (N) obra_acoes_historico
 ---
 
 > **Este documento deve ser mantido atualizado quando forem criadas novas tabelas ou alterado o schema.**
+
+---
+
+## Briefing de Continuacao de Desenvolvimento
+
+> **Secao criada para facilitar a continuidade do desenvolvimento entre sessoes**
+
+### Estado Atual do Projeto
+
+A plataforma Gavinho e uma aplicacao completa de **gestao de construcao civil** com as seguintes areas funcionais implementadas:
+
+#### Modulos Implementados
+
+| Modulo | Estado | Descricao |
+|--------|--------|-----------|
+| **Autenticacao** | Completo | Login email/password, OAuth Google, recuperacao senha |
+| **Gestao Projetos** | Completo | CRUD projetos GA/GB, dashboard, documentos, entregaveis |
+| **Gestao Obras** | Completo | CRUD obras com cards, diario obra, autos, licencas |
+| **Chat Obras WhatsApp** | Completo | Integracao Twilio, canais, contactos, historico |
+| **Processamento IA** | Completo | Analise automatica de mensagens, sugestoes, cron |
+| **Sistema Comunicacoes** | Completo | Canais, emails, timeline unificada, acoes operacionais |
+| **Exportacao PDF** | Completo | Diario de obra exportavel para PDF |
+| **Biblioteca** | Parcial | Materiais, inspiracao, modelos 3D |
+| **Financeiro** | Parcial | Faturas, recibos, pagamentos |
+| **Orcamentos** | Parcial | Propostas, itens, capitulos |
+
+---
+
+### Arquitetura Tecnica
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        FRONTEND                                  │
+│  React 19 + Vite + React Router 7                               │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
+│  │   Pages     │  │ Components  │  │  Contexts   │              │
+│  │ (39 paginas)│  │(11 comps)   │  │ (AuthContext)│              │
+│  └─────────────┘  └─────────────┘  └─────────────┘              │
+└─────────────────────────┬───────────────────────────────────────┘
+                          │ supabase-js
+┌─────────────────────────▼───────────────────────────────────────┐
+│                       SUPABASE                                   │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
+│  │  Database   │  │    Auth     │  │   Storage   │              │
+│  │ (74+ tabelas)│  │ (usuarios) │  │ (ficheiros) │              │
+│  └─────────────┘  └─────────────┘  └─────────────┘              │
+│  ┌──────────────────────────────────────────────┐               │
+│  │           Edge Functions (Deno)               │               │
+│  │  analisar-mensagens | processar-mensagens-cron│               │
+│  │  twilio-send/webhook | email-send/webhook     │               │
+│  │  twilio-conversations | obra-acoes            │               │
+│  └──────────────────────────────────────────────┘               │
+└─────────────────────────┬───────────────────────────────────────┘
+                          │
+┌─────────────────────────▼───────────────────────────────────────┐
+│                    INTEGRACOES EXTERNAS                         │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
+│  │   Twilio    │  │  SendGrid   │  │  Anthropic  │              │
+│  │  WhatsApp   │  │   Resend    │  │   OpenAI    │              │
+│  └─────────────┘  └─────────────┘  └─────────────┘              │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Ficheiros Principais por Modulo
+
+#### Autenticacao e Layout
+| Ficheiro | Localizacao | Funcao |
+|----------|-------------|--------|
+| `AuthContext.jsx` | `src/contexts/` | Gestao estado auth, roles, permissoes |
+| `Layout.jsx` | `src/components/` | Layout principal com sidebar responsiva |
+| `ProtectedRoute.jsx` | `src/components/` | HOC protecao de rotas |
+| `Login.jsx` | `src/pages/` | Pagina de login |
+
+#### Gestao de Projetos
+| Ficheiro | Localizacao | Funcao |
+|----------|-------------|--------|
+| `Projetos.jsx` | `src/pages/` | Lista projetos com cards/grid |
+| `ProjetoDetalhe.jsx` | `src/pages/` | Detalhe com abas |
+| `ProjetoDocumentos.jsx` | `src/components/` | Gestao documentos |
+| `ProjetoEntregaveis.jsx` | `src/components/` | Gestao entregaveis |
+
+#### Gestao de Obras
+| Ficheiro | Localizacao | Funcao |
+|----------|-------------|--------|
+| `Obras.jsx` | `src/pages/` | Lista obras com cards (redesenhado) |
+| `ObraDetalhe.jsx` | `src/pages/` | Detalhe com abas |
+| `DiarioObra.jsx` | `src/pages/` | Diario de obra com export PDF |
+| `ChatObras.jsx` | `src/pages/` | Chat WhatsApp + IA (principal) |
+| `ObraComunicacoes.jsx` | `src/pages/` | Comunicacoes da obra |
+
+#### Edge Functions IA
+| Ficheiro | Localizacao | Funcao |
+|----------|-------------|--------|
+| `analisar-mensagens/` | `supabase/functions/` | Analise IA de mensagens |
+| `processar-mensagens-cron/` | `supabase/functions/` | Processamento automatico periodico |
+| `obra-acoes/` | `supabase/functions/` | Criar acoes de mensagens/IA |
+
+#### Edge Functions Comunicacao
+| Ficheiro | Localizacao | Funcao |
+|----------|-------------|--------|
+| `twilio-send/` | `supabase/functions/` | Enviar WhatsApp |
+| `twilio-webhook/` | `supabase/functions/` | Receber WhatsApp |
+| `twilio-conversations/` | `supabase/functions/` | Gestao conversas |
+| `email-send/` | `supabase/functions/` | Enviar email |
+| `email-webhook/` | `supabase/functions/` | Webhooks email |
+
+---
+
+### Fluxo do Sistema de IA
+
+```
+Mensagem WhatsApp/Email
+        │
+        ▼
+┌───────────────────┐
+│  twilio-webhook   │ ──► Armazena em whatsapp_mensagens
+│  email-webhook    │     (processada_ia = false)
+└───────────────────┘
+        │
+        ▼ (cron ou manual)
+┌───────────────────┐
+│ processar-cron    │ ──► Busca mensagens nao processadas
+│ analisar-mensagens│
+└───────────────────┘
+        │
+        ▼
+┌───────────────────┐
+│   Anthropic/      │ ──► Identifica tipo:
+│   OpenAI API      │     - requisicao_material
+└───────────────────┘     - registo_horas
+        │                 - trabalho_executado
+        ▼                 - nova_tarefa
+┌───────────────────┐     - nao_conformidade
+│   ia_sugestoes    │
+└───────────────────┘
+        │
+        ▼ (utilizador aceita)
+┌───────────────────┐
+│   obra-acoes      │ ──► Cria acao em obra_acoes
+└───────────────────┘
+```
+
+---
+
+### Variaveis de Ambiente Necessarias
+
+#### Frontend (.env)
+```
+VITE_SUPABASE_URL=https://xxx.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+#### Supabase Secrets (Edge Functions)
+```
+ANTHROPIC_API_KEY=sk-ant-...
+OPENAI_API_KEY=sk-...
+SENDGRID_API_KEY=SG...
+RESEND_API_KEY=re_...
+```
+
+#### Twilio (Tabela whatsapp_config)
+```sql
+-- Credenciais Twilio armazenadas na tabela whatsapp_config
+SELECT twilio_account_sid, twilio_phone_number FROM whatsapp_config WHERE ativo = true;
+```
+
+---
+
+### Areas para Continuacao de Desenvolvimento
+
+#### Prioridade Alta
+| Area | Descricao | Tabelas Relacionadas |
+|------|-----------|---------------------|
+| **Notificacoes Push** | Sistema de notificacoes em tempo real | Criar `notificacoes` |
+| **Dashboard Analitico** | Metricas e KPIs de projetos/obras | Views agregadas |
+| **Mobile PWA** | Otimizacao para instalacao mobile | - |
+
+#### Prioridade Media
+| Area | Descricao | Tabelas Relacionadas |
+|------|-----------|---------------------|
+| **Orcamentos Completo** | Fluxo completo de orcamentacao | `orcamentos`, `orcamento_capitulos` |
+| **Financeiro Completo** | Faturas, recibos, pagamentos | `faturas`, `recibos_*` |
+| **Relatorios Avancados** | Exportacao Word/Excel | - |
+
+#### Prioridade Baixa
+| Area | Descricao | Tabelas Relacionadas |
+|------|-----------|---------------------|
+| **Integracao Calendario** | Sync com Google Calendar | `calendario_eventos` |
+| **Biblioteca Completa** | Upload 3D, categorias avancadas | `biblioteca_*` |
+| **Multi-tenant** | Suporte a multiplas empresas | Refatoracao RLS |
+
+---
+
+### Comandos Uteis
+
+```bash
+# Desenvolvimento
+cd gavinho-app && npm run dev
+
+# Build
+npm run build
+
+# Deploy Edge Functions
+supabase functions deploy analisar-mensagens
+supabase functions deploy processar-mensagens-cron
+
+# Logs Edge Functions
+supabase functions logs analisar-mensagens --tail
+
+# Testar Edge Function localmente
+supabase functions serve analisar-mensagens --env-file .env.local
+```
+
+---
+
+### Dependencias Principais
+
+```json
+{
+  "react": "^19.2.0",
+  "react-router": "^7.11.0",
+  "@supabase/supabase-js": "^2.88.0",
+  "lucide-react": "^0.511.0",
+  "jspdf": "^4.0.0",
+  "html2canvas": "^1.4.1",
+  "xlsx": "^0.18.5",
+  "docx": "^9.5.1",
+  "file-saver": "^2.0.5"
+}
+```
+
+---
+
+### Convencoes de Codigo
+
+1. **Nomes de ficheiros**: PascalCase para componentes (`ChatObras.jsx`)
+2. **Estilos**: CSS-in-JS inline com objetos JavaScript
+3. **Estado**: useState/useEffect local, Context API para global
+4. **Queries**: Supabase client direto nas paginas/componentes
+5. **Tipos de acao IA**: `requisicao_material`, `registo_horas`, `trabalho_executado`, `nova_tarefa`, `nao_conformidade`
+6. **Estados de acao**: `pendente`, `em_progresso`, `aguarda_validacao`, `concluida`, `cancelada`, `adiada`
+
+---
+
+> **Nota**: Este briefing deve ser atualizado sempre que houver alteracoes significativas na arquitetura ou novas funcionalidades implementadas.
