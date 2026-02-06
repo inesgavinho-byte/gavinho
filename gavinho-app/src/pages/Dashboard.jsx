@@ -17,6 +17,12 @@ import {
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import {
+  CriticalDeadlinesWidget,
+  BudgetHealthWidget,
+  PendingApprovalsWidget,
+  UnreadMessagesWidget
+} from '../components/DashboardWidgets'
 
 export default function Dashboard() {
   const navigate = useNavigate()
@@ -298,7 +304,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="card" style={{ 
+        <div className="card" style={{
           background: 'linear-gradient(135deg, rgba(184, 138, 138, 0.1) 0%, rgba(184, 138, 138, 0.05) 100%)',
           borderLeft: '4px solid var(--error)'
         }}>
@@ -312,6 +318,14 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* KPI Widgets Row */}
+      <div className="grid grid-4 mb-xl" style={{ gap: '20px' }}>
+        <CriticalDeadlinesWidget />
+        <BudgetHealthWidget />
+        <PendingApprovalsWidget />
+        <UnreadMessagesWidget />
       </div>
 
       {/* Main Content */}
