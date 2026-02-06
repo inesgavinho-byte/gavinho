@@ -204,6 +204,10 @@ export default function ProjetoDetalhe() {
     data_upload: new Date().toISOString().split('T')[0]
   })
 
+  // Imagens finais do projeto com suporte para drag-and-drop reordering
+  const [finalImageOrder, setFinalImageOrder] = useState([])
+  const [draggedImage, setDraggedImage] = useState(null)
+
   // CONSTANTES agora importadas de ../constants/projectConstants.js:
   // COMPARTIMENTOS, TIPOLOGIAS, SUBTIPOS, FASES, STATUS_OPTIONS
 
@@ -1255,6 +1259,20 @@ export default function ProjetoDetalhe() {
     }
   }, [id])
 
+  // Load final image order from localStorage
+  useEffect(() => {
+    if (project?.id) {
+      const stored = localStorage.getItem(`gavinho_final_images_order_${project.id}`)
+      if (stored) {
+        try {
+          setFinalImageOrder(JSON.parse(stored))
+        } catch {
+          setFinalImageOrder([])
+        }
+      }
+    }
+  }, [project?.id])
+
   // Loading state
   if (loading) {
     return (
@@ -1639,24 +1657,6 @@ export default function ProjetoDetalhe() {
     })
     setCollapsedCompartimentos(newState)
   }
-
-  // Imagens finais do projeto com suporte para drag-and-drop reordering
-  const [finalImageOrder, setFinalImageOrder] = useState([])
-  const [draggedImage, setDraggedImage] = useState(null)
-
-  // Load final image order from localStorage
-  useEffect(() => {
-    if (project?.id) {
-      const stored = localStorage.getItem(`gavinho_final_images_order_${project.id}`)
-      if (stored) {
-        try {
-          setFinalImageOrder(JSON.parse(stored))
-        } catch {
-          setFinalImageOrder([])
-        }
-      }
-    }
-  }, [project?.id])
 
   // Get final images sorted by custom order
   const imagensFinais = (() => {
