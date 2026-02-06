@@ -280,8 +280,8 @@ function DocumentHeader({ ata, projeto, onUpdate, onSave, saving, isNew }) {
   return (
     <div style={{
       textAlign: 'center',
-      paddingBottom: '32px',
-      marginBottom: '32px',
+      paddingBottom: '20px',
+      marginBottom: '24px',
       borderBottom: '2px solid var(--brown)'
     }}>
       {/* Project Info */}
@@ -395,13 +395,13 @@ function DocumentHeader({ ata, projeto, onUpdate, onSave, saving, isNew }) {
 // Document Section Component
 function DocumentSection({ title, icon: Icon, children, color = 'var(--brown)' }) {
   return (
-    <div style={{ marginBottom: '32px' }}>
+    <div style={{ marginBottom: '24px' }}>
       <div style={{
         display: 'flex',
         alignItems: 'center',
         gap: '10px',
-        marginBottom: '16px',
-        paddingBottom: '8px',
+        marginBottom: '12px',
+        paddingBottom: '6px',
         borderBottom: `2px solid ${color}`
       }}>
         {Icon && <Icon size={18} style={{ color }} />}
@@ -1165,7 +1165,7 @@ export default function ProjetoAtas({ projeto }) {
   return (
     <div style={{
       display: 'flex',
-      height: 'calc(100vh - 280px)',
+      height: 'calc(100vh - 180px)',
       minHeight: '500px',
       background: 'var(--cream)',
       borderRadius: '16px',
@@ -1181,7 +1181,7 @@ export default function ProjetoAtas({ projeto }) {
       }}>
         {/* Sidebar Header */}
         <div style={{
-          padding: '20px',
+          padding: '14px 16px',
           borderBottom: '1px solid var(--stone)'
         }}>
           <div style={{
@@ -1416,7 +1416,7 @@ export default function ProjetoAtas({ projeto }) {
             <div style={{
               flex: 1,
               overflow: 'auto',
-              padding: '32px'
+              padding: '16px 32px'
             }}>
               <div style={{
                 maxWidth: '800px',
@@ -1424,8 +1424,8 @@ export default function ProjetoAtas({ projeto }) {
                 background: 'white',
                 borderRadius: '4px',
                 boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
-                padding: '48px 56px',
-                minHeight: '800px'
+                padding: '32px 48px',
+                minHeight: '600px'
               }}>
                 {/* Document Header */}
                 <DocumentHeader
