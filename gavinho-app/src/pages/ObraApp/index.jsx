@@ -7,7 +7,8 @@ import { useState, useEffect, useRef } from 'react'
 import {
   Menu, Clock, Package, LogOut, Bell, BellOff, HardHat,
   MessageSquare, Users, Loader2, CheckSquare, Image,
-  WifiOff, BookOpen, X, RefreshCw, ChevronDown, Check, Camera
+  WifiOff, BookOpen, X, RefreshCw, ChevronDown, Check, Camera,
+  User, Settings
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 
@@ -20,7 +21,8 @@ import {
   ObraChat,
   Tarefas,
   Galeria,
-  DiarioObra
+  DiarioObra,
+  ProfilePage
 } from './components'
 
 // Import hooks
@@ -42,6 +44,7 @@ export default function ObraApp() {
   const [showObraDropdown, setShowObraDropdown] = useState(false)
   const [showAvatarModal, setShowAvatarModal] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const [showProfilePage, setShowProfilePage] = useState(false)
   const avatarInputRef = useRef(null)
 
   // Push notifications
@@ -130,6 +133,11 @@ export default function ObraApp() {
     setUser(null)
     setObras([])
     setObra(null)
+  }
+
+  const handleUpdateUser = (updatedUser) => {
+    setUser(updatedUser)
+    localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(updatedUser))
   }
 
   // ========== AVATAR UPLOAD ==========
@@ -542,11 +550,12 @@ export default function ObraApp() {
         </div>
       )}
 
-      {/* Header */}
-      <header style={styles.header}>
-        <button onClick={() => setMenuOpen(!menuOpen)} style={styles.menuButton}>
-          <Menu size={24} />
-        </button>
+      {/* Header - hide when in profile page */}
+      {!showProfilePage && (
+        <header style={styles.header}>
+          <button onClick={() => setMenuOpen(!menuOpen)} style={styles.menuButton}>
+            <Menu size={24} />
+          </button>
 
         {/* Obra Selector in Header */}
         <div style={localStyles.obraSelector}>
@@ -630,15 +639,18 @@ export default function ObraApp() {
             </button>
           )}
         </div>
-      </header>
+        </header>
+      )}
 
       {/* Side Menu */}
       {menuOpen && (
         <div style={styles.menuOverlay} onClick={() => setMenuOpen(false)}>
           <div style={styles.menu} onClick={e => e.stopPropagation()}>
-            <div style={styles.menuHeader}>
+            <div
+              style={{ ...styles.menuHeader, cursor: 'pointer' }}
+              onClick={() => { setShowProfilePage(true); setMenuOpen(false) }}
+            >
               <div
-                onClick={() => setShowAvatarModal(true)}
                 style={{
                   width: 48,
                   height: 48,
@@ -647,7 +659,6 @@ export default function ObraApp() {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  cursor: 'pointer',
                   position: 'relative',
                   overflow: 'hidden',
                   border: '2px solid rgba(255,255,255,0.3)'
@@ -673,10 +684,11 @@ export default function ObraApp() {
                   <Camera size={10} color="white" />
                 </div>
               </div>
-              <div>
+              <div style={{ flex: 1 }}>
                 <strong>{user.nome}</strong>
                 <p style={{ margin: 0, fontSize: 12, opacity: 0.7 }}>{user.cargo || 'Equipa'}</p>
               </div>
+              <Settings size={18} style={{ opacity: 0.6 }} />
             </div>
 
             {/* Obra selector in menu */}
@@ -740,25 +752,36 @@ export default function ObraApp() {
         </div>
       )}
 
-      {/* Main Content */}
-      <main style={styles.main}>
-        {!obra ? (
-          renderWelcomeScreen()
-        ) : (
-          <>
-            {activeTab === 'chat' && <ObraChat obra={obra} user={user} />}
-            {activeTab === 'tarefas' && <Tarefas obra={obra} user={user} />}
-            {activeTab === 'diario' && <DiarioObra obra={obra} user={user} />}
-            {activeTab === 'materiais' && <PedirMateriais obra={obra} user={user} />}
-            {activeTab === 'galeria' && <Galeria obra={obra} user={user} />}
-            {activeTab === 'presencas' && <RegistoPresenca obra={obra} user={user} />}
-            {activeTab === 'equipa' && <Equipa obra={obra} />}
-          </>
-        )}
-      </main>
+      {/* Profile Page - Full Screen */}
+      {showProfilePage && (
+        <ProfilePage
+          user={user}
+          onBack={() => setShowProfilePage(false)}
+          onUpdateUser={handleUpdateUser}
+        />
+      )}
 
-      {/* Bottom Navigation - only show if obra is selected */}
-      {obra && (
+      {/* Main Content */}
+      {!showProfilePage && (
+        <main style={styles.main}>
+          {!obra ? (
+            renderWelcomeScreen()
+          ) : (
+            <>
+              {activeTab === 'chat' && <ObraChat obra={obra} user={user} />}
+              {activeTab === 'tarefas' && <Tarefas obra={obra} user={user} />}
+              {activeTab === 'diario' && <DiarioObra obra={obra} user={user} />}
+              {activeTab === 'materiais' && <PedirMateriais obra={obra} user={user} />}
+              {activeTab === 'galeria' && <Galeria obra={obra} user={user} />}
+              {activeTab === 'presencas' && <RegistoPresenca obra={obra} user={user} />}
+              {activeTab === 'equipa' && <Equipa obra={obra} />}
+            </>
+          )}
+        </main>
+      )}
+
+      {/* Bottom Navigation - only show if obra is selected and not in profile */}
+      {obra && !showProfilePage && (
         <nav style={styles.bottomNav}>
           {tabs.map(tab => (
             <button
