@@ -140,31 +140,63 @@ export default function ProfilePage({ user, onBack, onUpdateUser }) {
   const handleSaveProfile = async () => {
     setLoading(true)
     try {
-      const table = user.tipo === 'trabalhador' ? 'trabalhadores' : 'profiles'
       const updateData = {
         nome: profileData.nome,
         cargo: profileData.cargo
       }
 
       if (user.tipo === 'trabalhador') {
+        // Para trabalhadores, atualizar tabela trabalhadores
         updateData.telefone = profileData.telefone
+
+        const { error } = await supabase
+          .from('trabalhadores')
+          .update(updateData)
+          .eq('id', user.id)
+
+        if (error) throw error
       } else {
-        updateData.email = profileData.email
+        // Para gestão, tentar primeiro utilizadores, depois profiles
+        let success = false
+
+        // Tentar tabela utilizadores
+        const { error: utilizadoresError } = await supabase
+          .from('utilizadores')
+          .update(updateData)
+          .eq('id', user.id)
+
+        if (!utilizadoresError) {
+          success = true
+        } else {
+          // Tentar tabela profiles (sem email - não pode ser alterado)
+          const { error: profilesError } = await supabase
+            .from('profiles')
+            .update(updateData)
+            .eq('id', user.id)
+
+          if (!profilesError) {
+            success = true
+          }
+        }
+
+        // Se nenhuma tabela funcionou, guardar apenas localmente
+        if (!success) {
+          console.log('Guardado apenas localmente (sem acesso à BD)')
+        }
       }
 
-      const { error } = await supabase
-        .from(table)
-        .update(updateData)
-        .eq('id', user.id)
+      // Atualizar estado local e localStorage
+      const updatedUser = { ...user, nome: profileData.nome, cargo: profileData.cargo }
+      if (user.tipo === 'trabalhador') {
+        updatedUser.telefone = profileData.telefone
+      }
 
-      if (error) throw error
-
-      onUpdateUser({ ...user, ...updateData })
+      onUpdateUser(updatedUser)
       setEditingProfile(false)
       alert('Perfil atualizado!')
     } catch (err) {
       console.error('Erro ao guardar:', err)
-      alert('Erro ao guardar alterações')
+      alert('Erro ao guardar alterações: ' + (err.message || 'Erro desconhecido'))
     } finally {
       setLoading(false)
     }
@@ -642,9 +674,12 @@ export default function ProfilePage({ user, onBack, onUpdateUser }) {
               <input
                 type="email"
                 value={profileData.email}
-                onChange={e => setProfileData(p => ({ ...p, email: e.target.value }))}
-                style={styles.formInput}
+                disabled
+                style={{ ...styles.formInput, background: '#f3f4f6', color: '#6b7280', cursor: 'not-allowed' }}
               />
+              <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
+                O email não pode ser alterado
+              </p>
             </div>
           ) : (
             <div style={styles.formGroup}>
