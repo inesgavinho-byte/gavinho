@@ -1692,86 +1692,108 @@ export default function ProjetoDetalhe() {
 
   return (
     <div className="fade-in">
-      {/* Header */}
-      <div style={{ marginBottom: '24px' }}>
-        <button
-          onClick={() => navigate(-1)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            background: 'none',
-            border: 'none',
-            color: 'var(--brown-light)',
-            fontSize: '13px',
-            cursor: 'pointer',
-            marginBottom: '16px',
-            padding: 0
-          }}
-        >
-          <ArrowLeft size={16} />
-          Voltar
-        </button>
-
+      {/* Header - Single line layout */}
+      <div style={{ marginBottom: '16px' }}>
         <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-md mb-sm">
-              <span style={{
+          <div className="flex items-center gap-md" style={{ flexWrap: 'wrap' }}>
+            {/* Back button */}
+            <button
+              onClick={() => navigate(-1)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                background: 'none',
+                border: 'none',
+                color: 'var(--brown-light)',
                 fontSize: '13px',
-                fontWeight: 700,
-                color: 'var(--blush-dark)',
-                letterSpacing: '0.5px'
+                cursor: 'pointer',
+                padding: 0
+              }}
+            >
+              <ArrowLeft size={16} />
+            </button>
+
+            {/* Separator */}
+            <div style={{ width: '1px', height: '20px', background: 'var(--stone)' }} />
+
+            {/* Project Name */}
+            <h1 style={{
+              fontSize: '18px',
+              fontWeight: 700,
+              color: 'var(--brown)',
+              margin: 0
+            }}>
+              {project.nome}
+            </h1>
+
+            {/* Separator */}
+            <div style={{ width: '1px', height: '20px', background: 'var(--stone)' }} />
+
+            {/* Project Codes */}
+            <span style={{
+              fontSize: '12px',
+              fontWeight: 600,
+              color: 'var(--blush-dark)',
+              letterSpacing: '0.5px'
+            }}>
+              {project.codigo}
+            </span>
+            {project.codigo_interno && (
+              <span style={{
+                fontSize: '11px',
+                fontWeight: 600,
+                color: 'var(--info)',
+                background: 'rgba(59, 130, 246, 0.1)',
+                padding: '2px 6px',
+                borderRadius: '4px',
+                fontFamily: 'monospace'
               }}>
-                {project.codigo}
+                {project.codigo_interno}
               </span>
-              {project.codigo_interno && (
-                <span style={{
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  color: 'var(--info)',
-                  background: 'rgba(59, 130, 246, 0.1)',
-                  padding: '3px 8px',
-                  borderRadius: '4px',
-                  fontFamily: 'monospace'
-                }}>
-                  {project.codigo_interno}
-                </span>
-              )}
-              <span className="badge badge-gold">{project.fase}</span>
-              <div 
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '4px 10px',
-                  borderRadius: '20px',
-                  background: `${getStatusColor(project.status)}15`,
-                  color: getStatusColor(project.status),
-                  fontSize: '12px',
-                  fontWeight: 600
-                }}
-              >
-                <div style={{
-                  width: '6px',
-                  height: '6px',
-                  borderRadius: '50%',
-                  background: getStatusColor(project.status)
-                }} />
-                {getStatusLabel(project.status)}
-              </div>
+            )}
+
+            {/* Phase Badge */}
+            <span className="badge badge-gold" style={{ fontSize: '11px', padding: '3px 8px' }}>{project.fase}</span>
+
+            {/* Status Badge */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '3px 8px',
+                borderRadius: '12px',
+                background: `${getStatusColor(project.status)}15`,
+                color: getStatusColor(project.status),
+                fontSize: '11px',
+                fontWeight: 600
+              }}
+            >
+              <div style={{
+                width: '5px',
+                height: '5px',
+                borderRadius: '50%',
+                background: getStatusColor(project.status)
+              }} />
+              {getStatusLabel(project.status)}
             </div>
-            <h1 className="page-title" style={{ marginBottom: '8px' }}>{project.nome}</h1>
-            <div className="flex items-center gap-lg text-muted" style={{ fontSize: '13px' }}>
+
+            {/* Separator */}
+            <div style={{ width: '1px', height: '20px', background: 'var(--stone)' }} />
+
+            {/* Project Info */}
+            <div className="flex items-center gap-md text-muted" style={{ fontSize: '12px' }}>
               <span className="flex items-center gap-xs">
-                <Building2 size={14} />
-                {project.tipologia} • {project.subtipo} {project.tipo_apartamento}
+                <Building2 size={13} />
+                {project.tipologia} • {project.subtipo}
               </span>
               <span className="flex items-center gap-xs">
-                <MapPin size={14} />
+                <MapPin size={13} />
                 {project.localizacao.cidade}, {project.localizacao.pais}
               </span>
               <span className="flex items-center gap-xs">
-                <Layers size={14} />
+                <Layers size={13} />
                 {project.area_bruta} {project.unidade_area}
               </span>
             </div>
@@ -1841,11 +1863,11 @@ export default function ProjetoDetalhe() {
       </div>
 
       {/* Tabs */}
-      <div 
+      <div
         style={{
           display: 'flex',
           gap: '4px',
-          marginBottom: '24px',
+          marginBottom: '16px',
           background: 'var(--cream)',
           padding: '4px',
           borderRadius: '12px',
