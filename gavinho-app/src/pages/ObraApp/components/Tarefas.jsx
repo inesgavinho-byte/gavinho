@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { styles, colors } from '../styles'
 import { formatDate, formatDateTime } from '../utils'
+import { notifyTaskCompleted, NOTIFICATION_TYPES, createNotification } from '../utils/notifications'
 
 const TASK_STATUS = {
   pendente: { label: 'Pendente', color: '#f59e0b', icon: Circle },
@@ -123,6 +124,18 @@ export default function Tarefas({ obra, user }) {
 
       if (selectedTarefa?.id === tarefa.id) {
         setSelectedTarefa({ ...selectedTarefa, ...updates })
+      }
+
+      // Send notification when task is completed
+      if (newStatus === 'concluida' && tarefa.criado_por_id && tarefa.criado_por_id !== user.id) {
+        await createNotification({
+          utilizadorId: tarefa.criado_por_id,
+          tipo: NOTIFICATION_TYPES.TAREFA_CONCLUIDA,
+          mensagem: `${user.nome} completou a tarefa: ${tarefa.titulo}`,
+          obraId: obra.id,
+          tarefaId: tarefa.id,
+          dados: { titulo: tarefa.titulo, completadoPor: user.nome }
+        })
       }
     } catch (err) {
       console.error('Erro ao atualizar tarefa:', err)
