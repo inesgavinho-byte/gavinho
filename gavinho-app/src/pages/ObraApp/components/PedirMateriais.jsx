@@ -324,13 +324,90 @@ export default function PedirMateriais({ obra, user }) {
     }
   }
 
+  // Send notifications to encarregado and diretor operações
+  const sendRequisicaoNotifications = async (requisicaoId, materialNome, qtd, unidadeMaterial, isUrgente) => {
+    try {
+      // Get users to notify: encarregado and diretor operações
+      const { data: usersToNotify } = await supabase
+        .from('utilizadores')
+        .select('id, nome, email, cargo')
+        .or('cargo.ilike.%encarregado%,cargo.ilike.%diretor%,cargo.ilike.%direção%,cargo.ilike.%gestao%')
+        .eq('ativo', true)
+
+      if (!usersToNotify || usersToNotify.length === 0) {
+        console.log('Nenhum utilizador encontrado para notificar')
+        return
+      }
+
+      const obraNome = obra?.nome || obra?.codigo || 'Obra'
+      const obraCodigo = obra?.codigo || ''
+
+      // Create notifications for each user
+      const notifications = usersToNotify.map(u => ({
+        utilizador_id: u.id,
+        utilizador_email: u.email,
+        tipo: 'requisicao_nova',
+        titulo: `Nova Requisição${isUrgente ? ' URGENTE' : ''} - ${obraCodigo}`,
+        mensagem: `${user.nome} pediu ${qtd} ${unidadeMaterial} de ${materialNome} para ${obraNome}`,
+        obra_id: obra.id,
+        requisicao_id: requisicaoId,
+        urgente: isUrgente,
+        dados: {
+          material: materialNome,
+          quantidade: qtd,
+          unidade: unidadeMaterial,
+          pedido_por: user.nome,
+          obra_codigo: obraCodigo,
+          obra_nome: obraNome
+        }
+      }))
+
+      // Insert notifications
+      await supabase.from('app_notificacoes').insert(notifications)
+
+      // Send emails to users
+      for (const u of usersToNotify) {
+        if (u.email) {
+          try {
+            await supabase.functions.invoke('email-send', {
+              body: {
+                to: [u.email],
+                subject: `Nova Requisição${isUrgente ? ' URGENTE' : ''} - ${obraCodigo}`,
+                body_text: `Olá ${u.nome},\n\n${user.nome} submeteu uma nova requisição de material para ${obraNome}:\n\n• Material: ${materialNome}\n• Quantidade: ${qtd} ${unidadeMaterial}${isUrgente ? '\n• ⚠️ URGENTE' : ''}\n\nAceda à aplicação para aprovar ou rejeitar o pedido.\n\nCumprimentos,\nGavinho App`,
+                body_html: `
+                  <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2 style="color: #3d4349;">Nova Requisição de Material${isUrgente ? ' <span style="color: #dc2626;">URGENTE</span>' : ''}</h2>
+                    <p>Olá ${u.nome},</p>
+                    <p><strong>${user.nome}</strong> submeteu uma nova requisição de material para <strong>${obraNome}</strong>:</p>
+                    <div style="background: #f5f5f5; padding: 16px; border-radius: 8px; margin: 16px 0;">
+                      <p style="margin: 4px 0;"><strong>Material:</strong> ${materialNome}</p>
+                      <p style="margin: 4px 0;"><strong>Quantidade:</strong> ${qtd} ${unidadeMaterial}</p>
+                      ${isUrgente ? '<p style="margin: 4px 0; color: #dc2626;"><strong>⚠️ URGENTE</strong></p>' : ''}
+                    </div>
+                    <p>Aceda à aplicação para aprovar ou rejeitar o pedido.</p>
+                    <p style="color: #6b7280; font-size: 12px; margin-top: 32px;">Cumprimentos,<br>Gavinho App</p>
+                  </div>
+                `,
+                obra_id: obra.id
+              }
+            })
+          } catch (emailErr) {
+            console.error('Erro ao enviar email para', u.email, emailErr)
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Erro ao enviar notificações:', err)
+    }
+  }
+
   const handleSubmit = async () => {
     if (!material.trim() || !quantidade) return
 
     setSending(true)
     try {
-      // Save to requisitions table
-      const { error } = await supabase.from('requisicoes_materiais').insert({
+      // Save to requisitions table and get the ID
+      const { data: insertedReq, error } = await supabase.from('requisicoes_materiais').insert({
         obra_id: obra.id,
         pedido_por_id: user.id,
         pedido_por_nome: user.nome,
@@ -341,7 +418,7 @@ export default function PedirMateriais({ obra, user }) {
         notas: notas || null,
         urgente,
         status: 'pendente'
-      })
+      }).select('id').single()
 
       if (error) throw error
 
@@ -356,6 +433,9 @@ export default function PedirMateriais({ obra, user }) {
         conteudo: `📦 REQUISIÇÃO DE MATERIAL${urgente ? ' (URGENTE)' : ''}\n${quantidade} ${unidade} de ${material}${notas ? `\nNotas: ${notas}` : ''}\n\n⏳ Aguarda aprovação do Encarregado`,
         tipo: 'requisicao_material'
       })
+
+      // Send notifications to encarregado and diretor operações (async, don't wait)
+      sendRequisicaoNotifications(insertedReq?.id, material.trim(), quantidade, unidade, urgente)
 
       setSuccess(true)
       setMaterial('')
