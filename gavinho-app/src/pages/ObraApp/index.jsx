@@ -824,12 +824,14 @@ export default function ObraApp() {
                           width: '100%',
                           padding: '10px 12px',
                           marginBottom: 4,
-                          background: obra?.id === o.id ? `${colors.primary}15` : 'white',
-                          border: obra?.id === o.id ? `1px solid ${colors.primary}` : '1px solid #e5e7eb',
+                          background: obra?.id === o.id ? `${colors.primary}30` : 'white',
+                          border: obra?.id === o.id ? `2px solid ${colors.primary}` : '1px solid #e5e7eb',
+                          borderLeft: obra?.id === o.id ? `4px solid ${colors.primary}` : '1px solid #e5e7eb',
                           borderRadius: 8,
                           cursor: 'pointer',
                           textAlign: 'left',
-                          transition: 'all 0.2s'
+                          transition: 'all 0.2s',
+                          boxShadow: obra?.id === o.id ? '0 2px 8px rgba(61, 67, 73, 0.15)' : 'none'
                         }}
                       >
                         <HardHat size={18} color={obra?.id === o.id ? colors.primary : '#6b7280'} />
@@ -846,7 +848,8 @@ export default function ObraApp() {
                           </div>
                           <div style={{
                             fontSize: 11,
-                            color: '#6b7280',
+                            color: obra?.id === o.id ? '#374151' : '#6b7280',
+                            fontWeight: obra?.id === o.id ? 500 : 400,
                             whiteSpace: 'nowrap',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis'
