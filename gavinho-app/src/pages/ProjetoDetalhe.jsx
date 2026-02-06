@@ -1640,8 +1640,77 @@ export default function ProjetoDetalhe() {
     setCollapsedCompartimentos(newState)
   }
 
-  // Imagens finais do projeto
-  const imagensFinais = renders.filter(r => r.is_final)
+  // Imagens finais do projeto com suporte para drag-and-drop reordering
+  const [finalImageOrder, setFinalImageOrder] = useState([])
+  const [draggedImage, setDraggedImage] = useState(null)
+
+  // Load final image order from localStorage
+  useEffect(() => {
+    if (project?.id) {
+      const stored = localStorage.getItem(`gavinho_final_images_order_${project.id}`)
+      if (stored) {
+        try {
+          setFinalImageOrder(JSON.parse(stored))
+        } catch {
+          setFinalImageOrder([])
+        }
+      }
+    }
+  }, [project?.id])
+
+  // Get final images sorted by custom order
+  const imagensFinais = (() => {
+    const finals = renders.filter(r => r.is_final)
+    if (finalImageOrder.length === 0) return finals
+
+    // Sort by custom order, new images go to the end
+    return finals.sort((a, b) => {
+      const indexA = finalImageOrder.indexOf(a.id)
+      const indexB = finalImageOrder.indexOf(b.id)
+      if (indexA === -1 && indexB === -1) return 0
+      if (indexA === -1) return 1
+      if (indexB === -1) return -1
+      return indexA - indexB
+    })
+  })()
+
+  // Handle drag start for final images
+  const handleFinalImageDragStart = (e, render) => {
+    setDraggedImage(render)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  // Handle drag over for final images
+  const handleFinalImageDragOver = (e) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+  }
+
+  // Handle drop for final images
+  const handleFinalImageDrop = (e, targetRender) => {
+    e.preventDefault()
+    if (!draggedImage || draggedImage.id === targetRender.id) {
+      setDraggedImage(null)
+      return
+    }
+
+    const currentOrder = imagensFinais.map(r => r.id)
+    const draggedIndex = currentOrder.indexOf(draggedImage.id)
+    const targetIndex = currentOrder.indexOf(targetRender.id)
+
+    // Remove dragged item and insert at new position
+    currentOrder.splice(draggedIndex, 1)
+    currentOrder.splice(targetIndex, 0, draggedImage.id)
+
+    setFinalImageOrder(currentOrder)
+    localStorage.setItem(`gavinho_final_images_order_${project.id}`, JSON.stringify(currentOrder))
+    setDraggedImage(null)
+  }
+
+  // Handle drag end
+  const handleFinalImageDragEnd = () => {
+    setDraggedImage(null)
+  }
 
   // Tabs principais
   const allTabs = [
@@ -2986,7 +3055,7 @@ export default function ProjetoDetalhe() {
               fontSize: '13px',
               fontWeight: 600
             }}>
-              {imagensFinais.length} imagem{imagensFinais.length !== 1 ? 'ns' : ''}
+              {imagensFinais.length} {imagensFinais.length !== 1 ? 'imagens' : 'imagem'}
             </span>
           </div>
 
@@ -2995,9 +3064,16 @@ export default function ProjetoDetalhe() {
               {imagensFinais.map((render) => (
                 <div
                   key={render.id}
-                  className="masonry-card"
+                  className={`masonry-card ${draggedImage?.id === render.id ? 'dragging' : ''}`}
+                  draggable
+                  onDragStart={(e) => handleFinalImageDragStart(e, render)}
+                  onDragOver={handleFinalImageDragOver}
+                  onDrop={(e) => handleFinalImageDrop(e, render)}
+                  onDragEnd={handleFinalImageDragEnd}
                   style={{
-                    cursor: render.imagem_url ? 'pointer' : 'default'
+                    cursor: 'grab',
+                    opacity: draggedImage?.id === render.id ? 0.5 : 1,
+                    transition: 'opacity 0.2s'
                   }}
                   onClick={() => render.imagem_url && openLightbox(render, imagensFinais)}
                 >
@@ -3027,20 +3103,6 @@ export default function ProjetoDetalhe() {
                     <div style={{ fontSize: '13px', fontWeight: 600 }}>{render.compartimento}</div>
                     <div style={{ fontSize: '11px', opacity: 0.8 }}>Versão {render.versao}</div>
                   </div>
-
-                  <button
-                    onClick={(e) => { e.stopPropagation(); toggleFinalImage(render) }}
-                    className="masonry-action-btn"
-                    style={{
-                      position: 'absolute',
-                      top: '8px',
-                      right: '8px',
-                      background: 'var(--error)'
-                    }}
-                    title="Remover das imagens finais"
-                  >
-                    <X size={14} />
-                  </button>
                 </div>
               ))}
             </div>
@@ -3076,22 +3138,19 @@ export default function ProjetoDetalhe() {
       {activeTab === 'biblioteca' && (
         <div>
           <div className="grid grid-3" style={{ gap: '16px', marginBottom: '24px' }}>
-            {/* KPI Cards */}
+            {/* KPI Cards - showing project-specific counts (0 when empty) */}
             {[
-              { label: 'Materiais', count: 12, icon: '🎨' },
-              { label: 'Objetos 3D', count: 8, icon: '📦' },
-              { label: 'Texturas', count: 24, icon: '🖼️' }
+              { label: 'Materiais', count: 0 },
+              { label: 'Objetos 3D', count: 0 },
+              { label: 'Texturas', count: 0 }
             ].map((item, idx) => (
               <div key={idx} className="card" style={{ padding: '20px' }}>
-                <div className="flex items-center gap-md">
-                  <span style={{ fontSize: '32px' }}>{item.icon}</span>
-                  <div>
-                    <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--brown)' }}>
-                      {item.count}
-                    </div>
-                    <div style={{ fontSize: '13px', color: 'var(--brown-light)' }}>
-                      {item.label}
-                    </div>
+                <div>
+                  <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--brown)' }}>
+                    {item.count}
+                  </div>
+                  <div style={{ fontSize: '13px', color: 'var(--brown-light)' }}>
+                    {item.label}
                   </div>
                 </div>
               </div>
