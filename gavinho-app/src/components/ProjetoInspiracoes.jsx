@@ -116,7 +116,7 @@ const FONTES_SUGERIDAS = [
   'Outro'
 ]
 
-export default function ProjetoInspiracoes({ projeto, userId, userName, compartimentosProjeto = [] }) {
+export default function ProjetoInspiracoes({ projeto, userId, userName, compartimentosProjeto = [], onCompartimentosChange }) {
   // State
   const [inspiracoes, setInspiracoes] = useState([])
   const [loading, setLoading] = useState(true)
@@ -134,6 +134,7 @@ export default function ProjetoInspiracoes({ projeto, userId, userName, comparti
   // Compartimento management state
   const [novoCompartimento, setNovoCompartimento] = useState('')
   const [savingCompartimento, setSavingCompartimento] = useState(false)
+  const [localCompartimentos, setLocalCompartimentos] = useState([])
 
   // Form states
   const [uploadForm, setUploadForm] = useState({
@@ -155,7 +156,18 @@ export default function ProjetoInspiracoes({ projeto, userId, userName, comparti
 
   // Filter and sort
   const [filterCompartimento, setFilterCompartimento] = useState('todos')
-  const [collapsedCompartimentos, setCollapsedCompartimentos] = useState({})
+
+  // LocalStorage key for collapsed state
+  const collapseStorageKey = projeto?.id ? `inspiracoes_collapsed_${projeto.id}` : null
+
+  // Initialize collapsed state from localStorage
+  const [collapsedCompartimentos, setCollapsedCompartimentos] = useState(() => {
+    if (typeof window !== 'undefined' && projeto?.id) {
+      const saved = localStorage.getItem(`inspiracoes_collapsed_${projeto.id}`)
+      return saved ? JSON.parse(saved) : {}
+    }
+    return {}
+  })
 
   // Refs
   const fileInputRef = useRef(null)
@@ -164,8 +176,21 @@ export default function ProjetoInspiracoes({ projeto, userId, userName, comparti
   const compartimentosDisponiveis = useMemo(() => {
     const defaultCompartimentos = ['Geral', 'Sala de Estar', 'Cozinha', 'Quarto', 'Casa de Banho', 'Escritorio', 'Exterior']
     const fromProject = compartimentosProjeto.map(c => c.nome || c)
-    const allCompartimentos = [...new Set([...defaultCompartimentos, ...fromProject])]
+    const fromLocal = localCompartimentos.map(c => c.nome || c)
+    const allCompartimentos = [...new Set([...defaultCompartimentos, ...fromProject, ...fromLocal])]
     return allCompartimentos.sort()
+  }, [compartimentosProjeto, localCompartimentos])
+
+  // Sync collapsed state with localStorage
+  useEffect(() => {
+    if (collapseStorageKey) {
+      localStorage.setItem(collapseStorageKey, JSON.stringify(collapsedCompartimentos))
+    }
+  }, [collapsedCompartimentos, collapseStorageKey])
+
+  // Initialize localCompartimentos from compartimentosProjeto
+  useEffect(() => {
+    setLocalCompartimentos(compartimentosProjeto.map(c => typeof c === 'string' ? { nome: c } : c))
   }, [compartimentosProjeto])
 
   // Load data on mount
@@ -457,16 +482,19 @@ export default function ProjetoInspiracoes({ projeto, userId, userName, comparti
   const handleAddCompartimento = async () => {
     if (!novoCompartimento.trim()) return
 
+    const nome = novoCompartimento.trim()
     setSavingCompartimento(true)
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('projeto_compartimentos')
         .insert({
           projeto_id: projeto.id,
-          nome: novoCompartimento.trim(),
+          nome: nome,
           created_by: userId,
           created_by_name: userName
         })
+        .select()
+        .single()
 
       if (error) {
         if (error.code === '23505') {
@@ -475,15 +503,19 @@ export default function ProjetoInspiracoes({ projeto, userId, userName, comparti
           throw error
         }
       } else {
-        // Reload to update compartimentosProjeto
-        window.location.reload()
+        // Update local state without page reload
+        setLocalCompartimentos(prev => [...prev, { nome: nome, id: data?.id }])
+        // Notify parent component if callback exists
+        if (onCompartimentosChange) {
+          onCompartimentosChange([...localCompartimentos, { nome: nome, id: data?.id }])
+        }
+        setNovoCompartimento('')
       }
     } catch (err) {
       console.error('Erro ao adicionar compartimento:', err)
       alert('Erro ao adicionar compartimento: ' + err.message)
     } finally {
       setSavingCompartimento(false)
-      setNovoCompartimento('')
     }
   }
 
@@ -506,6 +538,13 @@ export default function ProjetoInspiracoes({ projeto, userId, userName, comparti
         alert('Erro ao mover inspiracoes: ' + updateError.message)
         return
       }
+
+      // Update local inspiracoes state
+      setInspiracoes(prev => prev.map(insp =>
+        insp.compartimento === compartimento
+          ? { ...insp, compartimento: 'Geral' }
+          : insp
+      ))
     }
 
     // Delete compartimento from database
@@ -518,7 +557,19 @@ export default function ProjetoInspiracoes({ projeto, userId, userName, comparti
     if (error) {
       alert('Erro ao eliminar compartimento: ' + error.message)
     } else {
-      window.location.reload()
+      // Update local state without page reload
+      const updatedCompartimentos = localCompartimentos.filter(c => (c.nome || c) !== compartimento)
+      setLocalCompartimentos(updatedCompartimentos)
+      // Notify parent component if callback exists
+      if (onCompartimentosChange) {
+        onCompartimentosChange(updatedCompartimentos)
+      }
+      // Remove from collapsed state
+      setCollapsedCompartimentos(prev => {
+        const newState = { ...prev }
+        delete newState[compartimento]
+        return newState
+      })
     }
   }
 
@@ -1065,7 +1116,8 @@ export default function ProjetoInspiracoes({ projeto, userId, userName, comparti
                 <div className="compartimentos-list">
                   {compartimentosDisponiveis.map(comp => {
                     const count = inspiracoesByCompartimento[comp]?.length || 0
-                    const isFromProject = compartimentosProjeto.some(c => (c.nome || c) === comp)
+                    const isFromProject = compartimentosProjeto.some(c => (c.nome || c) === comp) ||
+                                          localCompartimentos.some(c => (c.nome || c) === comp)
                     const isDefault = ['Geral', 'Sala de Estar', 'Cozinha', 'Quarto', 'Casa de Banho', 'Escritorio', 'Exterior'].includes(comp)
 
                     return (
@@ -1076,10 +1128,10 @@ export default function ProjetoInspiracoes({ projeto, userId, userName, comparti
                           {count > 0 && (
                             <span className="compartimento-item-count">{count}</span>
                           )}
-                          {isFromProject && (
+                          {isFromProject && !isDefault && (
                             <span className="compartimento-item-badge">Deste Projeto</span>
                           )}
-                          {isDefault && !isFromProject && (
+                          {isDefault && (
                             <span className="compartimento-item-badge default">Predefinido</span>
                           )}
                         </div>
@@ -1091,7 +1143,7 @@ export default function ProjetoInspiracoes({ projeto, userId, userName, comparti
                           >
                             <Plus size={14} />
                           </button>
-                          {isFromProject && comp !== 'Geral' && (
+                          {isFromProject && !isDefault && comp !== 'Geral' && (
                             <button
                               className="btn-icon btn-danger"
                               onClick={() => handleDeleteCompartimento(comp)}
