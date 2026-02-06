@@ -7,7 +7,9 @@ import {
   ArrowLeft, Camera, User, Mail, Phone, Briefcase, Shield,
   HardHat, Users, Settings, ChevronRight, Loader2, X,
   Plus, Pencil, Trash2, Check, Search, ToggleLeft, ToggleRight,
-  Building2, UserCog, Bell, Palette, Database, Lock
+  Building2, UserCog, Bell, Palette, Database, Lock,
+  Sun, Moon, Smartphone, Trash, RefreshCw, Eye, EyeOff,
+  AlertTriangle, CheckCircle, MessageSquare, Package, Image
 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import { colors } from '../styles'
@@ -35,6 +37,38 @@ export default function ProfilePage({ user, onBack, onUpdateUser }) {
   const [searchTerm, setSearchTerm] = useState('')
   const [showAddModal, setShowAddModal] = useState(null) // 'obra' | 'trabalhador'
   const [editingItem, setEditingItem] = useState(null)
+
+  // Settings sub-section
+  const [settingsSection, setSettingsSection] = useState(null) // 'notificacoes' | 'database' | 'aparencia' | 'seguranca'
+
+  // Notification settings
+  const [notifSettings, setNotifSettings] = useState({
+    pushEnabled: 'Notification' in window && Notification.permission === 'granted',
+    novasMensagens: true,
+    novasTarefas: true,
+    pedidosMateriais: true,
+    alertasUrgentes: true
+  })
+
+  // Appearance settings
+  const [theme, setTheme] = useState(localStorage.getItem('gavinho_theme') || 'light')
+
+  // Database stats
+  const [dbStats, setDbStats] = useState(null)
+  const [clearingCache, setClearingCache] = useState(false)
+
+  // Security
+  const [passwordData, setPasswordData] = useState({
+    current: '',
+    new: '',
+    confirm: ''
+  })
+  const [showPasswords, setShowPasswords] = useState({
+    current: false,
+    new: false,
+    confirm: false
+  })
+  const [changingPassword, setChangingPassword] = useState(false)
 
   // Is admin/manager
   const isAdmin = user.tipo === 'gestao'
@@ -266,6 +300,180 @@ export default function ProfilePage({ user, onBack, onUpdateUser }) {
       setLoading(false)
     }
   }
+
+  // ========== SETTINGS FUNCTIONS ==========
+
+  // Request push notifications permission
+  const requestPushPermission = async () => {
+    if (!('Notification' in window)) {
+      alert('O teu browser não suporta notificações')
+      return
+    }
+
+    try {
+      const permission = await Notification.requestPermission()
+      if (permission === 'granted') {
+        setNotifSettings(prev => ({ ...prev, pushEnabled: true }))
+        // Show test notification
+        new Notification('Gavinho Obras', {
+          body: 'Notificações ativadas com sucesso!',
+          icon: '/icons/icon.svg'
+        })
+      } else {
+        alert('Permissão para notificações negada')
+      }
+    } catch (err) {
+      console.error('Erro ao pedir permissão:', err)
+      alert('Erro ao ativar notificações')
+    }
+  }
+
+  // Save notification settings to localStorage
+  const saveNotifSettings = (key, value) => {
+    const newSettings = { ...notifSettings, [key]: value }
+    setNotifSettings(newSettings)
+    localStorage.setItem('gavinho_notif_settings', JSON.stringify(newSettings))
+  }
+
+  // Load notification settings from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('gavinho_notif_settings')
+    if (saved) {
+      try {
+        setNotifSettings(prev => ({ ...prev, ...JSON.parse(saved) }))
+      } catch (e) {
+        console.error('Erro ao carregar definições:', e)
+      }
+    }
+  }, [])
+
+  // Load database stats
+  const loadDbStats = async () => {
+    setLoading(true)
+    try {
+      // Calculate localStorage usage
+      let localStorageSize = 0
+      for (let key in localStorage) {
+        if (localStorage.hasOwnProperty(key)) {
+          localStorageSize += localStorage[key].length * 2 // UTF-16 = 2 bytes per char
+        }
+      }
+
+      // Count cached items
+      const cacheKeys = Object.keys(localStorage).filter(k => k.startsWith('gavinho_'))
+
+      // Get counts from database (if accessible)
+      let mensagensCount = 0
+      let fotografiasCount = 0
+      let tarefasCount = 0
+
+      try {
+        const [msgRes, fotoRes, tarefaRes] = await Promise.all([
+          supabase.from('obra_mensagens').select('id', { count: 'exact', head: true }),
+          supabase.from('obra_fotografias').select('id', { count: 'exact', head: true }),
+          supabase.from('obra_tarefas').select('id', { count: 'exact', head: true })
+        ])
+        mensagensCount = msgRes.count || 0
+        fotografiasCount = fotoRes.count || 0
+        tarefasCount = tarefaRes.count || 0
+      } catch (e) {
+        console.log('Não foi possível obter contagens da BD')
+      }
+
+      setDbStats({
+        localStorageSize: (localStorageSize / 1024).toFixed(2),
+        cacheItems: cacheKeys.length,
+        mensagens: mensagensCount,
+        fotografias: fotografiasCount,
+        tarefas: tarefasCount
+      })
+    } catch (err) {
+      console.error('Erro ao carregar stats:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Clear app cache
+  const clearCache = async () => {
+    if (!confirm('Limpar cache? Os teus dados de sessão serão mantidos.')) return
+
+    setClearingCache(true)
+    try {
+      // Keep essential keys
+      const essentialKeys = ['obra_app_user', 'obra_app_obras', 'obra_app_obra', 'gavinho_theme', 'gavinho_notif_settings']
+      const keysToRemove = Object.keys(localStorage).filter(k =>
+        k.startsWith('gavinho_') && !essentialKeys.includes(k)
+      )
+
+      keysToRemove.forEach(key => localStorage.removeItem(key))
+
+      // Clear service worker caches if available
+      if ('caches' in window) {
+        const cacheNames = await caches.keys()
+        await Promise.all(cacheNames.map(name => caches.delete(name)))
+      }
+
+      alert('Cache limpo com sucesso!')
+      loadDbStats()
+    } catch (err) {
+      console.error('Erro ao limpar cache:', err)
+      alert('Erro ao limpar cache')
+    } finally {
+      setClearingCache(false)
+    }
+  }
+
+  // Change theme
+  const changeTheme = (newTheme) => {
+    setTheme(newTheme)
+    localStorage.setItem('gavinho_theme', newTheme)
+    // Apply theme to document (if supported)
+    document.documentElement.setAttribute('data-theme', newTheme)
+  }
+
+  // Change password
+  const handleChangePassword = async () => {
+    if (!passwordData.current || !passwordData.new || !passwordData.confirm) {
+      alert('Preenche todos os campos')
+      return
+    }
+
+    if (passwordData.new !== passwordData.confirm) {
+      alert('As palavras-passe não coincidem')
+      return
+    }
+
+    if (passwordData.new.length < 6) {
+      alert('A palavra-passe deve ter pelo menos 6 caracteres')
+      return
+    }
+
+    setChangingPassword(true)
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: passwordData.new
+      })
+
+      if (error) throw error
+
+      alert('Palavra-passe alterada com sucesso!')
+      setPasswordData({ current: '', new: '', confirm: '' })
+      setSettingsSection(null)
+    } catch (err) {
+      console.error('Erro ao alterar palavra-passe:', err)
+      alert('Erro ao alterar palavra-passe: ' + (err.message || 'Erro desconhecido'))
+    } finally {
+      setChangingPassword(false)
+    }
+  }
+
+  // Load db stats when entering database section
+  useEffect(() => {
+    if (settingsSection === 'database') {
+      loadDbStats()
+    }
+  }, [settingsSection])
 
   // ========== STYLES ==========
   const styles = {
@@ -972,58 +1180,354 @@ export default function ProfilePage({ user, onBack, onUpdateUser }) {
     )
   }
 
-  // Render Settings (Admin)
-  const renderSettings = () => (
+  // Render Settings Sub-sections
+  const renderNotificacoesSettings = () => (
     <div>
       <div style={styles.infoSection}>
-        <h4 style={styles.sectionTitle}>Notificações</h4>
-        <button style={styles.menuItem}>
-          <div style={{ ...styles.menuItemIcon, background: '#fef3c7', color: '#d97706' }}>
-            <Bell size={20} />
+        <h4 style={styles.sectionTitle}>Permissões</h4>
+        <div style={styles.listItem}>
+          <div style={{ ...styles.listItemAvatar, borderRadius: 10, background: notifSettings.pushEnabled ? '#dcfce7' : '#fee2e2' }}>
+            {notifSettings.pushEnabled ? <CheckCircle size={20} color="#16a34a" /> : <AlertTriangle size={20} color="#dc2626" />}
           </div>
-          <div style={styles.menuItemContent}>
-            <p style={styles.menuItemTitle}>Notificações Push</p>
-            <p style={styles.menuItemDesc}>Configurar alertas e avisos</p>
+          <div style={styles.listItemContent}>
+            <p style={styles.listItemName}>Notificações Push</p>
+            <p style={styles.listItemMeta}>
+              {notifSettings.pushEnabled ? 'Ativadas' : 'Desativadas'}
+            </p>
           </div>
-          <ChevronRight size={20} color="#9ca3af" />
-        </button>
+          {!notifSettings.pushEnabled && (
+            <button
+              onClick={requestPushPermission}
+              style={{ ...styles.addButton, padding: '8px 12px', fontSize: 12 }}
+            >
+              Ativar
+            </button>
+          )}
+        </div>
       </div>
 
       <div style={styles.infoSection}>
-        <h4 style={styles.sectionTitle}>Sistema</h4>
-        <button style={styles.menuItem}>
+        <h4 style={styles.sectionTitle}>Tipos de Notificação</h4>
+
+        {[
+          { key: 'novasMensagens', icon: MessageSquare, label: 'Novas Mensagens', desc: 'Chat da obra' },
+          { key: 'novasTarefas', icon: CheckCircle, label: 'Novas Tarefas', desc: 'Tarefas atribuídas' },
+          { key: 'pedidosMateriais', icon: Package, label: 'Pedidos de Materiais', desc: 'Novos pedidos e atualizações' },
+          { key: 'alertasUrgentes', icon: AlertTriangle, label: 'Alertas Urgentes', desc: 'Avisos importantes' }
+        ].map(item => (
+          <div key={item.key} style={styles.listItem}>
+            <div style={{ ...styles.listItemAvatar, borderRadius: 10, background: '#f3f4f6' }}>
+              <item.icon size={18} color="#6b7280" />
+            </div>
+            <div style={styles.listItemContent}>
+              <p style={styles.listItemName}>{item.label}</p>
+              <p style={styles.listItemMeta}>{item.desc}</p>
+            </div>
+            <button
+              onClick={() => saveNotifSettings(item.key, !notifSettings[item.key])}
+              style={{ ...styles.iconButton, background: 'transparent' }}
+            >
+              {notifSettings[item.key] ? (
+                <ToggleRight size={28} color="#16a34a" />
+              ) : (
+                <ToggleLeft size={28} color="#9ca3af" />
+              )}
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+
+  const renderDatabaseSettings = () => (
+    <div>
+      <div style={styles.infoSection}>
+        <h4 style={styles.sectionTitle}>Estatísticas</h4>
+
+        {loading && !dbStats ? (
+          <div style={{ textAlign: 'center', padding: 40 }}>
+            <Loader2 size={24} style={{ animation: 'spin 1s linear infinite' }} />
+            <p style={{ color: '#6b7280', marginTop: 8 }}>A carregar...</p>
+          </div>
+        ) : dbStats ? (
+          <>
+            <div style={styles.listItem}>
+              <div style={{ ...styles.listItemAvatar, borderRadius: 10, background: '#e0e7ff' }}>
+                <Smartphone size={18} color="#4f46e5" />
+              </div>
+              <div style={styles.listItemContent}>
+                <p style={styles.listItemName}>Armazenamento Local</p>
+                <p style={styles.listItemMeta}>{dbStats.localStorageSize} KB utilizados</p>
+              </div>
+            </div>
+            <div style={styles.listItem}>
+              <div style={{ ...styles.listItemAvatar, borderRadius: 10, background: '#fef3c7' }}>
+                <Database size={18} color="#d97706" />
+              </div>
+              <div style={styles.listItemContent}>
+                <p style={styles.listItemName}>Itens em Cache</p>
+                <p style={styles.listItemMeta}>{dbStats.cacheItems} itens</p>
+              </div>
+            </div>
+            <div style={styles.listItem}>
+              <div style={{ ...styles.listItemAvatar, borderRadius: 10, background: '#dcfce7' }}>
+                <MessageSquare size={18} color="#16a34a" />
+              </div>
+              <div style={styles.listItemContent}>
+                <p style={styles.listItemName}>Mensagens</p>
+                <p style={styles.listItemMeta}>{dbStats.mensagens} no total</p>
+              </div>
+            </div>
+            <div style={styles.listItem}>
+              <div style={{ ...styles.listItemAvatar, borderRadius: 10, background: '#fce7f3' }}>
+                <Image size={18} color="#db2777" />
+              </div>
+              <div style={styles.listItemContent}>
+                <p style={styles.listItemName}>Fotografias</p>
+                <p style={styles.listItemMeta}>{dbStats.fotografias} no total</p>
+              </div>
+            </div>
+          </>
+        ) : null}
+      </div>
+
+      <div style={styles.infoSection}>
+        <h4 style={styles.sectionTitle}>Ações</h4>
+        <button
+          onClick={loadDbStats}
+          disabled={loading}
+          style={{ ...styles.menuItem, opacity: loading ? 0.5 : 1 }}
+        >
           <div style={{ ...styles.menuItemIcon, background: '#e0e7ff', color: '#4f46e5' }}>
-            <Database size={20} />
+            <RefreshCw size={20} style={loading ? { animation: 'spin 1s linear infinite' } : {}} />
           </div>
           <div style={styles.menuItemContent}>
-            <p style={styles.menuItemTitle}>Base de Dados</p>
-            <p style={styles.menuItemDesc}>Ver estatísticas e limpar cache</p>
+            <p style={styles.menuItemTitle}>Atualizar Estatísticas</p>
+            <p style={styles.menuItemDesc}>Recarregar dados</p>
           </div>
-          <ChevronRight size={20} color="#9ca3af" />
         </button>
-        <button style={styles.menuItem}>
-          <div style={{ ...styles.menuItemIcon, background: '#fce7f3', color: '#db2777' }}>
-            <Palette size={20} />
-          </div>
-          <div style={styles.menuItemContent}>
-            <p style={styles.menuItemTitle}>Aparência</p>
-            <p style={styles.menuItemDesc}>Tema e personalização</p>
-          </div>
-          <ChevronRight size={20} color="#9ca3af" />
-        </button>
-        <button style={styles.menuItem}>
+        <button
+          onClick={clearCache}
+          disabled={clearingCache}
+          style={{ ...styles.menuItem, opacity: clearingCache ? 0.5 : 1 }}
+        >
           <div style={{ ...styles.menuItemIcon, background: '#fee2e2', color: '#dc2626' }}>
-            <Lock size={20} />
+            <Trash size={20} />
           </div>
           <div style={styles.menuItemContent}>
-            <p style={styles.menuItemTitle}>Segurança</p>
-            <p style={styles.menuItemDesc}>Alterar palavra-passe</p>
+            <p style={styles.menuItemTitle}>Limpar Cache</p>
+            <p style={styles.menuItemDesc}>Libertar espaço de armazenamento</p>
           </div>
-          <ChevronRight size={20} color="#9ca3af" />
         </button>
       </div>
     </div>
   )
+
+  const renderAparenciaSettings = () => (
+    <div>
+      <div style={styles.infoSection}>
+        <h4 style={styles.sectionTitle}>Tema</h4>
+
+        {[
+          { key: 'light', icon: Sun, label: 'Claro', desc: 'Fundo branco' },
+          { key: 'dark', icon: Moon, label: 'Escuro', desc: 'Fundo escuro' },
+          { key: 'auto', icon: Smartphone, label: 'Automático', desc: 'Seguir sistema' }
+        ].map(item => (
+          <button
+            key={item.key}
+            onClick={() => changeTheme(item.key)}
+            style={{
+              ...styles.listItem,
+              border: theme === item.key ? `2px solid ${colors.primary}` : '2px solid transparent',
+              cursor: 'pointer'
+            }}
+          >
+            <div style={{
+              ...styles.listItemAvatar,
+              borderRadius: 10,
+              background: theme === item.key ? `${colors.primary}15` : '#f3f4f6'
+            }}>
+              <item.icon size={18} color={theme === item.key ? colors.primary : '#6b7280'} />
+            </div>
+            <div style={styles.listItemContent}>
+              <p style={{
+                ...styles.listItemName,
+                color: theme === item.key ? colors.primary : '#1f2937'
+              }}>{item.label}</p>
+              <p style={styles.listItemMeta}>{item.desc}</p>
+            </div>
+            {theme === item.key && <Check size={20} color={colors.primary} />}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ padding: 16, background: '#fef3c7', borderRadius: 12, margin: 16 }}>
+        <p style={{ fontSize: 13, color: '#92400e', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <AlertTriangle size={16} />
+          O tema escuro estará disponível em breve
+        </p>
+      </div>
+    </div>
+  )
+
+  const renderSegurancaSettings = () => (
+    <div>
+      {user.tipo === 'gestao' ? (
+        <div style={styles.infoSection}>
+          <h4 style={styles.sectionTitle}>Alterar Palavra-passe</h4>
+
+          <div style={{ padding: 16 }}>
+            <div style={styles.formGroup}>
+              <label style={styles.formLabel}>Palavra-passe Atual</label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showPasswords.current ? 'text' : 'password'}
+                  value={passwordData.current}
+                  onChange={e => setPasswordData(p => ({ ...p, current: e.target.value }))}
+                  style={{ ...styles.formInput, paddingRight: 40 }}
+                  placeholder="Introduz a palavra-passe atual"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPasswords(p => ({ ...p, current: !p.current }))}
+                  style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer' }}
+                >
+                  {showPasswords.current ? <EyeOff size={18} color="#6b7280" /> : <Eye size={18} color="#6b7280" />}
+                </button>
+              </div>
+            </div>
+
+            <div style={styles.formGroup}>
+              <label style={styles.formLabel}>Nova Palavra-passe</label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showPasswords.new ? 'text' : 'password'}
+                  value={passwordData.new}
+                  onChange={e => setPasswordData(p => ({ ...p, new: e.target.value }))}
+                  style={{ ...styles.formInput, paddingRight: 40 }}
+                  placeholder="Mínimo 6 caracteres"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPasswords(p => ({ ...p, new: !p.new }))}
+                  style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer' }}
+                >
+                  {showPasswords.new ? <EyeOff size={18} color="#6b7280" /> : <Eye size={18} color="#6b7280" />}
+                </button>
+              </div>
+            </div>
+
+            <div style={styles.formGroup}>
+              <label style={styles.formLabel}>Confirmar Nova Palavra-passe</label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showPasswords.confirm ? 'text' : 'password'}
+                  value={passwordData.confirm}
+                  onChange={e => setPasswordData(p => ({ ...p, confirm: e.target.value }))}
+                  style={{ ...styles.formInput, paddingRight: 40 }}
+                  placeholder="Repete a nova palavra-passe"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPasswords(p => ({ ...p, confirm: !p.confirm }))}
+                  style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer' }}
+                >
+                  {showPasswords.confirm ? <EyeOff size={18} color="#6b7280" /> : <Eye size={18} color="#6b7280" />}
+                </button>
+              </div>
+            </div>
+
+            {passwordData.new && passwordData.confirm && passwordData.new !== passwordData.confirm && (
+              <p style={{ color: '#dc2626', fontSize: 12, margin: '0 0 16px' }}>
+                As palavras-passe não coincidem
+              </p>
+            )}
+
+            <button
+              onClick={handleChangePassword}
+              disabled={changingPassword || !passwordData.current || !passwordData.new || !passwordData.confirm || passwordData.new !== passwordData.confirm}
+              style={{
+                ...styles.buttonPrimary,
+                width: '100%',
+                opacity: (!passwordData.current || !passwordData.new || !passwordData.confirm || passwordData.new !== passwordData.confirm) ? 0.5 : 1
+              }}
+            >
+              {changingPassword ? 'A alterar...' : 'Alterar Palavra-passe'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div style={{ padding: 16, background: '#f3f4f6', borderRadius: 12, margin: 16, textAlign: 'center' }}>
+          <Lock size={32} color="#9ca3af" style={{ marginBottom: 8 }} />
+          <p style={{ fontSize: 14, color: '#6b7280', margin: 0 }}>
+            Para alterar o PIN, contacta o teu encarregado
+          </p>
+        </div>
+      )}
+    </div>
+  )
+
+  // Render Settings (Admin)
+  const renderSettings = () => {
+    // If a sub-section is active, render it
+    if (settingsSection === 'notificacoes') return renderNotificacoesSettings()
+    if (settingsSection === 'database') return renderDatabaseSettings()
+    if (settingsSection === 'aparencia') return renderAparenciaSettings()
+    if (settingsSection === 'seguranca') return renderSegurancaSettings()
+
+    // Otherwise render main settings menu
+    return (
+      <div>
+        <div style={styles.infoSection}>
+          <h4 style={styles.sectionTitle}>Notificações</h4>
+          <button style={styles.menuItem} onClick={() => setSettingsSection('notificacoes')}>
+            <div style={{ ...styles.menuItemIcon, background: '#fef3c7', color: '#d97706' }}>
+              <Bell size={20} />
+            </div>
+            <div style={styles.menuItemContent}>
+              <p style={styles.menuItemTitle}>Notificações Push</p>
+              <p style={styles.menuItemDesc}>Configurar alertas e avisos</p>
+            </div>
+            <ChevronRight size={20} color="#9ca3af" />
+          </button>
+        </div>
+
+        <div style={styles.infoSection}>
+          <h4 style={styles.sectionTitle}>Sistema</h4>
+          <button style={styles.menuItem} onClick={() => setSettingsSection('database')}>
+            <div style={{ ...styles.menuItemIcon, background: '#e0e7ff', color: '#4f46e5' }}>
+              <Database size={20} />
+            </div>
+            <div style={styles.menuItemContent}>
+              <p style={styles.menuItemTitle}>Base de Dados</p>
+              <p style={styles.menuItemDesc}>Ver estatísticas e limpar cache</p>
+            </div>
+            <ChevronRight size={20} color="#9ca3af" />
+          </button>
+          <button style={styles.menuItem} onClick={() => setSettingsSection('aparencia')}>
+            <div style={{ ...styles.menuItemIcon, background: '#fce7f3', color: '#db2777' }}>
+              <Palette size={20} />
+            </div>
+            <div style={styles.menuItemContent}>
+              <p style={styles.menuItemTitle}>Aparência</p>
+              <p style={styles.menuItemDesc}>Tema e personalização</p>
+            </div>
+            <ChevronRight size={20} color="#9ca3af" />
+          </button>
+          <button style={styles.menuItem} onClick={() => setSettingsSection('seguranca')}>
+            <div style={{ ...styles.menuItemIcon, background: '#fee2e2', color: '#dc2626' }}>
+              <Lock size={20} />
+            </div>
+            <div style={styles.menuItemContent}>
+              <p style={styles.menuItemTitle}>Segurança</p>
+              <p style={styles.menuItemDesc}>Alterar palavra-passe</p>
+            </div>
+            <ChevronRight size={20} color="#9ca3af" />
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   // Main content based on active section
   const renderContent = () => {
@@ -1163,6 +1667,16 @@ export default function ProfilePage({ user, onBack, onUpdateUser }) {
 
   // Get header title based on section
   const getHeaderTitle = () => {
+    // Check settings sub-sections first
+    if (activeSection === 'definicoes' && settingsSection) {
+      switch (settingsSection) {
+        case 'notificacoes': return 'Notificações'
+        case 'database': return 'Base de Dados'
+        case 'aparencia': return 'Aparência'
+        case 'seguranca': return 'Segurança'
+      }
+    }
+
     switch (activeSection) {
       case 'obras': return 'Gerir Obras'
       case 'trabalhadores': return 'Gerir Trabalhadores'
@@ -1171,12 +1685,28 @@ export default function ProfilePage({ user, onBack, onUpdateUser }) {
     }
   }
 
+  // Handle back navigation
+  const handleBack = () => {
+    // If in a settings sub-section, go back to settings menu
+    if (activeSection === 'definicoes' && settingsSection) {
+      setSettingsSection(null)
+      return
+    }
+    // If in a main section, go back to profile
+    if (activeSection) {
+      setActiveSection(null)
+      return
+    }
+    // Otherwise, exit profile page
+    onBack()
+  }
+
   return (
     <div style={styles.container}>
       {/* Header */}
       <div style={styles.header}>
         <button
-          onClick={() => activeSection ? setActiveSection(null) : onBack()}
+          onClick={handleBack}
           style={styles.backButton}
         >
           <ArrowLeft size={24} />
