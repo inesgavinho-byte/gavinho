@@ -1,8 +1,10 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { useEffect, useState, lazy, Suspense } from 'react'
 import { AuthProvider } from './contexts/AuthContext'
+import { NotificationProvider } from './contexts/NotificationContext'
 import { ThemeProvider } from './components/ui/ThemeProvider'
 import { ToastProvider } from './components/ui/Toast'
+import NotificationPanel from './components/ui/NotificationPanel'
 import ProtectedRoute from './components/ProtectedRoute'
 import Layout from './components/Layout'
 import { Loader2 } from 'lucide-react'
@@ -184,7 +186,9 @@ function App() {
         <OAuthCallbackHandler>
           <BrowserRouter>
             <AuthProvider>
-              <Routes>
+              <NotificationProvider>
+                <NotificationPanel />
+                <Routes>
                 {/* Public Routes - No Suspense needed (eager loaded) */}
                 <Route path="/login" element={<Login />} />
                 <Route path="/registo" element={<Registo />} />
@@ -405,7 +409,8 @@ function App() {
                     </Suspense>
                   } />
                 </Route>
-              </Routes>
+                </Routes>
+              </NotificationProvider>
             </AuthProvider>
           </BrowserRouter>
         </OAuthCallbackHandler>
