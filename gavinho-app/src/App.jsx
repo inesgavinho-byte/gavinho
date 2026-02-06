@@ -57,6 +57,8 @@ const DecisoesPagina = lazy(() => import('./pages/DecisoesPagina'))
 const MQT = lazy(() => import('./pages/MQT'))
 const GestaoObras = lazy(() => import('./pages/GestaoObras'))
 const AdminSeed = lazy(() => import('./pages/AdminSeed'))
+const Configuracoes = lazy(() => import('./pages/Configuracoes'))
+const EquipaMembro = lazy(() => import('./pages/EquipaMembro'))
 
 // PWA App - separate chunk
 const ObraApp = lazy(() => import('./pages/ObraApp'))
@@ -299,7 +301,7 @@ function App() {
                   } />
                   <Route path="equipa/:id" element={
                     <Suspense fallback={<PageLoader />}>
-                      <PlaceholderPage title="Perfil do Colaborador" subtitle="Informações e alocações" />
+                      <EquipaMembro />
                     </Suspense>
                   } />
                   <Route path="gestao-obras" element={
@@ -394,7 +396,7 @@ function App() {
                   } />
                   <Route path="configuracoes" element={
                     <Suspense fallback={<PageLoader />}>
-                      <PlaceholderPage title="Configurações" subtitle="Definições da plataforma" />
+                      <Configuracoes />
                     </Suspense>
                   } />
                   <Route path="admin/seed" element={

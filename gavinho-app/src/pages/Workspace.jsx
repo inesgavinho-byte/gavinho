@@ -820,11 +820,32 @@ export default function Workspace() {
     setShowMessageMenu(null)
   }
 
-  const handleCreateTask = (taskData) => {
-    // TODO: In production, would insert into tasks table
-    setShowCreateTaskModal(false)
-    setTaskFromMessage(null)
-    toastSuccess('Tarefa criada com sucesso!')
+  const handleCreateTask = async (taskData) => {
+    try {
+      // Inserir tarefa na base de dados
+      const { error } = await supabase
+        .from('tarefas')
+        .insert({
+          projeto_id: canalAtivo?.id,
+          titulo: taskData.titulo || taskData.title,
+          descricao: taskData.descricao || taskData.description,
+          prioridade: taskData.prioridade || 'media',
+          status: 'pendente',
+          data_limite: taskData.dataLimite || taskData.dueDate || null,
+          categoria: 'geral',
+          origem_tipo: 'manual',
+          notas: taskFromMessage?.conteudo ? `Criada a partir de mensagem: "${taskFromMessage.conteudo.substring(0, 200)}"` : null
+        })
+
+      if (error) throw error
+
+      setShowCreateTaskModal(false)
+      setTaskFromMessage(null)
+      toastSuccess('Tarefa criada com sucesso!')
+    } catch (err) {
+      console.error('Erro ao criar tarefa:', err)
+      toastError('Erro ao criar tarefa')
+    }
   }
 
   // ========== FORWARD MESSAGE ==========
@@ -834,15 +855,41 @@ export default function Workspace() {
     setShowMessageMenu(null)
   }
 
-  const handleForwardMessage = (targetChannelId) => {
+  const handleForwardMessage = async (targetChannelId) => {
     if (!messageToForward) return
 
     const targetChannel = canais.find(c => c.id === targetChannelId)
 
-    // TODO: In production, would insert forwarded message
-    setShowForwardModal(false)
-    setMessageToForward(null)
-    toastSuccess(`Mensagem reencaminhada para ${targetChannel?.nome}`)
+    try {
+      // Inserir mensagem reencaminhada no canal de destino
+      const { error } = await supabase
+        .from('chat_posts')
+        .insert({
+          canal_id: targetChannelId,
+          autor_id: profile?.id,
+          autor_nome: profile?.nome || 'Utilizador',
+          conteudo: messageToForward.conteudo,
+          tipo: 'reencaminhada',
+          metadata: {
+            forwarded_from: {
+              canal_id: canalAtivo?.id,
+              canal_nome: canalAtivo?.nome,
+              canal_codigo: canalAtivo?.codigo,
+              original_author: messageToForward.autor_nome,
+              original_date: messageToForward.created_at
+            }
+          }
+        })
+
+      if (error) throw error
+
+      setShowForwardModal(false)
+      setMessageToForward(null)
+      toastSuccess(`Mensagem reencaminhada para ${targetChannel?.nome}`)
+    } catch (err) {
+      console.error('Erro ao reencaminhar mensagem:', err)
+      toastError('Erro ao reencaminhar mensagem')
+    }
   }
 
   // ========== DRAG & DROP FILES ==========
@@ -1143,11 +1190,36 @@ export default function Workspace() {
     setShowMessageMenu(null)
   }
 
-  const createMeeting = () => {
-    // TODO: In production, would integrate with Google Calendar/Outlook
-    toastSuccess(`Reunião "${meetingDetails.title}" agendada para ${meetingDetails.date} às ${meetingDetails.time}`, 'Reunião agendada')
-    setShowScheduleMeetingModal(false)
-    setMeetingDetails({ title: '', date: '', time: '', duration: '30', participants: [], description: '' })
+  const createMeeting = async () => {
+    try {
+      // Criar data de início e fim
+      const dataInicio = new Date(`${meetingDetails.date}T${meetingDetails.time}:00`)
+      const dataFim = new Date(dataInicio.getTime() + parseInt(meetingDetails.duration) * 60000)
+
+      // Inserir evento no calendário
+      const { error } = await supabase
+        .from('calendario_eventos')
+        .insert({
+          titulo: meetingDetails.title,
+          descricao: meetingDetails.description,
+          tipo: 'reuniao',
+          data_inicio: dataInicio.toISOString(),
+          data_fim: dataFim.toISOString(),
+          projeto_id: canalAtivo?.id,
+          criado_por: profile?.id,
+          participantes: meetingDetails.participants.map(p => ({ id: p.id, nome: p.nome })),
+          notificar: true
+        })
+
+      if (error) throw error
+
+      toastSuccess(`Reunião "${meetingDetails.title}" agendada para ${meetingDetails.date} às ${meetingDetails.time}`, 'Reunião agendada')
+      setShowScheduleMeetingModal(false)
+      setMeetingDetails({ title: '', date: '', time: '', duration: '30', participants: [], description: '' })
+    } catch (err) {
+      console.error('Erro ao criar reunião:', err)
+      toastError('Erro ao agendar reunião')
+    }
   }
 
   // ========== AI ASSISTANT ==========
