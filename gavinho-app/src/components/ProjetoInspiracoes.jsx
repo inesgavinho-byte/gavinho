@@ -4,7 +4,7 @@ import {
   Plus, Upload, Image, X, ChevronLeft, ChevronRight,
   Star, Trash2, Edit, Loader2, Palette, Link2,
   AlertCircle, RefreshCw, Eye, Tag, ExternalLink,
-  ChevronDown, ChevronUp, FolderOpen
+  ChevronDown, ChevronUp, FolderOpen, Settings, FolderPlus
 } from 'lucide-react'
 import './ProjetoInspiracoes.css'
 
@@ -125,10 +125,15 @@ export default function ProjetoInspiracoes({ projeto, userId, userName, comparti
   // Modal states
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
+  const [showCompartimentosModal, setShowCompartimentosModal] = useState(false)
   const [editingInspiracao, setEditingInspiracao] = useState(null)
   const [lightboxImage, setLightboxImage] = useState(null)
   const [lightboxIndex, setLightboxIndex] = useState(0)
   const [lightboxImages, setLightboxImages] = useState([])
+
+  // Compartimento management state
+  const [novoCompartimento, setNovoCompartimento] = useState('')
+  const [savingCompartimento, setSavingCompartimento] = useState(false)
 
   // Form states
   const [uploadForm, setUploadForm] = useState({
@@ -438,6 +443,85 @@ export default function ProjetoInspiracoes({ projeto, userId, userName, comparti
     setCollapsedCompartimentos(newState)
   }
 
+  // Open upload modal with specific compartimento pre-selected
+  const openUploadForCompartimento = (compartimento, e) => {
+    if (e) e.stopPropagation()
+    setUploadForm(prev => ({
+      ...prev,
+      compartimento: compartimento
+    }))
+    setShowUploadModal(true)
+  }
+
+  // Add new compartimento
+  const handleAddCompartimento = async () => {
+    if (!novoCompartimento.trim()) return
+
+    setSavingCompartimento(true)
+    try {
+      const { error } = await supabase
+        .from('projeto_compartimentos')
+        .insert({
+          projeto_id: projeto.id,
+          nome: novoCompartimento.trim(),
+          created_by: userId,
+          created_by_name: userName
+        })
+
+      if (error) {
+        if (error.code === '23505') {
+          alert('Este compartimento ja existe neste projeto')
+        } else {
+          throw error
+        }
+      } else {
+        // Reload to update compartimentosProjeto
+        window.location.reload()
+      }
+    } catch (err) {
+      console.error('Erro ao adicionar compartimento:', err)
+      alert('Erro ao adicionar compartimento: ' + err.message)
+    } finally {
+      setSavingCompartimento(false)
+      setNovoCompartimento('')
+    }
+  }
+
+  // Delete compartimento
+  const handleDeleteCompartimento = async (compartimento) => {
+    // Check if compartimento has inspiracoes
+    const count = inspiracoesByCompartimento[compartimento]?.length || 0
+    if (count > 0) {
+      const confirmMsg = `Este compartimento tem ${count} inspiracao(oes). As inspiracoes serao movidas para "Geral". Continuar?`
+      if (!confirm(confirmMsg)) return
+
+      // Move inspiracoes to "Geral"
+      const { error: updateError } = await supabase
+        .from('projeto_inspiracoes')
+        .update({ compartimento: 'Geral' })
+        .eq('projeto_id', projeto.id)
+        .eq('compartimento', compartimento)
+
+      if (updateError) {
+        alert('Erro ao mover inspiracoes: ' + updateError.message)
+        return
+      }
+    }
+
+    // Delete compartimento from database
+    const { error } = await supabase
+      .from('projeto_compartimentos')
+      .delete()
+      .eq('projeto_id', projeto.id)
+      .eq('nome', compartimento)
+
+    if (error) {
+      alert('Erro ao eliminar compartimento: ' + error.message)
+    } else {
+      window.location.reload()
+    }
+  }
+
   // Count total
   const totalInspiracoes = inspiracoes.length
   const totalCompartimentos = Object.keys(inspiracoesByCompartimento).length
@@ -495,6 +579,14 @@ export default function ProjetoInspiracoes({ projeto, userId, userName, comparti
               </button>
             </>
           )}
+          {/* Manage Compartimentos button */}
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => setShowCompartimentosModal(true)}
+            title="Gerir Compartimentos"
+          >
+            <Settings size={16} />
+          </button>
           <button
             className="btn btn-primary"
             onClick={() => setShowUploadModal(true)}
@@ -541,8 +633,17 @@ export default function ProjetoInspiracoes({ projeto, userId, userName, comparti
                       {items.length} imagem{items.length !== 1 ? 'ns' : ''}
                     </span>
                   </div>
-                  <div className="inspiracoes-section-toggle">
-                    {isCollapsed ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+                  <div className="inspiracoes-section-actions">
+                    <button
+                      className="btn-icon btn-add-to-compartimento"
+                      onClick={(e) => openUploadForCompartimento(compartimento, e)}
+                      title={`Adicionar inspiracao a ${compartimento}`}
+                    >
+                      <Plus size={16} />
+                    </button>
+                    <div className="inspiracoes-section-toggle">
+                      {isCollapsed ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+                    </div>
                   </div>
                 </div>
 
@@ -916,6 +1017,105 @@ export default function ProjetoInspiracoes({ projeto, userId, userName, comparti
             >
               <ChevronRight size={28} />
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Compartimentos Management Modal */}
+      {showCompartimentosModal && (
+        <div className="modal-overlay" onClick={() => setShowCompartimentosModal(false)}>
+          <div className="modal-content modal-lg" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Gerir Compartimentos</h3>
+              <button className="btn-close" onClick={() => setShowCompartimentosModal(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              {/* Add new compartimento */}
+              <div className="form-group">
+                <label>Adicionar Novo Compartimento</label>
+                <div className="compartimento-add-row">
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="Nome do compartimento..."
+                    value={novoCompartimento}
+                    onChange={e => setNovoCompartimento(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleAddCompartimento()}
+                  />
+                  <button
+                    className="btn btn-primary"
+                    onClick={handleAddCompartimento}
+                    disabled={!novoCompartimento.trim() || savingCompartimento}
+                  >
+                    {savingCompartimento ? (
+                      <Loader2 size={16} className="spin" />
+                    ) : (
+                      <Plus size={16} />
+                    )}
+                    Adicionar
+                  </button>
+                </div>
+              </div>
+
+              {/* Existing compartimentos */}
+              <div className="form-group">
+                <label>Compartimentos Existentes</label>
+                <div className="compartimentos-list">
+                  {compartimentosDisponiveis.map(comp => {
+                    const count = inspiracoesByCompartimento[comp]?.length || 0
+                    const isFromProject = compartimentosProjeto.some(c => (c.nome || c) === comp)
+                    const isDefault = ['Geral', 'Sala de Estar', 'Cozinha', 'Quarto', 'Casa de Banho', 'Escritorio', 'Exterior'].includes(comp)
+
+                    return (
+                      <div key={comp} className="compartimento-item">
+                        <div className="compartimento-item-info">
+                          <FolderOpen size={16} />
+                          <span className="compartimento-item-name">{comp}</span>
+                          {count > 0 && (
+                            <span className="compartimento-item-count">{count}</span>
+                          )}
+                          {isFromProject && (
+                            <span className="compartimento-item-badge">Deste Projeto</span>
+                          )}
+                          {isDefault && !isFromProject && (
+                            <span className="compartimento-item-badge default">Predefinido</span>
+                          )}
+                        </div>
+                        <div className="compartimento-item-actions">
+                          <button
+                            className="btn-icon"
+                            onClick={() => openUploadForCompartimento(comp)}
+                            title="Adicionar inspiracao"
+                          >
+                            <Plus size={14} />
+                          </button>
+                          {isFromProject && comp !== 'Geral' && (
+                            <button
+                              className="btn-icon btn-danger"
+                              onClick={() => handleDeleteCompartimento(comp)}
+                              title="Eliminar compartimento"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <p className="compartimentos-hint">
+                Os compartimentos predefinidos estao sempre disponiveis. Pode criar compartimentos personalizados para este projeto que aparecerao em primeiro lugar na lista.
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-primary" onClick={() => setShowCompartimentosModal(false)}>
+                Concluir
+              </button>
+            </div>
           </div>
         </div>
       )}
