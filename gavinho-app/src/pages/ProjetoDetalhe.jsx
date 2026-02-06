@@ -2830,143 +2830,85 @@ export default function ProjetoDetalhe() {
                             </button>
                           </div>
 
-                          {/* Grid de Renders da Vista */}
-                          <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                            gap: '12px'
-                          }}>
+                          {/* Grid de Renders da Vista - Masonry Pinterest Style */}
+                          <div className="masonry-grid">
                             {vistaRenders
                               .sort((a, b) => (b.versao || 0) - (a.versao || 0))
                               .map((render) => (
                               <div
                                 key={render.id}
-                                style={{
-                                  position: 'relative',
-                                  aspectRatio: '16/10',
-                                  background: render.imagem_url ? `url(${render.imagem_url}) center/cover` : 'var(--white)',
-                                  borderRadius: '8px',
-                                  overflow: 'hidden',
-                                  border: render.is_final ? '3px solid var(--success)' : '1px solid var(--stone)',
-                                  cursor: render.imagem_url ? 'pointer' : 'default'
-                                }}
+                                className={`masonry-card ${render.is_final ? 'is-final' : ''}`}
+                                style={{ cursor: render.imagem_url ? 'pointer' : 'default' }}
                                 onClick={() => openLightbox(render, compartimentoRenders)}
                               >
-                                {!render.imagem_url && (
-                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                                    <Image size={24} style={{ color: 'var(--brown-light)', opacity: 0.4 }} />
+                                {render.imagem_url ? (
+                                  <img
+                                    src={render.imagem_url}
+                                    alt={`${render.compartimento} - v${render.versao}`}
+                                    className="masonry-card-image"
+                                  />
+                                ) : (
+                                  <div className="masonry-placeholder">
+                                    <Image size={24} />
                                   </div>
                                 )}
 
                                 {/* Versão Badge */}
-                                <div style={{
-                                  position: 'absolute',
-                                  top: '6px',
-                                  left: '6px',
-                                  padding: '3px 7px',
-                                  background: 'rgba(0,0,0,0.7)',
-                                  color: 'white',
-                                  borderRadius: '4px',
-                                  fontSize: '11px',
-                                  fontWeight: 600
-                                }}>
+                                <div className="masonry-badge dark">
                                   v{render.versao}
                                 </div>
 
                                 {/* Final Badge */}
                                 {render.is_final && (
-                                  <div style={{
-                                    position: 'absolute',
-                                    top: '6px',
-                                    right: '6px',
-                                    padding: '3px 6px',
-                                    background: 'var(--success)',
-                                    color: 'white',
-                                    borderRadius: '4px',
-                                    fontSize: '9px',
-                                    fontWeight: 600,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '3px'
-                                  }}>
+                                  <div className="masonry-badge success" style={{ left: 'auto', right: '50px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                     <CheckCircle size={10} />
                                     FINAL
                                   </div>
                                 )}
 
-                                {/* Hover Actions */}
-                                <div style={{
-                                  position: 'absolute',
-                                  bottom: 0,
-                                  left: 0,
-                                  right: 0,
-                                  padding: '6px',
-                                  background: 'linear-gradient(transparent, rgba(0,0,0,0.8))',
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                  alignItems: 'center'
-                                }}>
+                                {/* Actions */}
+                                <div className="masonry-card-actions">
                                   <button
-                                    onClick={(e) => { e.stopPropagation(); toggleFinalImage(render) }}
-                                    style={{
-                                      padding: '3px 6px',
-                                      background: render.is_final ? 'var(--error)' : 'var(--success)',
-                                      color: 'white',
-                                      border: 'none',
-                                      borderRadius: '4px',
-                                      fontSize: '9px',
-                                      cursor: 'pointer'
-                                    }}
+                                    onClick={(e) => { e.stopPropagation(); setMoleskineRender(render) }}
+                                    className="masonry-action-btn"
+                                    title="Moleskine"
                                   >
-                                    {render.is_final ? 'Remover Final' : 'Marcar Final'}
+                                    <Pencil size={14} />
                                   </button>
-                                  <div style={{ display: 'flex', gap: '3px' }}>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); openEditRenderModal(render) }}
+                                    className="masonry-action-btn"
+                                    title="Editar"
+                                  >
+                                    <Edit size={14} />
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleDeleteRender(render) }}
+                                    className="masonry-action-btn danger"
+                                    title="Eliminar"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
+
+                                {/* Info Footer */}
+                                <div className="masonry-card-info">
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span className="masonry-card-info-subtitle">{render.vista || 'Vista Principal'}</span>
                                     <button
-                                      onClick={(e) => { e.stopPropagation(); setMoleskineRender(render) }}
+                                      onClick={(e) => { e.stopPropagation(); toggleFinalImage(render) }}
+                                      className={`masonry-action-btn ${render.is_final ? '' : 'success'}`}
                                       style={{
-                                        padding: '3px 6px',
-                                        background: '#8B8670',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '4px',
-                                        cursor: 'pointer',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '3px',
-                                        fontSize: '9px',
-                                        fontWeight: 500
+                                        padding: '4px 10px',
+                                        borderRadius: '12px',
+                                        fontSize: '10px',
+                                        fontWeight: 500,
+                                        background: render.is_final ? 'var(--error)' : 'var(--success)',
+                                        color: 'white'
                                       }}
-                                      title="Moleskine - Anotar render"
+                                      title={render.is_final ? 'Remover Final' : 'Marcar Final'}
                                     >
-                                      <Pencil size={10} />
-                                      Moleskine
-                                    </button>
-                                    <button
-                                      onClick={(e) => { e.stopPropagation(); openEditRenderModal(render) }}
-                                      style={{
-                                        padding: '3px',
-                                        background: 'rgba(255,255,255,0.2)',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '4px',
-                                        cursor: 'pointer'
-                                      }}
-                                      title="Editar"
-                                    >
-                                      <Edit size={12} />
-                                    </button>
-                                    <button
-                                      onClick={(e) => { e.stopPropagation(); handleDeleteRender(render) }}
-                                      style={{
-                                        padding: '3px',
-                                        background: 'rgba(255,255,255,0.2)',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '4px',
-                                        cursor: 'pointer'
-                                      }}
-                                    >
-                                      <Trash2 size={12} />
+                                      {render.is_final ? 'Remover' : 'Final'}
                                     </button>
                                   </div>
                                 </div>
@@ -3027,56 +2969,52 @@ export default function ProjetoDetalhe() {
           </div>
 
           {imagensFinais.length > 0 ? (
-            <div className="grid grid-3" style={{ gap: '16px' }}>
+            <div className="masonry-grid">
               {imagensFinais.map((render) => (
                 <div
                   key={render.id}
+                  className="masonry-card"
                   style={{
-                    position: 'relative',
-                    aspectRatio: '16/10',
-                    background: render.imagem_url ? `url(${render.imagem_url}) center/cover` : 'var(--cream)',
-                    borderRadius: '12px',
-                    overflow: 'hidden',
                     border: '3px solid var(--success)',
                     cursor: render.imagem_url ? 'pointer' : 'default'
                   }}
                   onClick={() => render.imagem_url && openLightbox(render, imagensFinais)}
                 >
-                  {!render.imagem_url && (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                  {render.imagem_url ? (
+                    <img
+                      src={render.imagem_url}
+                      alt={render.compartimento}
+                      style={{
+                        width: '100%',
+                        height: 'auto',
+                        display: 'block'
+                      }}
+                    />
+                  ) : (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      height: '200px',
+                      background: 'var(--cream)'
+                    }}>
                       <Image size={32} style={{ color: 'var(--brown-light)', opacity: 0.4 }} />
                     </div>
                   )}
 
-                  <div style={{
-                    position: 'absolute',
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    padding: '12px',
-                    background: 'linear-gradient(transparent, rgba(0,0,0,0.8))',
-                    color: 'white'
-                  }}>
+                  <div className="masonry-card-info">
                     <div style={{ fontSize: '13px', fontWeight: 600 }}>{render.compartimento}</div>
                     <div style={{ fontSize: '11px', opacity: 0.8 }}>Versão {render.versao}</div>
                   </div>
 
                   <button
                     onClick={(e) => { e.stopPropagation(); toggleFinalImage(render) }}
+                    className="masonry-action-btn"
                     style={{
                       position: 'absolute',
                       top: '8px',
                       right: '8px',
-                      padding: '6px',
-                      background: 'var(--error)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '6px',
-                      fontSize: '11px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
+                      background: 'var(--error)'
                     }}
                     title="Remover das imagens finais"
                   >
