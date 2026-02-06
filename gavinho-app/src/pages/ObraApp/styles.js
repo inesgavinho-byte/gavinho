@@ -72,15 +72,17 @@ export const styles = {
   obraCode: {
     margin: 0,
     fontSize: 16,
-    fontWeight: 600
+    fontWeight: 600,
+    color: 'white'
   },
   obraNome: {
     margin: 0,
     fontSize: 12,
-    opacity: 1,
+    opacity: 0.9,
     fontWeight: 500,
     textTransform: 'uppercase',
-    letterSpacing: 0.5
+    letterSpacing: 0.5,
+    color: 'white'
   },
   headerActions: {
     display: 'flex',

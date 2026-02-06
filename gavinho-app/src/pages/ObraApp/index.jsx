@@ -334,11 +334,12 @@ export default function ObraApp() {
       display: 'flex',
       alignItems: 'center',
       gap: 4,
-      padding: '4px 8px',
-      background: 'rgba(255,255,255,0.1)',
+      padding: '6px 12px',
+      background: '#2563eb',
       borderRadius: 8,
       border: 'none',
-      cursor: 'pointer'
+      cursor: 'pointer',
+      color: 'white'
     },
     obraDropdown: {
       position: 'absolute',
