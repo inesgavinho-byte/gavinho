@@ -155,6 +155,35 @@
 
 .inspiracoes-section-toggle {
   color: var(--brown-light, #666);
+  transition: transform 0.3s ease;
+}
+
+.inspiracoes-section-toggle.rotated {
+  transform: rotate(180deg);
+}
+
+/* Grid Wrapper with Animation */
+.inspiracoes-grid-wrapper {
+  display: grid;
+  grid-template-rows: 1fr;
+  overflow: hidden;
+  transition: grid-template-rows 0.35s ease-out, opacity 0.25s ease-out;
+  opacity: 1;
+}
+
+.inspiracoes-grid-wrapper.collapsed {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+
+.inspiracoes-grid-wrapper.expanded {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.inspiracoes-grid-wrapper > .inspiracoes-grid {
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* Photos Grid */

@@ -698,8 +698,8 @@ export default function ProjetoInspiracoes({ projeto, userId, userName, comparti
                   </div>
                 </div>
 
-                {/* Photos Grid */}
-                {!isCollapsed && (
+                {/* Photos Grid with Animation */}
+                <div className={`inspiracoes-grid-wrapper ${isCollapsed ? 'collapsed' : 'expanded'}`}>
                   <div className="inspiracoes-grid">
                     {items.map((inspiracao) => (
                       <div key={inspiracao.id} className="inspiracoes-card">
@@ -765,7 +765,7 @@ export default function ProjetoInspiracoes({ projeto, userId, userName, comparti
                       </div>
                     ))}
                   </div>
-                )}
+                </div>
               </div>
             )
           })}
