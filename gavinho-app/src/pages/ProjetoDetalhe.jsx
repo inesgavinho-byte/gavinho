@@ -148,13 +148,13 @@ export default function ProjetoDetalhe() {
   const [activeFaseSection, setActiveFaseSection] = useState(urlSubtab || 'entregaveis')
 
   // Sub-tabs para Archviz
-  const [activeArchvizSection, setActiveArchvizSection] = useState(urlSubtab || 'inspiracoes')
+  const [activeArchvizSection, setActiveArchvizSection] = useState(urlSubtab || 'processo')
 
   // Sub-tabs para Gestão de Projeto
   const [activeGestaoSection, setActiveGestaoSection] = useState(urlSubtab || 'decisoes')
 
   // Sub-tabs para Briefing & Conceito
-  const [activeBriefingSection, setActiveBriefingSection] = useState(urlSubtab || 'moodboards')
+  const [activeBriefingSection, setActiveBriefingSection] = useState(urlSubtab || 'inspiracoes')
 
   // Gestão de Renders/Archviz
   const [renders, setRenders] = useState([])
@@ -1670,6 +1670,7 @@ export default function ProjetoDetalhe() {
 
   // Secções dentro de Briefing & Conceito
   const briefingSections = [
+    { id: 'inspiracoes', label: 'Inspirações & Referências', icon: Palette },
     { id: 'moodboards', label: 'Moodboards', icon: Lightbulb },
     { id: 'levantamento', label: 'Levantamento Fotografico', icon: Camera }
   ]
@@ -1686,7 +1687,6 @@ export default function ProjetoDetalhe() {
 
   // Secções dentro de Archviz
   const archvizSections = [
-    { id: 'inspiracoes', label: 'Inspirações & Referências', icon: Palette },
     { id: 'processo', label: 'Imagens Processo', icon: ImagePlus },
     { id: 'finais', label: 'Imagens Finais', icon: CheckCircle },
     { id: 'moleskine', label: 'Moleskine', icon: Pencil }
@@ -2616,6 +2616,15 @@ export default function ProjetoDetalhe() {
             ))}
           </div>
 
+          {/* Inspirações & Referências */}
+          {activeBriefingSection === 'inspiracoes' && (
+            <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
+              <Palette size={48} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '16px' }} />
+              <h3 style={{ margin: '0 0 8px', color: 'var(--brown)' }}>Inspirações & Referências</h3>
+              <p style={{ color: 'var(--brown-light)', margin: 0 }}>Galeria de inspirações e referências visuais em desenvolvimento</p>
+            </div>
+          )}
+
           {/* Moodboards */}
           {activeBriefingSection === 'moodboards' && (
             <ProjetoMoodboards
@@ -2677,15 +2686,6 @@ export default function ProjetoDetalhe() {
               </button>
             ))}
           </div>
-
-          {/* Inspirações & Referências */}
-          {activeArchvizSection === 'inspiracoes' && (
-            <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
-              <Palette size={48} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '16px' }} />
-              <h3 style={{ margin: '0 0 8px', color: 'var(--brown)' }}>Inspirações & Referências</h3>
-              <p style={{ color: 'var(--brown-light)', margin: 0 }}>Galeria de inspirações e referências visuais em desenvolvimento</p>
-            </div>
-          )}
 
           {/* Imagens Processo */}
           {activeArchvizSection === 'processo' && (
@@ -3154,7 +3154,7 @@ export default function ProjetoDetalhe() {
             <MoleskineDigital
               projectId={project?.id}
               projectName={project?.nome}
-              onClose={() => setActiveArchvizSection('inspiracoes')}
+              onClose={() => setActiveArchvizSection('processo')}
             />
           )}
         </div>
