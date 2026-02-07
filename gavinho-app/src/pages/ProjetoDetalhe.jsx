@@ -63,6 +63,7 @@ import Moleskine from '../components/Moleskine'
 import MoleskineDigital from '../components/MoleskineDigital'
 import ProjetoChatIA from '../components/projeto/ProjetoChatIA'
 import ProjetoAtas from '../components/ProjetoAtas'
+import ProjetoNotebook from '../components/ProjetoNotebook'
 import ProjetoMoodboards from '../components/ProjetoMoodboards'
 import ProjetoLevantamento from '../components/ProjetoLevantamento'
 import ProjetoInspiracoes from '../components/ProjetoInspiracoes'
@@ -3157,9 +3158,13 @@ export default function ProjetoDetalhe() {
         </div>
       )}
 
-      {/* Tab Notebook (Atas) */}
+      {/* Tab Notebook (Documento do Projeto) */}
       {activeTab === 'notebook' && (
-        <ProjetoAtas projeto={project} />
+        <ProjetoNotebook
+          projeto={project}
+          userId={user?.id}
+          userName={user?.email?.split('@')[0] || 'Utilizador'}
+        />
       )}
 
       {/* Tab Biblioteca do Projeto */}
