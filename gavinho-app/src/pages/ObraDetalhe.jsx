@@ -126,6 +126,13 @@ export default function ObraDetalhe() {
   const [selectedAuto, setSelectedAuto] = useState(null)
   const [autoLinhas, setAutoLinhas] = useState([])
 
+  // Estados Modais
+  const [showNewCompraModal, setShowNewCompraModal] = useState(false)
+  const [showNewExecucaoModal, setShowNewExecucaoModal] = useState(false)
+  const [newCompraForm, setNewCompraForm] = useState({ notas: '', preco_comprado_total: '', data_compra: new Date().toISOString().split('T')[0] })
+  const [newExecucaoForm, setNewExecucaoForm] = useState({ pop_linha_id: '', percentagem_execucao: '', notas: '', data_registo: new Date().toISOString().split('T')[0] })
+  const [popLinhasDisponiveis, setPopLinhasDisponiveis] = useState([])
+
   // Refs para edição inline
   const cellInputRef = useRef(null)
 
@@ -275,14 +282,20 @@ export default function ObraDetalhe() {
     try {
       const { data, error } = await supabase
         .from('orcamentos_internos')
-        .select('*')
+        .select('*, mqt_versoes(versao, is_ativa)')
         .eq('obra_id', obra.id)
         .order('created_at', { ascending: false })
 
       if (error) throw error
-      setOrcamentos(data || [])
 
-      const active = data?.find(o => o.is_ativo) || data?.[0]
+      const mapped = (data || []).map(o => ({
+        ...o,
+        versao: o.mqt_versoes?.versao,
+        is_ativo: o.mqt_versoes?.is_ativa
+      }))
+      setOrcamentos(mapped)
+
+      const active = mapped.find(o => o.is_ativo) || mapped[0]
       if (active && (!selectedOrcamento || selectedOrcamento.id !== active.id)) {
         setSelectedOrcamento(active)
         await fetchOrcamentoLinhas(active.id)
@@ -296,12 +309,24 @@ export default function ObraDetalhe() {
     try {
       const { data, error } = await supabase
         .from('orcamento_linhas')
-        .select('*')
+        .select('*, mqt_linhas(ordem, capitulo, referencia, tipo_subtipo, zona, descricao, unidade, quantidade)')
         .eq('orcamento_id', orcamentoId)
-        .order('ordem')
 
       if (error) throw error
-      setOrcamentoLinhas(data || [])
+
+      const mapped = (data || []).map(l => ({
+        ...l,
+        ordem: l.mqt_linhas?.ordem || 0,
+        capitulo: l.mqt_linhas?.capitulo,
+        referencia: l.mqt_linhas?.referencia,
+        descricao: l.mqt_linhas?.descricao,
+        unidade: l.mqt_linhas?.unidade,
+        quantidade: l.mqt_linhas?.quantidade || 0,
+        custo_unitario: l.preco_custo_unitario,
+        preco_venda: l.preco_custo_unitario * 1.25
+      }))
+      mapped.sort((a, b) => a.ordem - b.ordem)
+      setOrcamentoLinhas(mapped)
     } catch (err) {
       console.error('Erro ao carregar linhas orçamento:', err)
     }
@@ -364,12 +389,21 @@ export default function ObraDetalhe() {
     try {
       const { data, error } = await supabase
         .from('obras_compras')
-        .select('*')
+        .select('*, fornecedores(nome)')
         .eq('obra_id', obra.id)
-        .order('data_pedido', { ascending: false })
+        .order('data_compra', { ascending: false })
 
       if (error) throw error
-      setCompras(data || [])
+
+      const mapped = (data || []).map(c => ({
+        ...c,
+        data_pedido: c.data_compra,
+        fornecedor: c.fornecedores?.nome || '-',
+        descricao: c.notas || '-',
+        valor: c.preco_comprado_total,
+        estado: 'registado'
+      }))
+      setCompras(mapped)
     } catch (err) {
       console.error('Erro ao carregar compras:', err)
     }
@@ -380,14 +414,41 @@ export default function ObraDetalhe() {
     try {
       const { data, error } = await supabase
         .from('obras_execucao')
-        .select('*')
+        .select('*, pop_linhas(orcamento_linha_id, orcamento_linhas:orcamento_linha_id(mqt_linha_id, mqt_linhas:mqt_linha_id(descricao)))')
         .eq('obra_id', obra.id)
         .order('data_registo', { ascending: false })
 
       if (error) throw error
-      setExecucao(data || [])
+
+      const mapped = (data || []).map(r => ({
+        ...r,
+        descricao: r.pop_linhas?.orcamento_linhas?.mqt_linhas?.descricao || r.notas || '-',
+        percentagem: r.percentagem_execucao
+      }))
+      setExecucao(mapped)
     } catch (err) {
       console.error('Erro ao carregar execução:', err)
+    }
+  }
+
+  // Fetch POP linhas contratadas (para execução e autos)
+  const fetchPopLinhasDisponiveis = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('pop_linhas')
+        .select('*, pops!inner(estado, obra_id), orcamento_linhas:orcamento_linha_id(mqt_linha_id, mqt_linhas:mqt_linha_id(descricao, unidade, quantidade))')
+        .eq('pops.obra_id', obra.id)
+        .eq('pops.estado', 'contratada')
+
+      if (error) throw error
+      setPopLinhasDisponiveis((data || []).map(pl => ({
+        ...pl,
+        descricao: pl.orcamento_linhas?.mqt_linhas?.descricao || `Linha ${pl.id.slice(0, 8)}`,
+        unidade: pl.orcamento_linhas?.mqt_linhas?.unidade,
+        quantidade: pl.orcamento_linhas?.mqt_linhas?.quantidade
+      })))
+    } catch (err) {
+      console.error('Erro ao carregar POP linhas:', err)
     }
   }
 
@@ -558,6 +619,222 @@ export default function ObraDetalhe() {
       setMqtLinhas(mqtLinhas.filter(l => l.id !== lineId))
     } catch (err) {
       console.error('Erro ao eliminar linha:', err)
+    }
+  }
+
+  // ============================================
+  // CRIAR ORÇAMENTO DO MQT
+  // ============================================
+
+  const createOrcamentoFromMqt = async () => {
+    if (!selectedMqtVersao || mqtLinhas.length === 0) return
+
+    try {
+      setSaving(true)
+      const orcamentoId = `${obra.id}_orc_${selectedMqtVersao.versao}`
+
+      const { error: orcError } = await supabase
+        .from('orcamentos_internos')
+        .insert({
+          id: orcamentoId,
+          obra_id: obra.id,
+          mqt_versao_id: selectedMqtVersao.id
+        })
+
+      if (orcError) throw orcError
+
+      const orcLinhas = mqtLinhas.map(l => ({
+        orcamento_id: orcamentoId,
+        mqt_linha_id: l.id,
+        preco_custo_unitario: 0
+      }))
+
+      const { error: linhasError } = await supabase
+        .from('orcamento_linhas')
+        .insert(orcLinhas)
+
+      if (linhasError) throw linhasError
+
+      await fetchOrcamentos()
+      handleTrackingSubtabChange('orcamento')
+    } catch (err) {
+      console.error('Erro ao criar orçamento:', err)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // ============================================
+  // CRIAR NOVA POP
+  // ============================================
+
+  const createNewPop = async () => {
+    if (!selectedOrcamento) return
+
+    try {
+      setSaving(true)
+      const nextNum = pops.length > 0 ? Math.max(...pops.map(p => p.numero)) + 1 : 1
+      const popId = `${obra.id}_pop_${nextNum}`
+
+      const { error: popError } = await supabase
+        .from('pops')
+        .insert({
+          id: popId,
+          obra_id: obra.id,
+          orcamento_id: selectedOrcamento.id,
+          numero: nextNum,
+          estado: 'rascunho'
+        })
+
+      if (popError) throw popError
+
+      // Buscar linhas do orçamento para criar linhas da POP
+      const currentOrcLinhas = orcamentoLinhas.length > 0
+        ? orcamentoLinhas
+        : await supabase
+            .from('orcamento_linhas')
+            .select('id')
+            .eq('orcamento_id', selectedOrcamento.id)
+            .then(r => r.data || [])
+
+      if (currentOrcLinhas.length > 0) {
+        const popLs = currentOrcLinhas.map(l => ({
+          pop_id: popId,
+          orcamento_linha_id: l.id,
+          margem_k: 1.25
+        }))
+
+        const { error: linhasError } = await supabase
+          .from('pop_linhas')
+          .insert(popLs)
+
+        if (linhasError) throw linhasError
+      }
+
+      await fetchPops()
+    } catch (err) {
+      console.error('Erro ao criar POP:', err)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // ============================================
+  // CRIAR NOVA COMPRA
+  // ============================================
+
+  const createNewCompra = async () => {
+    try {
+      setSaving(true)
+
+      const { error } = await supabase
+        .from('obras_compras')
+        .insert({
+          obra_id: obra.id,
+          data_compra: newCompraForm.data_compra || null,
+          preco_comprado_total: parseFloat(newCompraForm.preco_comprado_total) || 0,
+          preco_comprado_unitario: parseFloat(newCompraForm.preco_comprado_total) || 0,
+          notas: newCompraForm.notas || null
+        })
+
+      if (error) throw error
+
+      await fetchCompras()
+      setShowNewCompraModal(false)
+      setNewCompraForm({ notas: '', preco_comprado_total: '', data_compra: new Date().toISOString().split('T')[0] })
+    } catch (err) {
+      console.error('Erro ao criar compra:', err)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // ============================================
+  // REGISTAR EXECUÇÃO
+  // ============================================
+
+  const createExecucaoRegisto = async () => {
+    if (!newExecucaoForm.pop_linha_id) return
+
+    try {
+      setSaving(true)
+
+      const { error } = await supabase
+        .from('obras_execucao')
+        .insert({
+          obra_id: obra.id,
+          pop_linha_id: newExecucaoForm.pop_linha_id,
+          percentagem_execucao: parseFloat(newExecucaoForm.percentagem_execucao) || 0,
+          quantidade_executada: parseFloat(newExecucaoForm.quantidade_executada) || 0,
+          data_registo: newExecucaoForm.data_registo || new Date().toISOString().split('T')[0],
+          notas: newExecucaoForm.notas || null
+        })
+
+      if (error) throw error
+
+      await fetchExecucao()
+      setShowNewExecucaoModal(false)
+      setNewExecucaoForm({ pop_linha_id: '', percentagem_execucao: '', notas: '', data_registo: new Date().toISOString().split('T')[0] })
+    } catch (err) {
+      console.error('Erro ao registar execução:', err)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // ============================================
+  // CRIAR NOVO AUTO
+  // ============================================
+
+  const createNewAuto = async () => {
+    try {
+      setSaving(true)
+      const now = new Date()
+      const ano = now.getFullYear()
+      const mes = now.getMonth() + 1
+      const nextNum = autos.length > 0 ? Math.max(...autos.map(a => a.numero || 0)) + 1 : 1
+      const autoId = `${obra.id}_auto_${ano}_${mes}`
+
+      const { error: autoError } = await supabase
+        .from('autos')
+        .insert({
+          id: autoId,
+          obra_id: obra.id,
+          ano,
+          mes,
+          estado: 'rascunho'
+        })
+
+      if (autoError) throw autoError
+
+      // Buscar linhas POP contratadas para criar linhas do auto
+      if (popLinhasDisponiveis.length === 0) {
+        await fetchPopLinhasDisponiveis()
+      }
+
+      const plDisponiveis = popLinhasDisponiveis.length > 0 ? popLinhasDisponiveis : []
+      if (plDisponiveis.length > 0) {
+        const autoLs = plDisponiveis.map(pl => ({
+          auto_id: autoId,
+          pop_linha_id: pl.id,
+          percentagem_anterior: 0,
+          percentagem_atual: 0,
+          percentagem_periodo: 0,
+          valor_periodo: 0
+        }))
+
+        const { error: linhasError } = await supabase
+          .from('auto_linhas')
+          .insert(autoLs)
+
+        if (linhasError) throw linhasError
+      }
+
+      await fetchAutos()
+    } catch (err) {
+      console.error('Erro ao criar auto:', err)
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -1060,7 +1337,11 @@ export default function ObraDetalhe() {
 
           <div style={{ display: 'flex', gap: '8px' }}>
             {mqtVersoes.length > 0 && orcamentos.length === 0 && (
-              <button className="btn btn-primary btn-sm">
+              <button
+                onClick={createOrcamentoFromMqt}
+                className="btn btn-primary btn-sm"
+                disabled={saving || mqtLinhas.length === 0}
+              >
                 <Plus size={14} /> Criar Orçamento do MQT
               </button>
             )}
@@ -1089,13 +1370,16 @@ export default function ObraDetalhe() {
             columns={columns}
             data={orcamentoLinhas}
             onUpdate={async (id, field, value) => {
+              // Mapear campos do UI para campos da BD
+              const fieldMap = { custo_unitario: 'preco_custo_unitario' }
+              const dbField = fieldMap[field] || field
               const { error } = await supabase
                 .from('orcamento_linhas')
-                .update({ [field]: value })
+                .update({ [dbField]: value })
                 .eq('id', id)
               if (!error) {
                 setOrcamentoLinhas(orcamentoLinhas.map(l =>
-                  l.id === id ? { ...l, [field]: value } : l
+                  l.id === id ? { ...l, [field]: value, ...(field === 'custo_unitario' ? { preco_venda: value * 1.25 } : {}) } : l
                 ))
               }
             }}
@@ -1140,7 +1424,12 @@ export default function ObraDetalhe() {
           marginBottom: '20px'
         }}>
           <h2 style={{ margin: 0, fontSize: '18px' }}>Propostas de Orçamento</h2>
-          <button className="btn btn-primary btn-sm">
+          <button
+            onClick={createNewPop}
+            className="btn btn-primary btn-sm"
+            disabled={saving || orcamentos.length === 0}
+            title={orcamentos.length === 0 ? 'Primeiro crie um orçamento interno' : ''}
+          >
             <Plus size={14} /> Nova POP
           </button>
         </div>
@@ -1251,7 +1540,10 @@ export default function ObraDetalhe() {
           marginBottom: '20px'
         }}>
           <h2 style={{ margin: 0, fontSize: '18px' }}>Compras da Obra</h2>
-          <button className="btn btn-primary btn-sm">
+          <button
+            onClick={() => setShowNewCompraModal(true)}
+            className="btn btn-primary btn-sm"
+          >
             <Plus size={14} /> Nova Compra
           </button>
         </div>
@@ -1324,7 +1616,13 @@ export default function ObraDetalhe() {
           marginBottom: '20px'
         }}>
           <h2 style={{ margin: 0, fontSize: '18px' }}>Controlo de Execução</h2>
-          <button className="btn btn-primary btn-sm">
+          <button
+            onClick={() => {
+              fetchPopLinhasDisponiveis()
+              setShowNewExecucaoModal(true)
+            }}
+            className="btn btn-primary btn-sm"
+          >
             <Plus size={14} /> Registar Execução
           </button>
         </div>
@@ -1394,7 +1692,11 @@ export default function ObraDetalhe() {
           marginBottom: '20px'
         }}>
           <h2 style={{ margin: 0, fontSize: '18px' }}>Autos de Medição</h2>
-          <button className="btn btn-primary btn-sm">
+          <button
+            onClick={createNewAuto}
+            className="btn btn-primary btn-sm"
+            disabled={saving}
+          >
             <Plus size={14} /> Novo Auto
           </button>
         </div>
@@ -1871,6 +2173,253 @@ export default function ObraDetalhe() {
           </div>
         )}
       </div>
+
+      {/* Modal Nova Compra */}
+      {showNewCompraModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+          onClick={(e) => e.target === e.currentTarget && setShowNewCompraModal(false)}
+        >
+          <div style={{
+            background: colors.white,
+            borderRadius: '16px',
+            padding: '24px',
+            width: '440px',
+            maxWidth: '90vw'
+          }}>
+            <h3 style={{ margin: '0 0 20px' }}>Nova Compra</h3>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px', color: colors.text }}>
+                  Data da Compra
+                </label>
+                <input
+                  type="date"
+                  value={newCompraForm.data_compra}
+                  onChange={(e) => setNewCompraForm({ ...newCompraForm, data_compra: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: '8px',
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px', color: colors.text }}>
+                  Descrição
+                </label>
+                <textarea
+                  value={newCompraForm.notas}
+                  onChange={(e) => setNewCompraForm({ ...newCompraForm, notas: e.target.value })}
+                  placeholder="Descreva a compra..."
+                  rows={3}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    resize: 'vertical'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px', color: colors.text }}>
+                  Valor (€)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={newCompraForm.preco_comprado_total}
+                  onChange={(e) => setNewCompraForm({ ...newCompraForm, preco_comprado_total: e.target.value })}
+                  placeholder="0.00"
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: '8px',
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
+              <button
+                onClick={() => setShowNewCompraModal(false)}
+                className="btn btn-ghost"
+                style={{ flex: 1 }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={createNewCompra}
+                className="btn btn-primary"
+                style={{ flex: 1 }}
+                disabled={saving}
+              >
+                {saving ? 'A guardar...' : 'Criar Compra'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Registar Execução */}
+      {showNewExecucaoModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+          onClick={(e) => e.target === e.currentTarget && setShowNewExecucaoModal(false)}
+        >
+          <div style={{
+            background: colors.white,
+            borderRadius: '16px',
+            padding: '24px',
+            width: '480px',
+            maxWidth: '90vw'
+          }}>
+            <h3 style={{ margin: '0 0 20px' }}>Registar Execução</h3>
+
+            {popLinhasDisponiveis.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '24px' }}>
+                <AlertTriangle size={32} style={{ color: colors.warning, marginBottom: '12px' }} />
+                <p style={{ color: colors.textMuted, margin: 0 }}>
+                  Sem POP contratada. Primeiro contrate uma POP para registar execução.
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px', color: colors.text }}>
+                    Linha da POP
+                  </label>
+                  <select
+                    value={newExecucaoForm.pop_linha_id}
+                    onChange={(e) => setNewExecucaoForm({ ...newExecucaoForm, pop_linha_id: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      border: `1px solid ${colors.border}`,
+                      borderRadius: '8px',
+                      fontSize: '14px'
+                    }}
+                  >
+                    <option value="">Selecione uma linha...</option>
+                    {popLinhasDisponiveis.map(pl => (
+                      <option key={pl.id} value={pl.id}>
+                        {pl.descricao} ({pl.unidade})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px', color: colors.text }}>
+                      Percentagem (%)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="100"
+                      value={newExecucaoForm.percentagem_execucao}
+                      onChange={(e) => setNewExecucaoForm({ ...newExecucaoForm, percentagem_execucao: e.target.value })}
+                      placeholder="0"
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        border: `1px solid ${colors.border}`,
+                        borderRadius: '8px',
+                        fontSize: '14px'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px', color: colors.text }}>
+                      Data
+                    </label>
+                    <input
+                      type="date"
+                      value={newExecucaoForm.data_registo}
+                      onChange={(e) => setNewExecucaoForm({ ...newExecucaoForm, data_registo: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        border: `1px solid ${colors.border}`,
+                        borderRadius: '8px',
+                        fontSize: '14px'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px', color: colors.text }}>
+                    Notas
+                  </label>
+                  <textarea
+                    value={newExecucaoForm.notas}
+                    onChange={(e) => setNewExecucaoForm({ ...newExecucaoForm, notas: e.target.value })}
+                    placeholder="Observações..."
+                    rows={2}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      border: `1px solid ${colors.border}`,
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      resize: 'vertical'
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
+              <button
+                onClick={() => setShowNewExecucaoModal(false)}
+                className="btn btn-ghost"
+                style={{ flex: 1 }}
+              >
+                Cancelar
+              </button>
+              {popLinhasDisponiveis.length > 0 && (
+                <button
+                  onClick={createExecucaoRegisto}
+                  className="btn btn-primary"
+                  style={{ flex: 1 }}
+                  disabled={saving || !newExecucaoForm.pop_linha_id}
+                >
+                  {saving ? 'A guardar...' : 'Registar'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
