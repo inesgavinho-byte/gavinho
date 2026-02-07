@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../components/ui/Toast'
@@ -119,6 +119,9 @@ export default function ChatProjetos() {
   const [editingCanal, setEditingCanal] = useState(null) // Canal a editar
   const [showDeleteCanalConfirm, setShowDeleteCanalConfirm] = useState(null) // Canal a eliminar
 
+  const [messageFilter, setMessageFilter] = useState('todas') // todas, anexos, imagens, mencoes, guardadas
+  const [sidebarSearch, setSidebarSearch] = useState('')
+
   const [novoCanal, setNovoCanal] = useState({ nome: '', descricao: '', tipo: 'publico', icone: 'hash' })
   const [novoTopico, setNovoTopico] = useState({ titulo: '', descricao: '' })
   
@@ -210,7 +213,7 @@ export default function ChatProjetos() {
     try {
       const { data, error } = await supabase
         .from('projetos')
-        .select('id, codigo, nome')
+        .select('id, codigo, nome, status, fase, cliente_nome')
         .eq('arquivado', false)
         .order('codigo', { ascending: true })
       
@@ -1009,283 +1012,136 @@ export default function ChatProjetos() {
         overflow: 'hidden',
         border: '1px solid var(--stone)'
       }}>
-        {/* Sidebar - Projetos, Canais e Tópicos */}
-        <div style={{ 
-          background: '#1e1e2d', 
-          color: 'white',
+        {/* Sidebar - Projetos */}
+        <div style={{
+          background: 'var(--cream)',
+          borderRight: '1px solid var(--stone)',
           display: 'flex',
           flexDirection: 'column',
           overflowY: 'auto'
         }}>
-          <div style={{ 
-            padding: '14px 16px', 
-            borderBottom: '1px solid rgba(255,255,255,0.08)',
+          {/* Header */}
+          <div style={{
+            padding: '16px',
+            borderBottom: '1px solid var(--stone)',
             display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center'
+            alignItems: 'center',
+            gap: '12px'
           }}>
-            <span style={{ fontWeight: 600, fontSize: '13px', letterSpacing: '0.5px', textTransform: 'uppercase', opacity: 0.7 }}>Projetos</span>
+            <div style={{
+              width: '36px', height: '36px', borderRadius: '8px',
+              background: 'var(--brown)', color: 'white',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '12px', fontWeight: 700
+            }}>GA</div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--brown)' }}>GAVINHO ARCH</div>
+              <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>{projetos.length} projetos</div>
+            </div>
           </div>
 
+          {/* Search */}
+          <div style={{ padding: '12px 16px 8px' }}>
+            <div style={{ position: 'relative' }}>
+              <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--brown-light)' }} />
+              <input
+                type="text"
+                placeholder="Pesquisar projetos..."
+                value={sidebarSearch}
+                onChange={e => setSidebarSearch(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 10px 8px 32px',
+                  border: '1px solid var(--stone)',
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                  background: 'white',
+                  color: 'var(--brown)'
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Projects grouped by status */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
-            {projetos.map(projeto => {
-              const isExpanded = projetosExpanded[projeto.id]
-              const isActive = projetoAtivo?.id === projeto.id
-              const projetoCanais = isActive ? canais : []
-              
-              return (
-                <div key={projeto.id}>
-                  {/* Projeto header */}
-                  <button
-                    onClick={() => {
-                      if (isActive) {
-                        // Se já é o projeto ativo, apenas alternar expansão
-                        toggleProjetoExpanded(projeto.id)
-                      } else {
-                        // Se é outro projeto, selecionar (já expande automaticamente)
-                        selectProjeto(projeto)
-                      }
-                    }}
-                    style={{
-                      width: '100%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      padding: '8px 14px',
-                      background: isActive ? 'rgba(201, 168, 130, 0.15)' : 'transparent',
-                      border: 'none',
-                      color: isActive ? '#C9A882' : 'rgba(255,255,255,0.7)',
-                      cursor: 'pointer',
-                      fontSize: '13px',
-                      textAlign: 'left',
-                      fontWeight: isActive ? 600 : 400
-                    }}
-                  >
-                    <span style={{ 
-                      transition: 'transform 0.2s',
-                      transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
-                      opacity: 0.5
-                    }}>
-                      <ChevronRight size={12} />
-                    </span>
-                    <FolderOpen size={14} style={{ opacity: 0.7 }} />
-                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {projeto.codigo}
-                    </span>
-                  </button>
-                  
-                  {/* Canais e Tópicos do projeto */}
-                  {isExpanded && isActive && (
-                    <div style={{ background: 'rgba(0,0,0,0.15)' }}>
-                      {projetoCanais.map(canal => {
-                        const IconComponent = CANAL_ICONS.find(i => i.id === canal.icone)?.icon || Hash
-                        const isCanalAtivo = canalAtivo?.id === canal.id
-                        const canalTopicos = isCanalAtivo ? topicos : []
-                        
-                        return (
-                          <div key={canal.id}>
-                            {/* Canal */}
-                            <div
-                              className="canal-item"
-                              style={{
-                                position: 'relative',
-                                display: 'flex',
-                                alignItems: 'center'
-                              }}
-                            >
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  setCanalAtivo(canal)
-                                }}
-                                style={{
-                                  flex: 1,
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '6px',
-                                  padding: '6px 14px 6px 32px',
-                                  background: 'transparent',
-                                  border: 'none',
-                                  color: isCanalAtivo ? 'white' : 'rgba(255,255,255,0.5)',
-                                  cursor: 'pointer',
-                                  fontSize: '12px',
-                                  textAlign: 'left',
-                                  fontWeight: isCanalAtivo ? 500 : 400
-                                }}
-                              >
-                                <IconComponent size={12} />
-                                <span style={{ flex: 1 }}>{canal.nome}</span>
-                                {canal.tipo === 'privado' && <Lock size={10} style={{ opacity: 0.4 }} />}
-                              </button>
-                              {/* Ações do canal (visíveis no hover) */}
-                              <div
-                                className="canal-actions"
-                                style={{
-                                  position: 'absolute',
-                                  right: '8px',
-                                  display: 'flex',
-                                  gap: '2px',
-                                  opacity: 0,
-                                  transition: 'opacity 0.15s'
-                                }}
-                              >
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    setEditingCanal({ ...canal })
-                                  }}
-                                  style={{
-                                    padding: '3px',
-                                    background: 'rgba(255,255,255,0.1)',
-                                    border: 'none',
-                                    borderRadius: '4px',
-                                    color: 'rgba(255,255,255,0.7)',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center'
-                                  }}
-                                  title="Editar canal"
-                                >
-                                  <Edit size={11} />
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    setShowDeleteCanalConfirm(canal)
-                                  }}
-                                  style={{
-                                    padding: '3px',
-                                    background: 'rgba(255,255,255,0.1)',
-                                    border: 'none',
-                                    borderRadius: '4px',
-                                    color: 'rgba(239,68,68,0.9)',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center'
-                                  }}
-                                  title="Eliminar canal"
-                                >
-                                  <Trash2 size={11} />
-                                </button>
-                              </div>
-                            </div>
-                            
-                            {/* Tópicos do canal */}
-                            {isCanalAtivo && canalTopicos.length > 0 && (
-                              <div>
-                                {canalTopicos.map(topico => (
-                                  <button
-                                    key={topico.id}
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      setTopicoAtivo(topico)
-                                    }}
-                                    style={{
-                                      width: '100%',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '6px',
-                                      padding: '5px 14px 5px 48px',
-                                      background: topicoAtivo?.id === topico.id ? 'rgba(201, 168, 130, 0.2)' : 'transparent',
-                                      border: 'none',
-                                      borderLeft: topicoAtivo?.id === topico.id ? '2px solid #C9A882' : '2px solid transparent',
-                                      color: topicoAtivo?.id === topico.id ? 'white' : unreadCounts[topico.id] ? 'white' : 'rgba(255,255,255,0.4)',
-                                      cursor: 'pointer',
-                                      fontSize: '11px',
-                                      textAlign: 'left',
-                                      position: 'relative',
-                                      zIndex: 1,
-                                      fontWeight: unreadCounts[topico.id] ? 600 : 400
-                                    }}
-                                  >
-                                    {topico.fixado && <Pin size={9} style={{ color: '#C9A882' }} />}
-                                    <span style={{
-                                      overflow: 'hidden',
-                                      textOverflow: 'ellipsis',
-                                      whiteSpace: 'nowrap',
-                                      flex: 1
-                                    }}>
-                                      {topico.titulo}
-                                    </span>
-                                    {unreadCounts[topico.id] > 0 && (
-                                      <span style={{
-                                        background: '#ef4444',
-                                        color: 'white',
-                                        fontSize: '9px',
-                                        fontWeight: 600,
-                                        padding: '1px 5px',
-                                        borderRadius: '10px',
-                                        minWidth: '16px',
-                                        textAlign: 'center'
-                                      }}>
-                                        {unreadCounts[topico.id] > 99 ? '99+' : unreadCounts[topico.id]}
-                                      </span>
-                                    )}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                            
-                            {/* Novo Tópico */}
-                            {isCanalAtivo && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  setShowNovoTopico(true)
-                                }}
-                                style={{
-                                  width: '100%',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                  padding: '4px 14px 4px 48px',
-                                  background: 'transparent',
-                                  border: 'none',
-                                  color: 'rgba(255,255,255,0.25)',
-                                  cursor: 'pointer',
-                                  fontSize: '10px',
-                                  textAlign: 'left'
-                                }}
-                              >
-                                <Plus size={10} />
-                                <span>Novo tópico</span>
-                              </button>
-                            )}
-                          </div>
-                        )
-                      })}
-                      
-                      {/* Novo Canal */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setShowNovoCanal(true)
-                        }}
-                        style={{
-                          width: '100%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          padding: '6px 14px 6px 32px',
-                          background: 'transparent',
-                          border: 'none',
-                          color: 'rgba(255,255,255,0.25)',
-                          cursor: 'pointer',
-                          fontSize: '11px',
-                          textAlign: 'left'
-                        }}
-                      >
-                        <Plus size={11} />
-                        <span>Novo canal</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
+            {(() => {
+              const filtered = projetos.filter(p =>
+                !sidebarSearch || p.codigo?.toLowerCase().includes(sidebarSearch.toLowerCase()) ||
+                p.nome?.toLowerCase().includes(sidebarSearch.toLowerCase()) ||
+                p.cliente_nome?.toLowerCase().includes(sidebarSearch.toLowerCase())
               )
-            })}
-            
+              const groups = {
+                'EM CURSO': filtered.filter(p => p.status === 'em_curso' || p.status === 'ativo' || !p.status),
+                'EM REVISÃO': filtered.filter(p => p.status === 'em_revisao' || p.status === 'revisao'),
+                'ARQUIVO': filtered.filter(p => p.status === 'arquivo' || p.status === 'concluido')
+              }
+              return Object.entries(groups).map(([label, groupProjects]) => {
+                if (groupProjects.length === 0) return null
+                return (
+                  <div key={label}>
+                    <div style={{
+                      padding: '12px 16px 6px',
+                      fontSize: '10px', fontWeight: 700,
+                      color: 'var(--brown-light)',
+                      letterSpacing: '0.5px',
+                      textTransform: 'uppercase'
+                    }}>
+                      {label}
+                    </div>
+                    {groupProjects.map(projeto => {
+                      const isActive = projetoAtivo?.id === projeto.id
+                      return (
+                        <button
+                          key={projeto.id}
+                          onClick={() => selectProjeto(projeto)}
+                          style={{
+                            width: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            padding: '10px 16px',
+                            background: isActive ? 'var(--brown)' : 'transparent',
+                            border: 'none',
+                            color: isActive ? 'white' : 'var(--brown)',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            borderRadius: 0
+                          }}
+                        >
+                          <div style={{
+                            width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
+                            background: (label === 'EM CURSO') ? '#22c55e' : (label === 'EM REVISÃO') ? '#9ca3af' : '#d1d5db'
+                          }} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: '13px', fontWeight: 600 }}>{projeto.codigo}</div>
+                            <div style={{ fontSize: '11px', opacity: 0.7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {projeto.nome} · {projeto.cliente_nome || ''}
+                            </div>
+                          </div>
+                          {unreadCounts[projeto.id] > 0 && (
+                            <span style={{
+                              background: '#ef4444',
+                              color: 'white',
+                              fontSize: '10px',
+                              fontWeight: 700,
+                              padding: '2px 7px',
+                              borderRadius: '10px',
+                              minWidth: '20px',
+                              textAlign: 'center'
+                            }}>
+                              {unreadCounts[projeto.id]}
+                            </span>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )
+              })
+            })()}
+
             {projetos.length === 0 && (
-              <div style={{ padding: '20px', textAlign: 'center', color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>
+              <div style={{ padding: '20px', textAlign: 'center', color: 'var(--brown-light)', fontSize: '12px' }}>
                 Sem projetos
               </div>
             )}
@@ -1295,58 +1151,108 @@ export default function ChatProjetos() {
         {/* Área de mensagens */}
         <div style={{ display: 'flex', flexDirection: 'column', background: 'white', overflow: 'hidden' }}>
           {/* Header do chat */}
-          {topicoAtivo && (
-            <div style={{ 
-              padding: '14px 24px', 
-              borderBottom: '1px solid var(--stone)',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              background: 'var(--cream)'
-            }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Hash size={16} style={{ color: 'var(--brown-light)' }} />
-                  <span style={{ fontWeight: 600, fontSize: '15px', color: 'var(--brown)' }}>
-                    {canalAtivo?.nome}
-                  </span>
-                  <span style={{ color: 'var(--brown-light)', fontSize: '14px' }}>›</span>
-                  <span style={{ fontSize: '14px', color: 'var(--brown)' }}>
-                    {topicoAtivo.titulo}
-                  </span>
+          {projetoAtivo && (
+            <div style={{ borderBottom: '1px solid var(--stone)', background: 'var(--cream)' }}>
+              {/* Project info */}
+              <div style={{ padding: '14px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                    <span style={{ fontWeight: 400, fontSize: '14px', color: 'var(--brown-light)', fontVariant: 'small-caps' }}>{projetoAtivo.codigo}</span>
+                    <span style={{ fontWeight: 600, fontSize: '16px', color: 'var(--brown)' }}>
+                      {projetoAtivo.nome}
+                    </span>
+                    <span style={{ color: 'var(--brown-light)', fontSize: '14px' }}>·</span>
+                    <span style={{ fontSize: '14px', color: 'var(--brown-light)' }}>
+                      {projetoAtivo.fase || 'Projeto'}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginTop: '3px' }}>
+                    {membrosEquipa.length} membros · {mensagens.length} mensagens · Última atividade há {(() => {
+                      if (mensagens.length === 0) return '--'
+                      const last = new Date(mensagens[mensagens.length - 1]?.created_at)
+                      const mins = Math.floor((Date.now() - last) / 60000)
+                      if (mins < 1) return 'agora'
+                      if (mins < 60) return `${mins} min`
+                      if (mins < 1440) return `${Math.floor(mins/60)}h`
+                      return `${Math.floor(mins/1440)}d`
+                    })()}
+                  </div>
                 </div>
-                <div style={{ fontSize: '11px', color: 'var(--brown-light)', marginTop: '2px' }}>
-                  {projetoAtivo?.codigo} • {projetoAtivo?.nome}
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  <button onClick={() => setShowSearch(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--brown-light)', padding: '6px', borderRadius: '6px' }} className="hover-bg">
+                    <Search size={18} />
+                  </button>
+                  <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--brown-light)', padding: '6px', borderRadius: '6px' }} className="hover-bg">
+                    <Paperclip size={18} />
+                  </button>
+                  <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--brown-light)', padding: '6px', borderRadius: '6px' }} className="hover-bg">
+                    <Users size={18} />
+                  </button>
+                  <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--brown-light)', padding: '6px', borderRadius: '6px' }} className="hover-bg">
+                    <MoreVertical size={18} />
+                  </button>
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button 
-                  style={{ 
-                    background: 'none', 
-                    border: 'none', 
-                    cursor: 'pointer', 
-                    color: 'var(--brown-light)',
-                    padding: '6px',
-                    borderRadius: '6px'
-                  }}
-                  className="hover-bg"
-                >
-                  <Users size={18} />
-                </button>
+
+              {/* Topic tabs */}
+              <div style={{ padding: '0 24px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '11px', color: 'var(--brown-light)', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase', marginRight: '4px' }}>TÓPICOS:</span>
+                {topicos.map(topico => (
+                  <button
+                    key={topico.id}
+                    onClick={() => setTopicoAtivo(topico)}
+                    style={{
+                      padding: '6px 14px',
+                      background: topicoAtivo?.id === topico.id ? 'var(--brown)' : 'transparent',
+                      color: topicoAtivo?.id === topico.id ? 'white' : 'var(--brown)',
+                      border: topicoAtivo?.id === topico.id ? 'none' : '1px solid var(--stone)',
+                      borderRadius: '16px',
+                      fontSize: '12px',
+                      fontWeight: topicoAtivo?.id === topico.id ? 600 : 400,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    {topico.icone && (() => { const I = CANAL_ICONS.find(i => i.id === topico.icone)?.icon; return I ? <I size={12} /> : null })()}
+                    {topico.titulo}
+                  </button>
+                ))}
                 <button
-                  onClick={() => setShowSearch(true)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: 'var(--brown-light)',
-                    padding: '6px',
-                    borderRadius: '6px'
-                  }}
-                  className="hover-bg"
+                  onClick={() => setShowNovoTopico(true)}
+                  style={{ padding: '6px 10px', background: 'transparent', border: '1px dashed var(--stone)', borderRadius: '16px', fontSize: '12px', cursor: 'pointer', color: 'var(--brown-light)', display: 'flex', alignItems: 'center', gap: '4px' }}
                 >
-                  <Search size={18} />
+                  <Plus size={12} /> Novo
                 </button>
+              </div>
+
+              {/* Filter buttons */}
+              <div style={{ padding: '10px 24px 12px', display: 'flex', gap: '6px' }}>
+                {[
+                  { id: 'todas', label: 'Todas' },
+                  { id: 'anexos', label: 'Com anexos' },
+                  { id: 'imagens', label: 'Com imagens' },
+                  { id: 'mencoes', label: 'Menções' },
+                  { id: 'guardadas', label: 'Guardadas' }
+                ].map(f => (
+                  <button
+                    key={f.id}
+                    onClick={() => setMessageFilter(f.id)}
+                    style={{
+                      padding: '5px 14px',
+                      background: messageFilter === f.id ? 'var(--brown)' : 'white',
+                      color: messageFilter === f.id ? 'white' : 'var(--brown)',
+                      border: messageFilter === f.id ? 'none' : '1px solid var(--stone)',
+                      borderRadius: '16px',
+                      fontSize: '11px',
+                      fontWeight: messageFilter === f.id ? 600 : 400,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {f.label}
+                  </button>
+                ))}
               </div>
             </div>
           )}
@@ -1385,14 +1291,34 @@ export default function ChatProjetos() {
                 <div style={{ fontSize: '12px' }}>Sê o primeiro a escrever!</div>
               </div>
             ) : (
-              mensagens.map((msg, idx) => {
+              mensagens.filter(msg => {
+                if (messageFilter === 'todas') return true
+                if (messageFilter === 'anexos') return msg.tipo === 'ficheiro'
+                if (messageFilter === 'imagens') return msg.tipo === 'imagem'
+                if (messageFilter === 'mencoes') return msg.conteudo?.includes(`@${profile?.nome || profile?.email}`)
+                if (messageFilter === 'guardadas') return msg.guardada
+                return true
+              }).map((msg, idx, arr) => {
                 const isOwn = msg.autor_id === profile?.id
                 const isGarvis = msg.autor_id === GARVIS_USER.id
-                const showAuthor = idx === 0 || mensagens[idx - 1]?.autor_id !== msg.autor_id
+                const showAuthor = idx === 0 || arr[idx - 1]?.autor_id !== msg.autor_id
                 const reactions = groupReactions(msg.reacoes)
 
+                // Date separator
+                const msgDate = new Date(msg.created_at).toLocaleDateString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase()
+                const prevDate = idx > 0 ? new Date(arr[idx-1].created_at).toLocaleDateString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase() : null
+                const showDateSeparator = idx === 0 || msgDate !== prevDate
+
                 return (
-                  <div key={msg.id} style={{ marginTop: showAuthor ? '12px' : '2px' }}>
+                  <React.Fragment key={msg.id}>
+                  {showDateSeparator && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px 0 8px', color: 'var(--brown-light)', fontSize: '11px', fontWeight: 600, letterSpacing: '0.5px' }}>
+                      <div style={{ flex: 1, height: '1px', background: 'var(--stone)' }} />
+                      <span>{msgDate}</span>
+                      <div style={{ flex: 1, height: '1px', background: 'var(--stone)' }} />
+                    </div>
+                  )}
+                  <div style={{ marginTop: showAuthor ? '12px' : '2px' }}>
                     {msg.parent && (
                       <div style={{
                         display: 'flex',
@@ -1490,6 +1416,17 @@ export default function ChatProjetos() {
                                 </span>
                               )}
                             </span>
+                            {msg.autor?.cargo && (
+                              <span style={{
+                                fontSize: '10px',
+                                fontWeight: 600,
+                                color: 'var(--brown-light)',
+                                letterSpacing: '0.3px',
+                                textTransform: 'uppercase'
+                              }}>
+                                {msg.autor.cargo}
+                              </span>
+                            )}
                             <span style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
                               {formatDate(msg.created_at)}
                             </span>
@@ -1505,30 +1442,26 @@ export default function ChatProjetos() {
                             />
                           </a>
                         ) : msg.tipo === 'ficheiro' ? (
-                          <a 
-                            href={msg.ficheiro_url} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
+                          <a href={msg.imagem_url || msg.file_url || msg.ficheiro_url} target="_blank" rel="noreferrer"
                             style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '8px',
-                              padding: '10px 14px',
-                              background: 'var(--cream)',
-                              borderRadius: '8px',
-                              textDecoration: 'none',
-                              color: 'var(--brown)',
-                              marginTop: '4px'
-                            }}
-                          >
-                            <File size={20} />
-                            <div>
-                              <div style={{ fontWeight: 500, fontSize: '13px' }}>{msg.ficheiro_nome}</div>
-                              <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
-                                {(msg.ficheiro_tamanho / 1024).toFixed(1)} KB
+                              display: 'flex', alignItems: 'center', gap: '14px',
+                              padding: '14px 18px',
+                              background: 'var(--cream)', border: '1px solid var(--stone)',
+                              borderRadius: '10px', textDecoration: 'none',
+                              maxWidth: '400px', marginTop: '8px'
+                            }}>
+                            <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: 'rgba(239,68,68,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              <File size={20} style={{ color: '#ef4444' }} />
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--brown)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {msg.file_name || msg.ficheiro_nome || 'Ficheiro'}
+                              </div>
+                              <div style={{ fontSize: '11px', color: 'var(--brown-light)', marginTop: '2px' }}>
+                                PDF · {msg.file_size || msg.ficheiro_tamanho ? `${((msg.file_size || msg.ficheiro_tamanho) / 1024).toFixed(1)} KB` : '--'}
                               </div>
                             </div>
-                            <Download size={16} style={{ marginLeft: '8px' }} />
+                            <Download size={18} style={{ color: 'var(--brown-light)', flexShrink: 0 }} />
                           </a>
                         ) : (
                           <div style={{
@@ -1566,9 +1499,15 @@ export default function ChatProjetos() {
                             ))}
                           </div>
                         )}
+                        {showAuthor && msg.lido_por_todos !== false && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px', marginLeft: '48px' }}>
+                            <Check size={12} style={{ color: '#22c55e' }} />
+                            <span style={{ fontSize: '10px', color: 'var(--brown-light)' }}>Lido por todos</span>
+                          </div>
+                        )}
                       </div>
-                      
-                      <div className="message-actions" style={{ 
+
+                      <div className="message-actions" style={{
                         display: 'none',
                         gap: '2px',
                         opacity: 0,
@@ -1614,6 +1553,7 @@ export default function ChatProjetos() {
                       </div>
                     </div>
                   </div>
+                  </React.Fragment>
                 )
               })
             )}
