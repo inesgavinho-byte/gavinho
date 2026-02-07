@@ -66,16 +66,6 @@ import ProjetoAtas from '../components/ProjetoAtas'
 import ProjetoMoodboards from '../components/ProjetoMoodboards'
 import ProjetoLevantamento from '../components/ProjetoLevantamento'
 
-// Importar constantes de ficheiros separados
-import {
-  COMPARTIMENTOS,
-  TIPOLOGIAS,
-  SUBTIPOS,
-  FASES,
-  STATUS_OPTIONS,
-  TIPOS_INTERVENIENTES
-} from '../constants/projectConstants'
-
 // Importar componentes de modais
 import {
   DeleteConfirmModal,
