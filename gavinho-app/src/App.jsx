@@ -326,7 +326,7 @@ function App() {
                   } />
                   <Route path="chat" element={
                     <Suspense fallback={<PageLoader />}>
-                      <Workspace />
+                      <ChatProjetos />
                     </Suspense>
                   } />
                   <Route path="chat-obras" element={

@@ -1071,9 +1071,10 @@ export default function ChatProjetos() {
                 p.cliente_nome?.toLowerCase().includes(sidebarSearch.toLowerCase())
               )
               const groups = {
-                'EM CURSO': filtered.filter(p => p.status === 'em_curso' || p.status === 'ativo' || !p.status),
-                'EM REVISÃO': filtered.filter(p => p.status === 'em_revisao' || p.status === 'revisao'),
-                'ARQUIVO': filtered.filter(p => p.status === 'arquivo' || p.status === 'concluido')
+                'NO PRAZO': filtered.filter(p => p.status === 'on_track' || !p.status),
+                'EM RISCO': filtered.filter(p => p.status === 'at_risk'),
+                'BLOQUEADO': filtered.filter(p => p.status === 'blocked'),
+                'CONCLUÍDO': filtered.filter(p => p.status === 'concluido' || p.status === 'arquivo')
               }
               return Object.entries(groups).map(([label, groupProjects]) => {
                 if (groupProjects.length === 0) return null
@@ -1110,7 +1111,7 @@ export default function ChatProjetos() {
                         >
                           <div style={{
                             width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
-                            background: (label === 'EM CURSO') ? '#22c55e' : (label === 'EM REVISÃO') ? '#9ca3af' : '#d1d5db'
+                            background: (label === 'NO PRAZO') ? '#22c55e' : (label === 'EM RISCO') ? '#f59e0b' : (label === 'BLOQUEADO') ? '#ef4444' : '#9ca3af'
                           }} />
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: '13px', fontWeight: 600 }}>{projeto.codigo}</div>

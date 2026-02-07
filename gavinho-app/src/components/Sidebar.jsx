@@ -37,7 +37,7 @@ const navigation = [
     items: [
       { name: 'Dashboard Projetos', href: '/dashboard-projetos', icon: LayoutDashboard },
       { name: 'Projetos', href: '/projetos', icon: FolderKanban },
-      { name: 'Team Chat', href: '/workspace', icon: MessageSquare },
+      { name: 'Team Chat', href: '/chat', icon: MessageSquare },
       { name: 'Calendário', href: '/calendario', icon: Calendar },
       { name: 'Biblioteca', href: '/biblioteca', icon: Library },
     ]
