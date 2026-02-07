@@ -234,22 +234,22 @@ export default function Sidebar({ isOpen, onClose, isMobile, collapsed, onToggle
           title={collapsed ? 'Expandir sidebar' : 'Colapsar sidebar'}
           style={{
             position: 'absolute',
-            top: '70px',
-            right: collapsed ? '50%' : '-12px',
+            top: collapsed ? '72px' : '28px',
+            right: collapsed ? '50%' : '-14px',
             transform: collapsed ? 'translateX(50%)' : 'none',
-            width: '24px',
-            height: '24px',
+            width: '28px',
+            height: '28px',
             borderRadius: '50%',
-            background: 'var(--white)',
-            border: '1px solid var(--stone)',
+            background: 'var(--brown)',
+            border: '2px solid var(--cream)',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: 'var(--brown-light)',
+            color: 'white',
             zIndex: 10,
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-            transition: 'all 0.2s'
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            transition: 'all 0.25s ease'
           }}
         >
           {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}

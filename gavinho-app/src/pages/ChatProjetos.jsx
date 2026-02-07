@@ -122,6 +122,8 @@ export default function ChatProjetos() {
   const [messageFilter, setMessageFilter] = useState('todas') // todas, anexos, imagens, mencoes, guardadas
   const [sidebarSearch, setSidebarSearch] = useState('')
 
+  const [editingProjectName, setEditingProjectName] = useState(false)
+  const [editProjectNameValue, setEditProjectNameValue] = useState('')
   const [novoCanal, setNovoCanal] = useState({ nome: '', descricao: '', tipo: 'publico', icone: 'hash' })
   const [novoTopico, setNovoTopico] = useState({ titulo: '', descricao: '' })
   
@@ -904,6 +906,23 @@ export default function ChatProjetos() {
     setNovaMensagem('')
   }
 
+  const handleRenameProject = async () => {
+    if (!editProjectNameValue.trim() || !projetoAtivo) return
+    try {
+      const { error } = await supabase
+        .from('projetos')
+        .update({ nome: editProjectNameValue.trim() })
+        .eq('id', projetoAtivo.id)
+      if (error) throw error
+      setProjetos(prev => prev.map(p => p.id === projetoAtivo.id ? { ...p, nome: editProjectNameValue.trim() } : p))
+      setProjetoAtivo(prev => ({ ...prev, nome: editProjectNameValue.trim() }))
+      setEditingProjectName(false)
+      toast.success('Nome do canal atualizado')
+    } catch (err) {
+      toast.error('Erro', 'Não foi possível renomear')
+    }
+  }
+
   const insertMention = (user) => {
     const mentionText = `@[${user.nome}](${user.id}) `
     setNovaMensagem(prev => {
@@ -1005,7 +1024,7 @@ export default function ChatProjetos() {
       }}>
         {/* Sidebar - Projetos */}
         <div style={{
-          background: 'var(--cream)',
+          background: '#eae5de',
           borderRight: '1px solid var(--stone)',
           display: 'flex',
           flexDirection: 'column',
@@ -1148,11 +1167,36 @@ export default function ChatProjetos() {
               {/* Project info */}
               <div style={{ padding: '14px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ fontWeight: 400, fontSize: '14px', color: 'var(--brown-light)', fontVariant: 'small-caps' }}>{projetoAtivo.codigo}</span>
-                    <span style={{ fontWeight: 600, fontSize: '16px', color: 'var(--brown)' }}>
-                      {projetoAtivo.nome}
-                    </span>
+                    {editingProjectName ? (
+                      <input
+                        autoFocus
+                        value={editProjectNameValue}
+                        onChange={e => setEditProjectNameValue(e.target.value)}
+                        onBlur={handleRenameProject}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') handleRenameProject()
+                          if (e.key === 'Escape') setEditingProjectName(false)
+                        }}
+                        style={{
+                          fontWeight: 600, fontSize: '16px', color: 'var(--brown)',
+                          border: '1px solid var(--gold)', borderRadius: '6px',
+                          padding: '2px 8px', background: 'white', outline: 'none',
+                          minWidth: '200px'
+                        }}
+                      />
+                    ) : (
+                      <span
+                        onClick={() => { setEditingProjectName(true); setEditProjectNameValue(projetoAtivo.nome) }}
+                        style={{ fontWeight: 600, fontSize: '16px', color: 'var(--brown)', cursor: 'pointer', borderBottom: '1px dashed transparent' }}
+                        onMouseEnter={e => e.currentTarget.style.borderBottomColor = 'var(--brown-light)'}
+                        onMouseLeave={e => e.currentTarget.style.borderBottomColor = 'transparent'}
+                        title="Clique para editar o nome do canal"
+                      >
+                        {projetoAtivo.nome}
+                      </span>
+                    )}
                     <span style={{ color: 'var(--brown-light)', fontSize: '14px' }}>·</span>
                     <span style={{ fontSize: '14px', color: 'var(--brown-light)' }}>
                       {projetoAtivo.fase || 'Projeto'}
@@ -1869,6 +1913,7 @@ export default function ChatProjetos() {
                     }
                   }}
                   placeholder={editingMessage ? 'Editar mensagem...' : `Mensagem em #${topicoAtivo.titulo}...`}
+                  className="chat-input-textarea"
                   style={{
                     flex: 1,
                     border: 'none',
@@ -1876,6 +1921,8 @@ export default function ChatProjetos() {
                     resize: 'none',
                     outline: 'none',
                     fontSize: '14px',
+                    fontFamily: 'inherit',
+                    color: 'var(--brown)',
                     minHeight: '24px',
                     maxHeight: '120px',
                     lineHeight: 1.5
