@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import {
-  Plus, Upload, FileText, Download, Trash2, Edit2, Save, X,
-  Calendar, Euro, CheckCircle, Clock, AlertCircle, File,
+  Plus, Upload, FileText, Trash2, Edit2, Save, X,
+  Calendar, Euro, File,
   Loader2, Eye, FileCheck, FilePlus2, Type, GitCompare
 } from 'lucide-react'
 import PDFTextAnnotator from './PDFTextAnnotator'

@@ -7,7 +7,7 @@ import {
   Search, Send, Image, X, HardHat, MessageSquare, Loader2, AlertCircle,
   Phone, Settings, Check, CheckCheck, Clock, Package, Users, Wrench,
   AlertTriangle, ListTodo, Sparkles, ChevronRight, RefreshCw, Plus,
-  ExternalLink, Wifi, WifiOff, Bot, Eye, EyeOff, ArrowLeft, Home
+  Wifi, WifiOff, Bot, ArrowLeft, Home
 } from 'lucide-react'
 
 // Dados mock para demonstrar funcionalidades da IA

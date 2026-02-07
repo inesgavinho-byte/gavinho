@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import {
   ChevronLeft, ChevronRight, Plus, Clock, MapPin, X, Edit, Trash2,
-  Flag, Building2, RefreshCw, Link2, Palmtree, CheckCircle, AlertCircle
+  Flag, Building2, RefreshCw, Link2, Palmtree
 } from 'lucide-react'
 import { useToast } from '../components/ui/Toast'
 import { ConfirmModal } from '../components/ui/ConfirmModal'

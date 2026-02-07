@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import {
-  Plus, Upload, FileText, ChevronRight, ChevronDown, Edit2, Trash2, Save, X,
-  Calendar, User, CheckCircle, Clock, AlertCircle, Download, FileSpreadsheet,
-  Loader2, MoreVertical, Eye, CheckSquare, Square, Paperclip, Shield,
+  Plus, FileText, ChevronRight, ChevronDown, Edit2, Trash2, Save, X,
+  FileSpreadsheet,
+  Loader2, CheckSquare, Square, Paperclip, Shield,
   GripVertical, ChevronUp, FolderPlus
 } from 'lucide-react'
 import * as XLSX from 'xlsx'

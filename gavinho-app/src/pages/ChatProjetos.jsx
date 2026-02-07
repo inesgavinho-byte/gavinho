@@ -6,9 +6,9 @@ import { ConfirmModal } from '../components/ui/ConfirmModal'
 import {
   Hash, Lock, Plus, Send, Paperclip, Smile, AtSign, Search,
   MoreVertical, Edit, Trash2, Reply, Pin, X, ChevronDown, ChevronRight,
-  MessageSquare, Users, Settings, Bell, BellOff, Image,
-  File, Download, Check, CheckCheck, Megaphone, FolderOpen,
-  Bold, Italic, Code, List, Link2
+  MessageSquare, Users,
+  File, Download, Check, Megaphone, FolderOpen,
+  Bold, Italic, Code, List
 } from 'lucide-react'
 
 // Função para renderizar texto com formatação markdown simples
