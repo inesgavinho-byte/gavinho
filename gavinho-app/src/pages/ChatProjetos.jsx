@@ -994,19 +994,12 @@ export default function ChatProjetos() {
   }
 
   return (
-    <div className="fade-in">
-      <div style={{ marginBottom: '20px' }}>
-        <h1 className="page-title">Chat de Projetos</h1>
-        <p style={{ color: 'var(--brown-light)', fontSize: '14px' }}>
-          Comunicação da equipa por projeto
-        </p>
-      </div>
-
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: '280px 1fr', 
-        height: 'calc(100vh - 200px)',
-        minHeight: '500px',
+    <div className="fade-in" style={{ height: 'calc(100vh - 80px)', display: 'flex', flexDirection: 'column' }}>
+      <div style={{
+        flex: 1,
+        display: 'grid',
+        gridTemplateColumns: '280px 1fr',
+        minHeight: 0,
         background: 'var(--white)',
         borderRadius: '12px',
         overflow: 'hidden',
