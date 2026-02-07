@@ -1664,6 +1664,7 @@ export default function ProjetoDetalhe() {
     { id: 'fases', label: 'Fases & Entregas', icon: Target, hasSubtabs: true },
     { id: 'chat-ia', label: 'Chat IA', icon: MessageSquare },
     { id: 'archviz', label: 'Archviz', icon: Image, hasSubtabs: true },
+    { id: 'notebook', label: 'Notebook', icon: BookOpen },
     { id: 'biblioteca', label: 'Biblioteca', icon: Library },
     { id: 'gestao', label: 'Gestão de Projeto', icon: Settings, hasSubtabs: true }
   ]
@@ -1681,8 +1682,7 @@ export default function ProjetoDetalhe() {
     { id: 'entregaveis', label: 'Entregáveis', icon: ListChecks },
     { id: 'recebidos', label: 'Recebidos', icon: Inbox },
     { id: 'entregas', label: 'Central Entregas', icon: Package },
-    { id: 'design-review', label: 'Design Review', icon: Eye },
-    { id: 'atas', label: 'Atas', icon: FileText }
+    { id: 'design-review', label: 'Design Review', icon: Eye }
   ]
 
   // Secções dentro de Archviz
@@ -2566,10 +2566,6 @@ export default function ProjetoDetalhe() {
               <DesignReview projeto={project} />
             )}
 
-            {/* Atas */}
-            {activeFaseSection === 'atas' && (
-              <ProjetoAtas projeto={project} />
-            )}
           </div>
         </div>
       )}
@@ -3158,6 +3154,11 @@ export default function ProjetoDetalhe() {
             />
           )}
         </div>
+      )}
+
+      {/* Tab Notebook (Atas) */}
+      {activeTab === 'notebook' && (
+        <ProjetoAtas projeto={project} />
       )}
 
       {/* Tab Biblioteca do Projeto */}
