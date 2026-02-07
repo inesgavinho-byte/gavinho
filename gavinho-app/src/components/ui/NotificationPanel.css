@@ -687,3 +687,316 @@
     height: 36px;
   }
 }
+
+/* =====================================================
+   NEW FEATURES STYLES
+   ===================================================== */
+
+/* Spinner animation */
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+/* Header active button */
+.header-btn.active {
+  background: var(--accent-olive);
+  color: var(--white);
+}
+
+.header-btn.active:hover {
+  background: var(--accent-olive-dark, #6b8f4d);
+  color: var(--white);
+}
+
+/* Urgent count in header */
+.urgent-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: var(--error-bg);
+  color: var(--error);
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 12px;
+}
+
+/* Notification title */
+.notification-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--brown);
+  margin-bottom: 2px;
+}
+
+/* Avatar icon (instead of initials/image) */
+.avatar-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}
+
+.emoji-icon {
+  font-size: 18px;
+}
+
+/* Origin badge */
+.notification-origin-badge {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--white);
+  border-radius: 50%;
+  border: 2px solid var(--white);
+}
+
+.notification-origin-badge.app {
+  background: var(--accent-olive);
+  color: white;
+}
+
+.notification-origin-badge.workspace {
+  background: var(--info);
+  color: white;
+}
+
+/* Urgent notification styling */
+.notification-item.urgent {
+  border-left: 3px solid var(--error);
+}
+
+.urgent-indicator {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  color: var(--error);
+}
+
+/* Badge variations */
+.badge-success {
+  background: var(--success);
+}
+
+.badge-requisicao {
+  background: #8b5cf6;
+}
+
+.badge-error {
+  background: var(--error);
+}
+
+/* Inline Actions */
+.notification-inline-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.inline-action-btn {
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  background: var(--stone);
+  color: var(--brown);
+}
+
+.inline-action-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.inline-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.action-btn-green {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.action-btn-green:hover {
+  background: var(--success);
+  color: white;
+}
+
+.action-btn-red {
+  background: var(--error-bg);
+  color: var(--error);
+}
+
+.action-btn-red:hover {
+  background: var(--error);
+  color: white;
+}
+
+.action-btn-blue {
+  background: var(--info-bg, #e0f2fe);
+  color: var(--info);
+}
+
+.action-btn-blue:hover {
+  background: var(--info);
+  color: white;
+}
+
+.action-btn-gray {
+  background: var(--stone);
+  color: var(--brown-light);
+}
+
+.action-btn-gray:hover {
+  background: var(--brown-light);
+  color: white;
+}
+
+.action-executed {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: var(--success-bg);
+  color: var(--success);
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 6px;
+}
+
+/* Grouped Notifications */
+.notification-item.grouped {
+  background: linear-gradient(135deg, var(--off-white) 0%, var(--cream) 100%);
+}
+
+.notification-item.grouped:hover {
+  background: linear-gradient(135deg, var(--cream) 0%, var(--stone) 100%);
+}
+
+.group-count-badge {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--brown);
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 10px;
+  border: 2px solid var(--white);
+}
+
+.group-chevron {
+  color: var(--brown-light);
+  flex-shrink: 0;
+  align-self: center;
+}
+
+/* Loading more */
+.notification-loading-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px;
+  color: var(--brown-light);
+  font-size: 13px;
+}
+
+/* End of history */
+.notification-end {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px;
+  color: var(--brown-light);
+  font-size: 12px;
+  border-top: 1px dashed var(--stone);
+}
+
+/* Urgent bell button */
+.notification-bell-btn.has-urgent {
+  animation: bellShake 0.5s ease-in-out;
+}
+
+@keyframes bellShake {
+  0%, 100% { transform: rotate(0); }
+  20% { transform: rotate(-10deg); }
+  40% { transform: rotate(10deg); }
+  60% { transform: rotate(-5deg); }
+  80% { transform: rotate(5deg); }
+}
+
+.notification-badge.urgent {
+  background: linear-gradient(135deg, var(--error) 0%, #dc2626 100%);
+  animation: urgentPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes urgentPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+}
+
+/* Dark mode additions */
+[data-theme="dark"] .notification-origin-badge {
+  border-color: #2d2d2d;
+}
+
+[data-theme="dark"] .inline-action-btn {
+  background: #3d3d3d;
+  color: #e5e5e5;
+}
+
+[data-theme="dark"] .action-btn-green {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+}
+
+[data-theme="dark"] .action-btn-red {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+}
+
+[data-theme="dark"] .action-btn-blue {
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+}
+
+[data-theme="dark"] .notification-item.grouped {
+  background: linear-gradient(135deg, #323232 0%, #3d3d3d 100%);
+}
+
+[data-theme="dark"] .group-count-badge {
+  background: #e5e5e5;
+  color: #2d2d2d;
+  border-color: #2d2d2d;
+}
+
+[data-theme="dark"] .notification-title {
+  color: #e5e5e5;
+}
+
+[data-theme="dark"] .urgent-count {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+[data-theme="dark"] .notification-end {
+  border-color: #3d3d3d;
+}
