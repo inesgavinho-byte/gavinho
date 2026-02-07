@@ -44,18 +44,21 @@ export default function Configuracoes() {
     try {
       setSaving(true)
 
-      const { error } = await supabase
-        .from('utilizadores')
-        .update({
-          settings: settings
-        })
-        .eq('id', user?.id)
+      // Save to Supabase Auth user metadata
+      const { error } = await supabase.auth.updateUser({
+        data: { platform_settings: settings }
+      })
 
       if (error) throw error
+
+      // Also save to localStorage as backup
+      localStorage.setItem('gavinho_settings', JSON.stringify(settings))
       toast.success('Configurações guardadas')
     } catch (err) {
       console.error('Erro ao guardar configurações:', err)
-      toast.error('Erro', 'Não foi possível guardar as configurações')
+      // Fallback: save to localStorage
+      localStorage.setItem('gavinho_settings', JSON.stringify(settings))
+      toast.success('Configurações guardadas localmente')
     } finally {
       setSaving(false)
     }
@@ -63,19 +66,25 @@ export default function Configuracoes() {
 
   useEffect(() => {
     const loadSettings = async () => {
-      if (!user?.id) return
-      const { data } = await supabase
-        .from('utilizadores')
-        .select('settings')
-        .eq('id', user.id)
-        .single()
+      if (!user) return
 
-      if (data?.settings) {
-        setSettings(prev => ({ ...prev, ...data.settings }))
+      // Load from Supabase Auth user metadata
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+      if (authUser?.user_metadata?.platform_settings) {
+        setSettings(prev => ({ ...prev, ...authUser.user_metadata.platform_settings }))
+        return
+      }
+
+      // Fallback: load from localStorage
+      const local = localStorage.getItem('gavinho_settings')
+      if (local) {
+        try {
+          setSettings(prev => ({ ...prev, ...JSON.parse(local) }))
+        } catch { /* ignore parse errors */ }
       }
     }
     loadSettings()
-  }, [user?.id])
+  }, [user])
 
   return (
     <div className="fade-in">
