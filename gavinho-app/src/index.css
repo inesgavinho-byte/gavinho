@@ -3421,3 +3421,203 @@ tbody tr:last-child td {
     transform: translateY(-4px);
   }
 }
+
+/* ===========================================
+   PINTEREST/MASONRY LAYOUT - Renders & Images
+   =========================================== */
+
+/* Masonry Grid Container */
+.masonry-grid {
+  column-count: 4;
+  column-gap: 16px;
+}
+
+/* Masonry Card */
+.masonry-card {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--cream);
+  break-inside: avoid;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.masonry-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Masonry Image */
+.masonry-card-image {
+  width: 100%;
+  height: auto;
+  display: block;
+  cursor: pointer;
+}
+
+/* Masonry Card Overlay */
+.masonry-card-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 10px;
+  background: linear-gradient(transparent, rgba(0,0,0,0.8));
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.masonry-card:hover .masonry-card-overlay {
+  opacity: 1;
+}
+
+/* Masonry Badge */
+.masonry-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 5px 10px;
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--brown);
+  border-radius: 16px;
+  font-size: 11px;
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(4px);
+}
+
+.masonry-badge.dark {
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+}
+
+.masonry-badge.success {
+  background: var(--success);
+  color: white;
+}
+
+/* Masonry Actions */
+.masonry-card-actions {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.masonry-card:hover .masonry-card-actions {
+  opacity: 1;
+}
+
+.masonry-action-btn {
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.95);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--brown);
+  transition: all 0.2s;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.masonry-action-btn:hover {
+  background: white;
+  transform: scale(1.1);
+}
+
+.masonry-action-btn.danger:hover {
+  color: var(--error);
+  background: #fef2f2;
+}
+
+.masonry-action-btn.success {
+  background: var(--success);
+  color: white;
+}
+
+.masonry-action-btn.success:hover {
+  background: var(--accent-olive-dark);
+}
+
+/* Masonry Card Info Footer */
+.masonry-card-info {
+  padding: 10px 12px;
+  background: white;
+}
+
+.masonry-card-info-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--brown);
+  margin-bottom: 2px;
+}
+
+.masonry-card-info-subtitle {
+  font-size: 11px;
+  color: var(--brown-light);
+}
+
+/* Final Images - Clean minimal style like Pinterest */
+.masonry-card.is-final {
+  /* No border - clean minimalist look */
+}
+
+/* Loading Placeholder */
+.masonry-placeholder {
+  width: 100%;
+  min-height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--cream);
+  color: var(--brown-light);
+  opacity: 0.5;
+}
+
+/* Responsive Masonry */
+@media (max-width: 1400px) {
+  .masonry-grid {
+    column-count: 3;
+  }
+}
+
+@media (max-width: 1100px) {
+  .masonry-grid {
+    column-count: 3;
+  }
+}
+
+@media (max-width: 900px) {
+  .masonry-grid {
+    column-count: 2;
+    column-gap: 12px;
+  }
+
+  .masonry-card {
+    margin-bottom: 12px;
+    border-radius: 12px;
+  }
+}
+
+@media (max-width: 600px) {
+  .masonry-grid {
+    column-count: 2;
+    column-gap: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .masonry-grid {
+    column-count: 1;
+  }
+}

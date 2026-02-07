@@ -214,17 +214,24 @@ export default function useNotifications(profile) {
       const notificationsToInsert = mentionedUserIds
         .filter(userId => userId !== profile.id)
         .map(userId => ({
-          utilizador_id: userId,
-          tipo: 'mention',
-          mensagem_id: message.id,
-          canal_id: message.canal_id,
-          remetente_id: profile.id,
-          conteudo: `${profile.nome || 'Alguém'} mencionou-te em ${canalInfo?.nome || 'uma conversa'}`,
-          lido: false
+          user_id: userId,
+          sender_id: profile.id,
+          type: 'mention',
+          title: '@Menção',
+          message: `${profile.nome || 'Alguém'} mencionou-te: "${message.conteudo?.substring(0, 50)}${message.conteudo?.length > 50 ? '...' : ''}"`,
+          context: {
+            project: canalInfo?.codigo || canalInfo?.nome,
+            channel: canalInfo?.nome,
+            message_id: message.id,
+            canal_id: message.canal_id
+          },
+          link: `/workspace?canal=${message.canal_id}`,
+          read: false
         }))
 
       if (notificationsToInsert.length > 0) {
-        await supabase.from('notificacoes').insert(notificationsToInsert)
+        const { error } = await supabase.from('notificacoes').insert(notificationsToInsert)
+        if (error) throw error
       }
     } catch (err) {
       // Silent fail - notifications table might not exist
@@ -241,17 +248,16 @@ export default function useNotifications(profile) {
         .from('notificacoes')
         .select(`
           *,
-          remetente:remetente_id(id, nome, avatar_url),
-          mensagem:mensagem_id(id, conteudo)
+          sender:sender_id(id, nome, avatar_url)
         `)
-        .eq('utilizador_id', profile.id)
-        .eq('tipo', 'mention')
+        .eq('user_id', profile.id)
+        .eq('type', 'mention')
         .order('created_at', { ascending: false })
         .limit(50)
 
       if (!error && data) {
         setMentionNotifications(data)
-        setUnreadMentionsCount(data.filter(n => !n.lido).length)
+        setUnreadMentionsCount(data.filter(n => !n.read).length)
       }
     } catch (err) {
       // Silent fail
@@ -265,11 +271,11 @@ export default function useNotifications(profile) {
     try {
       await supabase
         .from('notificacoes')
-        .update({ lido: true })
+        .update({ read: true })
         .eq('id', notificationId)
 
       setMentionNotifications(prev =>
-        prev.map(n => n.id === notificationId ? { ...n, lido: true } : n)
+        prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
       )
       setUnreadMentionsCount(prev => Math.max(0, prev - 1))
     } catch (err) {
@@ -284,12 +290,12 @@ export default function useNotifications(profile) {
     try {
       await supabase
         .from('notificacoes')
-        .update({ lido: true })
-        .eq('utilizador_id', profile.id)
-        .eq('tipo', 'mention')
-        .eq('lido', false)
+        .update({ read: true })
+        .eq('user_id', profile.id)
+        .eq('type', 'mention')
+        .eq('read', false)
 
-      setMentionNotifications(prev => prev.map(n => ({ ...n, lido: true })))
+      setMentionNotifications(prev => prev.map(n => ({ ...n, read: true })))
       setUnreadMentionsCount(0)
     } catch (err) {
       // Silent fail
@@ -309,9 +315,9 @@ export default function useNotifications(profile) {
         event: 'INSERT',
         schema: 'public',
         table: 'notificacoes',
-        filter: `utilizador_id=eq.${profile.id}`
+        filter: `user_id=eq.${profile.id}`
       }, (payload) => {
-        if (payload.new.tipo === 'mention') {
+        if (payload.new.type === 'mention') {
           setMentionNotifications(prev => [payload.new, ...prev])
           setUnreadMentionsCount(prev => prev + 1)
           playNotificationSound()

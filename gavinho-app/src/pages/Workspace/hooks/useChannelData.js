@@ -184,6 +184,65 @@ export default function useChannelData() {
     }
   }, [])
 
+  // ========== RENAME TOPIC ==========
+  const renameTopic = useCallback(async (topicId, newName) => {
+    if (!topicId || !newName.trim()) return false
+
+    try {
+      const { error } = await supabase
+        .from('chat_topicos')
+        .update({ nome: newName.trim() })
+        .eq('id', topicId)
+
+      if (error) throw error
+
+      // Update local state
+      setChannelTopics(prev => {
+        const updated = { ...prev }
+        for (const canalId in updated) {
+          updated[canalId] = updated[canalId].map(topic =>
+            topic.id === topicId ? { ...topic, nome: newName.trim() } : topic
+          )
+        }
+        return updated
+      })
+      return true
+    } catch (err) {
+      console.error('Error renaming topic:', err)
+      return false
+    }
+  }, [])
+
+  // ========== REMOVE TOPIC ==========
+  const removeTopic = useCallback(async (topicId, canalId) => {
+    if (!topicId) return false
+
+    try {
+      const { error } = await supabase
+        .from('chat_topicos')
+        .delete()
+        .eq('id', topicId)
+
+      if (error) throw error
+
+      // Update local state
+      setChannelTopics(prev => ({
+        ...prev,
+        [canalId]: (prev[canalId] || []).filter(topic => topic.id !== topicId)
+      }))
+
+      // Reset to 'geral' if the removed topic was active
+      if (activeTopic === topicId) {
+        setActiveTopic('geral')
+      }
+
+      return true
+    } catch (err) {
+      console.error('Error removing topic:', err)
+      return false
+    }
+  }, [activeTopic])
+
   // ========== EQUIPA HELPERS ==========
   const getEquipaCanais = useCallback((equipaId) => {
     return canais.filter(c => c.equipa === equipaId)
@@ -248,6 +307,8 @@ export default function useChannelData() {
     loadData,
     loadTopics,
     addTopic,
+    renameTopic,
+    removeTopic,
     getEquipaCanais,
     toggleEquipa,
     selectCanal,

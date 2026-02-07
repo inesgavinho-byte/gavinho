@@ -14,3 +14,6 @@ export { useFetch, useFetchAll } from './useFetch'
 
 // Async operations
 export { useAsync, useDebouncedAsync } from './useAsync'
+
+// Notifications (unified system)
+export { default as useUnifiedNotifications, formatRelativeTime, groupNotificationsByDate, NOTIFICATION_CONFIG } from './useUnifiedNotifications'
