@@ -945,8 +945,6 @@ export default function DesignReview({ projeto, initialReviewId }) {
     try {
       // Upload file to storage
       const fileName = `design-reviews/${projeto.id}/${Date.now()}_${newReviewFile.name}`
-      console.log('Uploading file:', fileName)
-
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('project-files')
         .upload(fileName, newReviewFile)
@@ -960,8 +958,6 @@ export default function DesignReview({ projeto, initialReviewId }) {
       const { data: urlData } = supabase.storage
         .from('project-files')
         .getPublicUrl(fileName)
-
-      console.log('File URL:', urlData.publicUrl)
 
       // Create review (use profile.id which is the utilizadores table ID)
       const { data: reviewData, error: reviewError } = await supabase
@@ -980,8 +976,6 @@ export default function DesignReview({ projeto, initialReviewId }) {
         console.error('Review error:', reviewError)
         throw new Error(`Erro ao criar review: ${reviewError.message}`)
       }
-
-      console.log('Review created:', reviewData)
 
       // Create first version
       const { error: versionError } = await supabase

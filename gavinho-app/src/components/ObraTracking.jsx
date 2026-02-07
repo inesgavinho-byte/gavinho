@@ -315,7 +315,6 @@ export default function ObraTracking({ obra, onStatsUpdate }) {
       }
     })
     
-    console.log(`PDF: Extraídos ${items.length} items`)
     return items
   }
 
@@ -330,7 +329,6 @@ export default function ObraTracking({ obra, onStatsUpdate }) {
     )
     
     if (!headerRow) {
-      console.log('Headers não encontrados, tentando extração genérica')
       return extractItemsGeneric(data)
     }
 
@@ -352,8 +350,6 @@ export default function ObraTracking({ obra, onStatsUpdate }) {
       status: headers.findIndex(h => h === 'status' || h.includes('estado'))
     }
 
-    console.log('Mapeamento de colunas:', colMap)
-    
     let currentEspecialidade = 'Geral'
     
     // Processar linhas após headers
@@ -499,7 +495,6 @@ export default function ObraTracking({ obra, onStatsUpdate }) {
       })
     }
     
-    console.log(`Extraídos ${items.length} items`)
     return items
   }
   

@@ -508,7 +508,6 @@ export default function ProjetoDocumentos({ projeto, onValorUpdate }) {
           documentName={annotatingDoc.nome}
           onClose={() => setAnnotatingDoc(null)}
           onSave={async (annotations) => {
-            console.log('Anotacoes guardadas:', annotations)
             // Aqui pode-se guardar as anotacoes na base de dados se necessario
           }}
         />
@@ -525,7 +524,6 @@ export default function ProjetoDocumentos({ projeto, onValorUpdate }) {
           projetoId={projeto?.id}
           onClose={() => setComparingDoc(null)}
           onSubmitReview={async (reviewData) => {
-            console.log('Revisao submetida:', reviewData)
             // Recarregar documentos apos submissao
             loadDocumentos()
           }}

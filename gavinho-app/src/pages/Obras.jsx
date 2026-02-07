@@ -52,7 +52,6 @@ export default function Obras() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'obras' },
         (payload) => {
-          console.log('Obras alterado:', payload)
           if (payload.eventType === 'INSERT') {
             // Refetch to get joined data
             fetchObras()

@@ -118,7 +118,6 @@ export default function ProjetoEntregaveis({ projeto }) {
       }
     } catch (err) {
       // Silently fail - table might not exist yet
-      console.log('Files cache not loaded (table may not exist)')
     }
   }
 
@@ -373,7 +372,6 @@ export default function ProjetoEntregaveis({ projeto }) {
       }])
 
       if (error) throw error
-      console.log('Tarefa criada para entregável:', entregavel.codigo)
     } catch (err) {
       console.error('Erro ao criar tarefa:', err)
     }
@@ -446,7 +444,6 @@ export default function ProjetoEntregaveis({ projeto }) {
       // Fallback: usar primeira e segunda coluna se nao encontrar
       if (codigoIdx === -1 && headers.length >= 2) codigoIdx = 0
       if (nomeIdx === -1 && headers.length >= 2) nomeIdx = 1
-      console.log('Headers:', headers, 'codigoIdx:', codigoIdx, 'nomeIdx:', nomeIdx)
       const escalaIdx = headers.findIndex(h => h.includes('ESCALA'))
       const faseIdx = headers.findIndex(h => h.includes('FASE'))
       const dataInicioIdx = headers.findIndex(h => h.includes('INÀCIO') || h.includes('INICIO'))

@@ -354,36 +354,6 @@ export default function Workspace() {
     return () => supabase.removeChannel(channel)
   }
 
-  const getMockPosts = () => [
-    {
-      id: '1',
-      conteudo: 'Bom dia equipa! Precisamos de rever os materiais para a Suite Principal. A cliente quer opções mais sustentáveis.',
-      autor: { id: '1', nome: 'Maria Gavinho', avatar_url: null, funcao: 'Diretora Criativa' },
-      created_at: new Date(Date.now() - 3600000 * 24).toISOString(),
-      reacoes: [{ emoji: '👍', users: ['João', 'Ana'] }],
-      replyCount: 3,
-      pinned: true
-    },
-    {
-      id: '2',
-      conteudo: 'Já falei com o fornecedor de pedras. Têm uma nova linha de mármore reciclado que pode ser interessante. Vou partilhar o catálogo.',
-      autor: { id: '2', nome: 'João Umbelino', avatar_url: null, funcao: 'Procurement' },
-      created_at: new Date(Date.now() - 3600000 * 12).toISOString(),
-      reacoes: [{ emoji: '❤️', users: ['Maria'] }, { emoji: '🎉', users: ['Ana', 'Carlos'] }],
-      replyCount: 1,
-      attachments: [{ name: 'Catalogo_Marmore_2025.pdf', type: 'pdf', size: '2.4 MB' }]
-    },
-    {
-      id: '3',
-      conteudo: '@Maria Gavinho o render da sala está pronto para revisão. Implementei as alterações que discutimos ontem.',
-      autor: { id: '3', nome: 'Carolina Cipriano', avatar_url: null, funcao: 'Designer 3D' },
-      created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
-      reacoes: [],
-      replyCount: 0,
-      imagem_url: '/api/placeholder/600/400'
-    }
-  ]
-
   const handleSendMessage = async () => {
     if (!messageInput.trim() && selectedFiles.length === 0) return
     if (!canalAtivo) return

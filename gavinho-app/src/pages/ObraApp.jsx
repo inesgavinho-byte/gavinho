@@ -110,8 +110,7 @@ export default function ObraApp() {
   const registerServiceWorker = async () => {
     if ('serviceWorker' in navigator) {
       try {
-        const registration = await navigator.serviceWorker.register('/sw.js')
-        console.log('Service Worker registado:', registration)
+        await navigator.serviceWorker.register('/sw.js')
       } catch (err) {
         console.error('Erro ao registar SW:', err)
       }

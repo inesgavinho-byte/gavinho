@@ -143,101 +143,159 @@ export default function GestaoProjetoPage() {
         })
       }
 
-      // Mock insights data (following mockup)
-      setInsights([
-        {
-          id: '1',
-          tipo: 'urgent',
-          titulo: 'Quinta da Marinha',
-          mensagem: 'tem 2 RFIs sem resposta há 5 dias. O atraso pode impactar a entrega dos alçados em 10 de Fevereiro.',
-          acao_label: 'Ver RFIs pendentes',
-          acao_rota: '/projetos'
-        },
-        {
-          id: '2',
-          tipo: 'warning',
-          titulo: 'Cascais Waterfront',
-          mensagem: 'O cliente aguarda aprovação do moodboard há 3 dias. Reunião agendada para amanhã às 15h.',
-          acao_label: 'Preparar apresentação',
-          acao_rota: '/projetos'
-        },
-        {
-          id: '3',
-          tipo: 'suggestion',
-          titulo: 'Estoril Prime',
-          mensagem: 'Detetei 4 decisões da última reunião de obra que ainda não foram registadas. Queres que as adicione?',
-          acao_label: 'Registar decisões',
-          acao_rota: '/projetos'
-        }
-      ])
+      // Generate insights from real project data
+      try {
+        const generatedInsights = []
+        if (projetosData) {
+          const offTrack = projetosData.filter(p => p.status === 'delayed')
+          const atRisk = projetosData.filter(p => p.status === 'at_risk')
 
-      // Mock alerts (following mockup)
-      setAlerts([
-        {
-          id: '1',
-          icon: 'clock',
-          titulo: 'Orçamento em risco',
-          descricao: 'Quinta da Marinha ultrapassou 8% do budget previsto',
-          acao: 'Ver detalhes'
-        },
-        {
-          id: '2',
-          icon: 'file',
-          titulo: 'Submittal pendente',
-          descricao: 'Caixilharia Estoril Prime aguarda aprovação há 7 dias',
-          acao: 'Aprovar agora'
-        },
-        {
-          id: '3',
-          icon: 'calendar',
-          titulo: 'Reunião amanhã',
-          descricao: 'Apresentação moodboard Cascais Waterfront às 15h',
-          acao: 'Ver agenda'
-        },
-        {
-          id: '4',
-          icon: 'receipt',
-          titulo: 'Fatura por emitir',
-          descricao: 'Oeiras Loft atingiu milestone de 75% — faturar €45.000',
-          acao: 'Gerar fatura'
-        }
-      ])
+          offTrack.forEach(p => {
+            generatedInsights.push({
+              id: `insight-urgent-${p.id}`,
+              tipo: 'urgent',
+              titulo: p.nome,
+              mensagem: `está marcado como atrasado. Verifica as tarefas pendentes e o plano de recuperação.`,
+              acao_label: 'Ver projeto',
+              acao_rota: `/projetos/${p.codigo}`
+            })
+          })
 
-      // Mock milestones (following mockup)
-      setMilestones([
-        {
-          id: '1',
-          dia: '25',
-          titulo: 'Entrega Projeto de Execução',
-          projeto: 'Quinta da Marinha',
-          status: 'overdue',
-          statusLabel: '5 dias em atraso'
-        },
-        {
-          id: '2',
-          dia: '31',
-          titulo: 'Aprovação Moodboard',
-          projeto: 'Cascais Waterfront',
-          status: 'tomorrow',
-          statusLabel: 'Amanhã'
-        },
-        {
-          id: '3',
-          dia: '07',
-          titulo: 'Vistoria Estrutura',
-          projeto: 'Estoril Prime',
-          status: 'upcoming',
-          statusLabel: 'Em 8 dias'
-        },
-        {
-          id: '4',
-          dia: '15',
-          titulo: 'Entrega Fase 1',
-          projeto: 'Oeiras Loft',
-          status: 'upcoming',
-          statusLabel: 'Em 16 dias'
+          atRisk.forEach(p => {
+            generatedInsights.push({
+              id: `insight-warning-${p.id}`,
+              tipo: 'warning',
+              titulo: p.nome,
+              mensagem: `está em risco. Revê o cronograma e os entregáveis próximos.`,
+              acao_label: 'Ver detalhes',
+              acao_rota: `/projetos/${p.codigo}`
+            })
+          })
+
+          // Add a suggestion insight if there are active projects without recent updates
+          const staleProjects = projetosData.filter(p => {
+            const lastUpdate = new Date(p.updated_at)
+            const daysSinceUpdate = (Date.now() - lastUpdate.getTime()) / (1000 * 60 * 60 * 24)
+            return daysSinceUpdate > 7
+          })
+          staleProjects.slice(0, 1).forEach(p => {
+            generatedInsights.push({
+              id: `insight-suggestion-${p.id}`,
+              tipo: 'suggestion',
+              titulo: p.nome,
+              mensagem: `não tem atualizações há mais de 7 dias. Considera rever o estado do projeto.`,
+              acao_label: 'Atualizar projeto',
+              acao_rota: `/projetos/${p.codigo}`
+            })
+          })
         }
-      ])
+        setInsights(generatedInsights.slice(0, 3))
+      } catch (insightErr) {
+        console.error('Error generating insights:', insightErr)
+        setInsights([])
+      }
+
+      // Generate alerts from real project data
+      try {
+        const generatedAlerts = []
+        if (projetosData) {
+          // Alert for off-track projects (budget risk)
+          projetosData.filter(p => p.status === 'delayed').forEach(p => {
+            generatedAlerts.push({
+              id: `alert-delay-${p.id}`,
+              icon: 'clock',
+              titulo: 'Projeto atrasado',
+              descricao: `${p.nome} está marcado como atrasado`,
+              acao: 'Ver detalhes'
+            })
+          })
+
+          // Alert for overdue tasks
+          const { data: overdueTasks } = await supabase
+            .from('tarefas')
+            .select('id, titulo, projetos(nome)')
+            .lt('data_limite', new Date().toISOString())
+            .in('status', ['pendente', 'em_progresso'])
+            .limit(3)
+
+          if (overdueTasks) {
+            overdueTasks.forEach(t => {
+              generatedAlerts.push({
+                id: `alert-task-${t.id}`,
+                icon: 'file',
+                titulo: 'Tarefa em atraso',
+                descricao: `${t.titulo}${t.projetos?.nome ? ` — ${t.projetos.nome}` : ''}`,
+                acao: 'Ver tarefa'
+              })
+            })
+          }
+
+          // Alert for projects at risk
+          projetosData.filter(p => p.status === 'at_risk').slice(0, 2).forEach(p => {
+            generatedAlerts.push({
+              id: `alert-risk-${p.id}`,
+              icon: 'calendar',
+              titulo: 'Projeto em risco',
+              descricao: `${p.nome} necessita de atenção`,
+              acao: 'Ver projeto'
+            })
+          })
+        }
+        setAlerts(generatedAlerts.slice(0, 4))
+      } catch (alertErr) {
+        console.error('Error generating alerts:', alertErr)
+        setAlerts([])
+      }
+
+      // Fetch milestones from entregaveis or projeto_fases_contratuais
+      try {
+        const { data: fasesData } = await supabase
+          .from('projeto_fases_contratuais')
+          .select('id, nome, data_prevista, data_real, estado, projetos(nome)')
+          .gte('data_prevista', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+          .lte('data_prevista', new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString())
+          .order('data_prevista', { ascending: true })
+          .limit(6)
+
+        if (fasesData && fasesData.length > 0) {
+          const now = new Date()
+          const tomorrow = new Date(now)
+          tomorrow.setDate(tomorrow.getDate() + 1)
+
+          const mappedMilestones = fasesData.map(f => {
+            const dataPrev = new Date(f.data_prevista)
+            const diffDays = Math.ceil((dataPrev - now) / (1000 * 60 * 60 * 24))
+            let status = 'upcoming'
+            let statusLabel = `Em ${diffDays} dias`
+
+            if (diffDays < 0) {
+              status = 'overdue'
+              statusLabel = `${Math.abs(diffDays)} dias em atraso`
+            } else if (diffDays === 0) {
+              status = 'tomorrow'
+              statusLabel = 'Hoje'
+            } else if (diffDays === 1) {
+              status = 'tomorrow'
+              statusLabel = 'Amanhã'
+            }
+
+            return {
+              id: f.id,
+              dia: String(dataPrev.getDate()).padStart(2, '0'),
+              titulo: f.nome,
+              projeto: f.projetos?.nome || 'N/A',
+              status,
+              statusLabel
+            }
+          })
+          setMilestones(mappedMilestones.slice(0, 4))
+        } else {
+          setMilestones([])
+        }
+      } catch (milestoneErr) {
+        console.error('Error fetching milestones:', milestoneErr)
+        setMilestones([])
+      }
 
       // Fetch tasks
       const { data: tasksData } = await supabase
@@ -248,51 +306,45 @@ export default function GestaoProjetoPage() {
         .limit(10)
 
       if (tasksData && tasksData.length > 0) {
-        setTasks(tasksData)
-      } else {
-        // Mock tasks (following mockup)
-        setTasks([
-          {
-            id: '1',
-            titulo: 'Responder aos 2 RFIs pendentes — Quinta da Marinha',
-            projeto_codigo: 'GA-2024-012',
-            projeto_nome: 'Quinta da Marinha',
-            status_projeto: 'off-track',
-            data_info: '5 dias em atraso',
-            prioridade: 'alta',
-            garvis_sugerida: true
-          },
-          {
-            id: '2',
-            titulo: 'Rever e aprovar moodboard para apresentação de amanhã',
-            projeto_codigo: 'GA-2024-015',
-            projeto_nome: 'Cascais Waterfront',
-            status_projeto: 'at-risk',
-            data_info: 'Hoje',
-            prioridade: 'alta',
-            garvis_sugerida: false
-          },
-          {
-            id: '3',
-            titulo: 'Validar proposta de iluminação — Sala de Estar',
-            projeto_codigo: 'GB-2024-008',
-            projeto_nome: 'Estoril Prime',
-            status_projeto: 'at-risk',
-            data_info: 'Hoje, 17h',
-            prioridade: 'media',
-            garvis_sugerida: false
-          },
-          {
-            id: '4',
-            titulo: 'Chamada com fornecedor de pedra natural — amostras Sintra',
-            projeto_codigo: 'GA-2025-001',
-            projeto_nome: 'Sintra Hills',
-            status_projeto: 'on-track',
-            data_info: 'Hoje, 11h',
-            prioridade: 'media',
-            garvis_sugerida: false
+        const mappedTasks = tasksData.map(t => {
+          const now = new Date()
+          const deadline = t.data_limite ? new Date(t.data_limite) : null
+          let dataInfo = ''
+          let statusProjeto = 'on-track'
+
+          if (deadline) {
+            const diffDays = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24))
+            if (diffDays < 0) {
+              dataInfo = `${Math.abs(diffDays)} dias em atraso`
+            } else if (diffDays === 0) {
+              dataInfo = 'Hoje'
+            } else if (diffDays === 1) {
+              dataInfo = 'Amanhã'
+            } else {
+              dataInfo = `Em ${diffDays} dias`
+            }
           }
-        ])
+
+          if (t.projetos) {
+            statusProjeto = t.projetos.status === 'delayed' ? 'off-track'
+              : t.projetos.status === 'at_risk' ? 'at-risk'
+              : 'on-track'
+          }
+
+          return {
+            id: t.id,
+            titulo: t.titulo,
+            projeto_codigo: t.projetos?.codigo || '',
+            projeto_nome: t.projetos?.nome || '',
+            status_projeto: statusProjeto,
+            data_info: dataInfo,
+            prioridade: t.prioridade || 'media',
+            garvis_sugerida: t.origem_tipo === 'sistema'
+          }
+        })
+        setTasks(mappedTasks)
+      } else {
+        setTasks([])
       }
 
     } catch (error) {

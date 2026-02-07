@@ -256,8 +256,6 @@ export default function Projetos() {
         projectData.codigo = formData.codigo
       }
 
-      console.log('A guardar projeto:', projectData)
-
       if (editingProject) {
         // Atualizar
         const { data, error } = await supabase
@@ -270,7 +268,6 @@ export default function Projetos() {
           console.error('Erro Supabase:', error)
           throw error
         }
-        console.log('Projeto atualizado:', data)
       } else {
         // Criar novo
         const { data, error } = await supabase
@@ -282,7 +279,6 @@ export default function Projetos() {
           console.error('Erro Supabase:', error)
           throw error
         }
-        console.log('Projeto criado:', data)
       }
 
       setShowModal(false)
