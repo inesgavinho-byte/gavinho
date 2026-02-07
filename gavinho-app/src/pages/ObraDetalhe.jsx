@@ -1,12 +1,12 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import {
-  ArrowLeft, Plus, Edit, Trash2, Save, Download, Upload, Lock, Unlock, Copy,
-  ChevronDown, Check, X, FileText, Calculator, Receipt, ShoppingCart,
-  TrendingUp, ClipboardList, Building2, MapPin, Calendar, Users, HardHat,
-  AlertTriangle, Eye, Send, FileCheck, MoreVertical, Camera, BookOpen,
-  Shield, Truck, Grid3X3, BarChart3, MessageSquare, CheckSquare, Loader2
+  ArrowLeft, Plus, Trash2, Lock, Copy,
+  FileText, Calculator, Receipt, ShoppingCart,
+  TrendingUp, ClipboardList, MapPin, Users,
+  AlertTriangle, Camera, BookOpen,
+  Shield, Truck, Grid3X3, BarChart3, MessageSquare, Loader2
 } from 'lucide-react'
 import ObraChat from '../components/ObraChat'
 import ObraChecklist from '../components/ObraChecklist'
@@ -140,6 +140,43 @@ export default function ObraDetalhe() {
 
   // Refs para edição inline
   const cellInputRef = useRef(null)
+
+  // ============================================
+  // MEMOIZED VALUES
+  // ============================================
+
+  const mqtColumns = useMemo(() => [
+    { key: 'capitulo', label: 'CAP.', width: 70, type: 'number', editable: true, align: 'center' },
+    { key: 'referencia', label: 'REF.', width: 80, type: 'text', editable: true },
+    { key: 'tipo_subtipo', label: 'TIPO/SUBTIPO', width: 160, type: 'text', editable: true },
+    { key: 'zona', label: 'ZONA', width: 140, type: 'text', editable: true },
+    { key: 'descricao', label: 'DESCRIÇÃO', width: 350, type: 'text', editable: true },
+    { key: 'unidade', label: 'UN', width: 70, type: 'select', options: unidades, editable: true },
+    { key: 'quantidade', label: 'QTD', width: 100, type: 'number', editable: true, align: 'right' },
+  ], [])
+
+  const orcamentoColumns = useMemo(() => [
+    { key: 'capitulo', label: 'CAP.', width: 70, type: 'number', editable: true, align: 'center' },
+    { key: 'referencia', label: 'REF.', width: 80, type: 'text', editable: true },
+    { key: 'descricao', label: 'DESCRIÇÃO', width: 300, type: 'text', editable: true },
+    { key: 'unidade', label: 'UN', width: 70, type: 'select', options: unidades, editable: true },
+    { key: 'quantidade', label: 'QTD', width: 90, type: 'number', editable: true, align: 'right' },
+    { key: 'custo_unitario', label: 'CUSTO/UN', width: 100, type: 'number', editable: true, align: 'right',
+      render: (val) => formatCurrency(val) },
+    { key: 'preco_venda', label: 'PREÇO/UN', width: 100, type: 'number', editable: true, align: 'right',
+      render: (val) => formatCurrency(val) },
+    { key: 'total_custo', label: 'TOTAL CUSTO', width: 110, editable: false, align: 'right',
+      render: (val, row) => formatCurrency((row.quantidade || 0) * (row.custo_unitario || 0)) },
+    { key: 'total_venda', label: 'TOTAL VENDA', width: 110, editable: false, align: 'right',
+      render: (val, row) => formatCurrency((row.quantidade || 0) * (row.preco_venda || 0)) },
+  ], [])
+
+  const { totalCusto, totalVenda, margem } = useMemo(() => {
+    const tc = orcamentoLinhas.reduce((sum, l) => sum + (l.quantidade || 0) * (l.custo_unitario || 0), 0)
+    const tv = orcamentoLinhas.reduce((sum, l) => sum + (l.quantidade || 0) * (l.preco_venda || 0), 0)
+    const m = tv > 0 ? ((tv - tc) / tv * 100) : 0
+    return { totalCusto: tc, totalVenda: tv, margem: m }
+  }, [orcamentoLinhas])
 
   // ============================================
   // EFEITOS
@@ -1066,6 +1103,7 @@ export default function ObraDetalhe() {
                       <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                         <button
                           onClick={() => onDelete(row.id)}
+                          aria-label="Eliminar linha"
                           style={{
                             background: 'none',
                             border: 'none',
@@ -1097,16 +1135,6 @@ export default function ObraDetalhe() {
   // ============================================
 
   const renderMqtTab = () => {
-    const columns = [
-      { key: 'capitulo', label: 'CAP.', width: 70, type: 'number', editable: true, align: 'center' },
-      { key: 'referencia', label: 'REF.', width: 80, type: 'text', editable: true },
-      { key: 'tipo_subtipo', label: 'TIPO/SUBTIPO', width: 160, type: 'text', editable: true },
-      { key: 'zona', label: 'ZONA', width: 140, type: 'text', editable: true },
-      { key: 'descricao', label: 'DESCRIÇÃO', width: 350, type: 'text', editable: true },
-      { key: 'unidade', label: 'UN', width: 70, type: 'select', options: unidades, editable: true },
-      { key: 'quantidade', label: 'QTD', width: 100, type: 'number', editable: true, align: 'right' },
-    ]
-
     return (
       <div>
         {/* Version selector */}
@@ -1118,6 +1146,7 @@ export default function ObraDetalhe() {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <select
+              aria-label="Selecionar versão MQT"
               value={selectedMqtVersao?.id || ''}
               onChange={async (e) => {
                 const versao = mqtVersoes.find(v => v.id === e.target.value)
@@ -1189,7 +1218,7 @@ export default function ObraDetalhe() {
           </div>
         ) : (
           <SpreadsheetTable
-            columns={columns}
+            columns={mqtColumns}
             data={mqtLinhas}
             onUpdate={updateMqtLine}
             onDelete={deleteMqtLine}
@@ -1257,26 +1286,6 @@ export default function ObraDetalhe() {
   }
 
   const renderOrcamentoTab = () => {
-    const columns = [
-      { key: 'capitulo', label: 'CAP.', width: 70, type: 'number', editable: true, align: 'center' },
-      { key: 'referencia', label: 'REF.', width: 80, type: 'text', editable: true },
-      { key: 'descricao', label: 'DESCRIÇÃO', width: 300, type: 'text', editable: true },
-      { key: 'unidade', label: 'UN', width: 70, type: 'select', options: unidades, editable: true },
-      { key: 'quantidade', label: 'QTD', width: 90, type: 'number', editable: true, align: 'right' },
-      { key: 'custo_unitario', label: 'CUSTO/UN', width: 100, type: 'number', editable: true, align: 'right',
-        render: (val) => formatCurrency(val) },
-      { key: 'preco_venda', label: 'PREÇO/UN', width: 100, type: 'number', editable: true, align: 'right',
-        render: (val) => formatCurrency(val) },
-      { key: 'total_custo', label: 'TOTAL CUSTO', width: 110, editable: false, align: 'right',
-        render: (val, row) => formatCurrency((row.quantidade || 0) * (row.custo_unitario || 0)) },
-      { key: 'total_venda', label: 'TOTAL VENDA', width: 110, editable: false, align: 'right',
-        render: (val, row) => formatCurrency((row.quantidade || 0) * (row.preco_venda || 0)) },
-    ]
-
-    const totalCusto = orcamentoLinhas.reduce((sum, l) => sum + (l.quantidade || 0) * (l.custo_unitario || 0), 0)
-    const totalVenda = orcamentoLinhas.reduce((sum, l) => sum + (l.quantidade || 0) * (l.preco_venda || 0), 0)
-    const margem = totalVenda > 0 ? ((totalVenda - totalCusto) / totalVenda * 100) : 0
-
     return (
       <div>
         {/* Summary Cards */}
@@ -1327,6 +1336,7 @@ export default function ObraDetalhe() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             {orcamentos.length > 0 && (
               <select
+                aria-label="Selecionar orçamento"
                 value={selectedOrcamento?.id || ''}
                 onChange={async (e) => {
                   const orc = orcamentos.find(o => o.id === e.target.value)
@@ -1383,7 +1393,7 @@ export default function ObraDetalhe() {
           </div>
         ) : (
           <SpreadsheetTable
-            columns={columns}
+            columns={orcamentoColumns}
             data={orcamentoLinhas}
             onUpdate={async (id, field, value) => {
               // Mapear campos do UI para campos da BD
@@ -1848,6 +1858,7 @@ export default function ObraDetalhe() {
               {obra.projetos?.codigo && (
                 <button
                   onClick={() => navigate(`/projetos/${obra.projetos.codigo}`)}
+                  aria-label={`Ver projeto ${obra.projetos.codigo}`}
                   style={{
                     cursor: 'pointer',
                     background: colors.background,
@@ -1895,16 +1906,22 @@ export default function ObraDetalhe() {
       </div>
 
       {/* Main Tabs */}
-      <div style={{
-        display: 'flex',
-        gap: '4px',
-        marginBottom: '0',
-        borderBottom: `1px solid ${colors.border}`,
-        paddingBottom: '0'
-      }}>
+      <div
+        role="tablist"
+        aria-label="Separadores principais"
+        style={{
+          display: 'flex',
+          gap: '4px',
+          marginBottom: '0',
+          borderBottom: `1px solid ${colors.border}`,
+          paddingBottom: '0'
+        }}
+      >
         {mainTabs.map(tab => (
           <button
             key={tab.id}
+            role="tab"
+            aria-selected={activeMainTab === tab.id}
             onClick={() => handleMainTabChange(tab.id)}
             style={{
               display: 'flex',
@@ -1952,17 +1969,23 @@ export default function ObraDetalhe() {
 
       {/* Sub-tabs for Tracking */}
       {activeMainTab === 'tracking' && (
-        <div style={{
-          display: 'flex',
-          gap: '8px',
-          padding: '16px 0',
-          marginBottom: '20px',
-          background: colors.white,
-          borderBottom: `1px solid ${colors.border}`
-        }}>
+        <div
+          role="tablist"
+          aria-label="Sub-separadores tracking"
+          style={{
+            display: 'flex',
+            gap: '8px',
+            padding: '16px 0',
+            marginBottom: '20px',
+            background: colors.white,
+            borderBottom: `1px solid ${colors.border}`
+          }}
+        >
           {trackingSubtabs.map(subtab => (
             <button
               key={subtab.id}
+              role="tab"
+              aria-selected={activeTrackingSubtab === subtab.id}
               onClick={() => handleTrackingSubtabChange(subtab.id)}
               style={{
                 display: 'flex',
@@ -1988,17 +2011,23 @@ export default function ObraDetalhe() {
 
       {/* Sub-tabs for Acompanhamento */}
       {activeMainTab === 'acompanhamento' && (
-        <div style={{
-          display: 'flex',
-          gap: '8px',
-          padding: '16px 0',
-          marginBottom: '20px',
-          background: colors.white,
-          borderBottom: `1px solid ${colors.border}`
-        }}>
+        <div
+          role="tablist"
+          aria-label="Sub-separadores acompanhamento"
+          style={{
+            display: 'flex',
+            gap: '8px',
+            padding: '16px 0',
+            marginBottom: '20px',
+            background: colors.white,
+            borderBottom: `1px solid ${colors.border}`
+          }}
+        >
           {acompanhamentoSubtabs.map(subtab => (
             <button
               key={subtab.id}
+              role="tab"
+              aria-selected={activeAcompanhamentoSubtab === subtab.id}
               onClick={() => setActiveAcompanhamentoSubtab(subtab.id)}
               style={{
                 display: 'flex',
@@ -2024,17 +2053,23 @@ export default function ObraDetalhe() {
 
       {/* Sub-tabs for Fiscalização */}
       {activeMainTab === 'fiscalizacao' && (
-        <div style={{
-          display: 'flex',
-          gap: '8px',
-          padding: '16px 0',
-          marginBottom: '20px',
-          background: colors.white,
-          borderBottom: `1px solid ${colors.border}`
-        }}>
+        <div
+          role="tablist"
+          aria-label="Sub-separadores fiscalização"
+          style={{
+            display: 'flex',
+            gap: '8px',
+            padding: '16px 0',
+            marginBottom: '20px',
+            background: colors.white,
+            borderBottom: `1px solid ${colors.border}`
+          }}
+        >
           {fiscalizacaoSubtabs.map(subtab => (
             <button
               key={subtab.id}
+              role="tab"
+              aria-selected={activeFiscalizacaoSubtab === subtab.id}
               onClick={() => setActiveFiscalizacaoSubtab(subtab.id)}
               style={{
                 display: 'flex',
@@ -2060,17 +2095,23 @@ export default function ObraDetalhe() {
 
       {/* Sub-tabs for Equipas */}
       {activeMainTab === 'equipas' && (
-        <div style={{
-          display: 'flex',
-          gap: '8px',
-          padding: '16px 0',
-          marginBottom: '20px',
-          background: colors.white,
-          borderBottom: `1px solid ${colors.border}`
-        }}>
+        <div
+          role="tablist"
+          aria-label="Sub-separadores equipas"
+          style={{
+            display: 'flex',
+            gap: '8px',
+            padding: '16px 0',
+            marginBottom: '20px',
+            background: colors.white,
+            borderBottom: `1px solid ${colors.border}`
+          }}
+        >
           {equipasSubtabs.map(subtab => (
             <button
               key={subtab.id}
+              role="tab"
+              aria-selected={activeEquipasSubtab === subtab.id}
               onClick={() => setActiveEquipasSubtab(subtab.id)}
               style={{
                 display: 'flex',
@@ -2095,7 +2136,7 @@ export default function ObraDetalhe() {
       )}
 
       {/* Tab Content */}
-      <div style={{ marginTop: activeMainTab === 'dashboard' || activeMainTab === 'projeto' ? '24px' : '0' }}>
+      <div role="tabpanel" aria-label={`Conteúdo do separador ${activeMainTab}`} style={{ marginTop: activeMainTab === 'dashboard' || activeMainTab === 'projeto' ? '24px' : '0' }}>
         {/* Dashboard */}
         {activeMainTab === 'dashboard' && (
           <div style={{
@@ -2107,7 +2148,13 @@ export default function ObraDetalhe() {
           }}>
             <BarChart3 size={48} style={{ color: colors.textMuted, opacity: 0.3, marginBottom: '16px' }} />
             <h3 style={{ margin: '0 0 8px', color: colors.text }}>Dashboard da Obra</h3>
-            <p style={{ color: colors.textMuted }}>Visão geral do progresso, KPIs e alertas</p>
+            <p style={{ color: colors.textMuted, marginBottom: '16px' }}>Funcionalidades previstas:</p>
+            <div style={{ display: 'inline-block', textAlign: 'left', color: colors.textMuted, fontSize: '13px', lineHeight: '1.8' }}>
+              • KPIs da obra (custo, prazo, qualidade)<br/>
+              • Progresso por fase de construção<br/>
+              • Alertas financeiros e desvios orçamentais<br/>
+              • Timeline de marcos e entregas
+            </div>
           </div>
         )}
 
@@ -2144,7 +2191,33 @@ export default function ObraDetalhe() {
             <h3 style={{ margin: '0 0 8px', color: colors.text }}>
               {acompanhamentoSubtabs.find(s => s.id === activeAcompanhamentoSubtab)?.label}
             </h3>
-            <p style={{ color: colors.textMuted }}>Em desenvolvimento</p>
+            <p style={{ color: colors.textMuted, marginBottom: '16px' }}>Funcionalidades previstas:</p>
+            <div style={{ display: 'inline-block', textAlign: 'left', color: colors.textMuted, fontSize: '13px', lineHeight: '1.8' }}>
+              {activeAcompanhamentoSubtab === 'fotografias' && (<>
+                • Registo fotográfico por zona e fase<br/>
+                • Galeria com filtros por data e categoria<br/>
+                • Comparação antes/depois<br/>
+                • Exportação para relatórios
+              </>)}
+              {activeAcompanhamentoSubtab === 'diario' && (<>
+                • Diário de obra com registo diário<br/>
+                • Condições meteorológicas e mão-de-obra<br/>
+                • Registo de equipamentos em obra<br/>
+                • Ocorrências e observações do dia
+              </>)}
+              {activeAcompanhamentoSubtab === 'relatorios' && (<>
+                • Relatórios de visita de acompanhamento<br/>
+                • Relatórios mensais de progresso<br/>
+                • Exportação em PDF<br/>
+                • Histórico de relatórios emitidos
+              </>)}
+              {activeAcompanhamentoSubtab === 'nao-conformidades' && (<>
+                • Registo de não conformidades<br/>
+                • Classificação por gravidade<br/>
+                • Ações corretivas e prazos<br/>
+                • Seguimento e fecho de NC
+              </>)}
+            </div>
           </div>
         )}
 
@@ -2161,7 +2234,21 @@ export default function ObraDetalhe() {
             <h3 style={{ margin: '0 0 8px', color: colors.text }}>
               {fiscalizacaoSubtabs.find(s => s.id === activeFiscalizacaoSubtab)?.label}
             </h3>
-            <p style={{ color: colors.textMuted }}>Em desenvolvimento</p>
+            <p style={{ color: colors.textMuted, marginBottom: '16px' }}>Funcionalidades previstas:</p>
+            <div style={{ display: 'inline-block', textAlign: 'left', color: colors.textMuted, fontSize: '13px', lineHeight: '1.8' }}>
+              {activeFiscalizacaoSubtab === 'hso' && (<>
+                • Plano de Higiene e Segurança em Obra<br/>
+                • Registos de inspeções de segurança<br/>
+                • Controlo de EPIs e equipamentos<br/>
+                • Relatórios de acidentes e incidentes
+              </>)}
+              {activeFiscalizacaoSubtab === 'ocorrencias' && (<>
+                • Registo de ocorrências em obra<br/>
+                • Classificação por tipo e gravidade<br/>
+                • Atribuição de responsáveis<br/>
+                • Seguimento e resolução
+              </>)}
+            </div>
           </div>
         )}
 
@@ -2178,7 +2265,27 @@ export default function ObraDetalhe() {
             <h3 style={{ margin: '0 0 8px', color: colors.text }}>
               {equipasSubtabs.find(s => s.id === activeEquipasSubtab)?.label}
             </h3>
-            <p style={{ color: colors.textMuted }}>Em desenvolvimento</p>
+            <p style={{ color: colors.textMuted, marginBottom: '16px' }}>Funcionalidades previstas:</p>
+            <div style={{ display: 'inline-block', textAlign: 'left', color: colors.textMuted, fontSize: '13px', lineHeight: '1.8' }}>
+              {activeEquipasSubtab === 'equipa' && (<>
+                • Gestão da equipa Gavinho em obra<br/>
+                • Atribuição de funções e responsabilidades<br/>
+                • Controlo de presenças diárias<br/>
+                • Calendário de disponibilidade
+              </>)}
+              {activeEquipasSubtab === 'subempreiteiros' && (<>
+                • Gestão de subempreiteiros<br/>
+                • Contratos e condições acordadas<br/>
+                • Avaliação de desempenho<br/>
+                • Controlo de faturação
+              </>)}
+              {activeEquipasSubtab === 'zonas' && (<>
+                • Definição de zonas de trabalho<br/>
+                • Atribuição de equipas por zona<br/>
+                • Mapa de ocupação da obra<br/>
+                • Planeamento de frentes de trabalho
+              </>)}
+            </div>
           </div>
         )}
 
@@ -2193,7 +2300,13 @@ export default function ObraDetalhe() {
           }}>
             <FileText size={48} style={{ color: colors.textMuted, opacity: 0.3, marginBottom: '16px' }} />
             <h3 style={{ margin: '0 0 8px', color: colors.text }}>Projeto de Execução</h3>
-            <p style={{ color: colors.textMuted }}>Documentação e peças desenhadas</p>
+            <p style={{ color: colors.textMuted, marginBottom: '16px' }}>Funcionalidades previstas:</p>
+            <div style={{ display: 'inline-block', textAlign: 'left', color: colors.textMuted, fontSize: '13px', lineHeight: '1.8' }}>
+              • Peças desenhadas e plantas<br/>
+              • Documentação técnica e cadernos de encargos<br/>
+              • Controlo de revisões e versões<br/>
+              • Distribuição de documentos à equipa
+            </div>
           </div>
         )}
 

@@ -286,20 +286,20 @@ import {
 - [x] Criar componente ConfirmModal
 - [x] Substituir alert() por Toast/ConfirmModal (5 ficheiros prioritários)
 - [x] Substituir confirm() por ConfirmModal (5 ficheiros prioritários)
-- [ ] Substituir alert()/confirm() nos restantes ficheiros (~55 ficheiros)
-- [ ] Adicionar loading states em tabs
-- [ ] Adicionar loading states em modais
+- [x] Substituir alert()/confirm() nos restantes ficheiros (~55 ficheiros)
+- [x] Adicionar loading states em tabs
+- [x] Adicionar loading states em modais
 - [x] Otimizar queries com JOINs
 - [x] Adicionar sanitização de texto
 
 ### Fase 3
-- [ ] Adicionar useMemo em ObraDetalhe
+- [x] Adicionar useMemo em ObraDetalhe
 - [x] Adicionar useMemo em Projetos
 - [x] Criar ficheiro de cores centralizado
-- [ ] Adicionar aria-labels
+- [x] Adicionar aria-labels
 - [x] Adicionar focus trap em modais (ConfirmModal)
-- [ ] Completar ou remover tabs placeholder
-- [ ] Remover imports não utilizados
+- [x] Completar ou remover tabs placeholder
+- [x] Remover imports não utilizados
 
 ---
 

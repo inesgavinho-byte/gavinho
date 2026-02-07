@@ -4,49 +4,32 @@ import {
   ArrowLeft,
   MapPin,
   Calendar,
-  User,
   Building2,
   FileText,
   Euro,
   CheckCircle,
-  Clock,
-  AlertCircle,
-  ChevronRight,
   Download,
-  ExternalLink,
-  Phone,
-  Mail,
-  Globe,
   Layers,
   Target,
-  TrendingUp,
-  Receipt,
-  CreditCard,
   MoreVertical,
   Edit,
   Trash2,
   Copy,
   Share,
-  Upload,
   X,
   Plus,
   File,
   ListChecks,
-  FileCheck,
-  Lock,
   Image,
   Library,
   Settings,
   Eye,
   BookOpen,
   Package,
-  Send,
-  Users,
   ClipboardList,
   Lightbulb,
   Palette,
   ImagePlus,
-  FolderOpen,
   UserCircle,
   Inbox,
   FileSearch,
@@ -60,8 +43,6 @@ import {
   ChevronUp,
   Pencil,
   MessageSquare,
-  Link2,
-  Type,
   Camera
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
@@ -1826,9 +1807,10 @@ export default function ProjetoDetalhe() {
               Editar
             </button>
             <div style={{ position: 'relative' }}>
-              <button 
+              <button
                 className="btn btn-secondary"
                 onClick={() => setShowActions(!showActions)}
+                aria-label="Mais ações"
                 style={{ padding: '10px' }}
               >
                 <MoreVertical size={18} />
@@ -1884,7 +1866,9 @@ export default function ProjetoDetalhe() {
       </div>
 
       {/* Tabs */}
-      <div 
+      <div
+        role="tablist"
+        aria-label="Separadores do projeto"
         style={{
           display: 'flex',
           gap: '4px',
@@ -1898,6 +1882,8 @@ export default function ProjetoDetalhe() {
         {tabs.map(tab => (
           <button
             key={tab.id}
+            role="tab"
+            aria-selected={activeTab === tab.id}
             onClick={() => handleTabChange(tab.id)}
             style={{
               display: 'flex',
@@ -1969,16 +1955,22 @@ export default function ProjetoDetalhe() {
       {activeTab === 'fases' && (
         <div>
           {/* Section navigation */}
-          <div style={{
-            display: 'flex',
-            gap: '8px',
-            marginBottom: '20px',
-            borderBottom: '1px solid var(--stone)',
-            paddingBottom: '12px'
-          }}>
+          <div
+            role="tablist"
+            aria-label="Sub-separadores fases e entregas"
+            style={{
+              display: 'flex',
+              gap: '8px',
+              marginBottom: '20px',
+              borderBottom: '1px solid var(--stone)',
+              paddingBottom: '12px'
+            }}
+          >
             {faseSections.map(section => (
               <button
                 key={section.id}
+                role="tab"
+                aria-selected={activeFaseSection === section.id}
                 onClick={() => handleSubtabChange(section.id)}
                 style={{
                   padding: '8px 16px',
@@ -2115,6 +2107,7 @@ export default function ProjetoDetalhe() {
                             </td>
                             <td style={{ padding: '12px 10px', textAlign: 'center' }}>
                               <select
+                                aria-label="Estado da fase"
                                 value={fase.estado}
                                 onChange={(e) => handleUpdateFaseEstado(fase.id, e.target.value)}
                                 style={{
@@ -2137,6 +2130,7 @@ export default function ProjetoDetalhe() {
                             </td>
                             <td style={{ padding: '12px 10px', textAlign: 'center' }}>
                               <select
+                                aria-label="Avaliação da fase"
                                 value={fase.avaliacao || ''}
                                 onChange={(e) => handleUpdateFaseAvaliacao(fase.id, e.target.value)}
                                 style={{
@@ -2161,12 +2155,14 @@ export default function ProjetoDetalhe() {
                               <div style={{ display: 'flex', gap: '4px' }}>
                                 <button
                                   onClick={() => handleEditFase(fase)}
+                                  aria-label="Editar fase"
                                   style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--brown-light)' }}
                                 >
                                   <Edit size={14} />
                                 </button>
                                 <button
                                   onClick={() => handleRemoveFase(fase.id)}
+                                  aria-label="Eliminar fase"
                                   style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--danger)' }}
                                 >
                                   <Trash2 size={14} />
@@ -2231,6 +2227,7 @@ export default function ProjetoDetalhe() {
                           type="button"
                           onClick={() => formatEscopo('bold')}
                           title="Negrito (Ctrl+B)"
+                          aria-label="Negrito"
                           style={{
                             width: '32px',
                             height: '32px',
@@ -2250,6 +2247,7 @@ export default function ProjetoDetalhe() {
                           type="button"
                           onClick={() => formatEscopo('italic')}
                           title="Itálico (Ctrl+I)"
+                          aria-label="Itálico"
                           style={{
                             width: '32px',
                             height: '32px',
@@ -2269,6 +2267,7 @@ export default function ProjetoDetalhe() {
                           type="button"
                           onClick={() => formatEscopo('underline')}
                           title="Sublinhado (Ctrl+U)"
+                          aria-label="Sublinhado"
                           style={{
                             width: '32px',
                             height: '32px',
@@ -2289,6 +2288,7 @@ export default function ProjetoDetalhe() {
                           type="button"
                           onClick={() => formatEscopo('insertUnorderedList')}
                           title="Lista com marcadores"
+                          aria-label="Lista com marcadores"
                           style={{
                             width: '32px',
                             height: '32px',
@@ -2308,6 +2308,7 @@ export default function ProjetoDetalhe() {
                           type="button"
                           onClick={() => formatEscopo('insertOrderedList')}
                           title="Lista numerada"
+                          aria-label="Lista numerada"
                           style={{
                             width: '32px',
                             height: '32px',
@@ -2587,16 +2588,22 @@ export default function ProjetoDetalhe() {
       {activeTab === 'briefing' && (
         <div>
           {/* Section navigation */}
-          <div style={{
-            display: 'flex',
-            gap: '8px',
-            marginBottom: '20px',
-            borderBottom: '1px solid var(--stone)',
-            paddingBottom: '12px'
-          }}>
+          <div
+            role="tablist"
+            aria-label="Sub-separadores briefing e conceito"
+            style={{
+              display: 'flex',
+              gap: '8px',
+              marginBottom: '20px',
+              borderBottom: '1px solid var(--stone)',
+              paddingBottom: '12px'
+            }}
+          >
             {briefingSections.map(section => (
               <button
                 key={section.id}
+                role="tab"
+                aria-selected={activeBriefingSection === section.id}
                 onClick={() => handleSubtabChange(section.id, 'briefing')}
                 style={{
                   padding: '8px 16px',
@@ -2643,16 +2650,22 @@ export default function ProjetoDetalhe() {
       {activeTab === 'archviz' && (
         <div>
           {/* Section navigation */}
-          <div style={{
-            display: 'flex',
-            gap: '8px',
-            marginBottom: '20px',
-            borderBottom: '1px solid var(--stone)',
-            paddingBottom: '12px'
-          }}>
+          <div
+            role="tablist"
+            aria-label="Sub-separadores archviz"
+            style={{
+              display: 'flex',
+              gap: '8px',
+              marginBottom: '20px',
+              borderBottom: '1px solid var(--stone)',
+              paddingBottom: '12px'
+            }}
+          >
             {archvizSections.map(section => (
               <button
                 key={section.id}
+                role="tab"
+                aria-selected={activeArchvizSection === section.id}
                 onClick={() => handleSubtabChange(section.id, 'archviz')}
                 style={{
                   padding: '8px 16px',
@@ -2796,6 +2809,7 @@ export default function ProjetoDetalhe() {
                             transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)'
                           }}
                           title={isCollapsed ? 'Expandir' : 'Colapsar'}
+                          aria-label={isCollapsed ? `Expandir ${compartimento}` : `Colapsar ${compartimento}`}
                         >
                           <ChevronDown size={18} />
                         </button>
@@ -2992,6 +3006,7 @@ export default function ProjetoDetalhe() {
                                         cursor: 'pointer'
                                       }}
                                       title="Editar"
+                                      aria-label="Editar render"
                                     >
                                       <Edit size={12} />
                                     </button>
@@ -3005,6 +3020,7 @@ export default function ProjetoDetalhe() {
                                         borderRadius: '4px',
                                         cursor: 'pointer'
                                       }}
+                                      aria-label="Eliminar render"
                                     >
                                       <Trash2 size={12} />
                                     </button>
@@ -3119,6 +3135,7 @@ export default function ProjetoDetalhe() {
                       justifyContent: 'center'
                     }}
                     title="Remover das imagens finais"
+                    aria-label="Remover das imagens finais"
                   >
                     <X size={14} />
                   </button>
@@ -3239,16 +3256,22 @@ export default function ProjetoDetalhe() {
       {activeTab === 'gestao' && (
         <div>
           {/* Section navigation */}
-          <div style={{
-            display: 'flex',
-            gap: '8px',
-            marginBottom: '20px',
-            borderBottom: '1px solid var(--stone)',
-            paddingBottom: '12px'
-          }}>
+          <div
+            role="tablist"
+            aria-label="Sub-separadores gestão de projeto"
+            style={{
+              display: 'flex',
+              gap: '8px',
+              marginBottom: '20px',
+              borderBottom: '1px solid var(--stone)',
+              paddingBottom: '12px'
+            }}
+          >
             {gestaoSections.map(section => (
               <button
                 key={section.id}
+                role="tab"
+                aria-selected={activeGestaoSection === section.id}
                 onClick={() => handleSubtabChange(section.id, 'gestao')}
                 style={{
                   padding: '8px 16px',
@@ -3377,11 +3400,12 @@ export default function ProjetoDetalhe() {
               <h3 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--brown)' }}>
                 {uploadingDoc ? 'Anexar Proposta Assinada' : 'Adicionar Documento'}
               </h3>
-              <button 
+              <button
                 onClick={() => {
                   setShowUploadModal(false)
                   setUploadingDoc(null)
                 }}
+                aria-label="Fechar"
                 style={{
                   background: 'none',
                   border: 'none',
@@ -3429,6 +3453,7 @@ export default function ProjetoDetalhe() {
                 type="file"
                 accept=".pdf,application/pdf"
                 onChange={handleFileSelect}
+                aria-label="Selecionar ficheiro PDF"
                 style={{
                   position: 'absolute',
                   top: 0,
