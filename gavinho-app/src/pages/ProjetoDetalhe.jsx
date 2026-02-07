@@ -66,6 +66,8 @@ import {
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { useToast } from '../components/ui/Toast'
+import { ConfirmModal } from '../components/ui/ConfirmModal'
 import { jsPDF } from 'jspdf'
 import ProjetoEntregaveis from '../components/ProjetoEntregaveis'
 import ProjetoDocumentos from '../components/ProjetoDocumentos'
@@ -111,6 +113,8 @@ export default function ProjetoDetalhe() {
   const { id, tab: urlTab, subtab: urlSubtab } = useParams()
   const navigate = useNavigate()
   const { isAdmin, user } = useAuth()
+  const toast = useToast()
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null })
   const [activeTab, setActiveTab] = useState(urlTab || 'dashboard')
   const [showActions, setShowActions] = useState(false)
   const [showUploadModal, setShowUploadModal] = useState(false)
@@ -299,10 +303,10 @@ export default function ProjetoDetalhe() {
       }))
 
       setShowEditModal(false)
-      alert('Projeto atualizado com sucesso!')
+      toast.success('Sucesso', 'Projeto atualizado com sucesso!')
     } catch (err) {
       console.error('Erro ao guardar:', err)
-      alert(`Erro ao guardar: ${err.message || JSON.stringify(err)}`)
+      toast.error('Erro', `Erro ao guardar: ${err.message || JSON.stringify(err)}`)
     }
     
     setSaving(false)
@@ -370,23 +374,31 @@ export default function ProjetoDetalhe() {
       fetchEquipaProjeto(project.id)
     } catch (err) {
       console.error('Erro ao adicionar membro:', err)
-      alert(`Erro: ${err.message}`)
+      toast.error('Erro', err.message)
     }
   }
 
   // Remover membro da equipa
-  const handleRemoveMembro = async (membroId) => {
-    if (!confirm('Remover este membro da equipa?')) return
-    try {
-      const { error } = await supabase
-        .from('projeto_equipa')
-        .delete()
-        .eq('id', membroId)
-      if (error) throw error
-      fetchEquipaProjeto(project.id)
-    } catch (err) {
-      console.error('Erro ao remover:', err)
-    }
+  const handleRemoveMembro = (membroId) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Remover Membro',
+      message: 'Remover este membro da equipa?',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase
+            .from('projeto_equipa')
+            .delete()
+            .eq('id', membroId)
+          if (error) throw error
+          fetchEquipaProjeto(project.id)
+        } catch (err) {
+          console.error('Erro ao remover:', err)
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      }
+    })
   }
 
   // TIPOS_INTERVENIENTES agora importado de ../constants/projectConstants
@@ -452,7 +464,7 @@ export default function ProjetoDetalhe() {
       })
     } catch (err) {
       console.error('Erro ao salvar interveniente:', err)
-      alert(`Erro: ${err.message}`)
+      toast.error('Erro', err.message)
     }
   }
 
@@ -472,18 +484,26 @@ export default function ProjetoDetalhe() {
   }
 
   // Remover interveniente
-  const handleRemoveInterveniente = async (id) => {
-    if (!confirm('Remover este interveniente?')) return
-    try {
-      const { error } = await supabase
-        .from('projeto_intervenientes')
-        .delete()
-        .eq('id', id)
-      if (error) throw error
-      fetchIntervenientes(project.id)
-    } catch (err) {
-      console.error('Erro ao remover interveniente:', err)
-    }
+  const handleRemoveInterveniente = (id) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Remover Interveniente',
+      message: 'Remover este interveniente?',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase
+            .from('projeto_intervenientes')
+            .delete()
+            .eq('id', id)
+          if (error) throw error
+          fetchIntervenientes(project.id)
+        } catch (err) {
+          console.error('Erro ao remover interveniente:', err)
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      }
+    })
   }
 
   // Carregar fases contratuais
@@ -544,7 +564,7 @@ export default function ProjetoDetalhe() {
       })
     } catch (err) {
       console.error('Erro ao salvar fase:', err)
-      alert(`Erro: ${err.message}`)
+      toast.error('Erro', err.message)
     }
   }
 
@@ -593,18 +613,26 @@ export default function ProjetoDetalhe() {
   }
 
   // Remover fase
-  const handleRemoveFase = async (id) => {
-    if (!confirm('Remover esta fase?')) return
-    try {
-      const { error } = await supabase
-        .from('projeto_fases_contratuais')
-        .delete()
-        .eq('id', id)
-      if (error) throw error
-      fetchFasesContratuais(project.id)
-    } catch (err) {
-      console.error('Erro ao remover fase:', err)
-    }
+  const handleRemoveFase = (id) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Remover Fase',
+      message: 'Remover esta fase?',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase
+            .from('projeto_fases_contratuais')
+            .delete()
+            .eq('id', id)
+          if (error) throw error
+          fetchFasesContratuais(project.id)
+        } catch (err) {
+          console.error('Erro ao remover fase:', err)
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      }
+    })
   }
 
   // Guardar escopo de trabalho
@@ -623,7 +651,7 @@ export default function ProjetoDetalhe() {
       setEditingEscopo(false)
     } catch (err) {
       console.error('Erro ao guardar escopo:', err)
-      alert('Erro ao guardar escopo: ' + err.message)
+      toast.error('Erro', 'Erro ao guardar escopo: ' + err.message)
     } finally {
       setSavingEscopo(false)
     }
@@ -664,7 +692,7 @@ export default function ProjetoDetalhe() {
       }
     } catch (err) {
       console.error('Erro ao analisar escopo:', err)
-      alert('Erro ao analisar escopo: ' + err.message)
+      toast.error('Erro', 'Erro ao analisar escopo: ' + err.message)
     } finally {
       setAnalisandoEscopo(false)
     }
@@ -690,7 +718,7 @@ export default function ProjetoDetalhe() {
       }))
     } catch (err) {
       console.error('Erro ao adicionar fase:', err)
-      alert('Erro ao adicionar fase: ' + err.message)
+      toast.error('Erro', 'Erro ao adicionar fase: ' + err.message)
     }
   }
 
@@ -762,52 +790,59 @@ export default function ProjetoDetalhe() {
   }
 
   // Duplicar projeto
-  const handleDuplicate = async () => {
+  const handleDuplicate = () => {
     if (!project) return
-    if (!confirm('Deseja duplicar este projeto?')) return
+    setConfirmModal({
+      isOpen: true,
+      title: 'Duplicar Projeto',
+      message: 'Deseja duplicar este projeto?',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          // Gerar novo código
+          const { data: lastProject } = await supabase
+            .from('projetos')
+            .select('codigo')
+            .order('codigo', { ascending: false })
+            .limit(1)
 
-    try {
-      // Gerar novo código
-      const { data: lastProject } = await supabase
-        .from('projetos')
-        .select('codigo')
-        .order('codigo', { ascending: false })
-        .limit(1)
+          let nextNum = 1
+          if (lastProject && lastProject.length > 0) {
+            const match = lastProject[0].codigo.match(/GA(\d+)/)
+            if (match) nextNum = parseInt(match[1]) + 1
+          }
+          const newCode = `GA${String(nextNum).padStart(5, '0')}`
 
-      let nextNum = 1
-      if (lastProject && lastProject.length > 0) {
-        const match = lastProject[0].codigo.match(/GA(\d+)/)
-        if (match) nextNum = parseInt(match[1]) + 1
+          // Criar cópia do projeto
+          const { error } = await supabase
+            .from('projetos')
+            .insert({
+              codigo: newCode,
+              nome: `${project.nome} (cópia)`,
+              tipologia: project.tipologia,
+              subtipo: project.subtipo,
+              fase: 'Conceito',
+              status: 'on_track',
+              progresso: 0,
+              cliente_id: project.cliente_id,
+              morada: project.morada,
+              cidade: project.cidade,
+              pais: project.pais || 'Portugal',
+              data_inicio: new Date().toISOString().split('T')[0]
+            })
+
+          if (error) throw error
+
+          toast.success('Sucesso', `Projeto duplicado com sucesso! Novo código: ${newCode}`)
+          navigate(`/projetos/${newCode}`)
+        } catch (err) {
+          console.error('Erro ao duplicar:', err)
+          toast.error('Erro', `Erro ao duplicar: ${err.message}`)
+        }
+        setShowActions(false)
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
       }
-      const newCode = `GA${String(nextNum).padStart(5, '0')}`
-
-      // Criar cópia do projeto
-      const { error } = await supabase
-        .from('projetos')
-        .insert({
-          codigo: newCode,
-          nome: `${project.nome} (cópia)`,
-          tipologia: project.tipologia,
-          subtipo: project.subtipo,
-          fase: 'Conceito',
-          status: 'on_track',
-          progresso: 0,
-          cliente_id: project.cliente_id,
-          morada: project.morada,
-          cidade: project.cidade,
-          pais: project.pais || 'Portugal',
-          data_inicio: new Date().toISOString().split('T')[0]
-        })
-
-      if (error) throw error
-
-      alert(`Projeto duplicado com sucesso! Novo código: ${newCode}`)
-      navigate(`/projetos/${newCode}`)
-    } catch (err) {
-      console.error('Erro ao duplicar:', err)
-      alert(`Erro ao duplicar: ${err.message}`)
-    }
-    setShowActions(false)
+    })
   }
 
   // Partilhar projeto
@@ -820,7 +855,7 @@ export default function ProjetoDetalhe() {
       })
     } else {
       navigator.clipboard.writeText(url)
-      alert('Link copiado para a área de transferência!')
+      toast.success('Sucesso', 'Link copiado para a área de transferência!')
     }
     setShowActions(false)
   }
@@ -955,7 +990,7 @@ export default function ProjetoDetalhe() {
 
     } catch (err) {
       console.error('Erro ao gerar PDF:', err)
-      alert('Erro ao gerar PDF: ' + err.message)
+      toast.error('Erro', 'Erro ao gerar PDF: ' + err.message)
     }
     setShowActions(false)
   }
@@ -977,11 +1012,11 @@ export default function ProjetoDetalhe() {
 
       if (error) throw error
 
-      alert('Projeto eliminado com sucesso!')
+      toast.success('Sucesso', 'Projeto eliminado com sucesso!')
       navigate('/projetos')
     } catch (err) {
       console.error('Erro ao eliminar:', err)
-      alert(`Erro ao eliminar: ${err.message}. Verifique se não existem dados associados.`)
+      toast.error('Erro', `Erro ao eliminar: ${err.message}. Verifique se não existem dados associados.`)
     }
     setShowDeleteConfirm(false)
   }
@@ -1341,7 +1376,7 @@ export default function ProjetoDetalhe() {
   // Função para processar upload de ficheiro
   const handleFileUpload = (file) => {
     if (!file || file.type !== 'application/pdf') {
-      alert('Por favor selecione um ficheiro PDF.')
+      toast.warning('Aviso', 'Por favor selecione um ficheiro PDF.')
       return
     }
 
@@ -1446,7 +1481,7 @@ export default function ProjetoDetalhe() {
 
   const handleSaveRender = async () => {
     if (!renderForm.compartimento) {
-      alert('Por favor selecione um compartimento')
+      toast.warning('Aviso', 'Por favor selecione um compartimento')
       return
     }
 
@@ -1501,7 +1536,7 @@ export default function ProjetoDetalhe() {
           .single()
 
         if (error) {
-          alert('Erro ao guardar render: ' + error.message)
+          toast.error('Erro', 'Erro ao guardar render: ' + error.message)
           return
         }
         setRenders(prev => [...prev, data])
@@ -1510,24 +1545,31 @@ export default function ProjetoDetalhe() {
       setShowRenderModal(false)
       setEditingRender(null)
     } catch (err) {
-      alert('Erro ao guardar render: ' + err.message)
+      toast.error('Erro', 'Erro ao guardar render: ' + err.message)
     }
   }
 
-  const handleDeleteRender = async (render) => {
-    if (!confirm('Tem certeza que deseja eliminar este render?')) return
+  const handleDeleteRender = (render) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar Render',
+      message: 'Tem certeza que deseja eliminar este render?',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase
+            .from('projeto_renders')
+            .delete()
+            .eq('id', render.id)
 
-    try {
-      const { error } = await supabase
-        .from('projeto_renders')
-        .delete()
-        .eq('id', render.id)
-
-      if (error) throw error
-      setRenders(prev => prev.filter(r => r.id !== render.id))
-    } catch (err) {
-      alert('Erro ao eliminar: ' + err.message)
-    }
+          if (error) throw error
+          setRenders(prev => prev.filter(r => r.id !== render.id))
+        } catch (err) {
+          toast.error('Erro', 'Erro ao eliminar: ' + err.message)
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      }
+    })
   }
 
   const toggleFinalImage = async (render) => {
@@ -1544,7 +1586,7 @@ export default function ProjetoDetalhe() {
         r.id === render.id ? { ...r, is_final: newIsFinal } : r
       ))
     } catch (err) {
-      alert('Erro ao atualizar: ' + err.message)
+      toast.error('Erro', 'Erro ao atualizar: ' + err.message)
     }
   }
 
@@ -1556,7 +1598,7 @@ export default function ProjetoDetalhe() {
 
   const processImageFile = (file) => {
     if (!file.type.startsWith('image/')) {
-      alert('Por favor selecione um ficheiro de imagem válido')
+      toast.warning('Aviso', 'Por favor selecione um ficheiro de imagem válido')
       return
     }
     // Simular upload - em produção, fazer upload para Supabase Storage
@@ -3517,6 +3559,16 @@ export default function ProjetoDetalhe() {
           }}
         />
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type || 'danger'}
+        confirmText="Confirmar"
+      />
 
     </div>
   )

@@ -10,6 +10,8 @@ import {
 } from 'lucide-react'
 import ObraChat from '../components/ObraChat'
 import ObraChecklist from '../components/ObraChecklist'
+import { useToast } from '../components/ui/Toast'
+import { ConfirmModal } from '../components/ui/ConfirmModal'
 
 // ============================================
 // CONFIGURAÇÃO DAS TABS PRINCIPAIS
@@ -83,6 +85,8 @@ const colors = {
 export default function ObraDetalhe() {
   const { id, tab: urlTab } = useParams()
   const navigate = useNavigate()
+  const toast = useToast()
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null })
 
   // Estados principais
   const [obra, setObra] = useState(null)
@@ -553,7 +557,7 @@ export default function ObraDetalhe() {
       setShowNewVersionModal(false)
     } catch (err) {
       console.error('Erro ao criar versão:', err)
-      alert('Erro ao criar nova versão')
+      toast.error('Erro', 'Erro ao criar nova versão')
     } finally {
       setSaving(false)
     }
@@ -607,19 +611,25 @@ export default function ObraDetalhe() {
   }
 
   const deleteMqtLine = async (lineId) => {
-    if (!confirm('Eliminar esta linha?')) return
-
-    try {
-      const { error } = await supabase
-        .from('mqt_linhas')
-        .delete()
-        .eq('id', lineId)
-
-      if (error) throw error
-      setMqtLinhas(mqtLinhas.filter(l => l.id !== lineId))
-    } catch (err) {
-      console.error('Erro ao eliminar linha:', err)
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar Linha',
+      message: 'Eliminar esta linha do MQT?',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase
+            .from('mqt_linhas')
+            .delete()
+            .eq('id', lineId)
+          if (error) throw error
+          setMqtLinhas(mqtLinhas.filter(l => l.id !== lineId))
+        } catch (err) {
+          console.error('Erro ao eliminar linha:', err)
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      }
+    })
   }
 
   // ============================================
@@ -1384,9 +1394,17 @@ export default function ObraDetalhe() {
               }
             }}
             onDelete={async (id) => {
-              if (!confirm('Eliminar esta linha?')) return
-              const { error } = await supabase.from('orcamento_linhas').delete().eq('id', id)
-              if (!error) setOrcamentoLinhas(orcamentoLinhas.filter(l => l.id !== id))
+              setConfirmModal({
+                isOpen: true,
+                title: 'Eliminar Linha',
+                message: 'Eliminar esta linha do orçamento?',
+                type: 'danger',
+                onConfirm: async () => {
+                  const { error } = await supabase.from('orcamento_linhas').delete().eq('id', id)
+                  if (!error) setOrcamentoLinhas(orcamentoLinhas.filter(l => l.id !== id))
+                  setConfirmModal(prev => ({ ...prev, isOpen: false }))
+                }
+              })
             }}
             onAdd={async () => {
               const newOrder = orcamentoLinhas.length > 0 ? Math.max(...orcamentoLinhas.map(l => l.ordem)) + 1 : 1
@@ -2173,6 +2191,18 @@ export default function ObraDetalhe() {
           </div>
         )}
       </div>
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type || 'danger'}
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+      />
 
       {/* Modal Nova Compra */}
       {showNewCompraModal && (

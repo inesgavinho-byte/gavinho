@@ -272,11 +272,11 @@ import {
 - [x] Remover console.logs de ProjetoArchviz.jsx
 - [x] Remover console.logs de ProjetoDetalhe.jsx
 - [x] Remover console.logs de Workspace.jsx
-- [ ] Implementar handler "Criar Orçamento do MQT"
-- [ ] Implementar handler "Nova POP"
-- [ ] Implementar handler "Nova Compra"
-- [ ] Implementar handler "Registar Execução"
-- [ ] Implementar handler "Novo Auto"
+- [x] Implementar handler "Criar Orçamento do MQT"
+- [x] Implementar handler "Nova POP"
+- [x] Implementar handler "Nova Compra"
+- [x] Implementar handler "Registar Execução"
+- [x] Implementar handler "Novo Auto"
 - [x] Remover mock data do Dashboard
 - [x] Remover mock data do Workspace
 - [x] Adicionar validação de tamanho de ficheiro
@@ -284,8 +284,9 @@ import {
 
 ### Fase 2
 - [x] Criar componente ConfirmModal
-- [ ] Substituir alert() por ConfirmModal
-- [ ] Substituir confirm() por ConfirmModal
+- [x] Substituir alert() por Toast/ConfirmModal (5 ficheiros prioritários)
+- [x] Substituir confirm() por ConfirmModal (5 ficheiros prioritários)
+- [ ] Substituir alert()/confirm() nos restantes ficheiros (~55 ficheiros)
 - [ ] Adicionar loading states em tabs
 - [ ] Adicionar loading states em modais
 - [x] Otimizar queries com JOINs

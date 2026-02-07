@@ -14,6 +14,8 @@ import {
 } from 'lucide-react'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
+import { useToast } from './ui/Toast'
+import { ConfirmModal } from './ui/ConfirmModal'
 
 // Status config
 const statusConfig = {
@@ -606,6 +608,7 @@ function AcoesEditor({ acoes, onChange }) {
 function AtaPreview({ ata, projeto, onClose }) {
   const printRef = useRef(null)
   const [exporting, setExporting] = useState(false)
+  const toast = useToast()
 
   const handlePrint = () => {
     const printContent = printRef.current
@@ -686,7 +689,7 @@ function AtaPreview({ ata, projeto, onClose }) {
       pdf.save(`Ata_${ata.numero_ata}_${projeto.codigo || projeto.nome}.pdf`)
     } catch (err) {
       console.error('Erro ao exportar PDF:', err)
-      alert('Erro ao exportar PDF')
+      toast.error('Erro', 'Erro ao exportar PDF')
     } finally {
       setExporting(false)
     }
@@ -968,6 +971,8 @@ export default function ProjetoAtas({ projeto }) {
   const [previewAta, setPreviewAta] = useState(null)
   const [saving, setSaving] = useState(false)
   const [expandedAta, setExpandedAta] = useState(null)
+  const toast = useToast()
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null })
 
   const [formData, setFormData] = useState({
     titulo: '',
@@ -1062,7 +1067,7 @@ export default function ProjetoAtas({ projeto }) {
 
   const handleSave = async () => {
     if (!formData.titulo.trim() || !formData.data_reuniao) {
-      alert('Preencha o titulo e a data da reuniao')
+      toast.warning('Aviso', 'Preencha o titulo e a data da reuniao')
       return
     }
 
@@ -1094,27 +1099,35 @@ export default function ProjetoAtas({ projeto }) {
       resetForm()
     } catch (err) {
       console.error('Erro ao guardar ata:', err)
-      alert('Erro ao guardar ata: ' + err.message)
+      toast.error('Erro', 'Erro ao guardar ata: ' + err.message)
     } finally {
       setSaving(false)
     }
   }
 
   const handleDelete = async (ata) => {
-    if (!confirm('Tem certeza que deseja eliminar esta ata?')) return
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar Ata',
+      message: 'Tem certeza que deseja eliminar esta ata?',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase
+            .from('projeto_atas')
+            .delete()
+            .eq('id', ata.id)
 
-    try {
-      const { error } = await supabase
-        .from('projeto_atas')
-        .delete()
-        .eq('id', ata.id)
-
-      if (error) throw error
-      await loadAtas()
-    } catch (err) {
-      console.error('Erro ao eliminar ata:', err)
-      alert('Erro ao eliminar ata')
-    }
+          if (error) throw error
+          await loadAtas()
+        } catch (err) {
+          console.error('Erro ao eliminar ata:', err)
+          toast.error('Erro', 'Erro ao eliminar ata')
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      }
+    })
+    return
   }
 
   const addOrdemDia = () => {
@@ -1872,6 +1885,16 @@ export default function ProjetoAtas({ projeto }) {
           onClose={() => setPreviewAta(null)}
         />
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type || 'danger'}
+        confirmText="Confirmar"
+      />
     </div>
   )
 }
