@@ -994,16 +994,14 @@ export default function ChatProjetos() {
   }
 
   return (
-    <div className="fade-in" style={{ height: 'calc(100vh - 80px)', display: 'flex', flexDirection: 'column' }}>
+    <div className="fade-in" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div style={{
         flex: 1,
         display: 'grid',
         gridTemplateColumns: '280px 1fr',
         minHeight: 0,
         background: 'var(--white)',
-        borderRadius: '12px',
-        overflow: 'hidden',
-        border: '1px solid var(--stone)'
+        overflow: 'hidden'
       }}>
         {/* Sidebar - Projetos */}
         <div style={{
