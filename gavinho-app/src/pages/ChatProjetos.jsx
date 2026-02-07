@@ -887,7 +887,7 @@ export default function ChatProjetos() {
     try {
       await supabase
         .from('chat_mensagens')
-        .update({ conteudo: novaMensagem.trim() })
+        .update({ conteudo: novaMensagem.trim(), updated_at: new Date().toISOString() })
         .eq('id', editingMessage.id)
 
       setEditingMessage(null)
@@ -1342,9 +1342,10 @@ export default function ChatProjetos() {
                       background: isGarvis ? 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%)' : 'transparent',
                       border: isGarvis ? '1px solid rgba(99, 102, 241, 0.2)' : 'none',
                       marginLeft: isGarvis ? '0' : undefined,
-                      marginRight: isGarvis ? '0' : undefined
+                      marginRight: isGarvis ? '0' : undefined,
+                      position: 'relative'
                     }}
-                    className={isGarvis ? 'garvis-message' : 'message-hover'}
+                    className={isGarvis ? 'garvis-message' : 'chat-message'}
                     >
                       {showAuthor ? (
                         <div style={{ position: 'relative', flexShrink: 0 }}>
@@ -1422,10 +1423,17 @@ export default function ChatProjetos() {
                             <span style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
                               {formatDate(msg.created_at)}
                             </span>
+                            {msg.updated_at && msg.updated_at !== msg.created_at && !msg.eliminado && (
+                              <span style={{ fontSize: '10px', color: 'var(--brown-light)', fontStyle: 'italic' }}>(editado)</span>
+                            )}
                           </div>
                         )}
                         
-                        {msg.tipo === 'imagem' ? (
+                        {msg.eliminado ? (
+                          <div style={{ fontSize: '13px', color: 'var(--brown-light)', fontStyle: 'italic', opacity: 0.6 }}>
+                            Esta mensagem foi eliminada
+                          </div>
+                        ) : msg.tipo === 'imagem' ? (
                           <a href={msg.ficheiro_url} target="_blank" rel="noopener noreferrer">
                             <img 
                               src={msg.ficheiro_url} 
@@ -1499,11 +1507,14 @@ export default function ChatProjetos() {
                         )}
                       </div>
 
-                      <div className="message-actions" style={{
-                        display: 'none',
+                      <div className="chat-message-actions" style={{
+                        display: 'flex',
                         gap: '2px',
-                        opacity: 0,
-                        transition: 'opacity 0.15s'
+                        padding: '4px 6px',
+                        background: 'white',
+                        borderRadius: '8px',
+                        border: '1px solid var(--stone)',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
                       }}>
                         {REACTION_EMOJIS.slice(0, 4).map(emoji => (
                           <button
@@ -1514,15 +1525,20 @@ export default function ChatProjetos() {
                               border: 'none',
                               cursor: 'pointer',
                               padding: '4px',
-                              fontSize: '14px'
+                              fontSize: '14px',
+                              borderRadius: '4px'
                             }}
+                            className="hover-bg"
                           >
                             {emoji}
                           </button>
                         ))}
+                        <div style={{ width: '1px', background: 'var(--stone)', margin: '2px 2px' }} />
                         <button
                           onClick={() => setReplyTo(msg)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--brown-light)' }}
+                          title="Responder"
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--brown-light)', borderRadius: '4px' }}
+                          className="hover-bg"
                         >
                           <Reply size={14} />
                         </button>
@@ -1530,13 +1546,17 @@ export default function ChatProjetos() {
                           <>
                             <button
                               onClick={() => startEditMessage(msg)}
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--brown-light)' }}
+                              title="Editar"
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--brown-light)', borderRadius: '4px' }}
+                              className="hover-bg"
                             >
                               <Edit size={14} />
                             </button>
                             <button
                               onClick={() => handleEliminarMensagem(msg)}
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#ef4444' }}
+                              title="Eliminar"
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#ef4444', borderRadius: '4px' }}
+                              className="hover-bg"
                             >
                               <Trash2 size={14} />
                             </button>
