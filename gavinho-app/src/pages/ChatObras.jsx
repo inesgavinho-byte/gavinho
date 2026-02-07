@@ -689,10 +689,106 @@ export default function ChatObras() {
         })
         .eq('id', id)
 
-      // TODO: Criar entidade correspondente (requisição, tarefa, etc.)
-      // Dependendo do tipo, criar na tabela apropriada
+      // Criar entidade correspondente na tabela apropriada
+      let entidadeCriadaId = null
+      const obraId = selectedObra?.id
+
+      if (tipo === 'materiais') {
+        const suggestion = aiSuggestions?.materiais?.find(s => s.id === id)
+        if (suggestion && obraId) {
+          const { data } = await supabase
+            .from('requisicoes_materiais')
+            .insert({
+              obra_id: obraId,
+              descricao: suggestion.material,
+              quantidade: suggestion.quantidade,
+              unidade: suggestion.unidade,
+              urgencia: suggestion.urgente ? 'alta' : 'normal',
+              estado: 'pendente'
+            })
+            .select('id')
+            .single()
+          entidadeCriadaId = data?.id
+        }
+      } else if (tipo === 'horas') {
+        const suggestion = aiSuggestions?.horas?.find(s => s.id === id)
+        if (suggestion && obraId) {
+          const { data } = await supabase
+            .from('obra_diario')
+            .insert({
+              obra_id: obraId,
+              data: suggestion.data || new Date().toISOString().split('T')[0],
+              mao_obra_propria: suggestion.pessoas || 0,
+              descricao: suggestion.texto,
+              notas: `Horas totais: ${suggestion.horasTotal || suggestion.horas || 0}`
+            })
+            .select('id')
+            .single()
+          entidadeCriadaId = data?.id
+        }
+      } else if (tipo === 'tarefas') {
+        const suggestion = aiSuggestions?.tarefas?.find(s => s.id === id)
+        if (suggestion && obraId) {
+          const { data } = await supabase
+            .from('tarefas')
+            .insert({
+              obra_id: obraId,
+              titulo: suggestion.tarefa,
+              descricao: suggestion.texto,
+              prioridade: suggestion.prioridade || 'media',
+              status: 'pendente',
+              origem_tipo: 'sistema'
+            })
+            .select('id')
+            .single()
+          entidadeCriadaId = data?.id
+        }
+      } else if (tipo === 'naoConformidades') {
+        const suggestion = aiSuggestions?.naoConformidades?.find(s => s.id === id)
+        if (suggestion && obraId) {
+          const { data } = await supabase
+            .from('nao_conformidades')
+            .insert({
+              obra_id: obraId,
+              codigo: `NC-${Date.now()}`,
+              titulo: suggestion.descricao,
+              descricao: suggestion.texto,
+              gravidade: suggestion.gravidade || 'menor',
+              estado: 'aberta'
+            })
+            .select('id')
+            .single()
+          entidadeCriadaId = data?.id
+        }
+      } else if (tipo === 'trabalhos') {
+        const suggestion = aiSuggestions?.trabalhos?.find(s => s.id === id)
+        if (suggestion && obraId) {
+          const { data } = await supabase
+            .from('obras_execucao')
+            .insert({
+              obra_id: obraId,
+              percentagem_execucao: suggestion.percentagem || 0,
+              data_registo: new Date().toISOString().split('T')[0],
+              notas: suggestion.trabalho
+            })
+            .select('id')
+            .single()
+          entidadeCriadaId = data?.id
+        }
+      }
+
+      // Guardar referência da entidade criada
+      if (entidadeCriadaId) {
+        await supabase
+          .from('ia_sugestoes')
+          .update({ entidade_criada_id: entidadeCriadaId })
+          .eq('id', id)
+      }
+
+      toast.success('Sugestão aceite', 'Entidade criada com sucesso')
     } catch (err) {
       console.error('Erro ao aceitar sugestão:', err)
+      toast.error('Erro', 'Não foi possível processar a sugestão')
     }
   }
 

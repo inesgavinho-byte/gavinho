@@ -820,11 +820,31 @@ export default function Workspace() {
     setShowMessageMenu(null)
   }
 
-  const handleCreateTask = (taskData) => {
-    // TODO: In production, would insert into tasks table
-    setShowCreateTaskModal(false)
-    setTaskFromMessage(null)
-    toastSuccess('Tarefa criada com sucesso!')
+  const handleCreateTask = async (taskData) => {
+    try {
+      const { error } = await supabase
+        .from('tarefas')
+        .insert({
+          titulo: taskData.titulo,
+          descricao: taskData.descricao,
+          prioridade: taskData.prioridade || 'media',
+          data_limite: taskData.prazo || null,
+          status: 'pendente',
+          categoria: 'geral',
+          origem_tipo: taskData.mensagem_origem ? 'manual' : 'manual',
+          origem_id: taskData.mensagem_origem || null,
+          criado_por_id: profile?.id
+        })
+
+      if (error) throw error
+
+      setShowCreateTaskModal(false)
+      setTaskFromMessage(null)
+      toastSuccess('Tarefa criada com sucesso!')
+    } catch (err) {
+      console.error('Erro ao criar tarefa:', err)
+      toastError('Erro ao criar tarefa')
+    }
   }
 
   // ========== FORWARD MESSAGE ==========
@@ -834,15 +854,36 @@ export default function Workspace() {
     setShowMessageMenu(null)
   }
 
-  const handleForwardMessage = (targetChannelId) => {
+  const handleForwardMessage = async (targetChannelId) => {
     if (!messageToForward) return
 
     const targetChannel = canais.find(c => c.id === targetChannelId)
 
-    // TODO: In production, would insert forwarded message
-    setShowForwardModal(false)
-    setMessageToForward(null)
-    toastSuccess(`Mensagem reencaminhada para ${targetChannel?.nome}`)
+    try {
+      const { error } = await supabase
+        .from('chat_mensagens')
+        .insert({
+          canal_id: targetChannelId,
+          autor_id: profile?.id,
+          conteudo: messageToForward.conteudo,
+          tipo: messageToForward.imagem_url ? 'imagem' : 'texto',
+          imagem_url: messageToForward.imagem_url || null,
+          metadata: {
+            forwarded: true,
+            forwarded_from_id: messageToForward.id,
+            forwarded_from_autor: messageToForward.autor?.nome
+          }
+        })
+
+      if (error) throw error
+
+      setShowForwardModal(false)
+      setMessageToForward(null)
+      toastSuccess(`Mensagem reencaminhada para ${targetChannel?.nome}`)
+    } catch (err) {
+      console.error('Erro ao reencaminhar mensagem:', err)
+      toastError('Erro ao reencaminhar mensagem')
+    }
   }
 
   // ========== DRAG & DROP FILES ==========
@@ -1143,11 +1184,32 @@ export default function Workspace() {
     setShowMessageMenu(null)
   }
 
-  const createMeeting = () => {
-    // TODO: In production, would integrate with Google Calendar/Outlook
-    toastSuccess(`Reunião "${meetingDetails.title}" agendada para ${meetingDetails.date} às ${meetingDetails.time}`, 'Reunião agendada')
-    setShowScheduleMeetingModal(false)
-    setMeetingDetails({ title: '', date: '', time: '', duration: '30', participants: [], description: '' })
+  const createMeeting = async () => {
+    try {
+      const dataInicio = new Date(`${meetingDetails.date}T${meetingDetails.time}:00`)
+      const dataFim = new Date(dataInicio.getTime() + parseInt(meetingDetails.duration) * 60000)
+
+      const { error } = await supabase
+        .from('calendario_eventos')
+        .insert({
+          titulo: meetingDetails.title,
+          descricao: meetingDetails.description || null,
+          tipo: 'reuniao',
+          data_inicio: dataInicio.toISOString(),
+          data_fim: dataFim.toISOString(),
+          criado_por: profile?.id,
+          notificar: true
+        })
+
+      if (error) throw error
+
+      toastSuccess(`Reunião "${meetingDetails.title}" agendada para ${meetingDetails.date} às ${meetingDetails.time}`, 'Reunião agendada')
+      setShowScheduleMeetingModal(false)
+      setMeetingDetails({ title: '', date: '', time: '', duration: '30', participants: [], description: '' })
+    } catch (err) {
+      console.error('Erro ao agendar reunião:', err)
+      toastError('Erro ao agendar reunião')
+    }
   }
 
   // ========== AI ASSISTANT ==========

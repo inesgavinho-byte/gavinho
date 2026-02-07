@@ -89,9 +89,21 @@ export default function Finance() {
       if (projError) throw projError
 
       // 2. Buscar custos agregados por capítulo (view)
-      const { data: custosView, error: custosError } = await supabase
+      const { data: custosView } = await supabase
         .from('v_custos_por_capitulo')
         .select('*')
+
+      // 2b. Buscar faturas para calcular valores faturados
+      const { data: faturasData } = await supabase
+        .from('faturas')
+        .select('projeto_id, total, estado')
+        .in('estado', ['emitida', 'paga'])
+
+      // 2c. Buscar pagamentos recebidos
+      const { data: pagamentosData } = await supabase
+        .from('projeto_pagamentos')
+        .select('projeto_id, valor, estado')
+        .eq('estado', 'pago')
 
       // 3. Buscar fornecedores ativos
       const { data: forns, error: fornError } = await supabase
@@ -183,8 +195,12 @@ export default function Finance() {
           },
           faturacao: {
             contratado: orcamentoAtual,
-            faturado: 0, // TODO: implementar quando tiver tabela de faturação
-            recebido: 0
+            faturado: (faturasData || [])
+              .filter(f => f.projeto_id === projeto.id)
+              .reduce((sum, f) => sum + parseFloat(f.total || 0), 0),
+            recebido: (pagamentosData || [])
+              .filter(p => p.projeto_id === projeto.id)
+              .reduce((sum, p) => sum + parseFloat(p.valor || 0), 0)
           },
           margem: {
             prevista: margemTarget,

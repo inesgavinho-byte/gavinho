@@ -63,6 +63,8 @@ const ObraApp = lazy(() => import('./pages/ObraApp'))
 
 // Placeholder (small, can be lazy)
 const PlaceholderPage = lazy(() => import('./pages/PlaceholderPage'))
+const ColaboradorDetalhe = lazy(() => import('./pages/ColaboradorDetalhe'))
+const Configuracoes = lazy(() => import('./pages/Configuracoes'))
 
 // =====================================================
 // LOADING FALLBACK COMPONENT
@@ -299,7 +301,7 @@ function App() {
                   } />
                   <Route path="equipa/:id" element={
                     <Suspense fallback={<PageLoader />}>
-                      <PlaceholderPage title="Perfil do Colaborador" subtitle="Informações e alocações" />
+                      <ColaboradorDetalhe />
                     </Suspense>
                   } />
                   <Route path="gestao-obras" element={
@@ -394,7 +396,7 @@ function App() {
                   } />
                   <Route path="configuracoes" element={
                     <Suspense fallback={<PageLoader />}>
-                      <PlaceholderPage title="Configurações" subtitle="Definições da plataforma" />
+                      <Configuracoes />
                     </Suspense>
                   } />
                   <Route path="admin/seed" element={
