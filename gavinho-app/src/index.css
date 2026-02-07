@@ -338,13 +338,13 @@ h4 { font-size: 17px; }
 }
 
 .nav-section-title {
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 10px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--brown-light);
+  letter-spacing: 1px;
+  color: var(--blush-dark);
   padding: 0 12px;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .nav-item {
@@ -363,13 +363,15 @@ h4 { font-size: 17px; }
 }
 
 .nav-item:hover {
-  background: rgba(195, 186, 175, 0.2);
+  background: rgba(122, 139, 110, 0.12);
+  color: var(--accent-olive-dark);
 }
 
 .nav-item.active {
-  background: rgba(195, 186, 175, 0.35);
-  color: var(--brown);
+  background: var(--accent-olive);
+  color: var(--white);
   font-weight: 600;
+  box-shadow: 0 2px 8px rgba(122, 139, 110, 0.3);
 }
 
 .nav-item svg {
@@ -379,6 +381,10 @@ h4 { font-size: 17px; }
   stroke-width: 1.75;
   fill: none;
   flex-shrink: 0;
+}
+
+.nav-item.active svg {
+  stroke: var(--white);
 }
 
 .nav-item-badge {
@@ -392,8 +398,8 @@ h4 { font-size: 17px; }
 }
 
 .nav-item.active .nav-item-badge {
-  background: var(--blush);
-  color: var(--brown-dark);
+  background: rgba(255, 255, 255, 0.25);
+  color: var(--white);
 }
 
 .sidebar-footer {
@@ -1435,13 +1441,13 @@ tbody tr:last-child td {
 }
 
 .sidebar.collapsed .nav-item:hover {
-  background: rgba(195, 186, 175, 0.3);
+  background: rgba(122, 139, 110, 0.15);
 }
 
 .sidebar.collapsed .nav-item.active {
-  background: var(--brown);
+  background: var(--accent-olive);
   color: var(--white);
-  box-shadow: 0 2px 8px rgba(139, 115, 85, 0.3);
+  box-shadow: 0 2px 8px rgba(122, 139, 110, 0.35);
 }
 
 .sidebar.collapsed .nav-item span:not(.nav-tooltip) {
@@ -1621,17 +1627,19 @@ tbody tr:last-child td {
 
 /* Nav item highlight (Workspace) - expanded mode */
 .nav-item.nav-item-highlight {
-  background: rgba(139, 155, 123, 0.15);
+  background: rgba(122, 139, 110, 0.1);
   border-left: 3px solid var(--accent-olive);
 }
 
 .nav-item.nav-item-highlight:hover {
-  background: rgba(139, 155, 123, 0.25);
+  background: rgba(122, 139, 110, 0.2);
 }
 
 .nav-item.nav-item-highlight.active {
-  background: rgba(139, 155, 123, 0.35);
-  color: var(--accent-olive);
+  background: var(--accent-olive-dark);
+  color: var(--white);
+  border-left: 3px solid var(--accent-olive-dark);
+  box-shadow: 0 2px 8px rgba(107, 122, 95, 0.35);
 }
 
 /* Nav item highlight (Workspace) - collapsed mode */
@@ -1653,8 +1661,9 @@ tbody tr:last-child td {
 
 /* Sidebar collapse button hover */
 .sidebar-collapse-btn:hover {
-  background: var(--cream) !important;
-  color: var(--brown) !important;
+  background: var(--accent-olive) !important;
+  color: var(--white) !important;
+  border-color: var(--accent-olive) !important;
 }
 
 /* ========================================
