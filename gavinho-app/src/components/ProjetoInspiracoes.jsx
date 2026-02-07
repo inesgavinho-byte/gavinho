@@ -185,7 +185,7 @@ export default function ProjetoInspiracoes({ projeto, userId, userName }) {
             Inspirações & Referências
           </h3>
           <p style={{ fontSize: '13px', color: 'var(--brown-light)', margin: '4px 0 0' }}>
-            {inspiracoes.length} imagem{inspiracoes.length !== 1 ? 'ns' : ''} em {Object.keys(grouped).length} categoria{Object.keys(grouped).length !== 1 ? 's' : ''}
+            {inspiracoes.length} {inspiracoes.length !== 1 ? 'imagens' : 'imagem'} em {Object.keys(grouped).length} {Object.keys(grouped).length !== 1 ? 'categorias' : 'categoria'}
           </p>
         </div>
         <button
@@ -311,8 +311,13 @@ export default function ProjetoInspiracoes({ projeto, userId, userName }) {
                     src={insp.imagem_url}
                     alt={insp.titulo || 'Inspiração'}
                     onClick={() => setLightboxImage(insp)}
-                    style={{ width: '100%', height: '160px', objectFit: 'cover', display: 'block' }}
+                    style={{ width: '100%', height: '160px', objectFit: 'cover', display: 'block', background: 'var(--stone-light, #f0ebe5)' }}
                     loading="lazy"
+                    onError={e => {
+                      e.target.style.objectFit = 'contain'
+                      e.target.style.padding = '20px'
+                      e.target.src = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none"><rect width="100" height="100" fill="%23f0ebe5"/><path d="M35 65L45 50L55 60L60 55L70 65H35Z" fill="%23c4b5a4" opacity="0.5"/><circle cx="40" cy="40" r="5" fill="%23c4b5a4" opacity="0.5"/></svg>')
+                    }}
                   />
                   {/* Overlay actions */}
                   <div style={{
