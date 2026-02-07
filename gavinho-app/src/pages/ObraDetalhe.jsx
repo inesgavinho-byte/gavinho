@@ -6,7 +6,7 @@ import {
   ChevronDown, Check, X, FileText, Calculator, Receipt, ShoppingCart,
   TrendingUp, ClipboardList, Building2, MapPin, Calendar, Users, HardHat,
   AlertTriangle, Eye, Send, FileCheck, MoreVertical, Camera, BookOpen,
-  Shield, Truck, Grid3X3, BarChart3, MessageSquare, CheckSquare
+  Shield, Truck, Grid3X3, BarChart3, MessageSquare, CheckSquare, Loader2
 } from 'lucide-react'
 import ObraChat from '../components/ObraChat'
 import ObraChecklist from '../components/ObraChecklist'
@@ -97,6 +97,7 @@ export default function ObraDetalhe() {
   const [activeFiscalizacaoSubtab, setActiveFiscalizacaoSubtab] = useState('hso')
   const [activeEquipasSubtab, setActiveEquipasSubtab] = useState('equipa')
   const [saving, setSaving] = useState(false)
+  const [tabLoading, setTabLoading] = useState(false)
   const [checklistCount, setChecklistCount] = useState(0)
   const [showChecklist, setShowChecklist] = useState(false)
   const [currentUser, setCurrentUser] = useState(null)
@@ -219,27 +220,32 @@ export default function ObraDetalhe() {
   }
 
   const loadTabData = async () => {
-    if (activeMainTab === 'tracking') {
-      switch (activeTrackingSubtab) {
-        case 'mqt':
-          await fetchMqtVersoes()
-          break
-        case 'orcamento':
-          await fetchOrcamentos()
-          break
-        case 'pops':
-          await fetchPops()
-          break
-        case 'compras':
-          await fetchCompras()
-          break
-        case 'execucao':
-          await fetchExecucao()
-          break
-        case 'autos':
-          await fetchAutos()
-          break
+    setTabLoading(true)
+    try {
+      if (activeMainTab === 'tracking') {
+        switch (activeTrackingSubtab) {
+          case 'mqt':
+            await fetchMqtVersoes()
+            break
+          case 'orcamento':
+            await fetchOrcamentos()
+            break
+          case 'pops':
+            await fetchPops()
+            break
+          case 'compras':
+            await fetchCompras()
+            break
+          case 'execucao':
+            await fetchExecucao()
+            break
+          case 'autos':
+            await fetchAutos()
+            break
+        }
       }
+    } finally {
+      setTabLoading(false)
     }
   }
 
@@ -2106,12 +2112,24 @@ export default function ObraDetalhe() {
         )}
 
         {/* Tracking Sub-tabs Content */}
-        {activeMainTab === 'tracking' && activeTrackingSubtab === 'mqt' && renderMqtTab()}
-        {activeMainTab === 'tracking' && activeTrackingSubtab === 'orcamento' && renderOrcamentoTab()}
-        {activeMainTab === 'tracking' && activeTrackingSubtab === 'pops' && renderPopsTab()}
-        {activeMainTab === 'tracking' && activeTrackingSubtab === 'compras' && renderComprasTab()}
-        {activeMainTab === 'tracking' && activeTrackingSubtab === 'execucao' && renderExecucaoTab()}
-        {activeMainTab === 'tracking' && activeTrackingSubtab === 'autos' && renderAutosTab()}
+        {activeMainTab === 'tracking' && tabLoading && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '48px',
+            color: colors.textMuted
+          }}>
+            <Loader2 size={24} className="spin" style={{ marginRight: '12px' }} />
+            A carregar dados...
+          </div>
+        )}
+        {activeMainTab === 'tracking' && !tabLoading && activeTrackingSubtab === 'mqt' && renderMqtTab()}
+        {activeMainTab === 'tracking' && !tabLoading && activeTrackingSubtab === 'orcamento' && renderOrcamentoTab()}
+        {activeMainTab === 'tracking' && !tabLoading && activeTrackingSubtab === 'pops' && renderPopsTab()}
+        {activeMainTab === 'tracking' && !tabLoading && activeTrackingSubtab === 'compras' && renderComprasTab()}
+        {activeMainTab === 'tracking' && !tabLoading && activeTrackingSubtab === 'execucao' && renderExecucaoTab()}
+        {activeMainTab === 'tracking' && !tabLoading && activeTrackingSubtab === 'autos' && renderAutosTab()}
 
         {/* Acompanhamento - Placeholder */}
         {activeMainTab === 'acompanhamento' && (

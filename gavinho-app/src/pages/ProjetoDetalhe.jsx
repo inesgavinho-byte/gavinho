@@ -420,6 +420,7 @@ export default function ProjetoDetalhe() {
   // Adicionar/Editar interveniente
   const handleSaveInterveniente = async () => {
     if (!project?.id || !intervenienteForm.tipo) return
+    setSaving(true)
     try {
       if (editingInterveniente) {
         const { error } = await supabase
@@ -465,6 +466,8 @@ export default function ProjetoDetalhe() {
     } catch (err) {
       console.error('Erro ao salvar interveniente:', err)
       toast.error('Erro', err.message)
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -523,6 +526,7 @@ export default function ProjetoDetalhe() {
   // Salvar fase contratual
   const handleSaveFase = async () => {
     if (!project?.id || !faseForm.nome) return
+    setSaving(true)
     try {
       const faseData = {
         projeto_id: project.id,
