@@ -40,6 +40,8 @@ export default function ProjetoNotebook({ projeto, userId, userName }) {
   const [contextMenu, setContextMenu] = useState(null)
   const [expandedSections, setExpandedSections] = useState({})
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null })
+  const [tableError, setTableError] = useState(null)
+  const [creatingTable, setCreatingTable] = useState(false)
 
   useEffect(() => {
     if (projeto?.id) fetchSections()
@@ -52,6 +54,59 @@ export default function ProjetoNotebook({ projeto, userId, userName }) {
     return () => document.removeEventListener('click', handleClick)
   }, [])
 
+  // SQL for creating the table
+  const CREATE_TABLE_SQL = `CREATE TABLE IF NOT EXISTS projeto_notebook_sections (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  projeto_id UUID NOT NULL REFERENCES projetos(id) ON DELETE CASCADE,
+  parent_id UUID REFERENCES projeto_notebook_sections(id) ON DELETE CASCADE,
+  titulo TEXT NOT NULL,
+  conteudo TEXT,
+  tipo TEXT DEFAULT 'secao' CHECK (tipo IN ('secao', 'pagina', 'tabela')),
+  icone TEXT DEFAULT 'file-text',
+  ordem INTEGER DEFAULT 0,
+  expandido BOOLEAN DEFAULT true,
+  created_by UUID,
+  created_by_name TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_notebook_sections_projeto ON projeto_notebook_sections(projeto_id);
+CREATE INDEX IF NOT EXISTS idx_notebook_sections_parent ON projeto_notebook_sections(parent_id);
+CREATE INDEX IF NOT EXISTS idx_notebook_sections_ordem ON projeto_notebook_sections(projeto_id, parent_id, ordem);
+
+ALTER TABLE projeto_notebook_sections ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "notebook_sections_all" ON projeto_notebook_sections FOR ALL USING (true) WITH CHECK (true);`
+
+  const handleCreateTable = async () => {
+    try {
+      setCreatingTable(true)
+      // Try using Supabase's rpc to execute SQL
+      const { error } = await supabase.rpc('exec_sql', { sql: CREATE_TABLE_SQL })
+      if (error) {
+        // If rpc doesn't exist, copy SQL to clipboard instead
+        await navigator.clipboard.writeText(CREATE_TABLE_SQL)
+        toast.info('SQL copiado', 'Cole e execute no SQL Editor do Supabase Dashboard')
+        window.open('https://supabase.com/dashboard/project/vctcppuvqjstscbzdykn/sql/new', '_blank')
+        return
+      }
+      toast.success('Tabela criada com sucesso!')
+      setTableError(null)
+      fetchSections()
+    } catch (err) {
+      // Fallback: copy SQL to clipboard
+      try {
+        await navigator.clipboard.writeText(CREATE_TABLE_SQL)
+        toast.info('SQL copiado', 'Cole e execute no SQL Editor do Supabase Dashboard')
+        window.open('https://supabase.com/dashboard/project/vctcppuvqjstscbzdykn/sql/new', '_blank')
+      } catch {
+        toast.error('Erro', 'Copie o SQL manualmente e execute no Supabase Dashboard')
+      }
+    } finally {
+      setCreatingTable(false)
+    }
+  }
+
   const fetchSections = async () => {
     try {
       setLoading(true)
@@ -61,8 +116,16 @@ export default function ProjetoNotebook({ projeto, userId, userName }) {
         .eq('projeto_id', projeto.id)
         .order('ordem', { ascending: true })
 
-      if (error) throw error
+      if (error) {
+        // Check if table doesn't exist
+        if (error.code === '42P01' || error.message?.includes('relation') || error.message?.includes('does not exist')) {
+          setTableError('table_not_found')
+          return
+        }
+        throw error
+      }
 
+      setTableError(null)
       const secs = data || []
       setSections(secs)
 
@@ -78,6 +141,7 @@ export default function ProjetoNotebook({ projeto, userId, userName }) {
       }
     } catch (err) {
       console.error('Erro ao carregar notebook:', err)
+      setTableError(err.message || 'unknown')
     } finally {
       setLoading(false)
     }
@@ -159,8 +223,13 @@ export default function ProjetoNotebook({ projeto, userId, userName }) {
       setNewSectionTitle('')
       toast.success('Secção criada')
     } catch (err) {
-      console.error('Erro:', err)
-      toast.error('Erro', 'Não foi possível criar a secção')
+      console.error('Erro ao criar secção:', err)
+      if (err.code === '42P01' || err.message?.includes('relation') || err.message?.includes('does not exist')) {
+        setTableError('table_not_found')
+        toast.error('Tabela não encontrada', 'A tabela do Notebook precisa de ser criada no Supabase')
+      } else {
+        toast.error('Erro ao criar secção', err.message || 'Não foi possível criar a secção')
+      }
     }
   }
 
@@ -361,6 +430,110 @@ export default function ProjetoNotebook({ projeto, userId, userName }) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', padding: '48px' }}>
         <Loader2 size={28} className="spin" style={{ color: 'var(--brown-light)' }} />
+      </div>
+    )
+  }
+
+  // Setup UI when table doesn't exist
+  if (tableError) {
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '48px 24px',
+        gap: '20px',
+        minHeight: '400px'
+      }}>
+        <div style={{
+          width: '56px', height: '56px',
+          background: 'var(--warning-bg)',
+          borderRadius: '50%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <FileText size={28} style={{ color: 'var(--warning)' }} />
+        </div>
+
+        <div style={{ textAlign: 'center', maxWidth: '480px' }}>
+          <h3 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--brown)', marginBottom: '8px' }}>
+            {tableError === 'table_not_found' ? 'Configuração Necessária' : 'Erro no Notebook'}
+          </h3>
+          <p style={{ fontSize: '13px', color: 'var(--brown-light)', lineHeight: 1.6 }}>
+            {tableError === 'table_not_found'
+              ? 'A tabela do Notebook ainda não existe na base de dados. Clique no botão abaixo para configurar automaticamente.'
+              : `Erro: ${tableError}`}
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
+          <button
+            onClick={handleCreateTable}
+            disabled={creatingTable}
+            style={{
+              padding: '10px 24px',
+              background: 'var(--accent-olive)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: creatingTable ? 'wait' : 'pointer',
+              fontSize: '13px',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              opacity: creatingTable ? 0.7 : 1
+            }}
+          >
+            {creatingTable ? <Loader2 size={14} className="spin" /> : <Plus size={14} />}
+            {creatingTable ? 'A configurar...' : 'Configurar Notebook'}
+          </button>
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(CREATE_TABLE_SQL)
+              toast.success('SQL copiado para a área de transferência')
+            }}
+            style={{
+              padding: '10px 24px',
+              background: 'transparent',
+              color: 'var(--brown)',
+              border: '1px solid var(--stone)',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '13px',
+              fontWeight: 500,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+          >
+            <FileText size={14} />
+            Copiar SQL
+          </button>
+        </div>
+
+        <details style={{ maxWidth: '600px', width: '100%', marginTop: '12px' }}>
+          <summary style={{ fontSize: '12px', color: 'var(--brown-light)', cursor: 'pointer', fontWeight: 500 }}>
+            Ver SQL de criação da tabela
+          </summary>
+          <pre style={{
+            marginTop: '8px',
+            padding: '12px',
+            background: 'var(--cream)',
+            border: '1px solid var(--stone)',
+            borderRadius: '8px',
+            fontSize: '11px',
+            color: 'var(--brown)',
+            overflow: 'auto',
+            maxHeight: '200px',
+            lineHeight: 1.5,
+            whiteSpace: 'pre-wrap'
+          }}>
+            {CREATE_TABLE_SQL}
+          </pre>
+        </details>
       </div>
     )
   }
