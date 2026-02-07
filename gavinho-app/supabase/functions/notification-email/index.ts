@@ -185,7 +185,7 @@ serve(async (req) => {
       .eq('ativo', true)
       .single()
 
-    const fromEmail = config?.email_principal || 'notificacoes@gavinho.pt'
+    const fromEmail = config?.email_principal || 'notificacoes@gavinhogroup.com'
 
     let notifications: any[] = []
 
