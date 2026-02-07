@@ -82,6 +82,7 @@ import ProjetoChatIA from '../components/projeto/ProjetoChatIA'
 import ProjetoAtas from '../components/ProjetoAtas'
 import ProjetoMoodboards from '../components/ProjetoMoodboards'
 import ProjetoLevantamento from '../components/ProjetoLevantamento'
+import ProjetoInspiracoes from '../components/ProjetoInspiracoes'
 
 // Importar constantes de ficheiros separados
 import {
@@ -186,6 +187,9 @@ export default function ProjetoDetalhe() {
   const [showRenderModal, setShowRenderModal] = useState(false)
   const [editingRender, setEditingRender] = useState(null)
   const [lightboxImage, setLightboxImage] = useState(null) // Para lightbox
+  const [lightboxImages, setLightboxImages] = useState([]) // Array de imagens para navegação no lightbox
+  const [lightboxIndex, setLightboxIndex] = useState(0) // Índice atual no lightbox
+  const [collapsedCompartimentos, setCollapsedCompartimentos] = useState({}) // Compartimentos colapsados
   const [moleskineRender, setMoleskineRender] = useState(null) // Para Moleskine (anotação de renders)
   const [renderAnnotations, setRenderAnnotations] = useState({}) // Mapa de render_id -> annotation count
   const [isDragging, setIsDragging] = useState(false) // Para drag & drop
@@ -199,6 +203,10 @@ export default function ProjetoDetalhe() {
     imagem_url: '',
     data_upload: new Date().toISOString().split('T')[0]
   })
+
+  // Imagens finais do projeto com suporte para drag-and-drop reordering
+  const [finalImageOrder, setFinalImageOrder] = useState([])
+  const [draggedImage, setDraggedImage] = useState(null)
 
   // CONSTANTES agora importadas de ../constants/projectConstants.js:
   // COMPARTIMENTOS, TIPOLOGIAS, SUBTIPOS, FASES, STATUS_OPTIONS
@@ -318,6 +326,8 @@ export default function ProjetoDetalhe() {
         setActiveArchvizSection(urlSubtab)
       } else if (urlTab === 'gestao') {
         setActiveGestaoSection(urlSubtab)
+      } else if (urlTab === 'briefing') {
+        setActiveBriefingSection(urlSubtab)
       }
     }
   }, [urlTab, urlSubtab])
@@ -1249,6 +1259,20 @@ export default function ProjetoDetalhe() {
     }
   }, [id])
 
+  // Load final image order from localStorage
+  useEffect(() => {
+    if (project?.id) {
+      const stored = localStorage.getItem(`gavinho_final_images_order_${project.id}`)
+      if (stored) {
+        try {
+          setFinalImageOrder(JSON.parse(stored))
+        } catch {
+          setFinalImageOrder([])
+        }
+      }
+    }
+  }, [project?.id])
+
   // Loading state
   if (loading) {
     return (
@@ -1582,11 +1606,38 @@ export default function ProjetoDetalhe() {
     if (file) processImageFile(file)
   }
 
-  // Abrir lightbox
-  const openLightbox = (render) => {
+  // Abrir lightbox com navegação
+  const openLightbox = (render, imageArray = null) => {
     if (render.imagem_url) {
       setLightboxImage(render)
+      if (imageArray && imageArray.length > 0) {
+        // Filtrar apenas imagens com URL
+        const imagesWithUrl = imageArray.filter(r => r.imagem_url)
+        setLightboxImages(imagesWithUrl)
+        const index = imagesWithUrl.findIndex(r => r.id === render.id)
+        setLightboxIndex(index >= 0 ? index : 0)
+      } else {
+        setLightboxImages([render])
+        setLightboxIndex(0)
+      }
     }
+  }
+
+  // Navegar no lightbox
+  const navigateLightbox = (direction) => {
+    const newIndex = lightboxIndex + direction
+    if (newIndex >= 0 && newIndex < lightboxImages.length) {
+      setLightboxIndex(newIndex)
+      setLightboxImage(lightboxImages[newIndex])
+    }
+  }
+
+  // Toggle colapsar compartimento
+  const toggleCompartimentoCollapse = (compartimento) => {
+    setCollapsedCompartimentos(prev => ({
+      ...prev,
+      [compartimento]: !prev[compartimento]
+    }))
   }
 
   // Renders agrupados por compartimento
@@ -1598,8 +1649,68 @@ export default function ProjetoDetalhe() {
     return acc
   }, {})
 
-  // Imagens finais do projeto
-  const imagensFinais = renders.filter(r => r.is_final)
+  // Colapsar/Expandir todos os compartimentos
+  const toggleAllCompartimentos = (collapse) => {
+    const newState = {}
+    Object.keys(rendersByCompartimento).forEach(comp => {
+      newState[comp] = collapse
+    })
+    setCollapsedCompartimentos(newState)
+  }
+
+  // Get final images sorted by custom order
+  const imagensFinais = (() => {
+    const finals = renders.filter(r => r.is_final)
+    if (finalImageOrder.length === 0) return finals
+
+    // Sort by custom order, new images go to the end
+    return finals.sort((a, b) => {
+      const indexA = finalImageOrder.indexOf(a.id)
+      const indexB = finalImageOrder.indexOf(b.id)
+      if (indexA === -1 && indexB === -1) return 0
+      if (indexA === -1) return 1
+      if (indexB === -1) return -1
+      return indexA - indexB
+    })
+  })()
+
+  // Handle drag start for final images
+  const handleFinalImageDragStart = (e, render) => {
+    setDraggedImage(render)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  // Handle drag over for final images
+  const handleFinalImageDragOver = (e) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+  }
+
+  // Handle drop for final images
+  const handleFinalImageDrop = (e, targetRender) => {
+    e.preventDefault()
+    if (!draggedImage || draggedImage.id === targetRender.id) {
+      setDraggedImage(null)
+      return
+    }
+
+    const currentOrder = imagensFinais.map(r => r.id)
+    const draggedIndex = currentOrder.indexOf(draggedImage.id)
+    const targetIndex = currentOrder.indexOf(targetRender.id)
+
+    // Remove dragged item and insert at new position
+    currentOrder.splice(draggedIndex, 1)
+    currentOrder.splice(targetIndex, 0, draggedImage.id)
+
+    setFinalImageOrder(currentOrder)
+    localStorage.setItem(`gavinho_final_images_order_${project.id}`, JSON.stringify(currentOrder))
+    setDraggedImage(null)
+  }
+
+  // Handle drag end
+  const handleFinalImageDragEnd = () => {
+    setDraggedImage(null)
+  }
 
   // Tabs principais
   const allTabs = [
@@ -1650,86 +1761,108 @@ export default function ProjetoDetalhe() {
 
   return (
     <div className="fade-in">
-      {/* Header */}
-      <div style={{ marginBottom: '24px' }}>
-        <button
-          onClick={() => navigate(-1)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            background: 'none',
-            border: 'none',
-            color: 'var(--brown-light)',
-            fontSize: '13px',
-            cursor: 'pointer',
-            marginBottom: '16px',
-            padding: 0
-          }}
-        >
-          <ArrowLeft size={16} />
-          Voltar
-        </button>
-
+      {/* Header - Single line layout */}
+      <div style={{ marginBottom: '16px' }}>
         <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-md mb-sm">
-              <span style={{
+          <div className="flex items-center gap-md" style={{ flexWrap: 'wrap' }}>
+            {/* Back button */}
+            <button
+              onClick={() => navigate(-1)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                background: 'none',
+                border: 'none',
+                color: 'var(--brown-light)',
                 fontSize: '13px',
-                fontWeight: 700,
-                color: 'var(--blush-dark)',
-                letterSpacing: '0.5px'
+                cursor: 'pointer',
+                padding: 0
+              }}
+            >
+              <ArrowLeft size={16} />
+            </button>
+
+            {/* Separator */}
+            <div style={{ width: '1px', height: '20px', background: 'var(--stone)' }} />
+
+            {/* Project Name */}
+            <h1 style={{
+              fontSize: '18px',
+              fontWeight: 700,
+              color: 'var(--brown)',
+              margin: 0
+            }}>
+              {project.nome}
+            </h1>
+
+            {/* Separator */}
+            <div style={{ width: '1px', height: '20px', background: 'var(--stone)' }} />
+
+            {/* Project Codes */}
+            <span style={{
+              fontSize: '12px',
+              fontWeight: 600,
+              color: 'var(--blush-dark)',
+              letterSpacing: '0.5px'
+            }}>
+              {project.codigo}
+            </span>
+            {project.codigo_interno && (
+              <span style={{
+                fontSize: '11px',
+                fontWeight: 600,
+                color: 'var(--info)',
+                background: 'rgba(59, 130, 246, 0.1)',
+                padding: '2px 6px',
+                borderRadius: '4px',
+                fontFamily: 'monospace'
               }}>
-                {project.codigo}
+                {project.codigo_interno}
               </span>
-              {project.codigo_interno && (
-                <span style={{
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  color: 'var(--info)',
-                  background: 'rgba(59, 130, 246, 0.1)',
-                  padding: '3px 8px',
-                  borderRadius: '4px',
-                  fontFamily: 'monospace'
-                }}>
-                  {project.codigo_interno}
-                </span>
-              )}
-              <span className="badge badge-gold">{project.fase}</span>
-              <div 
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '4px 10px',
-                  borderRadius: '20px',
-                  background: `${getStatusColor(project.status)}15`,
-                  color: getStatusColor(project.status),
-                  fontSize: '12px',
-                  fontWeight: 600
-                }}
-              >
-                <div style={{
-                  width: '6px',
-                  height: '6px',
-                  borderRadius: '50%',
-                  background: getStatusColor(project.status)
-                }} />
-                {getStatusLabel(project.status)}
-              </div>
+            )}
+
+            {/* Phase Badge */}
+            <span className="badge badge-gold" style={{ fontSize: '11px', padding: '3px 8px' }}>{project.fase}</span>
+
+            {/* Status Badge */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '3px 8px',
+                borderRadius: '12px',
+                background: `${getStatusColor(project.status)}15`,
+                color: getStatusColor(project.status),
+                fontSize: '11px',
+                fontWeight: 600
+              }}
+            >
+              <div style={{
+                width: '5px',
+                height: '5px',
+                borderRadius: '50%',
+                background: getStatusColor(project.status)
+              }} />
+              {getStatusLabel(project.status)}
             </div>
-            <h1 className="page-title" style={{ marginBottom: '8px' }}>{project.nome}</h1>
-            <div className="flex items-center gap-lg text-muted" style={{ fontSize: '13px' }}>
+
+            {/* Separator */}
+            <div style={{ width: '1px', height: '20px', background: 'var(--stone)' }} />
+
+            {/* Project Info */}
+            <div className="flex items-center gap-md text-muted" style={{ fontSize: '12px' }}>
               <span className="flex items-center gap-xs">
-                <Building2 size={14} />
-                {project.tipologia} • {project.subtipo} {project.tipo_apartamento}
+                <Building2 size={13} />
+                {project.tipologia} • {project.subtipo}
               </span>
               <span className="flex items-center gap-xs">
-                <MapPin size={14} />
+                <MapPin size={13} />
                 {project.localizacao.cidade}, {project.localizacao.pais}
               </span>
               <span className="flex items-center gap-xs">
-                <Layers size={14} />
+                <Layers size={13} />
                 {project.area_bruta} {project.unidade_area}
               </span>
             </div>
@@ -1799,11 +1932,11 @@ export default function ProjetoDetalhe() {
       </div>
 
       {/* Tabs */}
-      <div 
+      <div
         style={{
           display: 'flex',
           gap: '4px',
-          marginBottom: '24px',
+          marginBottom: '16px',
           background: 'var(--cream)',
           padding: '4px',
           borderRadius: '12px',
@@ -2592,10 +2725,13 @@ export default function ProjetoDetalhe() {
 
           {/* Inspirações & Referências */}
           {activeArchvizSection === 'inspiracoes' && (
-            <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
-              <Palette size={48} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '16px' }} />
-              <h3 style={{ margin: '0 0 8px', color: 'var(--brown)' }}>Inspirações & Referências</h3>
-              <p style={{ color: 'var(--brown-light)', margin: 0 }}>Galeria de inspirações e referências visuais em desenvolvimento</p>
+            <div className="card">
+              <ProjetoInspiracoes
+                projeto={project}
+                userId={user?.id}
+                userName={user?.nome || user?.email}
+                compartimentosProjeto={projetoCompartimentos}
+              />
             </div>
           )}
 
@@ -2611,10 +2747,55 @@ export default function ProjetoDetalhe() {
                 {renders.length} render{renders.length !== 1 ? 's' : ''} • {imagensFinais.length} {imagensFinais.length !== 1 ? 'imagens finais' : 'imagem final'}
               </p>
             </div>
-            <button onClick={openAddRenderModal} className="btn btn-primary" style={{ padding: '10px 16px' }}>
-              <Plus size={16} style={{ marginRight: '8px' }} />
-              Adicionar Render
-            </button>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              {/* Botões Colapsar/Expandir Tudo */}
+              {Object.keys(rendersByCompartimento).length > 1 && (
+                <>
+                  <button
+                    onClick={() => toggleAllCompartimentos(true)}
+                    style={{
+                      padding: '6px 12px',
+                      background: 'transparent',
+                      color: 'var(--brown-light)',
+                      border: '1px solid var(--stone)',
+                      borderRadius: '6px',
+                      fontSize: '11px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                    title="Colapsar todos os compartimentos"
+                  >
+                    <ChevronUp size={14} />
+                    Colapsar
+                  </button>
+                  <button
+                    onClick={() => toggleAllCompartimentos(false)}
+                    style={{
+                      padding: '6px 12px',
+                      background: 'transparent',
+                      color: 'var(--brown-light)',
+                      border: '1px solid var(--stone)',
+                      borderRadius: '6px',
+                      fontSize: '11px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                    title="Expandir todos os compartimentos"
+                  >
+                    <ChevronDown size={14} />
+                    Expandir
+                  </button>
+                </>
+              )}
+              <button onClick={openAddRenderModal} className="btn btn-primary" style={{ padding: '10px 16px' }}>
+                <Plus size={16} style={{ marginRight: '8px' }} />
+                Adicionar Render
+              </button>
+            </div>
           </div>
 
           {/* Renders por Compartimento e Vista */}
@@ -2632,32 +2813,79 @@ export default function ProjetoDetalhe() {
                 const totalVersoes = compartimentoRenders.length
                 const totalVistas = Object.keys(rendersByVista).length
 
+                const isCollapsed = collapsedCompartimentos[compartimento]
+
                 return (
                   <div key={compartimento} style={{
                     background: 'var(--white)',
                     border: '1px solid var(--stone)',
                     borderRadius: '12px',
-                    padding: '16px'
+                    padding: isCollapsed ? '12px 16px' : '16px',
+                    transition: 'padding 0.2s ease'
                   }}>
                     {/* Cabeçalho do Compartimento */}
-                    <div className="flex items-center justify-between" style={{ marginBottom: '16px' }}>
-                      <h4 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--brown)', margin: 0 }}>
-                        {compartimento}
-                        <span style={{ fontWeight: 400, color: 'var(--brown-light)', marginLeft: '8px', fontSize: '13px' }}>
-                          ({totalVistas} {totalVistas !== 1 ? 'vistas' : 'vista'} • {totalVersoes} {totalVersoes !== 1 ? 'versões' : 'versão'})
-                        </span>
-                      </h4>
-                      <button
-                        onClick={() => openAddRenderModal(compartimento)}
-                        className="btn btn-secondary"
-                        style={{ padding: '6px 12px', fontSize: '12px' }}
-                      >
-                        <Plus size={14} style={{ marginRight: '6px' }} />
-                        Nova Vista
-                      </button>
+                    <div
+                      className="flex items-center justify-between"
+                      style={{
+                        marginBottom: isCollapsed ? 0 : '16px',
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => toggleCompartimentoCollapse(compartimento)}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); toggleCompartimentoCollapse(compartimento) }}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            padding: '4px',
+                            cursor: 'pointer',
+                            color: 'var(--brown-light)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            transition: 'transform 0.2s ease',
+                            transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)'
+                          }}
+                          title={isCollapsed ? 'Expandir' : 'Colapsar'}
+                        >
+                          <ChevronDown size={18} />
+                        </button>
+                        <h4 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--brown)', margin: 0 }}>
+                          {compartimento}
+                          <span style={{ fontWeight: 400, color: 'var(--brown-light)', marginLeft: '8px', fontSize: '13px' }}>
+                            ({totalVistas} {totalVistas !== 1 ? 'vistas' : 'vista'} • {totalVersoes} {totalVersoes !== 1 ? 'versões' : 'versão'})
+                          </span>
+                        </h4>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {/* Preview de imagens quando colapsado */}
+                        {isCollapsed && compartimentoRenders.filter(r => r.imagem_url).slice(0, 4).map((render, idx) => (
+                          <div
+                            key={render.id}
+                            style={{
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '4px',
+                              background: `url(${render.imagem_url}) center/cover`,
+                              border: render.is_final ? '2px solid var(--success)' : '1px solid var(--stone)',
+                              marginLeft: idx > 0 ? '-8px' : 0
+                            }}
+                            onClick={(e) => { e.stopPropagation(); openLightbox(render, compartimentoRenders) }}
+                          />
+                        ))}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); openAddRenderModal(compartimento) }}
+                          className="btn btn-secondary"
+                          style={{ padding: '6px 12px', fontSize: '12px' }}
+                        >
+                          <Plus size={14} style={{ marginRight: '6px' }} />
+                          Nova Vista
+                        </button>
+                      </div>
                     </div>
 
-                    {/* Vistas dentro do Compartimento */}
+                    {/* Vistas dentro do Compartimento - só mostra se não colapsado */}
+                    {!isCollapsed && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                       {Object.entries(rendersByVista).map(([vista, vistaRenders]) => (
                         <div key={vista} style={{
@@ -2693,143 +2921,85 @@ export default function ProjetoDetalhe() {
                             </button>
                           </div>
 
-                          {/* Grid de Renders da Vista */}
-                          <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                            gap: '12px'
-                          }}>
+                          {/* Grid de Renders da Vista - Masonry Pinterest Style */}
+                          <div className="masonry-grid">
                             {vistaRenders
                               .sort((a, b) => (b.versao || 0) - (a.versao || 0))
                               .map((render) => (
                               <div
                                 key={render.id}
-                                style={{
-                                  position: 'relative',
-                                  aspectRatio: '16/10',
-                                  background: render.imagem_url ? `url(${render.imagem_url}) center/cover` : 'var(--white)',
-                                  borderRadius: '8px',
-                                  overflow: 'hidden',
-                                  border: render.is_final ? '3px solid var(--success)' : '1px solid var(--stone)',
-                                  cursor: render.imagem_url ? 'pointer' : 'default'
-                                }}
-                                onClick={() => openLightbox(render)}
+                                className={`masonry-card ${render.is_final ? 'is-final' : ''}`}
+                                style={{ cursor: render.imagem_url ? 'pointer' : 'default' }}
+                                onClick={() => openLightbox(render, compartimentoRenders)}
                               >
-                                {!render.imagem_url && (
-                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                                    <Image size={24} style={{ color: 'var(--brown-light)', opacity: 0.4 }} />
+                                {render.imagem_url ? (
+                                  <img
+                                    src={render.imagem_url}
+                                    alt={`${render.compartimento} - v${render.versao}`}
+                                    className="masonry-card-image"
+                                  />
+                                ) : (
+                                  <div className="masonry-placeholder">
+                                    <Image size={24} />
                                   </div>
                                 )}
 
                                 {/* Versão Badge */}
-                                <div style={{
-                                  position: 'absolute',
-                                  top: '6px',
-                                  left: '6px',
-                                  padding: '3px 7px',
-                                  background: 'rgba(0,0,0,0.7)',
-                                  color: 'white',
-                                  borderRadius: '4px',
-                                  fontSize: '11px',
-                                  fontWeight: 600
-                                }}>
+                                <div className="masonry-badge dark">
                                   v{render.versao}
                                 </div>
 
                                 {/* Final Badge */}
                                 {render.is_final && (
-                                  <div style={{
-                                    position: 'absolute',
-                                    top: '6px',
-                                    right: '6px',
-                                    padding: '3px 6px',
-                                    background: 'var(--success)',
-                                    color: 'white',
-                                    borderRadius: '4px',
-                                    fontSize: '9px',
-                                    fontWeight: 600,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '3px'
-                                  }}>
+                                  <div className="masonry-badge success" style={{ left: 'auto', right: '50px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                     <CheckCircle size={10} />
                                     FINAL
                                   </div>
                                 )}
 
-                                {/* Hover Actions */}
-                                <div style={{
-                                  position: 'absolute',
-                                  bottom: 0,
-                                  left: 0,
-                                  right: 0,
-                                  padding: '6px',
-                                  background: 'linear-gradient(transparent, rgba(0,0,0,0.8))',
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                  alignItems: 'center'
-                                }}>
+                                {/* Actions */}
+                                <div className="masonry-card-actions">
                                   <button
-                                    onClick={(e) => { e.stopPropagation(); toggleFinalImage(render) }}
-                                    style={{
-                                      padding: '3px 6px',
-                                      background: render.is_final ? 'var(--error)' : 'var(--success)',
-                                      color: 'white',
-                                      border: 'none',
-                                      borderRadius: '4px',
-                                      fontSize: '9px',
-                                      cursor: 'pointer'
-                                    }}
+                                    onClick={(e) => { e.stopPropagation(); setMoleskineRender(render) }}
+                                    className="masonry-action-btn"
+                                    title="Moleskine"
                                   >
-                                    {render.is_final ? 'Remover Final' : 'Marcar Final'}
+                                    <Pencil size={14} />
                                   </button>
-                                  <div style={{ display: 'flex', gap: '3px' }}>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); openEditRenderModal(render) }}
+                                    className="masonry-action-btn"
+                                    title="Editar"
+                                  >
+                                    <Edit size={14} />
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleDeleteRender(render) }}
+                                    className="masonry-action-btn danger"
+                                    title="Eliminar"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
+
+                                {/* Info Footer */}
+                                <div className="masonry-card-info">
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span className="masonry-card-info-subtitle">{render.vista || 'Vista Principal'}</span>
                                     <button
-                                      onClick={(e) => { e.stopPropagation(); setMoleskineRender(render) }}
+                                      onClick={(e) => { e.stopPropagation(); toggleFinalImage(render) }}
+                                      className={`masonry-action-btn ${render.is_final ? '' : 'success'}`}
                                       style={{
-                                        padding: '3px 6px',
-                                        background: '#8B8670',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '4px',
-                                        cursor: 'pointer',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '3px',
-                                        fontSize: '9px',
-                                        fontWeight: 500
+                                        padding: '4px 10px',
+                                        borderRadius: '12px',
+                                        fontSize: '10px',
+                                        fontWeight: 500,
+                                        background: render.is_final ? 'var(--error)' : 'var(--success)',
+                                        color: 'white'
                                       }}
-                                      title="Moleskine - Anotar render"
+                                      title={render.is_final ? 'Remover Final' : 'Marcar Final'}
                                     >
-                                      <Pencil size={10} />
-                                      Moleskine
-                                    </button>
-                                    <button
-                                      onClick={(e) => { e.stopPropagation(); openEditRenderModal(render) }}
-                                      style={{
-                                        padding: '3px',
-                                        background: 'rgba(255,255,255,0.2)',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '4px',
-                                        cursor: 'pointer'
-                                      }}
-                                      title="Editar"
-                                    >
-                                      <Edit size={12} />
-                                    </button>
-                                    <button
-                                      onClick={(e) => { e.stopPropagation(); handleDeleteRender(render) }}
-                                      style={{
-                                        padding: '3px',
-                                        background: 'rgba(255,255,255,0.2)',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '4px',
-                                        cursor: 'pointer'
-                                      }}
-                                    >
-                                      <Trash2 size={12} />
+                                      {render.is_final ? 'Remover' : 'Final'}
                                     </button>
                                   </div>
                                 </div>
@@ -2839,6 +3009,7 @@ export default function ProjetoDetalhe() {
                         </div>
                       ))}
                     </div>
+                    )}
                   </div>
                 )
               })}
@@ -2884,64 +3055,54 @@ export default function ProjetoDetalhe() {
               fontSize: '13px',
               fontWeight: 600
             }}>
-              {imagensFinais.length} imagem{imagensFinais.length !== 1 ? 'ns' : ''}
+              {imagensFinais.length} {imagensFinais.length !== 1 ? 'imagens' : 'imagem'}
             </span>
           </div>
 
           {imagensFinais.length > 0 ? (
-            <div className="grid grid-3" style={{ gap: '16px' }}>
+            <div className="masonry-grid">
               {imagensFinais.map((render) => (
                 <div
                   key={render.id}
+                  className={`masonry-card ${draggedImage?.id === render.id ? 'dragging' : ''}`}
+                  draggable
+                  onDragStart={(e) => handleFinalImageDragStart(e, render)}
+                  onDragOver={handleFinalImageDragOver}
+                  onDrop={(e) => handleFinalImageDrop(e, render)}
+                  onDragEnd={handleFinalImageDragEnd}
                   style={{
-                    position: 'relative',
-                    aspectRatio: '16/10',
-                    background: render.imagem_url ? `url(${render.imagem_url}) center/cover` : 'var(--cream)',
-                    borderRadius: '12px',
-                    overflow: 'hidden',
-                    border: '3px solid var(--success)'
+                    cursor: 'grab',
+                    opacity: draggedImage?.id === render.id ? 0.5 : 1,
+                    transition: 'opacity 0.2s'
                   }}
+                  onClick={() => render.imagem_url && openLightbox(render, imagensFinais)}
                 >
-                  {!render.imagem_url && (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                  {render.imagem_url ? (
+                    <img
+                      src={render.imagem_url}
+                      alt={render.compartimento}
+                      style={{
+                        width: '100%',
+                        height: 'auto',
+                        display: 'block'
+                      }}
+                    />
+                  ) : (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      height: '200px',
+                      background: 'var(--cream)'
+                    }}>
                       <Image size={32} style={{ color: 'var(--brown-light)', opacity: 0.4 }} />
                     </div>
                   )}
 
-                  <div style={{
-                    position: 'absolute',
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    padding: '12px',
-                    background: 'linear-gradient(transparent, rgba(0,0,0,0.8))',
-                    color: 'white'
-                  }}>
+                  <div className="masonry-card-info">
                     <div style={{ fontSize: '13px', fontWeight: 600 }}>{render.compartimento}</div>
                     <div style={{ fontSize: '11px', opacity: 0.8 }}>Versão {render.versao}</div>
                   </div>
-
-                  <button
-                    onClick={() => toggleFinalImage(render)}
-                    style={{
-                      position: 'absolute',
-                      top: '8px',
-                      right: '8px',
-                      padding: '6px',
-                      background: 'var(--error)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '6px',
-                      fontSize: '11px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                    title="Remover das imagens finais"
-                  >
-                    <X size={14} />
-                  </button>
                 </div>
               ))}
             </div>
@@ -2977,22 +3138,19 @@ export default function ProjetoDetalhe() {
       {activeTab === 'biblioteca' && (
         <div>
           <div className="grid grid-3" style={{ gap: '16px', marginBottom: '24px' }}>
-            {/* KPI Cards */}
+            {/* KPI Cards - showing project-specific counts (0 when empty) */}
             {[
-              { label: 'Materiais', count: 12, icon: '🎨' },
-              { label: 'Objetos 3D', count: 8, icon: '📦' },
-              { label: 'Texturas', count: 24, icon: '🖼️' }
+              { label: 'Materiais', count: 0 },
+              { label: 'Objetos 3D', count: 0 },
+              { label: 'Texturas', count: 0 }
             ].map((item, idx) => (
               <div key={idx} className="card" style={{ padding: '20px' }}>
-                <div className="flex items-center gap-md">
-                  <span style={{ fontSize: '32px' }}>{item.icon}</span>
-                  <div>
-                    <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--brown)' }}>
-                      {item.count}
-                    </div>
-                    <div style={{ fontSize: '13px', color: 'var(--brown-light)' }}>
-                      {item.label}
-                    </div>
+                <div>
+                  <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--brown)' }}>
+                    {item.count}
+                  </div>
+                  <div style={{ fontSize: '13px', color: 'var(--brown-light)' }}>
+                    {item.label}
                   </div>
                 </div>
               </div>
@@ -3349,9 +3507,12 @@ export default function ProjetoDetalhe() {
       {/* Lightbox para visualizar imagens em grande */}
       <ImageLightbox
         image={lightboxImage}
-        onClose={() => setLightboxImage(null)}
-        onEditRender={(img) => { openEditRenderModal(img); setLightboxImage(null) }}
-        onOpenMoleskine={(img) => { setMoleskineRender(img); setLightboxImage(null) }}
+        images={lightboxImages}
+        currentIndex={lightboxIndex}
+        onClose={() => { setLightboxImage(null); setLightboxImages([]); setLightboxIndex(0) }}
+        onNavigate={navigateLightbox}
+        onEditRender={(img) => { openEditRenderModal(img); setLightboxImage(null); setLightboxImages([]); setLightboxIndex(0) }}
+        onOpenMoleskine={(img) => { setMoleskineRender(img); setLightboxImage(null); setLightboxImages([]); setLightboxIndex(0) }}
       />
 
       {/* Moleskine - Ferramenta de anotação de renders */}

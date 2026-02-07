@@ -3,16 +3,20 @@ import { supabase } from '../lib/supabase'
 import {
   Plus, Upload, FileText, ChevronRight, ChevronDown, Edit2, Trash2, Save, X,
   Calendar, User, CheckCircle, Clock, AlertCircle, Download, FileSpreadsheet,
-  Loader2, MoreVertical, Eye, CheckSquare, Square, Paperclip, Shield
+  Loader2, MoreVertical, Eye, CheckSquare, Square, Paperclip, Shield,
+  GripVertical, ChevronUp, FolderPlus
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { DeliveryFileSection } from './deliveries'
 
 const statusConfig = {
+  'nao_iniciado': { label: 'Não Iniciado', color: '#95a5a6', bg: 'rgba(149, 165, 166, 0.15)' },
   'pendente': { label: 'Pendente', color: 'var(--brown-light)', bg: 'var(--stone)' },
   'em_progresso': { label: 'Em Progresso', color: 'var(--info)', bg: 'rgba(138, 158, 184, 0.15)' },
+  'aguarda_gp': { label: 'Aguarda GP', color: '#9b59b6', bg: 'rgba(155, 89, 182, 0.25)', border: '2px solid #9b59b6' },
+  'bloqueado': { label: 'Bloqueado', color: '#e74c3c', bg: 'rgba(231, 76, 60, 0.2)', border: '2px solid #e74c3c' },
   'concluido': { label: 'Concluído', color: 'var(--success)', bg: 'rgba(122, 158, 122, 0.15)' },
-  'aprovado': { label: 'Aprovado', color: 'var(--warning)', bg: 'rgba(201, 168, 130, 0.15)' }
+  'aprovado': { label: 'Aprovado', color: '#27ae60', bg: 'rgba(39, 174, 96, 0.15)' }
 }
 
 export default function ProjetoEntregaveis({ projeto }) {
@@ -66,6 +70,14 @@ export default function ProjetoEntregaveis({ projeto }) {
   const [showFaseModal, setShowFaseModal] = useState(false)
   const [newFaseName, setNewFaseName] = useState('')
   const [savingFase, setSavingFase] = useState(false)
+
+  // Estado para edição de fase
+  const [editingFase, setEditingFase] = useState(null) // { nome: 'Projeto Base', newName: '' }
+
+  // Estado para modal de subcategoria
+  const [showSubcategoriaModal, setShowSubcategoriaModal] = useState(false)
+  const [subcategoriaData, setSubcategoriaData] = useState({ fase: '', nome: '', prefixoCodigo: '' })
+  const [editingSubcategoriaMode, setEditingSubcategoriaMode] = useState({}) // { 'fase__categoria': true }
 
   // Estado para cache de ficheiros atuais (para mostrar ícones)
   const [filesCache, setFilesCache] = useState({})
@@ -577,6 +589,151 @@ export default function ProjetoEntregaveis({ projeto }) {
     setShowModal(true)
   }
 
+  // Editar nome da fase
+  const handleEditFase = async (oldFaseName, newFaseName) => {
+    if (!newFaseName.trim() || oldFaseName === newFaseName.trim()) {
+      setEditingFase(null)
+      return
+    }
+
+    try {
+      // Atualizar todos os entregáveis desta fase
+      const { error } = await supabase
+        .from('projeto_entregaveis')
+        .update({ fase: newFaseName.trim() })
+        .eq('projeto_id', projeto.id)
+        .eq('fase', oldFaseName)
+
+      if (error) throw error
+
+      setEditingFase(null)
+      loadEntregaveis(false)
+    } catch (err) {
+      alert('Erro ao renomear fase: ' + err.message)
+    }
+  }
+
+  // Abrir modal para adicionar subcategoria
+  const handleOpenSubcategoriaModal = (faseNome, existingCategoria = null) => {
+    setSubcategoriaData({
+      fase: faseNome,
+      nome: existingCategoria || '',
+      prefixoCodigo: '',
+      isEditing: !!existingCategoria,
+      oldNome: existingCategoria
+    })
+    setShowSubcategoriaModal(true)
+  }
+
+  // Guardar subcategoria (criar ou renomear)
+  const handleSaveSubcategoria = async () => {
+    const { fase, nome, prefixoCodigo, isEditing, oldNome } = subcategoriaData
+
+    if (!nome.trim()) {
+      alert('Nome da subcategoria é obrigatório')
+      return
+    }
+
+    try {
+      if (isEditing && oldNome !== nome.trim()) {
+        // Renomear categoria existente
+        const { error } = await supabase
+          .from('projeto_entregaveis')
+          .update({ categoria: nome.trim() })
+          .eq('projeto_id', projeto.id)
+          .eq('fase', fase)
+          .eq('categoria', oldNome)
+
+        if (error) throw error
+      }
+
+      // Se tem prefixo de código e não é edição, criar primeiro item placeholder
+      if (prefixoCodigo.trim() && !isEditing) {
+        // Apenas definir o prefixo para uso futuro ao adicionar itens
+        // O prefixo será usado na função handleAddToFase
+      }
+
+      setShowSubcategoriaModal(false)
+      setSubcategoriaData({ fase: '', nome: '', prefixoCodigo: '' })
+      loadEntregaveis(false)
+    } catch (err) {
+      alert('Erro ao guardar subcategoria: ' + err.message)
+    }
+  }
+
+  // Toggle modo edição da subcategoria
+  const toggleSubcategoriaEditMode = (faseNome, catNome) => {
+    const key = `${faseNome}__${catNome}`
+    setEditingSubcategoriaMode(prev => ({
+      ...prev,
+      [key]: !prev[key]
+    }))
+  }
+
+  // Mover item para cima ou para baixo dentro da categoria
+  const handleMoveItem = async (item, direction, categoryItems) => {
+    const sortedItems = [...categoryItems].sort((a, b) =>
+      (a.codigo || '').localeCompare(b.codigo || '', undefined, { numeric: true })
+    )
+    const currentIndex = sortedItems.findIndex(i => i.id === item.id)
+    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1
+
+    if (newIndex < 0 || newIndex >= sortedItems.length) return
+
+    // Trocar códigos entre os dois itens
+    const otherItem = sortedItems[newIndex]
+    const tempCodigo = item.codigo
+
+    try {
+      // Atualizar código do item atual para o do outro
+      await supabase
+        .from('projeto_entregaveis')
+        .update({ codigo: otherItem.codigo })
+        .eq('id', item.id)
+
+      // Atualizar código do outro item para o do atual
+      await supabase
+        .from('projeto_entregaveis')
+        .update({ codigo: tempCodigo })
+        .eq('id', otherItem.id)
+
+      loadEntregaveis(false)
+    } catch (err) {
+      alert('Erro ao mover item: ' + err.message)
+    }
+  }
+
+  // Gerar próximo código baseado no prefixo da categoria
+  const generateNextCode = (faseNome, catNome, existingItems) => {
+    const categoryItems = existingItems.filter(
+      i => i.fase === faseNome && i.categoria === catNome
+    )
+
+    if (categoryItems.length === 0) {
+      // Primeiro item - usar prefixo padrão baseado na fase
+      const fasePrefix = faseNome === 'Projeto Base' ? 'PB' :
+                         faseNome === 'Projeto de Execução' ? 'PEXA' :
+                         faseNome === 'Licenciamento' ? 'LIC' :
+                         faseNome === 'Construção' ? 'CONS' : 'XX'
+      return `${fasePrefix}.01.001`
+    }
+
+    // Encontrar o maior código e incrementar
+    const codes = categoryItems.map(i => i.codigo || '').filter(Boolean)
+    if (codes.length === 0) return `01.001`
+
+    const lastCode = codes.sort((a, b) =>
+      b.localeCompare(a, undefined, { numeric: true })
+    )[0]
+
+    // Extrair e incrementar o último número
+    const parts = lastCode.split('.')
+    const lastNum = parseInt(parts[parts.length - 1]) || 0
+    parts[parts.length - 1] = String(lastNum + 1).padStart(3, '0')
+
+    return parts.join('.')
+  }
+
   const formatDate = (date) => {
     if (!date) return '-'
     return new Date(date).toLocaleDateString('pt-PT', { day: '2-digit', month: 'short' })
@@ -792,7 +949,7 @@ export default function ProjetoEntregaveis({ projeto }) {
                         </span>
                       </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <div style={{
                         background: 'rgba(255,255,255,0.2)',
                         padding: '6px 12px',
@@ -802,12 +959,62 @@ export default function ProjetoEntregaveis({ projeto }) {
                       }}>
                         {fasePercent}%
                       </div>
+                      {/* Botão Editar Fase */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setEditingFase({ nome: faseNome, newName: faseNome })
+                        }}
+                        title="Editar nome da fase"
+                        style={{
+                          background: 'rgba(255,255,255,0.25)',
+                          border: '1px solid rgba(255,255,255,0.4)',
+                          borderRadius: '6px',
+                          padding: '6px 10px',
+                          cursor: 'pointer',
+                          color: 'white',
+                          display: 'flex',
+                          alignItems: 'center',
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.35)'}
+                        onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
+                      >
+                        <Edit2 size={14} />
+                      </button>
+                      {/* Botão Adicionar Subcategoria */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleOpenSubcategoriaModal(faseNome)
+                        }}
+                        title="Adicionar nova subcategoria"
+                        style={{
+                          background: 'rgba(255,255,255,0.25)',
+                          border: '1px solid rgba(255,255,255,0.4)',
+                          borderRadius: '6px',
+                          padding: '6px 10px',
+                          cursor: 'pointer',
+                          color: 'white',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          fontSize: '11px',
+                          fontWeight: 500,
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.35)'}
+                        onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
+                      >
+                        <FolderPlus size={14} />
+                      </button>
+                      {/* Botão Adicionar Entregável */}
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
                           handleAddToFase(faseNome)
                         }}
-                        title="Adicionar desenho a esta fase"
+                        title="Adicionar novo entregável"
                         style={{
                           background: 'rgba(255,255,255,0.25)',
                           border: '1px solid rgba(255,255,255,0.4)',
@@ -857,12 +1064,37 @@ export default function ProjetoEntregaveis({ projeto }) {
                                 {items.length} itens  –  {items.filter(i => i.status === 'concluido' || i.status === 'aprovado').length} ✓
                               </span>
                             </div>
+                            {/* Botão Editar Subcategoria (toggle edit mode) */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                toggleSubcategoriaEditMode(faseNome, catNome)
+                              }}
+                              title={editingSubcategoriaMode[`${faseNome}__${catNome}`] ? 'Sair do modo edição' : 'Entrar no modo edição'}
+                              style={{
+                                background: editingSubcategoriaMode[`${faseNome}__${catNome}`] ? 'var(--info)' : 'var(--stone)',
+                                border: 'none',
+                                borderRadius: '4px',
+                                padding: '4px 8px',
+                                cursor: 'pointer',
+                                color: editingSubcategoriaMode[`${faseNome}__${catNome}`] ? 'white' : 'var(--brown)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '2px',
+                                fontSize: '10px',
+                                fontWeight: 500,
+                                transition: 'all 0.2s'
+                              }}
+                            >
+                              <Edit2 size={12} />
+                            </button>
+                            {/* Botão Adicionar Entregável */}
                             <button
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handleAddToFase(faseNome, catNome)
                               }}
-                              title={`Adicionar desenho a ${catNome}`}
+                              title={`Adicionar entregável a ${catNome}`}
                               style={{
                                 background: 'var(--stone)',
                                 border: 'none',
@@ -890,7 +1122,9 @@ export default function ProjetoEntregaveis({ projeto }) {
                               {/* Cabeçalho das colunas */}
                               <div style={{
                                 display: 'grid',
-                                gridTemplateColumns: '32px 80px 1fr 70px 100px 100px 70px 70px 50px 60px',
+                                gridTemplateColumns: editingSubcategoriaMode[`${faseNome}__${catNome}`]
+                                  ? '24px 32px 80px 1fr 120px 70px 100px 100px 70px 70px 50px 90px'
+                                  : '32px 80px 1fr 120px 70px 100px 100px 70px 70px 50px 60px',
                                 alignItems: 'center',
                                 gap: '8px',
                                 padding: '8px 12px',
@@ -900,6 +1134,7 @@ export default function ProjetoEntregaveis({ projeto }) {
                                 textTransform: 'uppercase',
                                 letterSpacing: '0.5px'
                               }}>
+                                {editingSubcategoriaMode[`${faseNome}__${catNome}`] && <span></span>}
                                 <span
                                   onClick={toggleSelectAll}
                                   style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
@@ -913,6 +1148,7 @@ export default function ProjetoEntregaveis({ projeto }) {
                                 </span>
                                 <span>Código</span>
                                 <span>Descrição</span>
+                                <span>Obs.</span>
                                 <span style={{ textAlign: 'center' }}>Escala</span>
                                 <span style={{ textAlign: 'center' }}>Estado</span>
                                 <span style={{ textAlign: 'center' }}>Executante</span>
@@ -921,12 +1157,14 @@ export default function ProjetoEntregaveis({ projeto }) {
                                 <span style={{ textAlign: 'center' }}>Fich.</span>
                                 <span></span>
                               </div>
-                              {items.sort((a, b) => (a.codigo || '').localeCompare(b.codigo || '', undefined, { numeric: true })).map(item => (
+                              {items.sort((a, b) => (a.codigo || '').localeCompare(b.codigo || '', undefined, { numeric: true })).map((item, itemIndex, sortedItems) => (
                                 <div
                                   key={item.id}
                                   style={{
                                     display: 'grid',
-                                    gridTemplateColumns: '32px 80px 1fr 70px 100px 100px 70px 70px 50px 60px',
+                                    gridTemplateColumns: editingSubcategoriaMode[`${faseNome}__${catNome}`]
+                                      ? '24px 32px 80px 1fr 120px 70px 100px 100px 70px 70px 50px 90px'
+                                      : '32px 80px 1fr 120px 70px 100px 100px 70px 70px 50px 60px',
                                     alignItems: 'center',
                                     gap: '8px',
                                     padding: '10px 12px',
@@ -936,6 +1174,21 @@ export default function ProjetoEntregaveis({ projeto }) {
                                     fontSize: '13px'
                                   }}
                                 >
+                                  {/* Drag Handle - só em modo edição */}
+                                  {editingSubcategoriaMode[`${faseNome}__${catNome}`] && (
+                                    <span
+                                      style={{
+                                        cursor: 'grab',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: 'var(--brown-light)'
+                                      }}
+                                      title="Arrastar para reordenar"
+                                    >
+                                      <GripVertical size={14} />
+                                    </span>
+                                  )}
                                   {/* Checkbox */}
                                   <span
                                     onClick={() => toggleSelectItem(item.id)}
@@ -953,6 +1206,20 @@ export default function ProjetoEntregaveis({ projeto }) {
                                   </span>
                                   {/* Descrição */}
                                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.nome}</span>
+                                  {/* Observações */}
+                                  <span
+                                    style={{
+                                      fontSize: '11px',
+                                      color: item.notas ? 'var(--brown)' : 'var(--brown-light)',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      whiteSpace: 'nowrap',
+                                      opacity: item.notas ? 1 : 0.5
+                                    }}
+                                    title={item.notas || 'Sem observações'}
+                                  >
+                                    {item.notas || '—'}
+                                  </span>
                                   {/* Escala */}
                                   <span style={{ fontSize: '11px', color: 'var(--brown-light)', background: item.escala ? 'var(--stone)' : 'transparent', padding: '2px 6px', borderRadius: '4px', textAlign: 'center' }}>
                                     {item.escala || '-'}
@@ -988,6 +1255,7 @@ export default function ProjetoEntregaveis({ projeto }) {
                                         fontWeight: 600,
                                         background: statusConfig[item.status]?.bg,
                                         color: statusConfig[item.status]?.color,
+                                        border: statusConfig[item.status]?.border || 'none',
                                         textAlign: 'center',
                                         cursor: 'pointer',
                                         transition: 'all 0.2s'
@@ -1130,13 +1398,54 @@ export default function ProjetoEntregaveis({ projeto }) {
                                     )}
                                   </span>
                                   {/* Ações */}
-                                  <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
-                                    <button onClick={() => handleEdit(item)} className="btn btn-ghost btn-icon" style={{ padding: '4px' }}>
-                                      <Edit2 size={12} />
-                                    </button>
-                                    <button onClick={() => handleDelete(item)} className="btn btn-ghost btn-icon" style={{ padding: '4px', color: 'var(--error)' }}>
-                                      <Trash2 size={12} />
-                                    </button>
+                                  <div style={{ display: 'flex', gap: '2px', justifyContent: 'center', alignItems: 'center' }}>
+                                    {editingSubcategoriaMode[`${faseNome}__${catNome}`] ? (
+                                      <>
+                                        {/* Setas Up/Down */}
+                                        <button
+                                          onClick={() => handleMoveItem(item, 'up', items)}
+                                          disabled={itemIndex === 0}
+                                          className="btn btn-ghost btn-icon"
+                                          style={{
+                                            padding: '4px',
+                                            opacity: itemIndex === 0 ? 0.3 : 1,
+                                            cursor: itemIndex === 0 ? 'not-allowed' : 'pointer'
+                                          }}
+                                          title="Mover para cima"
+                                        >
+                                          <ChevronUp size={12} />
+                                        </button>
+                                        <button
+                                          onClick={() => handleMoveItem(item, 'down', items)}
+                                          disabled={itemIndex === sortedItems.length - 1}
+                                          className="btn btn-ghost btn-icon"
+                                          style={{
+                                            padding: '4px',
+                                            opacity: itemIndex === sortedItems.length - 1 ? 0.3 : 1,
+                                            cursor: itemIndex === sortedItems.length - 1 ? 'not-allowed' : 'pointer'
+                                          }}
+                                          title="Mover para baixo"
+                                        >
+                                          <ChevronDown size={12} />
+                                        </button>
+                                        {/* Edit/Delete */}
+                                        <button onClick={() => handleEdit(item)} className="btn btn-ghost btn-icon" style={{ padding: '4px' }}>
+                                          <Edit2 size={12} />
+                                        </button>
+                                        <button onClick={() => handleDelete(item)} className="btn btn-ghost btn-icon" style={{ padding: '4px', color: 'var(--error)' }}>
+                                          <Trash2 size={12} />
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <button onClick={() => handleEdit(item)} className="btn btn-ghost btn-icon" style={{ padding: '4px' }}>
+                                          <Edit2 size={12} />
+                                        </button>
+                                        <button onClick={() => handleDelete(item)} className="btn btn-ghost btn-icon" style={{ padding: '4px', color: 'var(--error)' }}>
+                                          <Trash2 size={12} />
+                                        </button>
+                                      </>
+                                    )}
                                   </div>
                                 </div>
                               ))}
@@ -1646,6 +1955,246 @@ export default function ProjetoEntregaveis({ projeto }) {
                 className="btn btn-primary"
               >
                 {savingFase ? <Loader2 size={16} className="spin" /> : <><Plus size={16} /> Criar Fase</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Editar Fase */}
+      {editingFase && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+          onClick={() => setEditingFase(null)}
+        >
+          <div
+            style={{
+              background: 'white',
+              borderRadius: '16px',
+              width: '400px',
+              maxWidth: '90vw'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{
+              padding: '20px 24px',
+              borderBottom: '1px solid var(--stone)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
+                Editar Fase
+              </h3>
+              <button
+                onClick={() => setEditingFase(null)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--brown-light)',
+                  padding: '4px'
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ padding: '24px' }}>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--brown)', marginBottom: '6px' }}>
+                  Nome da Fase *
+                </label>
+                <input
+                  type="text"
+                  value={editingFase.newName}
+                  onChange={(e) => setEditingFase(prev => ({ ...prev, newName: e.target.value }))}
+                  placeholder="Nome da fase"
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid var(--stone)',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    boxSizing: 'border-box'
+                  }}
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            <div style={{
+              padding: '16px 24px',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '12px',
+              background: 'var(--cream)'
+            }}>
+              <button
+                onClick={() => setEditingFase(null)}
+                className="btn btn-outline"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => handleEditFase(editingFase.nome, editingFase.newName)}
+                disabled={!editingFase.newName.trim()}
+                className="btn btn-primary"
+              >
+                <Save size={16} /> Guardar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Subcategoria */}
+      {showSubcategoriaModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+          onClick={() => setShowSubcategoriaModal(false)}
+        >
+          <div
+            style={{
+              background: 'white',
+              borderRadius: '16px',
+              width: '450px',
+              maxWidth: '90vw'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{
+              padding: '20px 24px',
+              borderBottom: '1px solid var(--stone)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
+                {subcategoriaData.isEditing ? 'Editar Subcategoria' : 'Nova Subcategoria'}
+              </h3>
+              <button
+                onClick={() => setShowSubcategoriaModal(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--brown-light)',
+                  padding: '4px'
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ padding: '24px' }}>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '12px', color: 'var(--brown-light)', marginBottom: '4px' }}>
+                  Fase
+                </label>
+                <div style={{
+                  padding: '10px 12px',
+                  background: 'var(--cream)',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  color: 'var(--brown)'
+                }}>
+                  {subcategoriaData.fase}
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--brown)', marginBottom: '6px' }}>
+                  Nome da Subcategoria *
+                </label>
+                <input
+                  type="text"
+                  value={subcategoriaData.nome}
+                  onChange={(e) => setSubcategoriaData(prev => ({ ...prev, nome: e.target.value }))}
+                  placeholder="Ex: Enquadramento urbano, Existente, Proposta..."
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid var(--stone)',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    boxSizing: 'border-box'
+                  }}
+                  autoFocus
+                />
+              </div>
+
+              {!subcategoriaData.isEditing && (
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--brown)', marginBottom: '6px' }}>
+                    Prefixo do Código
+                  </label>
+                  <input
+                    type="text"
+                    value={subcategoriaData.prefixoCodigo}
+                    onChange={(e) => setSubcategoriaData(prev => ({ ...prev, prefixoCodigo: e.target.value.toUpperCase() }))}
+                    placeholder="Ex: PEXA.413.03"
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      border: '1px solid var(--stone)',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      boxSizing: 'border-box',
+                      fontFamily: 'monospace'
+                    }}
+                  />
+                  <p style={{ fontSize: '11px', color: 'var(--brown-light)', marginTop: '6px' }}>
+                    Os novos entregáveis terão códigos como: {subcategoriaData.prefixoCodigo || 'PEXA.01'}.001, {subcategoriaData.prefixoCodigo || 'PEXA.01'}.002, etc.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div style={{
+              padding: '16px 24px',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '12px',
+              background: 'var(--cream)'
+            }}>
+              <button
+                onClick={() => {
+                  setShowSubcategoriaModal(false)
+                  setSubcategoriaData({ fase: '', nome: '', prefixoCodigo: '' })
+                }}
+                className="btn btn-outline"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveSubcategoria}
+                disabled={!subcategoriaData.nome.trim()}
+                className="btn btn-primary"
+              >
+                {subcategoriaData.isEditing ? <><Save size={16} /> Guardar</> : <><Plus size={16} /> Criar</>}
               </button>
             </div>
           </div>

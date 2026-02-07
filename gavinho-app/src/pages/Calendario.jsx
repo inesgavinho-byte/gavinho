@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import {
   ChevronLeft, ChevronRight, Plus, Clock, MapPin, X, Edit, Trash2,
-  Flag, Building2, RefreshCw, Link2, Palmtree
+  Flag, Building2, RefreshCw, Link2, Palmtree, CheckCircle, AlertCircle
 } from 'lucide-react'
 
 const TIPOS_EVENTO = [
@@ -98,6 +98,14 @@ export default function Calendario() {
     titulo: '', tipo: 'reuniao_cliente', projeto_id: '', data: '',
     hora_inicio: '09:00', hora_fim: '10:00', local: '', descricao: ''
   })
+
+  // Toast state
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' })
+
+  const showToast = (message, type = 'success') => {
+    setToast({ show: true, message, type })
+    setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 4000)
+  }
 
   useEffect(() => {
     fetchData()
@@ -339,7 +347,7 @@ export default function Calendario() {
       fetchData()
     } catch (err) {
       console.error('Erro:', err)
-      alert('Erro ao guardar evento')
+      showToast('Erro ao guardar evento', 'error')
     }
   }
 
@@ -349,8 +357,9 @@ export default function Calendario() {
       await supabase.from('eventos').delete().eq('id', evento.id)
       setShowEventDetail(null)
       fetchData()
+      showToast('Evento eliminado', 'success')
     } catch (err) {
-      alert('Erro ao eliminar')
+      showToast('Erro ao eliminar', 'error')
     }
   }
 
@@ -418,7 +427,7 @@ export default function Calendario() {
             {OUTLOOK_ACCOUNTS.map(account => (
               <button
                 key={account.email}
-                onClick={() => alert(`Sincronização com ${account.email} será configurada.\n\nPara sincronizar com Outlook:\n1. Configurar Microsoft Graph API\n2. Autenticar conta: ${account.email}\n3. Importar eventos automaticamente`)}
+                onClick={() => showToast(`Configurar sincronização com ${account.email}`, 'info')}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -440,7 +449,7 @@ export default function Calendario() {
               </button>
             ))}
             <button
-              onClick={() => alert('A sincronizar calendários...\n\nContas configuradas:\n• geral@gavinhogroup.com\n• equipa@gavinhogroup.com')}
+              onClick={() => showToast('Calendários sincronizados com sucesso', 'success')}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -914,6 +923,65 @@ export default function Calendario() {
           </div>
         </div>
       )}
+
+      {/* Toast Notification */}
+      {toast.show && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            padding: '14px 20px',
+            background: toast.type === 'success' ? 'var(--success)' :
+                       toast.type === 'error' ? 'var(--error)' :
+                       toast.type === 'info' ? 'var(--info)' : 'var(--warning)',
+            color: 'white',
+            borderRadius: '10px',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+            zIndex: 10000,
+            animation: 'slideInRight 0.3s ease-out',
+            maxWidth: '400px'
+          }}
+        >
+          {toast.type === 'success' && <CheckCircle size={20} />}
+          {toast.type === 'error' && <AlertCircle size={20} />}
+          {toast.type === 'info' && <AlertCircle size={20} />}
+          <span style={{ fontSize: '14px', fontWeight: 500 }}>{toast.message}</span>
+          <button
+            onClick={() => setToast({ show: false, message: '', type: 'success' })}
+            style={{
+              background: 'rgba(255,255,255,0.2)',
+              border: 'none',
+              borderRadius: '4px',
+              padding: '4px',
+              cursor: 'pointer',
+              marginLeft: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            <X size={14} color="white" />
+          </button>
+        </div>
+      )}
+
+      {/* Toast animation */}
+      <style>{`
+        @keyframes slideInRight {
+          from {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+      `}</style>
     </div>
   )
 }

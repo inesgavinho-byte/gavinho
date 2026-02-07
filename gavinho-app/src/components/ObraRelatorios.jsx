@@ -3,8 +3,12 @@ import { supabase } from '../lib/supabase'
 import {
   FileText, Plus, X, Calendar, Edit2, Trash2, Eye, Download,
   ChevronDown, ChevronRight, Send, Save, Clock, Loader2,
-  CheckCircle, AlertCircle, FileEdit, Image as ImageIcon
+  CheckCircle, AlertCircle, FileEdit, Image as ImageIcon, FileDown
 } from 'lucide-react'
+import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
+         AlignmentType, BorderStyle, WidthType, ShadingType, HeadingLevel } from 'docx'
+import { saveAs } from 'file-saver'
+import jsPDF from 'jspdf'
 
 const TIPOS_RELATORIO = [
   { id: 'semanal', label: 'Semanal' },
@@ -190,8 +194,263 @@ export default function ObraRelatorios({ obra }) {
     }
   }
 
+  // Exportar DOCX
+  const handleExportDocx = async (relatorio) => {
+    try {
+      const tipoLabel = TIPOS_RELATORIO.find(t => t.id === relatorio.tipo)?.label || relatorio.tipo
+      const periodoText = `${formatDate(relatorio.data_inicio)} a ${formatDate(relatorio.data_fim)}`
+
+      const sections = []
+
+      // Header
+      sections.push(
+        new Paragraph({
+          children: [new TextRun({ text: obra?.nome || 'Obra', bold: true, size: 32 })],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 100 }
+        }),
+        new Paragraph({
+          children: [new TextRun({ text: `Relatorio ${tipoLabel}`, size: 24, color: '666666' })],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 200 }
+        }),
+        new Paragraph({
+          children: [new TextRun({ text: relatorio.titulo, bold: true, size: 28 })],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 100 }
+        }),
+        new Paragraph({
+          children: [new TextRun({ text: `Periodo: ${periodoText}`, size: 20, color: '888888' })],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 400 }
+        })
+      )
+
+      // Progresso Global
+      if (relatorio.progresso_global != null) {
+        sections.push(
+          new Paragraph({
+            children: [new TextRun({ text: 'Progresso Global', bold: true, size: 24 })],
+            spacing: { before: 300, after: 100 }
+          }),
+          new Paragraph({
+            children: [new TextRun({ text: `${relatorio.progresso_global}%`, size: 22 })],
+            spacing: { after: 200 }
+          })
+        )
+      }
+
+      // Resumo Executivo
+      if (relatorio.resumo_executivo) {
+        sections.push(
+          new Paragraph({
+            children: [new TextRun({ text: 'Resumo Executivo', bold: true, size: 24 })],
+            spacing: { before: 300, after: 100 }
+          }),
+          new Paragraph({
+            children: [new TextRun({ text: relatorio.resumo_executivo, size: 22 })],
+            spacing: { after: 200 }
+          })
+        )
+      }
+
+      // Trabalhos Realizados
+      if (relatorio.trabalhos_realizados) {
+        sections.push(
+          new Paragraph({
+            children: [new TextRun({ text: 'Trabalhos Realizados', bold: true, size: 24 })],
+            spacing: { before: 300, after: 100 }
+          }),
+          new Paragraph({
+            children: [new TextRun({ text: relatorio.trabalhos_realizados, size: 22 })],
+            spacing: { after: 200 }
+          })
+        )
+      }
+
+      // Trabalhos Proximos
+      if (relatorio.trabalhos_proxima_semana) {
+        sections.push(
+          new Paragraph({
+            children: [new TextRun({ text: 'Trabalhos Previstos Proximo Periodo', bold: true, size: 24 })],
+            spacing: { before: 300, after: 100 }
+          }),
+          new Paragraph({
+            children: [new TextRun({ text: relatorio.trabalhos_proxima_semana, size: 22 })],
+            spacing: { after: 200 }
+          })
+        )
+      }
+
+      // Problemas
+      if (relatorio.problemas_identificados) {
+        sections.push(
+          new Paragraph({
+            children: [new TextRun({ text: 'Problemas Identificados', bold: true, size: 24, color: 'CC0000' })],
+            spacing: { before: 300, after: 100 }
+          }),
+          new Paragraph({
+            children: [new TextRun({ text: relatorio.problemas_identificados, size: 22 })],
+            spacing: { after: 200 }
+          })
+        )
+      }
+
+      // Decisoes Pendentes
+      if (relatorio.decisoes_pendentes) {
+        sections.push(
+          new Paragraph({
+            children: [new TextRun({ text: 'Decisoes Pendentes', bold: true, size: 24, color: 'CC6600' })],
+            spacing: { before: 300, after: 100 }
+          }),
+          new Paragraph({
+            children: [new TextRun({ text: relatorio.decisoes_pendentes, size: 22 })],
+            spacing: { after: 200 }
+          })
+        )
+      }
+
+      // Observacoes
+      if (relatorio.observacoes) {
+        sections.push(
+          new Paragraph({
+            children: [new TextRun({ text: 'Observacoes', bold: true, size: 24 })],
+            spacing: { before: 300, after: 100 }
+          }),
+          new Paragraph({
+            children: [new TextRun({ text: relatorio.observacoes, size: 22 })],
+            spacing: { after: 200 }
+          })
+        )
+      }
+
+      // Footer
+      sections.push(
+        new Paragraph({
+          children: [new TextRun({ text: `Gerado em ${new Date().toLocaleString('pt-PT')}`, size: 18, color: 'AAAAAA' })],
+          alignment: AlignmentType.RIGHT,
+          spacing: { before: 400 }
+        })
+      )
+
+      const doc = new Document({
+        sections: [{
+          properties: {},
+          children: sections
+        }]
+      })
+
+      const blob = await Packer.toBlob(doc)
+      saveAs(blob, `${relatorio.codigo}_${obra?.codigo || 'obra'}.docx`)
+    } catch (err) {
+      console.error('Erro ao exportar DOCX:', err)
+      alert('Erro ao exportar DOCX')
+    }
+  }
+
+  // Exportar PDF
+  const handleExportPdf = (relatorio) => {
+    try {
+      const tipoLabel = TIPOS_RELATORIO.find(t => t.id === relatorio.tipo)?.label || relatorio.tipo
+      const periodoText = `${formatDate(relatorio.data_inicio)} a ${formatDate(relatorio.data_fim)}`
+
+      const pdf = new jsPDF()
+      let y = 20
+
+      // Header
+      pdf.setFontSize(18)
+      pdf.setFont('helvetica', 'bold')
+      pdf.text(obra?.nome || 'Obra', 105, y, { align: 'center' })
+      y += 8
+
+      pdf.setFontSize(12)
+      pdf.setFont('helvetica', 'normal')
+      pdf.setTextColor(100)
+      pdf.text(`Relatorio ${tipoLabel}`, 105, y, { align: 'center' })
+      y += 10
+
+      pdf.setFontSize(14)
+      pdf.setFont('helvetica', 'bold')
+      pdf.setTextColor(0)
+      pdf.text(relatorio.titulo, 105, y, { align: 'center' })
+      y += 8
+
+      pdf.setFontSize(10)
+      pdf.setFont('helvetica', 'normal')
+      pdf.setTextColor(100)
+      pdf.text(`Periodo: ${periodoText}`, 105, y, { align: 'center' })
+      y += 15
+
+      // Linha separadora
+      pdf.setDrawColor(200)
+      pdf.line(20, y, 190, y)
+      y += 10
+
+      // Progresso Global
+      if (relatorio.progresso_global != null) {
+        pdf.setFontSize(12)
+        pdf.setFont('helvetica', 'bold')
+        pdf.setTextColor(0)
+        pdf.text('Progresso Global', 20, y)
+        y += 6
+        pdf.setFont('helvetica', 'normal')
+        pdf.text(`${relatorio.progresso_global}%`, 20, y)
+        y += 12
+      }
+
+      // Funcao auxiliar para adicionar secao
+      const addSection = (title, content, color = [0, 0, 0]) => {
+        if (!content) return
+
+        // Verificar se precisa de nova pagina
+        if (y > 250) {
+          pdf.addPage()
+          y = 20
+        }
+
+        pdf.setFontSize(12)
+        pdf.setFont('helvetica', 'bold')
+        pdf.setTextColor(color[0], color[1], color[2])
+        pdf.text(title, 20, y)
+        y += 6
+
+        pdf.setFontSize(10)
+        pdf.setFont('helvetica', 'normal')
+        pdf.setTextColor(60)
+
+        const lines = pdf.splitTextToSize(content, 170)
+        lines.forEach(line => {
+          if (y > 280) {
+            pdf.addPage()
+            y = 20
+          }
+          pdf.text(line, 20, y)
+          y += 5
+        })
+        y += 8
+      }
+
+      addSection('Resumo Executivo', relatorio.resumo_executivo)
+      addSection('Trabalhos Realizados', relatorio.trabalhos_realizados)
+      addSection('Trabalhos Previstos Proximo Periodo', relatorio.trabalhos_proxima_semana)
+      addSection('Problemas Identificados', relatorio.problemas_identificados, [180, 0, 0])
+      addSection('Decisoes Pendentes', relatorio.decisoes_pendentes, [180, 90, 0])
+      addSection('Observacoes', relatorio.observacoes)
+
+      // Footer
+      pdf.setFontSize(8)
+      pdf.setTextColor(150)
+      pdf.text(`Gerado em ${new Date().toLocaleString('pt-PT')}`, 190, 290, { align: 'right' })
+
+      pdf.save(`${relatorio.codigo}_${obra?.codigo || 'obra'}.pdf`)
+    } catch (err) {
+      console.error('Erro ao exportar PDF:', err)
+      alert('Erro ao exportar PDF')
+    }
+  }
+
   const handleDelete = async (relatorio) => {
-    if (!confirm('Tem certeza que deseja apagar este relatório?')) return
+    if (!confirm('Tem certeza que deseja apagar este relatorio?')) return
 
     try {
       const { error } = await supabase
@@ -203,7 +462,7 @@ export default function ObraRelatorios({ obra }) {
       loadData()
     } catch (err) {
       console.error('Erro ao apagar:', err)
-      alert('Erro ao apagar relatório')
+      alert('Erro ao apagar relatorio')
     }
   }
 
@@ -400,6 +659,20 @@ export default function ObraRelatorios({ obra }) {
 
                   {/* Ações */}
                   <div style={{ display: 'flex', gap: '4px' }}>
+                    <button
+                      className="btn btn-ghost btn-icon"
+                      onClick={() => handleExportPdf(relatorio)}
+                      title="Exportar PDF"
+                    >
+                      <FileDown size={16} />
+                    </button>
+                    <button
+                      className="btn btn-ghost btn-icon"
+                      onClick={() => handleExportDocx(relatorio)}
+                      title="Exportar DOCX"
+                    >
+                      <Download size={16} />
+                    </button>
                     <button
                       className="btn btn-ghost btn-icon"
                       onClick={() => handleEdit(relatorio)}

@@ -27,101 +27,78 @@ import {
   Loader2, FolderDown, MessageSquarePlus, UsersRound
 } from 'lucide-react'
 
-// Microsoft Graph API Configuration
-const MS_GRAPH_CONFIG = {
-  clientId: import.meta.env.VITE_MS_CLIENT_ID || 'YOUR_CLIENT_ID',
-  authority: 'https://login.microsoftonline.com/common',
-  redirectUri: typeof window !== 'undefined' ? window.location.origin + '/oauth/callback' : '',
-  scopes: ['User.Read', 'Team.ReadBasic.All', 'Channel.ReadBasic.All', 'ChannelMessage.Read.All', 'Files.Read.All']
-}
+// Import extracted utilities and constants
+import {
+  MS_GRAPH_CONFIG,
+  USER_STATUS_OPTIONS,
+  MESSAGE_TAGS,
+  REMINDER_OPTIONS,
+  EQUIPAS_GAVINHO,
+  DEFAULT_TOPICS,
+  REACTIONS,
+  EMOJI_CATEGORIES,
+  FILTER_OPTIONS,
+  KEYBOARD_SHORTCUTS
+} from './Workspace/utils/constants'
 
-// Status options for users
-const USER_STATUS_OPTIONS = [
-  { id: 'available', label: 'Disponível', icon: 'CheckCircle2', color: '#22c55e' },
-  { id: 'busy', label: 'Ocupado', icon: 'XCircle', color: '#ef4444' },
-  { id: 'away', label: 'Ausente', icon: 'Clock', color: '#f59e0b' },
-  { id: 'dnd', label: 'Não incomodar', icon: 'BellOff', color: '#ef4444' },
-  { id: 'meeting', label: 'Em reunião', icon: 'Video', color: '#8b5cf6' },
-  { id: 'lunch', label: 'Almoço', icon: 'Coffee', color: '#f97316' },
-  { id: 'vacation', label: 'Férias', icon: 'Plane', color: '#06b6d4' },
-  { id: 'wfh', label: 'A trabalhar de casa', icon: 'Home', color: '#10b981' }
-]
+import {
+  formatTime,
+  formatDateTime,
+  formatFileSize,
+  getInitials,
+  extractUrls
+} from './Workspace/utils/formatters'
 
-// Message tags/labels
-const MESSAGE_TAGS = [
-  { id: 'urgent', label: 'Urgente', color: '#ef4444' },
-  { id: 'important', label: 'Importante', color: '#f59e0b' },
-  { id: 'followup', label: 'Follow-up', color: '#8b5cf6' },
-  { id: 'decision', label: 'Decisão', color: '#3b82f6' },
-  { id: 'info', label: 'Informação', color: '#06b6d4' },
-  { id: 'action', label: 'Ação necessária', color: '#ec4899' }
-]
+import {
+  renderFormattedText,
+  applyFormatting as applyFormattingUtil,
+  insertEmoji as insertEmojiUtil,
+  insertMention as insertMentionUtil,
+  isOwnMessage
+} from './Workspace/utils/messageUtils'
 
-// Reminder options
-const REMINDER_OPTIONS = [
-  { id: '30min', label: 'Em 30 minutos', minutes: 30 },
-  { id: '1h', label: 'Em 1 hora', minutes: 60 },
-  { id: '2h', label: 'Em 2 horas', minutes: 120 },
-  { id: '4h', label: 'Em 4 horas', minutes: 240 },
-  { id: 'tomorrow', label: 'Amanhã de manhã', minutes: 'tomorrow' },
-  { id: 'nextweek', label: 'Próxima semana', minutes: 'nextweek' },
-  { id: 'custom', label: 'Personalizado...', minutes: 'custom' }
-]
+import {
+  getPresenceColor,
+  isUserOnline as checkUserOnline,
+  getTypingText
+} from './Workspace/utils/presenceUtils'
 
-// Estrutura de equipas GAVINHO (baseado no Teams)
-const EQUIPAS_GAVINHO = [
-  { id: 'arch', nome: 'GAVINHO ARCH', cor: '#6366f1', inicial: 'A', descricao: 'Projetos de Arquitetura' },
-  { id: 'hosp', nome: 'GAVINHO HOSP.', cor: '#f59e0b', inicial: 'H', descricao: 'Projetos de Hospitalidade' },
-  { id: 'signature', nome: 'GAVINHO Signature', cor: '#10b981', inicial: 'GS', descricao: 'Projetos Premium' }
-]
+// Import extracted components
+import {
+  KeyboardShortcutsModal,
+  EmojiPicker,
+  CreateTaskModal,
+  ForwardMessageModal,
+  CallModal,
+  ReminderModal,
+  StatusMenu,
+  DMPanel,
+  MessageList,
+  MessageInput,
+  WorkspaceSidebar,
+  ChannelHeader,
+  ThreadPanel,
+  ActivityLogPanel,
+  SavedMessagesPanel,
+  ThemeToggle
+} from './Workspace/components'
 
-// Tópicos padrão para cada canal/projeto
-const DEFAULT_TOPICS = [
-  { id: 'geral', nome: 'Geral', icon: 'MessageSquare', cor: '#6b7280' },
-  { id: 'estudo-previo', nome: 'Estudo Prévio', icon: 'FileText', cor: '#8b5cf6' },
-  { id: 'projeto-execucao', nome: 'Projeto de Execução', icon: 'Building2', cor: '#3b82f6' },
-  { id: 'central-entregas', nome: 'Central de Entregas', icon: 'FolderOpen', cor: '#10b981' },
-  { id: 'obra', nome: 'Acompanhamento Obra', icon: 'Grip', cor: '#f59e0b' },
-  { id: 'cliente', nome: 'Cliente', icon: 'Users', cor: '#ec4899' }
-]
+// Import theme context
+import { ThemeProvider, useTheme } from './Workspace/context'
 
-// Reações disponíveis (estilo Teams)
-const REACTIONS = [
-  { emoji: '👍', name: 'like' },
-  { emoji: '❤️', name: 'heart' },
-  { emoji: '😄', name: 'laugh' },
-  { emoji: '😮', name: 'surprised' },
-  { emoji: '😢', name: 'sad' },
-  { emoji: '🎉', name: 'celebrate' }
-]
+// Import custom hooks
+import {
+  useChannelData,
+  useMessageActions,
+  usePresence,
+  useNotifications,
+  useTeamsImport,
+  useToast,
+  useConfirm
+} from './Workspace/hooks'
 
-// Emojis organizados por categoria
-const EMOJI_CATEGORIES = [
-  {
-    name: 'Frequentes',
-    emojis: ['👍', '❤️', '😄', '🎉', '👏', '🙏', '💪', '✅', '🔥', '⭐']
-  },
-  {
-    name: 'Caras',
-    emojis: ['😀', '😃', '😄', '😁', '😅', '😂', '🤣', '😊', '😇', '🙂', '😉', '😌', '😍', '🥰', '😘', '😋', '😛', '🤔', '🤨', '😐', '😑', '😶', '🙄', '😏', '😮', '😲', '😳', '🥺', '😢', '😭', '😤', '😠', '🤯', '😱', '🥴', '😴']
-  },
-  {
-    name: 'Gestos',
-    emojis: ['👋', '🤚', '✋', '🖐️', '👌', '🤌', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '👇', '☝️', '👍', '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '🤝', '🙏', '💪']
-  },
-  {
-    name: 'Objetos',
-    emojis: ['💼', '📁', '📂', '📄', '📝', '✏️', '📌', '📎', '🔗', '📧', '📨', '💻', '🖥️', '📱', '📷', '🎨', '🏠', '🏢', '🏗️', '🔨', '🔧', '📐', '📏', '🗓️', '⏰', '💡', '🔑', '🔒']
-  },
-  {
-    name: 'Símbolos',
-    emojis: ['✅', '❌', '⭕', '❗', '❓', '💯', '🔴', '🟠', '🟡', '🟢', '🔵', '🟣', '⚪', '⚫', '▶️', '⏸️', '⏹️', '🔄', '➡️', '⬅️', '⬆️', '⬇️', '↗️', '↘️', '🔔', '🔕']
-  },
-  {
-    name: 'Celebração',
-    emojis: ['🎉', '🎊', '🎈', '🎁', '🏆', '🥇', '🥈', '🥉', '🏅', '🎯', '🌟', '✨', '💫', '🔥', '💥', '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '💕', '💖', '💗']
-  }
-]
+import { ConfirmModal, ToastContainer, ExportModal, CreatePrivateChannelModal, WebhookSettingsModal, ScheduleMessageModal, EmailSettingsModal } from './Workspace/components/Modals'
+import CentralEntregasChat from './Workspace/components/CentralEntregasChat'
 
 export default function Workspace() {
   // Handle OAuth callback in popup
@@ -152,238 +129,167 @@ export default function Workspace() {
 
   const { profile, getUserInitials } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
-  const [loading, setLoading] = useState(true)
   const [linkCopied, setLinkCopied] = useState(false)
 
-  // Estrutura Teams
-  const [equipas, setEquipas] = useState(EQUIPAS_GAVINHO)
-  const [equipaAtiva, setEquipaAtiva] = useState(null)
-  const [equipasExpanded, setEquipasExpanded] = useState({})
+  // ========== CUSTOM HOOKS ==========
 
-  // Canais (projetos dentro de cada equipa)
-  const [canais, setCanais] = useState([])
-  const [canalAtivo, setCanalAtivo] = useState(null)
+  // Channel Data Hook
+  const {
+    loading, equipas, equipaAtiva, equipasExpanded, canais, canalAtivo,
+    channelTopics, activeTopic, showAddTopic, newTopicName, activeTab, membros, favoriteChannels,
+    setEquipaAtiva, setEquipasExpanded, setCanalAtivo, setActiveTopic, setShowAddTopic,
+    setNewTopicName, setActiveTab, setMembros, loadData, loadTopics, addTopic, renameTopic, removeTopic,
+    getEquipaCanais, toggleEquipa, selectCanal, toggleFavorite, isFavorite, getChannelLink
+  } = useChannelData()
 
-  // Tópicos dentro do canal
-  const [channelTopics, setChannelTopics] = useState({})
-  const [activeTopic, setActiveTopic] = useState('geral')
-  const [showAddTopic, setShowAddTopic] = useState(false)
-  const [newTopicName, setNewTopicName] = useState('')
+  // Message Actions Hook
+  const {
+    posts, messageInput, replyInput, messageInputRef, editingMessage, editingContent,
+    replyingTo, showMessageMenu, activeThread, threadReplies, selectedFiles, uploading,
+    showEmojiPicker, emojiCategory, showMentions, mentionQuery, mentionStartIndex,
+    showFormattingToolbar, savedMessages, messageTags, showTagSelector,
+    hasMoreMessages, loadingMoreMessages,
+    setPosts, setMessageInput, setReplyInput, setEditingMessage, setEditingContent,
+    setReplyingTo, setShowMessageMenu, setActiveThread, setSelectedFiles, setUploading,
+    setShowEmojiPicker, setEmojiCategory, setShowMentions, setMentionQuery, setMentionStartIndex,
+    setShowFormattingToolbar, setShowTagSelector, loadPosts, loadMorePosts, loadThreadReplies,
+    sendMessage, sendReply, editMessage, deleteMessage, addReaction,
+    toggleSaveMessage, isMessageSaved, forwardMessage, tagMessage, removeTag,
+    openThread, closeThread, handleFileSelect, removeFile, insertEmoji
+  } = useMessageActions(profile)
 
-  // Tabs do canal
-  const [activeTab, setActiveTab] = useState('publicacoes')
+  // Presence Hook
+  const {
+    typingUsers, onlineUsers, readReceipts, userStatus, customStatusMessage, showStatusMenu,
+    setTypingUsers, setUserStatus, setCustomStatusMessage, setShowStatusMenu,
+    updateMyPresence, loadOnlineUsers, handleTyping, setUserTyping,
+    isUserOnline, getUserStatus, getPresenceColor: getPresenceColorHook, getPresenceLabel,
+    markMessageAsRead, getReadStatus, isMessageRead, updateUserStatus
+  } = usePresence(profile, membros, canalAtivo?.id)
 
-  // Mensagens/Posts
-  const [posts, setPosts] = useState([])
+  // Notifications Hook
+  const {
+    mutedChannels, soundEnabled, channelPinnedMessages, showPinnedMessages,
+    dndEnabled, dndSchedule, showDndSettings, reminders, showReminderModal,
+    reminderMessage, customReminderDate, setMutedChannels, setSoundEnabled,
+    setShowPinnedMessages, setDndEnabled, setDndSchedule, setShowDndSettings,
+    setReminders, setShowReminderModal, setReminderMessage, setCustomReminderDate,
+    toggleMuteChannel, isChannelMuted, toggleSound, playNotificationSound,
+    togglePinMessage, isMessagePinned, getChannelPinnedMessages, toggleDnd,
+    updateDndSchedule, isDndActive, addReminder, removeReminder,
+    markReminderComplete, getActiveReminders, openReminderModal,
+    // Mention notifications
+    parseMentions, findMentionedUserIds, createMentionNotifications
+  } = useNotifications(profile)
+
+  // Toast & Confirm Hooks (replacing alert/confirm)
+  const { toasts, success: toastSuccess, error: toastError, info: toastInfo, dismissToast } = useToast()
+  const { confirmState, confirm, closeConfirm, confirmArchive } = useConfirm()
+
+  // ========== REMAINING LOCAL STATE ==========
+
+  // Search
   const [searchQuery, setSearchQuery] = useState('')
   const [showSearch, setShowSearch] = useState(false)
-
-  // Threads
-  const [activeThread, setActiveThread] = useState(null)
-  const [threadReplies, setThreadReplies] = useState({})
-
-  // Input
-  const [messageInput, setMessageInput] = useState('')
-  const [replyInput, setReplyInput] = useState('')
-
-  // Emoji Picker
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false)
-  const [emojiCategory, setEmojiCategory] = useState('Frequentes')
-
-  // Mention Autocomplete
-  const [showMentions, setShowMentions] = useState(false)
-  const [mentionQuery, setMentionQuery] = useState('')
-  const [mentionStartIndex, setMentionStartIndex] = useState(-1)
-
-  // Edit/Delete/Reply
-  const [editingMessage, setEditingMessage] = useState(null)
-  const [editingContent, setEditingContent] = useState('')
-  const [replyingTo, setReplyingTo] = useState(null)
-  const [showMessageMenu, setShowMessageMenu] = useState(null)
-
-  // Upload
-  const [selectedFiles, setSelectedFiles] = useState([])
-  const [uploading, setUploading] = useState(false)
-
-  // Equipa members
-  const [membros, setMembros] = useState([])
-
-  // Notifications
-  const [mutedChannels, setMutedChannels] = useState([])
-  const [pinnedMessages, setPinnedMessages] = useState([])
-  const [soundEnabled, setSoundEnabled] = useState(true)
-
-  // Saved Messages (Bookmarks)
-  const [savedMessages, setSavedMessages] = useState([])
   const [showSavedMessages, setShowSavedMessages] = useState(false)
-
-  // Filters
   const [activeFilter, setActiveFilter] = useState('all')
   const [showFilters, setShowFilters] = useState(false)
-
-  // Advanced Search
   const [showAdvancedSearch, setShowAdvancedSearch] = useState(false)
   const [searchFilters, setSearchFilters] = useState({
-    author: '',
-    dateFrom: '',
-    dateTo: '',
-    hasAttachments: false,
-    hasMentions: false
+    author: '', dateFrom: '', dateTo: '', hasAttachments: false, hasMentions: false
   })
 
-  // Rich Text Formatting
-  const [showFormattingToolbar, setShowFormattingToolbar] = useState(true)
-
-  // Typing Indicator
-  const [typingUsers, setTypingUsers] = useState([])
+  // Legacy
+  const [pinnedMessages, setPinnedMessages] = useState([])
+  const [filterByTag, setFilterByTag] = useState(null)
   const typingTimeoutRef = useRef(null)
 
-  // Online Status - {userId: 'online'|'away'|'offline'}
-  const [onlineUsers, setOnlineUsers] = useState({})
-
-  // Read Receipts
-  const [readReceipts, setReadReceipts] = useState({})
-
-  // Favorite Channels
-  const [favoriteChannels, setFavoriteChannels] = useState([])
-
-  // Pinned Messages
-  const [channelPinnedMessages, setChannelPinnedMessages] = useState({})
-  const [showPinnedMessages, setShowPinnedMessages] = useState(false)
-
-  // Create Task Modal
+  // Modals
   const [showCreateTaskModal, setShowCreateTaskModal] = useState(false)
   const [taskFromMessage, setTaskFromMessage] = useState(null)
-
-  // Forward Message Modal
   const [showForwardModal, setShowForwardModal] = useState(false)
   const [messageToForward, setMessageToForward] = useState(null)
-
-  // Drag & Drop
   const [isDragging, setIsDragging] = useState(false)
-
-  // Keyboard shortcuts help
   const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false)
-
-  // Activity Log
   const [showActivityLog, setShowActivityLog] = useState(false)
-  const [activityFilter, setActivityFilter] = useState('all') // all, mentions, unread
+  const [activityFilter, setActivityFilter] = useState('all')
   const [activityLog, setActivityLog] = useState([])
 
-  // ========== NEW FEATURES STATE ==========
-
-  // Direct Messages (DM)
+  // DM
   const [showDMPanel, setShowDMPanel] = useState(false)
   const [directMessages, setDirectMessages] = useState([])
   const [activeDM, setActiveDM] = useState(null)
   const [dmMessages, setDmMessages] = useState({})
   const [showNewDMModal, setShowNewDMModal] = useState(false)
 
-  // Video/Audio Calls
+  // Calls
   const [showCallModal, setShowCallModal] = useState(false)
   const [activeCall, setActiveCall] = useState(null)
-  const [callType, setCallType] = useState(null) // 'video' or 'audio'
+  const [callType, setCallType] = useState(null)
   const [isMuted, setIsMuted] = useState(false)
   const [isVideoOff, setIsVideoOff] = useState(false)
   const [isScreenSharing, setIsScreenSharing] = useState(false)
 
-  // Message Reminders
-  const [showReminderModal, setShowReminderModal] = useState(false)
-  const [reminderMessage, setReminderMessage] = useState(null)
-  const [reminders, setReminders] = useState([])
-  const [customReminderDate, setCustomReminderDate] = useState('')
-
-  // Calendar Integration
+  // Calendar
   const [showScheduleMeetingModal, setShowScheduleMeetingModal] = useState(false)
   const [meetingDetails, setMeetingDetails] = useState({
-    title: '',
-    date: '',
-    time: '',
-    duration: '30',
-    participants: [],
-    description: ''
+    title: '', date: '', time: '', duration: '30', participants: [], description: ''
   })
 
-  // AI Bot/Assistant
+  // AI
   const [showAIAssistant, setShowAIAssistant] = useState(false)
   const [aiMessages, setAiMessages] = useState([])
   const [aiInput, setAiInput] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
 
-  // Private Channels
+  // Channels
   const [privateChannels, setPrivateChannels] = useState([])
   const [showCreatePrivateChannel, setShowCreatePrivateChannel] = useState(false)
   const [newPrivateChannel, setNewPrivateChannel] = useState({ name: '', members: [] })
-
-  // Archive Channels
   const [archivedChannels, setArchivedChannels] = useState([])
   const [showArchivedChannels, setShowArchivedChannels] = useState(false)
 
-  // Channel Analytics
+  // Analytics
   const [showAnalytics, setShowAnalytics] = useState(false)
   const [channelAnalytics, setChannelAnalytics] = useState({
-    totalMessages: 0,
-    messagesThisWeek: 0,
-    activeUsers: 0,
-    topContributors: [],
-    activityByDay: [],
-    popularTopics: []
+    totalMessages: 0, messagesThisWeek: 0, activeUsers: 0,
+    topContributors: [], activityByDay: [], popularTopics: []
   })
 
-  // Tags/Labels
-  const [messageTags, setMessageTags] = useState({})
-  const [showTagSelector, setShowTagSelector] = useState(null)
-  const [filterByTag, setFilterByTag] = useState(null)
-
-  // User Status
-  const [userStatus, setUserStatus] = useState('available')
-  const [customStatusMessage, setCustomStatusMessage] = useState('')
-  const [showStatusMenu, setShowStatusMenu] = useState(false)
-
-  // Do Not Disturb
-  const [dndEnabled, setDndEnabled] = useState(false)
-  const [dndSchedule, setDndSchedule] = useState({ start: '22:00', end: '08:00' })
-  const [showDndSettings, setShowDndSettings] = useState(false)
-
-  // User Profile Card
+  // Profile
   const [showProfileCard, setShowProfileCard] = useState(null)
   const [expandedProfile, setExpandedProfile] = useState(null)
-
-  // Desktop Notifications
   const [notificationsEnabled, setNotificationsEnabled] = useState(false)
   const [notificationPermission, setNotificationPermission] = useState('default')
 
-  // Export Conversation
+  // Export
   const [showExportModal, setShowExportModal] = useState(false)
-  const [exportFormat, setExportFormat] = useState('pdf')
-  const [exportDateRange, setExportDateRange] = useState({ from: '', to: '' })
 
-  // Webhooks
+  // Webhooks & Email
   const [webhooks, setWebhooks] = useState([])
   const [showWebhookSettings, setShowWebhookSettings] = useState(false)
   const [newWebhook, setNewWebhook] = useState({ url: '', events: [] })
-
-  // Email Sync
   const [emailSyncEnabled, setEmailSyncEnabled] = useState(false)
   const [emailDigestFrequency, setEmailDigestFrequency] = useState('daily')
   const [showEmailSettings, setShowEmailSettings] = useState(false)
 
-  // ========== MICROSOFT TEAMS IMPORT ==========
-  const [showTeamsImport, setShowTeamsImport] = useState(false)
-  const [teamsAuthState, setTeamsAuthState] = useState('idle') // idle, authenticating, authenticated, error
-  const [teamsAccessToken, setTeamsAccessToken] = useState(null)
-  const [teamsUser, setTeamsUser] = useState(null)
-  const [availableTeams, setAvailableTeams] = useState([])
-  const [selectedTeamsToImport, setSelectedTeamsToImport] = useState([])
-  const [teamsChannels, setTeamsChannels] = useState({}) // { teamId: [channels] }
-  const [selectedChannelsToImport, setSelectedChannelsToImport] = useState([])
-  const [importProgress, setImportProgress] = useState({ status: 'idle', current: 0, total: 0, currentItem: '' })
-  const [importLog, setImportLog] = useState([])
-  const [importStep, setImportStep] = useState(1) // 1: Auth, 2: Select Teams, 3: Select Channels, 4: Import, 5: Complete
+  // Scheduled Messages
+  const [scheduledMessages, setScheduledMessages] = useState([])
+  const [showScheduleMessage, setShowScheduleMessage] = useState(false)
 
+  // Teams Import Hook
+  const {
+    showTeamsImport, setShowTeamsImport, openTeamsImport, closeTeamsImport,
+    teamsAuthState, teamsAccessToken, teamsUser,
+    availableTeams, selectedTeamsToImport, teamsChannels, selectedChannelsToImport,
+    importProgress, importLog, importStep,
+    startTeamsAuth, fetchTeamsUser, fetchAvailableTeams, fetchTeamChannels,
+    toggleTeamSelection, toggleChannelSelection, startTeamsImport, resetTeamsImport, goToStep
+  } = useTeamsImport()
+
+  // Refs
   const fileInputRef = useRef(null)
   const messagesEndRef = useRef(null)
-  const messageInputRef = useRef(null)
   const presenceIntervalRef = useRef(null)
 
   useEffect(() => {
@@ -423,144 +329,6 @@ export default function Workspace() {
     }
   }, [membros])
 
-  const loadData = async () => {
-    try {
-      setLoading(true)
-      const [projetosRes, membrosRes] = await Promise.all([
-        supabase
-          .from('projetos')
-          .select('id, codigo, nome, tipologia, status')
-          .eq('arquivado', false)
-          .order('codigo', { ascending: false }),
-        supabase
-          .from('utilizadores')
-          .select('id, nome, avatar_url, funcao')
-          .eq('ativo', true)
-          .order('nome')
-      ])
-
-      if (projetosRes.data) {
-        const canaisComEquipa = projetosRes.data.map(p => ({
-          ...p,
-          equipa: p.tipologia?.toLowerCase().includes('hosp') ? 'hosp' :
-                  p.tipologia?.toLowerCase().includes('signature') ? 'signature' : 'arch',
-          unreadCount: 0, // Real count loaded from database
-          lastActivity: new Date().toISOString()
-        }))
-
-        setCanais(canaisComEquipa)
-
-        // Check URL for canal parameter
-        const canalParam = searchParams.get('canal')
-        const tabParam = searchParams.get('tab')
-
-        if (canalParam) {
-          // Find canal by codigo or id
-          const canalFromUrl = canaisComEquipa.find(c =>
-            c.codigo === canalParam || c.id === canalParam
-          )
-          if (canalFromUrl) {
-            setEquipaAtiva(canalFromUrl.equipa)
-            setEquipasExpanded({ [canalFromUrl.equipa]: true })
-            setCanalAtivo(canalFromUrl)
-            if (tabParam) setActiveTab(tabParam)
-            return
-          }
-        }
-
-        // Default: select first canal
-        if (canaisComEquipa.length > 0) {
-          const primeiraEquipa = canaisComEquipa[0].equipa
-          setEquipaAtiva(primeiraEquipa)
-          setEquipasExpanded({ [primeiraEquipa]: true })
-          setCanalAtivo(canaisComEquipa[0])
-        }
-      }
-
-      if (membrosRes.data) {
-        setMembros(membrosRes.data)
-      }
-    } catch (err) {
-      // Silent fail - will show empty state
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const loadPosts = async (canalId) => {
-    try {
-      const { data, error } = await supabase
-        .from('chat_mensagens')
-        .select(`
-          *,
-          autor:autor_id(id, nome, avatar_url, funcao)
-        `)
-        .eq('canal_id', canalId)
-        .is('parent_id', null)
-        .eq('eliminado', false)
-        .order('created_at', { ascending: true })
-        .limit(100)
-
-      if (error) {
-        setPosts([])
-        return
-      }
-
-      if (data && data.length > 0) {
-        // Carregar contagem de replies e formatar attachments
-        const postsWithReplies = await Promise.all(data.map(async (post) => {
-          const { count } = await supabase
-            .from('chat_mensagens')
-            .select('*', { count: 'exact', head: true })
-            .eq('parent_id', post.id)
-            .eq('eliminado', false)
-
-          // Construir array de attachments a partir dos campos de ficheiro
-          let attachments = []
-          if (post.ficheiro_url) {
-            const isImage = post.tipo === 'imagem' || post.ficheiro_nome?.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i)
-            attachments.push({
-              name: post.ficheiro_nome || 'Ficheiro',
-              url: post.ficheiro_url,
-              type: isImage ? 'image' : 'file',
-              size: post.ficheiro_tamanho ? `${Math.round(post.ficheiro_tamanho / 1024)} KB` : ''
-            })
-          }
-
-          // Carregar anexos adicionais da tabela chat_anexos
-          const { data: extraAnexos } = await supabase
-            .from('chat_anexos')
-            .select('*')
-            .eq('mensagem_id', post.id)
-
-          if (extraAnexos && extraAnexos.length > 0) {
-            extraAnexos.forEach(anexo => {
-              const isImage = anexo.nome?.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i)
-              attachments.push({
-                name: anexo.nome || 'Ficheiro',
-                url: anexo.url,
-                type: isImage ? 'image' : 'file',
-                size: anexo.tamanho ? `${Math.round(anexo.tamanho / 1024)} KB` : ''
-              })
-            })
-          }
-
-          return {
-            ...post,
-            replyCount: count || 0,
-            attachments: attachments.length > 0 ? attachments : undefined
-          }
-        }))
-
-        setPosts(postsWithReplies)
-      } else {
-        setPosts([])
-      }
-    } catch (err) {
-      setPosts([])
-    }
-  }
-
   const subscribeToChannel = (canalId) => {
     const channel = supabase
       .channel(`chat-${canalId}`)
@@ -571,7 +339,11 @@ export default function Workspace() {
         filter: `canal_id=eq.${canalId}`
       }, (payload) => {
         if (!payload.new.parent_id) {
-          setPosts(prev => [...prev, { ...payload.new, replyCount: 0 }])
+          // Avoid duplicates - check if message already exists locally
+          setPosts(prev => {
+            if (prev.some(p => p.id === payload.new.id)) return prev
+            return [...prev, { ...payload.new, replyCount: 0 }]
+          })
         } else if (activeThread?.id === payload.new.parent_id) {
           setThreadReplies(prev => ({
             ...prev,
@@ -614,47 +386,6 @@ export default function Workspace() {
     }
   ]
 
-  const loadThreadReplies = async (postId) => {
-    if (threadReplies[postId]) return
-
-    try {
-      const { data } = await supabase
-        .from('chat_mensagens')
-        .select(`
-          *,
-          autor:autor_id(id, nome, avatar_url, funcao)
-        `)
-        .eq('parent_id', postId)
-        .eq('eliminado', false)
-        .order('created_at', { ascending: true })
-
-      if (data) {
-        setThreadReplies(prev => ({ ...prev, [postId]: data }))
-      } else {
-        // Mock replies
-        setThreadReplies(prev => ({
-          ...prev,
-          [postId]: [
-            {
-              id: `${postId}-r1`,
-              conteudo: 'Concordo! Vou verificar também com o nosso contacto em Itália.',
-              autor: { nome: 'Ana Santos', funcao: 'Project Manager' },
-              created_at: new Date(Date.now() - 3600000 * 10).toISOString()
-            },
-            {
-              id: `${postId}-r2`,
-              conteudo: 'Excelente iniciativa. Sustentabilidade é cada vez mais importante para os nossos clientes.',
-              autor: { nome: 'Carlos Mendes', funcao: 'Arquiteto' },
-              created_at: new Date(Date.now() - 3600000 * 8).toISOString()
-            }
-          ]
-        }))
-      }
-    } catch (err) {
-      // Silent fail - replies will show empty
-    }
-  }
-
   const handleSendMessage = async () => {
     if (!messageInput.trim() && selectedFiles.length === 0) return
     if (!canalAtivo) return
@@ -684,6 +415,9 @@ export default function Workspace() {
       }
 
       // Inserir mensagem na base de dados
+      // Check if activeTopic is a valid UUID (not the default 'geral' string)
+      const isValidUUID = activeTopic && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(activeTopic)
+
       const { data: insertedMessage, error: insertError } = await supabase
         .from('chat_mensagens')
         .insert({
@@ -691,7 +425,7 @@ export default function Workspace() {
           tipo: attachments.length > 0 ? (attachments[0].type === 'image' ? 'imagem' : 'ficheiro') : 'texto',
           autor_id: profile?.id,
           canal_id: canalAtivo?.id,
-          topico_id: null, // Workspace uses canal_id directly
+          ...(isValidUUID && { topico_id: activeTopic }),
           parent_id: replyingTo?.id || null,
           ficheiro_url: attachments.length > 0 ? attachments[0].url : null,
           ficheiro_nome: attachments.length > 0 ? attachments[0].name : null,
@@ -733,12 +467,24 @@ export default function Workspace() {
       }
 
       setPosts(prev => [...prev, newPost])
+
+      // Criar notificações para @menções
+      if (parseMentions && findMentionedUserIds && createMentionNotifications) {
+        const mentionedNames = parseMentions(messageInput)
+        if (mentionedNames.length > 0) {
+          const mentionedUserIds = findMentionedUserIds(mentionedNames, membros)
+          if (mentionedUserIds.length > 0) {
+            await createMentionNotifications(insertedMessage, mentionedUserIds, canalAtivo)
+          }
+        }
+      }
+
       setMessageInput('')
       setSelectedFiles([])
       setReplyingTo(null)
 
     } catch (err) {
-      alert('Erro ao enviar mensagem: ' + err.message)
+      toastError(err.message, 'Erro ao enviar mensagem')
     } finally {
       setUploading(false)
     }
@@ -819,63 +565,6 @@ export default function Workspace() {
     }
   }
 
-  const handleFileSelect = (e) => {
-    const files = Array.from(e.target.files || [])
-    const newFiles = files.map(file => ({
-      file,
-      name: file.name,
-      type: file.type.startsWith('image/') ? 'image' : 'file',
-      size: file.size, // Store raw bytes for database
-      sizeFormatted: formatFileSize(file.size), // Formatted for display
-      preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : null
-    }))
-    setSelectedFiles(prev => [...prev, ...newFiles])
-  }
-
-  const formatFileSize = (bytes) => {
-    if (bytes < 1024) return bytes + ' B'
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-    return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
-  }
-
-  const formatTime = (dateStr) => {
-    const date = new Date(dateStr)
-    const now = new Date()
-    const diffMs = now - date
-    const diffMins = Math.floor(diffMs / 60000)
-    const diffHours = Math.floor(diffMs / 3600000)
-    const diffDays = Math.floor(diffMs / 86400000)
-
-    if (diffMins < 1) return 'Agora'
-    if (diffMins < 60) return `${diffMins}m`
-    if (diffHours < 24) return `${diffHours}h`
-    if (diffDays < 7) return `${diffDays}d`
-    return date.toLocaleDateString('pt-PT', { day: '2-digit', month: 'short' })
-  }
-
-  const formatDateTime = (dateStr) => {
-    return new Date(dateStr).toLocaleDateString('pt-PT', {
-      day: '2-digit',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  }
-
-  const getEquipaCanais = (equipaId) => canais.filter(c => c.equipa === equipaId)
-
-  const toggleEquipa = (equipaId) => {
-    setEquipasExpanded(prev => ({ ...prev, [equipaId]: !prev[equipaId] }))
-    setEquipaAtiva(equipaId)
-  }
-
-  // Select canal and update URL
-  const selectCanal = (canal) => {
-    setCanalAtivo(canal)
-    setActiveThread(null)
-    setSearchParams({ canal: canal.codigo })
-  }
-
   // Copy direct link to clipboard
   const copyChannelLink = () => {
     const url = `${window.location.origin}/chat?canal=${canalAtivo.codigo}`
@@ -885,45 +574,16 @@ export default function Workspace() {
     })
   }
 
-  // Get direct link for a canal
-  const getChannelLink = (canal) => {
-    return `${window.location.origin}/chat?canal=${canal.codigo}`
-  }
-
-  const openThread = (post) => {
-    setActiveThread(post)
-    loadThreadReplies(post.id)
-  }
-
-  const getInitials = (nome) => {
-    if (!nome) return 'U'
-    return nome.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
-  }
-
-  // Insert emoji at cursor position
-  const insertEmoji = (emoji) => {
-    const input = messageInputRef.current
-    if (input) {
-      const start = input.selectionStart
-      const end = input.selectionEnd
-      const newValue = messageInput.substring(0, start) + emoji + messageInput.substring(end)
-      setMessageInput(newValue)
-      // Set cursor position after emoji
-      setTimeout(() => {
-        input.selectionStart = input.selectionEnd = start + emoji.length
-        input.focus()
-      }, 0)
-    } else {
-      setMessageInput(prev => prev + emoji)
-    }
-    setShowEmojiPicker(false)
-  }
-
-  // Handle message input change with mention detection
+  // Handle message input change with mention detection and typing indicator
   const handleMessageChange = (e) => {
     const value = e.target.value
     const cursorPos = e.target.selectionStart
     setMessageInput(value)
+
+    // Broadcast typing indicator
+    if (value.trim()) {
+      handleTyping()
+    }
 
     // Check for @ mention
     const textBeforeCursor = value.substring(0, cursorPos)
@@ -996,17 +656,6 @@ export default function Workspace() {
     setEditingContent('')
   }
 
-  // Delete message
-  const deleteMessage = (postId) => {
-    if (!window.confirm('Tens a certeza que queres eliminar esta mensagem?')) return
-
-    setPosts(prev => prev.filter(p => p.id !== postId))
-    setShowMessageMenu(null)
-
-    // Em produção, marcar como eliminado na base de dados
-    // await supabase.from('chat_mensagens').update({ eliminado: true }).eq('id', postId)
-  }
-
   // Start replying to a message
   const startReplyTo = (post) => {
     setReplyingTo(post)
@@ -1024,58 +673,10 @@ export default function Workspace() {
     return post.autor?.id === profile?.id || post.autor?.nome === profile?.nome
   }
 
-  // Toggle saved message (bookmark)
-  const toggleSaveMessage = (post) => {
-    const isSaved = savedMessages.some(m => m.id === post.id)
-    if (isSaved) {
-      setSavedMessages(prev => prev.filter(m => m.id !== post.id))
-    } else {
-      setSavedMessages(prev => [...prev, { ...post, savedAt: new Date().toISOString() }])
-    }
-    setShowMessageMenu(null)
-  }
-
-  // Check if message is saved
-  const isMessageSaved = (postId) => {
-    return savedMessages.some(m => m.id === postId)
-  }
-
-  // Play notification sound
-  const playNotificationSound = () => {
-    if (!soundEnabled) return
-    try {
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)()
-      const oscillator = audioContext.createOscillator()
-      const gainNode = audioContext.createGain()
-
-      oscillator.connect(gainNode)
-      gainNode.connect(audioContext.destination)
-
-      oscillator.frequency.value = 800
-      oscillator.type = 'sine'
-      gainNode.gain.setValueAtTime(0.1, audioContext.currentTime)
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3)
-
-      oscillator.start(audioContext.currentTime)
-      oscillator.stop(audioContext.currentTime + 0.3)
-    } catch (e) {
-      // Audio not supported - silent fail
-    }
-  }
-
   // Get total unread count
   const getTotalUnreadCount = () => {
     return canais.reduce((sum, c) => sum + (c.unreadCount || 0), 0)
   }
-
-  // Filter options
-  const FILTER_OPTIONS = [
-    { id: 'all', label: 'Todas', icon: MessageSquare },
-    { id: 'attachments', label: 'Com anexos', icon: FileText },
-    { id: 'images', label: 'Com imagens', icon: FileImage },
-    { id: 'mentions', label: 'Menções', icon: AtSign },
-    { id: 'saved', label: 'Guardadas', icon: Bookmark }
-  ]
 
   // Apply filters to posts
   const applyFilters = (postsToFilter) => {
@@ -1211,178 +812,16 @@ export default function Workspace() {
     }, 0)
   }
 
-  // Render formatted text (bold, italic, code, links)
-  const renderFormattedText = (text) => {
-    if (!text) return null
-
-    // Process code blocks first
-    const codeBlockRegex = /```([\s\S]*?)```/g
-    const inlineCodeRegex = /`([^`]+)`/g
-    const boldRegex = /\*\*([^*]+)\*\*/g
-    const italicRegex = /_([^_]+)_/g
-    const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g
-    const urlRegex = /(https?:\/\/[^\s]+)/g
-
-    let result = text
-
-    // Code blocks
-    result = result.replace(codeBlockRegex, '<pre class="code-block">$1</pre>')
-    // Inline code
-    result = result.replace(inlineCodeRegex, '<code class="inline-code">$1</code>')
-    // Bold
-    result = result.replace(boldRegex, '<strong>$1</strong>')
-    // Italic
-    result = result.replace(italicRegex, '<em>$1</em>')
-    // Links
-    result = result.replace(linkRegex, '<a href="$2" target="_blank" class="chat-link">$1</a>')
-    // Auto-link URLs
-    result = result.replace(urlRegex, (match) => {
-      if (result.includes(`href="${match}"`)) return match
-      return `<a href="${match}" target="_blank" class="chat-link">${match}</a>`
-    })
-
-    return <span dangerouslySetInnerHTML={{ __html: result }} />
-  }
-
-  // Extract URL previews from text
-  const extractUrls = (text) => {
-    if (!text) return []
-    const urlRegex = /(https?:\/\/[^\s]+)/g
-    return text.match(urlRegex) || []
-  }
-
-  // ========== TYPING INDICATOR ==========
-  const handleTyping = () => {
-    // Emit typing event (in production, would broadcast via Supabase realtime)
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current)
-    }
-    typingTimeoutRef.current = setTimeout(() => {
-      // Stop typing indicator after 3 seconds of no input
-    }, 3000)
-  }
-
-  // ========== ONLINE STATUS ==========
-  // Atualizar própria presença
-  const updateMyPresence = async () => {
-    if (!profile?.id) return
-
-    try {
-      await supabase.from('chat_presenca').upsert({
-        utilizador_id: profile.id,
-        estado: 'online',
-        ultima_actividade: new Date().toISOString(),
-        dispositivo: 'web'
-      }, { onConflict: 'utilizador_id' })
-    } catch (err) {
-      // Silenciar erros
-    }
-  }
-
-  // Carregar presença dos membros
-  const loadOnlineUsers = async () => {
-    if (!membros.length) return
-
-    try {
-      const { data } = await supabase
-        .from('chat_presenca')
-        .select('utilizador_id, estado, ultima_actividade')
-        .in('utilizador_id', membros.map(m => m.id))
-
-      const map = {}
-      data?.forEach(p => {
-        // Considerar offline se última atividade > 15min
-        const lastActive = new Date(p.ultima_actividade)
-        const diffMinutes = (Date.now() - lastActive.getTime()) / 60000
-
-        if (diffMinutes > 15) {
-          map[p.utilizador_id] = 'offline'
-        } else if (diffMinutes > 5) {
-          map[p.utilizador_id] = 'away'
-        } else {
-          map[p.utilizador_id] = p.estado
-        }
-      })
-
-      setOnlineUsers(map)
-    } catch (err) {
-      // Silenciar erros
-    }
-  }
-
-  const isUserOnline = (userId) => {
-    return onlineUsers[userId] === 'online'
-  }
-
-  // Cor do indicador de presença
-  const getPresenceColor = (userId) => {
-    const estado = onlineUsers[userId]
-    if (estado === 'online') return '#22c55e' // Verde
-    if (estado === 'away') return '#eab308' // Amarelo
-    return '#9ca3af' // Cinza
-  }
-
-  // ========== READ RECEIPTS ==========
-  const markMessageAsRead = (messageId) => {
-    setReadReceipts(prev => ({
-      ...prev,
-      [messageId]: {
-        read: true,
-        readAt: new Date().toISOString(),
-        readBy: [...(prev[messageId]?.readBy || []), profile?.id]
-      }
-    }))
-  }
-
-  const getReadStatus = (message) => {
-    const receipt = readReceipts[message.id]
-    if (!receipt) return 'sent'
-    if (receipt.readBy?.length > 0) return 'read'
-    return 'delivered'
-  }
-
-  // ========== FAVORITE CHANNELS ==========
-  const toggleFavoriteChannel = (channelId) => {
-    setFavoriteChannels(prev =>
-      prev.includes(channelId)
-        ? prev.filter(id => id !== channelId)
-        : [...prev, channelId]
-    )
-  }
-
-  const isFavoriteChannel = (channelId) => {
-    return favoriteChannels.includes(channelId)
-  }
-
   // Sort channels: favorites first
   const sortedCanais = [...canais].sort((a, b) => {
-    const aFav = isFavoriteChannel(a.id)
-    const bFav = isFavoriteChannel(b.id)
+    const aFav = isFavorite(a.id)
+    const bFav = isFavorite(b.id)
     if (aFav && !bFav) return -1
     if (!aFav && bFav) return 1
     return 0
   })
 
-  // ========== PINNED MESSAGES ==========
-  const togglePinMessage = (post) => {
-    if (!canalAtivo) return
-    const channelId = canalAtivo.id
-    const isPinned = channelPinnedMessages[channelId]?.some(m => m.id === post.id)
-
-    setChannelPinnedMessages(prev => ({
-      ...prev,
-      [channelId]: isPinned
-        ? (prev[channelId] || []).filter(m => m.id !== post.id)
-        : [...(prev[channelId] || []), { ...post, pinnedAt: new Date().toISOString() }]
-    }))
-    setShowMessageMenu(null)
-  }
-
-  const isMessagePinned = (postId) => {
-    if (!canalAtivo) return false
-    return channelPinnedMessages[canalAtivo.id]?.some(m => m.id === postId)
-  }
-
+  // Get current channel pinned messages
   const getCurrentChannelPinnedMessages = () => {
     if (!canalAtivo) return []
     return channelPinnedMessages[canalAtivo.id] || []
@@ -1395,11 +834,32 @@ export default function Workspace() {
     setShowMessageMenu(null)
   }
 
-  const handleCreateTask = (taskData) => {
-    // TODO: In production, would insert into tasks table
-    setShowCreateTaskModal(false)
-    setTaskFromMessage(null)
-    alert('Tarefa criada com sucesso!')
+  const handleCreateTask = async (taskData) => {
+    try {
+      // Inserir tarefa na base de dados
+      const { error } = await supabase
+        .from('tarefas')
+        .insert({
+          projeto_id: canalAtivo?.id,
+          titulo: taskData.titulo || taskData.title,
+          descricao: taskData.descricao || taskData.description,
+          prioridade: taskData.prioridade || 'media',
+          status: 'pendente',
+          data_limite: taskData.dataLimite || taskData.dueDate || null,
+          categoria: 'geral',
+          origem_tipo: 'manual',
+          notas: taskFromMessage?.conteudo ? `Criada a partir de mensagem: "${taskFromMessage.conteudo.substring(0, 200)}"` : null
+        })
+
+      if (error) throw error
+
+      setShowCreateTaskModal(false)
+      setTaskFromMessage(null)
+      toastSuccess('Tarefa criada com sucesso!')
+    } catch (err) {
+      console.error('Erro ao criar tarefa:', err)
+      toastError('Erro ao criar tarefa')
+    }
   }
 
   // ========== FORWARD MESSAGE ==========
@@ -1409,15 +869,41 @@ export default function Workspace() {
     setShowMessageMenu(null)
   }
 
-  const handleForwardMessage = (targetChannelId) => {
+  const handleForwardMessage = async (targetChannelId) => {
     if (!messageToForward) return
 
     const targetChannel = canais.find(c => c.id === targetChannelId)
 
-    // TODO: In production, would insert forwarded message
-    setShowForwardModal(false)
-    setMessageToForward(null)
-    alert(`Mensagem reencaminhada para ${targetChannel?.nome}`)
+    try {
+      // Inserir mensagem reencaminhada no canal de destino
+      const { error } = await supabase
+        .from('chat_posts')
+        .insert({
+          canal_id: targetChannelId,
+          autor_id: profile?.id,
+          autor_nome: profile?.nome || 'Utilizador',
+          conteudo: messageToForward.conteudo,
+          tipo: 'reencaminhada',
+          metadata: {
+            forwarded_from: {
+              canal_id: canalAtivo?.id,
+              canal_nome: canalAtivo?.nome,
+              canal_codigo: canalAtivo?.codigo,
+              original_author: messageToForward.autor_nome,
+              original_date: messageToForward.created_at
+            }
+          }
+        })
+
+      if (error) throw error
+
+      setShowForwardModal(false)
+      setMessageToForward(null)
+      toastSuccess(`Mensagem reencaminhada para ${targetChannel?.nome}`)
+    } catch (err) {
+      console.error('Erro ao reencaminhar mensagem:', err)
+      toastError('Erro ao reencaminhar mensagem')
+    }
   }
 
   // ========== DRAG & DROP FILES ==========
@@ -1512,17 +998,6 @@ export default function Workspace() {
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [messageInput])
 
-  // KEYBOARD_SHORTCUTS constant for help modal
-  const KEYBOARD_SHORTCUTS = [
-    { keys: ['Ctrl', 'Enter'], description: 'Enviar mensagem' },
-    { keys: ['Ctrl', 'K'], description: 'Pesquisar' },
-    { keys: ['Ctrl', 'B'], description: 'Negrito' },
-    { keys: ['Ctrl', 'I'], description: 'Itálico' },
-    { keys: ['Ctrl', 'Shift', 'C'], description: 'Código' },
-    { keys: ['Esc'], description: 'Fechar menus/modais' },
-    { keys: ['?'], description: 'Atalhos de teclado' }
-  ]
-
   // ========== ACTIVITY LOG ==========
   // Filter activity log
   const getFilteredActivity = () => {
@@ -1606,6 +1081,17 @@ export default function Workspace() {
     if (activeTopic === topicId) {
       setActiveTopic('geral')
     }
+  }
+
+  // Rename custom topic
+  const renameCustomTopic = (topicId, newName) => {
+    if (!canalAtivo || !newName.trim()) return
+    setChannelTopics(prev => ({
+      ...prev,
+      [canalAtivo.id]: (prev[canalAtivo.id] || DEFAULT_TOPICS).map(t =>
+        t.id === topicId ? { ...t, nome: newName.trim() } : t
+      )
+    }))
   }
 
   // Get topic icon component
@@ -1709,7 +1195,7 @@ export default function Workspace() {
     }
     setReminders(prev => [...prev, reminder])
     setShowMessageMenu(null)
-    alert(`Lembrete definido para ${reminderTime.toLocaleString('pt-PT')}`)
+    toastSuccess(`Lembrete definido para ${reminderTime.toLocaleString('pt-PT')}`, 'Lembrete criado')
   }
 
   const deleteReminder = (reminderId) => {
@@ -1729,11 +1215,36 @@ export default function Workspace() {
     setShowMessageMenu(null)
   }
 
-  const createMeeting = () => {
-    // TODO: In production, would integrate with Google Calendar/Outlook
-    alert(`Reunião "${meetingDetails.title}" agendada para ${meetingDetails.date} às ${meetingDetails.time}`)
-    setShowScheduleMeetingModal(false)
-    setMeetingDetails({ title: '', date: '', time: '', duration: '30', participants: [], description: '' })
+  const createMeeting = async () => {
+    try {
+      // Criar data de início e fim
+      const dataInicio = new Date(`${meetingDetails.date}T${meetingDetails.time}:00`)
+      const dataFim = new Date(dataInicio.getTime() + parseInt(meetingDetails.duration) * 60000)
+
+      // Inserir evento no calendário
+      const { error } = await supabase
+        .from('calendario_eventos')
+        .insert({
+          titulo: meetingDetails.title,
+          descricao: meetingDetails.description,
+          tipo: 'reuniao',
+          data_inicio: dataInicio.toISOString(),
+          data_fim: dataFim.toISOString(),
+          projeto_id: canalAtivo?.id,
+          criado_por: profile?.id,
+          participantes: meetingDetails.participants.map(p => ({ id: p.id, nome: p.nome })),
+          notificar: true
+        })
+
+      if (error) throw error
+
+      toastSuccess(`Reunião "${meetingDetails.title}" agendada para ${meetingDetails.date} às ${meetingDetails.time}`, 'Reunião agendada')
+      setShowScheduleMeetingModal(false)
+      setMeetingDetails({ title: '', date: '', time: '', duration: '30', participants: [], description: '' })
+    } catch (err) {
+      console.error('Erro ao criar reunião:', err)
+      toastError('Erro ao agendar reunião')
+    }
   }
 
   // ========== AI ASSISTANT ==========
@@ -1789,14 +1300,18 @@ export default function Workspace() {
   }
 
   // ========== ARCHIVE CHANNELS ==========
-  const archiveChannel = (channelId) => {
+  const archiveChannel = async (channelId) => {
     const channel = canais.find(c => c.id === channelId)
-    if (channel && window.confirm(`Arquivar canal ${channel.codigo}?`)) {
+    if (!channel) return
+
+    const confirmed = await confirmArchive(`canal "${channel.codigo}"`)
+    if (confirmed) {
       setArchivedChannels(prev => [...prev, { ...channel, archivedAt: new Date().toISOString() }])
       setCanais(prev => prev.filter(c => c.id !== channelId))
       if (canalAtivo?.id === channelId) {
         setCanalAtivo(canais[0] || null)
       }
+      toastSuccess(`Canal "${channel.codigo}" arquivado`)
     }
   }
 
@@ -1885,7 +1400,7 @@ export default function Workspace() {
       })
       setShowAnalytics(true)
     } catch (err) {
-      console.error('Erro ao carregar analytics:', err)
+      toastError('Não foi possível carregar as estatísticas')
       setShowAnalytics(true)
     }
   }
@@ -1913,13 +1428,6 @@ export default function Workspace() {
   }
 
   // ========== USER STATUS ==========
-  const updateUserStatus = (statusId, customMessage = '') => {
-    setUserStatus(statusId)
-    setCustomStatusMessage(customMessage)
-    setShowStatusMenu(false)
-    // In production, would sync to database
-  }
-
   const getStatusInfo = (statusId) => {
     return USER_STATUS_OPTIONS.find(s => s.id === statusId) || USER_STATUS_OPTIONS[0]
   }
@@ -1978,395 +1486,155 @@ export default function Workspace() {
     }
   }
 
-  // ========== EXPORT CONVERSATION ==========
-  const exportConversation = () => {
-    const content = posts.map(p =>
-      `[${formatDateTime(p.created_at)}] ${p.autor?.nome}: ${p.conteudo}`
-    ).join('\n\n')
-
-    if (exportFormat === 'txt') {
-      const blob = new Blob([content], { type: 'text/plain' })
-      downloadBlob(blob, `${canalAtivo?.codigo || 'chat'}_export.txt`)
-    } else {
-      // For PDF, create a simple HTML-based export
-      const htmlContent = `
-        <html><head><title>Exportação - ${canalAtivo?.codigo}</title>
-        <style>body{font-family:Arial;padding:40px;}h1{color:#3D3D3D;}.msg{margin:20px 0;padding:15px;border-left:3px solid #7A8B6E;}.time{color:#888;font-size:12px;}.author{font-weight:bold;}</style></head>
-        <body><h1>${canalAtivo?.codigo} - ${canalAtivo?.nome}</h1>
-        ${posts.map(p => `<div class="msg"><div class="time">${formatDateTime(p.created_at)}</div><div class="author">${p.autor?.nome}</div><div>${p.conteudo}</div></div>`).join('')}
-        </body></html>
-      `
-      const blob = new Blob([htmlContent], { type: 'text/html' })
-      downloadBlob(blob, `${canalAtivo?.codigo || 'chat'}_export.html`)
-    }
-    setShowExportModal(false)
-  }
-
-  const downloadBlob = (blob, filename) => {
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
   // ========== WEBHOOKS ==========
-  const addWebhook = () => {
-    if (!newWebhook.url.trim()) return
+  const addWebhook = (webhookData) => {
     const webhook = {
       id: `webhook-${Date.now()}`,
-      ...newWebhook,
+      url: webhookData.url,
+      name: webhookData.name || 'Webhook',
+      events: webhookData.events || [],
       created_at: new Date().toISOString(),
       active: true
     }
     setWebhooks(prev => [...prev, webhook])
-    setNewWebhook({ url: '', events: [] })
+    showToast(`Webhook "${webhook.name}" adicionado`, 'success')
   }
 
   const deleteWebhook = (webhookId) => {
     setWebhooks(prev => prev.filter(w => w.id !== webhookId))
+    showToast('Webhook removido', 'success')
   }
 
-  const triggerWebhook = (event, data) => {
-    webhooks.filter(w => w.active && w.events.includes(event)).forEach(webhook => {
-      // TODO: In production, would POST to webhook.url
-    })
+  const toggleWebhook = (webhookId) => {
+    setWebhooks(prev => prev.map(w =>
+      w.id === webhookId ? { ...w, active: !w.active } : w
+    ))
+  }
+
+  const testWebhook = async (webhook) => {
+    const payload = {
+      type: 'test',
+      timestamp: new Date().toISOString(),
+      channel: {
+        id: canalAtivo?.id,
+        code: canalAtivo?.codigo,
+        name: canalAtivo?.nome
+      },
+      message: 'Este é um teste do webhook'
+    }
+
+    try {
+      const response = await fetch(webhook.url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload),
+        mode: 'no-cors' // For cross-origin requests
+      })
+      return { success: true }
+    } catch (err) {
+      throw new Error('Não foi possível contactar o webhook')
+    }
+  }
+
+  const triggerWebhook = async (event, data) => {
+    const payload = {
+      type: event,
+      timestamp: new Date().toISOString(),
+      channel: {
+        id: canalAtivo?.id,
+        code: canalAtivo?.codigo,
+        name: canalAtivo?.nome
+      },
+      data
+    }
+
+    webhooks
+      .filter(w => w.active && w.events.includes(event))
+      .forEach(async (webhook) => {
+        try {
+          await fetch(webhook.url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            mode: 'no-cors'
+          })
+        } catch (err) {
+          console.error(`Webhook ${webhook.name} failed:`, err)
+        }
+      })
   }
 
   // ========== EMAIL SYNC ==========
   const toggleEmailSync = () => {
     setEmailSyncEnabled(!emailSyncEnabled)
     if (!emailSyncEnabled) {
-      alert('Sincronização de email ativada. Receberás resumos diários das conversas.')
+      toastSuccess('Receberás resumos diários das conversas.', 'Sincronização de email ativada')
     }
   }
 
-  // ========== MICROSOFT TEAMS IMPORT ==========
-
-  // Start Microsoft OAuth login
-  const startTeamsAuth = () => {
-    setTeamsAuthState('authenticating')
-
-    // Clear any previous OAuth data from localStorage
-    localStorage.removeItem('teams_oauth_token')
-    localStorage.removeItem('teams_oauth_error')
-    localStorage.removeItem('teams_oauth_timestamp')
-
-    // Build OAuth URL
-    const authUrl = new URL(`${MS_GRAPH_CONFIG.authority}/oauth2/v2.0/authorize`)
-    authUrl.searchParams.set('client_id', MS_GRAPH_CONFIG.clientId)
-    authUrl.searchParams.set('response_type', 'token')
-    authUrl.searchParams.set('redirect_uri', MS_GRAPH_CONFIG.redirectUri)
-    authUrl.searchParams.set('scope', MS_GRAPH_CONFIG.scopes.join(' '))
-    authUrl.searchParams.set('response_mode', 'fragment')
-    authUrl.searchParams.set('state', 'teams_import')
-
-    // Open popup for auth
-    const width = 500
-    const height = 600
-    const left = window.screenX + (window.outerWidth - width) / 2
-    const top = window.screenY + (window.outerHeight - height) / 2
-
-    window.open(
-      authUrl.toString(),
-      'Microsoft Login',
-      `width=${width},height=${height},left=${left},top=${top}`
-    )
-
-    let authCompleted = false
-
-    // Function to handle successful auth - simplified, no storage events
-    const handleAuthSuccess = (token) => {
-      if (authCompleted) return
-      authCompleted = true
-
-      // Process the token first
-      setTeamsAccessToken(token)
-      setTeamsAuthState('authenticated')
-      fetchTeamsUser(token)
-      fetchAvailableTeams(token)
-      setImportStep(2)
-
-      // Clean up localStorage much later to avoid any interference
-      setTimeout(() => {
-        try {
-          localStorage.removeItem('ms_teams_oauth_token')
-          localStorage.removeItem('ms_teams_oauth_error')
-        } catch (e) { /* ignore */ }
-      }, 10000)
+  // ========== SCHEDULED MESSAGES ==========
+  const scheduleMessage = (scheduleData) => {
+    const scheduled = {
+      id: `scheduled-${Date.now()}`,
+      message: scheduleData.message,
+      scheduledFor: scheduleData.scheduledFor,
+      channelId: scheduleData.channelId || canalAtivo?.id,
+      channelName: canalAtivo?.nome,
+      channelCode: canalAtivo?.codigo,
+      created_at: new Date().toISOString(),
+      status: 'pending',
+      authorId: profile?.id,
+      authorName: profile?.nome
     }
-
-    // Function to handle auth error
-    const handleAuthError = (error) => {
-      if (authCompleted) return
-      authCompleted = true
-
-      setTeamsAuthState('error')
-      addImportLog('error', error || 'Erro de autenticação')
-
-      setTimeout(() => {
-        try {
-          localStorage.removeItem('ms_teams_oauth_token')
-          localStorage.removeItem('ms_teams_oauth_error')
-        } catch (e) { /* ignore */ }
-      }, 10000)
-    }
-
-    // Only use polling - avoid storage events which can interfere with Supabase
-    const checkStorage = setInterval(() => {
-      if (authCompleted) {
-        clearInterval(checkStorage)
-        return
-      }
-
-      // Use unique prefixed keys to avoid conflicts
-      const token = localStorage.getItem('ms_teams_oauth_token')
-      const error = localStorage.getItem('ms_teams_oauth_error')
-
-      if (token) {
-        clearInterval(checkStorage)
-        handleAuthSuccess(token)
-      } else if (error) {
-        clearInterval(checkStorage)
-        handleAuthError(error)
-      }
-    }, 500)
-
-    // Timeout after 2 minutes
-    setTimeout(() => {
-      if (!authCompleted) {
-        clearInterval(checkStorage)
-        setTeamsAuthState('error')
-        addImportLog('error', 'Autenticação expirou. Tente novamente.')
-      }
-    }, 120000)
+    setScheduledMessages(prev => [...prev, scheduled])
+    toastSuccess(`Mensagem agendada para ${new Date(scheduleData.scheduledFor).toLocaleString('pt-PT')}`)
   }
 
-  // Fetch authenticated user info
-  const fetchTeamsUser = async (token) => {
-    try {
-      const response = await fetch('https://graph.microsoft.com/v1.0/me', {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      if (response.ok) {
-        const user = await response.json()
-        setTeamsUser(user)
-        addImportLog('success', `Autenticado como ${user.displayName}`)
-      }
-    } catch (error) {
-      addImportLog('error', 'Erro ao obter informações do utilizador')
-    }
+  const cancelScheduledMessage = (scheduledId) => {
+    setScheduledMessages(prev => prev.filter(s => s.id !== scheduledId))
+    toastInfo('Mensagem agendada cancelada')
   }
 
-  // Fetch available Teams
-  const fetchAvailableTeams = async (token) => {
-    try {
-      addImportLog('info', 'A carregar Teams...')
-      const response = await fetch('https://graph.microsoft.com/v1.0/me/joinedTeams', {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setAvailableTeams(data.value || [])
-        addImportLog('success', `Encontrados ${data.value?.length || 0} Teams`)
-      } else {
-        throw new Error('Failed to fetch teams')
-      }
-    } catch (error) {
-      addImportLog('error', 'Erro ao carregar Teams. Verifique as permissões.')
-      setTeamsAuthState('error')
-    }
-  }
-
-  // Fetch channels for a team
-  const fetchTeamChannels = async (teamId) => {
-    if (!teamsAccessToken) return
+  const sendScheduledMessage = async (scheduled) => {
+    if (scheduled.status !== 'pending') return
 
     try {
-      const response = await fetch(
-        `https://graph.microsoft.com/v1.0/teams/${teamId}/channels`,
-        { headers: { Authorization: `Bearer ${teamsAccessToken}` } }
-      )
+      // Mark as sending
+      setScheduledMessages(prev => prev.map(s =>
+        s.id === scheduled.id ? { ...s, status: 'sending' } : s
+      ))
 
-      if (response.ok) {
-        const data = await response.json()
-        setTeamsChannels(prev => ({ ...prev, [teamId]: data.value || [] }))
-        return data.value || []
-      }
-    } catch (error) {
-      addImportLog('error', `Erro ao carregar canais do Team ${teamId}`)
-    }
-    return []
-  }
+      // Send the message using existing sendMessage function
+      await sendMessage(scheduled.message, scheduled.channelId)
 
-  // Toggle team selection
-  const toggleTeamSelection = async (team) => {
-    const isSelected = selectedTeamsToImport.some(t => t.id === team.id)
-
-    if (isSelected) {
-      setSelectedTeamsToImport(prev => prev.filter(t => t.id !== team.id))
-      setSelectedChannelsToImport(prev => prev.filter(c => c.teamId !== team.id))
-    } else {
-      setSelectedTeamsToImport(prev => [...prev, team])
-      // Fetch channels for this team
-      if (!teamsChannels[team.id]) {
-        await fetchTeamChannels(team.id)
-      }
+      // Mark as sent
+      setScheduledMessages(prev => prev.map(s =>
+        s.id === scheduled.id ? { ...s, status: 'sent' } : s
+      ))
+      toastSuccess('Mensagem agendada enviada com sucesso')
+    } catch (err) {
+      setScheduledMessages(prev => prev.map(s =>
+        s.id === scheduled.id ? { ...s, status: 'failed' } : s
+      ))
+      toastError('Erro ao enviar mensagem agendada')
     }
   }
 
-  // Toggle channel selection
-  const toggleChannelSelection = (channel, teamId) => {
-    const channelWithTeam = { ...channel, teamId }
-    const isSelected = selectedChannelsToImport.some(c => c.id === channel.id)
-
-    if (isSelected) {
-      setSelectedChannelsToImport(prev => prev.filter(c => c.id !== channel.id))
-    } else {
-      setSelectedChannelsToImport(prev => [...prev, channelWithTeam])
-    }
-  }
-
-  // Add log entry
-  const addImportLog = (type, message) => {
-    setImportLog(prev => [...prev, {
-      id: Date.now(),
-      type,
-      message,
-      timestamp: new Date().toISOString()
-    }])
-  }
-
-  // Start the import process
-  const startTeamsImport = async () => {
-    if (selectedChannelsToImport.length === 0) {
-      alert('Selecione pelo menos um canal para importar')
-      return
-    }
-
-    setImportStep(4)
-    setImportProgress({ status: 'importing', current: 0, total: selectedChannelsToImport.length, currentItem: '' })
-    addImportLog('info', `Iniciando importação de ${selectedChannelsToImport.length} canais...`)
-
-    for (let i = 0; i < selectedChannelsToImport.length; i++) {
-      const channel = selectedChannelsToImport[i]
-      const team = selectedTeamsToImport.find(t => t.id === channel.teamId)
-
-      setImportProgress(prev => ({
-        ...prev,
-        current: i + 1,
-        currentItem: `${team?.displayName} > ${channel.displayName}`
-      }))
-
-      addImportLog('info', `Importando: ${channel.displayName}`)
-
-      try {
-        // Fetch messages from this channel
-        const messages = await fetchChannelMessages(channel.teamId, channel.id)
-
-        // Create local channel/project mapping
-        const localChannel = {
-          id: `imported-${channel.id}`,
-          codigo: channel.displayName.substring(0, 10).toUpperCase().replace(/\s/g, ''),
-          nome: channel.displayName,
-          equipa: 'arch',
-          importedFrom: 'teams',
-          teamsTeamId: channel.teamId,
-          teamsChannelId: channel.id,
-          unreadCount: 0,
-          lastActivity: new Date().toISOString()
-        }
-
-        // Add to local channels
-        setCanais(prev => {
-          // Check if already imported
-          if (prev.some(c => c.teamsChannelId === channel.id)) {
-            addImportLog('warning', `Canal "${channel.displayName}" já foi importado anteriormente`)
-            return prev
-          }
-          return [...prev, localChannel]
+  // Check for scheduled messages that need to be sent
+  useEffect(() => {
+    const checkScheduled = setInterval(() => {
+      const now = new Date()
+      scheduledMessages
+        .filter(s => s.status === 'pending' && new Date(s.scheduledFor) <= now)
+        .forEach(scheduled => {
+          sendScheduledMessage(scheduled)
         })
+    }, 30000) // Check every 30 seconds
 
-        // Import messages
-        if (messages.length > 0) {
-          const importedPosts = messages.map(msg => ({
-            id: `imported-${msg.id}`,
-            conteudo: msg.body?.content?.replace(/<[^>]*>/g, '') || '',
-            autor: {
-              id: msg.from?.user?.id || 'unknown',
-              nome: msg.from?.user?.displayName || 'Utilizador Teams',
-              avatar_url: null,
-              funcao: 'Importado do Teams'
-            },
-            created_at: msg.createdDateTime,
-            reacoes: [],
-            replyCount: msg.replies?.length || 0,
-            importedFrom: 'teams',
-            canal_id: localChannel.id
-          }))
-
-          // Store messages (in production, would save to database)
-          addImportLog('success', `Importadas ${importedPosts.length} mensagens de "${channel.displayName}"`)
-        }
-
-        addImportLog('success', `Canal "${channel.displayName}" importado com sucesso`)
-
-      } catch (error) {
-        addImportLog('error', `Erro ao importar "${channel.displayName}": ${error.message}`)
-      }
-
-      // Small delay between channels
-      await new Promise(resolve => setTimeout(resolve, 500))
-    }
-
-    setImportProgress(prev => ({ ...prev, status: 'complete' }))
-    setImportStep(5)
-    addImportLog('success', '✓ Importação concluída!')
-  }
-
-  // Fetch messages from a channel
-  const fetchChannelMessages = async (teamId, channelId) => {
-    if (!teamsAccessToken) return []
-
-    try {
-      const response = await fetch(
-        `https://graph.microsoft.com/v1.0/teams/${teamId}/channels/${channelId}/messages?$top=50`,
-        { headers: { Authorization: `Bearer ${teamsAccessToken}` } }
-      )
-
-      if (response.ok) {
-        const data = await response.json()
-        return data.value || []
-      }
-    } catch (error) {
-      // Silent fail - will return empty array
-    }
-    return []
-  }
-
-  // Reset import state
-  const resetTeamsImport = () => {
-    setTeamsAuthState('idle')
-    setTeamsAccessToken(null)
-    setTeamsUser(null)
-    setAvailableTeams([])
-    setSelectedTeamsToImport([])
-    setTeamsChannels({})
-    setSelectedChannelsToImport([])
-    setImportProgress({ status: 'idle', current: 0, total: 0, currentItem: '' })
-    setImportLog([])
-    setImportStep(1)
-  }
-
-  // Close import modal
-  const closeTeamsImport = () => {
-    setShowTeamsImport(false)
-    if (importStep === 5) {
-      resetTeamsImport()
-    }
-  }
+    return () => clearInterval(checkScheduled)
+  }, [scheduledMessages])
 
   if (loading) {
     return (
@@ -2377,6 +1645,7 @@ export default function Workspace() {
   }
 
   return (
+    <ThemeProvider>
     <div className="fade-in workspace-container" style={{
       height: '100%',
       width: '100%',
@@ -2385,748 +1654,57 @@ export default function Workspace() {
     }}>
 
       {/* ========== SIDEBAR EQUIPAS ========== */}
-      <div style={{
-        width: '280px',
-        background: 'var(--off-white)',
-        borderRight: '1px solid var(--stone)',
-        display: 'flex',
-        flexDirection: 'column',
-        flexShrink: 0
-      }}>
-        {/* Header */}
-        <div style={{
-          padding: '16px 20px',
-          borderBottom: '1px solid var(--stone)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--brown)', margin: 0 }}>
-              Equipas
-            </h2>
-            {/* Total unread badge */}
-            {getTotalUnreadCount() > 0 && (
-              <span style={{
-                minWidth: '22px',
-                height: '22px',
-                borderRadius: '11px',
-                background: 'var(--error)',
-                color: 'white',
-                fontSize: '11px',
-                fontWeight: 700,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: '0 6px'
-              }}>
-                {getTotalUnreadCount()}
-              </span>
-            )}
-          </div>
-          <div style={{ display: 'flex', gap: '4px' }}>
-            {/* Activity button */}
-            <button
-              onClick={() => setShowActivityLog(!showActivityLog)}
-              title="Atividade"
-              style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '6px',
-                background: showActivityLog ? 'var(--accent-olive)' : 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                color: showActivityLog ? 'white' : 'var(--brown-light)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                position: 'relative'
-              }}
-            >
-              <Bell size={18} />
-              {getUnreadActivityCount() > 0 && (
-                <span style={{
-                  position: 'absolute',
-                  top: '-2px',
-                  right: '-2px',
-                  minWidth: '16px',
-                  height: '16px',
-                  borderRadius: '8px',
-                  background: 'var(--error)',
-                  color: 'white',
-                  fontSize: '9px',
-                  fontWeight: 700,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: '0 4px'
-                }}>
-                  {getUnreadActivityCount()}
-                </span>
-              )}
-            </button>
-            {/* Saved messages button */}
-            <button
-              onClick={() => setShowSavedMessages(!showSavedMessages)}
-              title="Mensagens guardadas"
-              style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '6px',
-                background: showSavedMessages ? 'var(--accent-olive)' : 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                color: showSavedMessages ? 'white' : 'var(--brown-light)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                position: 'relative'
-              }}
-            >
-              <Bookmark size={18} />
-              {savedMessages.length > 0 && (
-                <span style={{
-                  position: 'absolute',
-                  top: '-2px',
-                  right: '-2px',
-                  width: '16px',
-                  height: '16px',
-                  borderRadius: '50%',
-                  background: 'var(--warning)',
-                  color: 'white',
-                  fontSize: '9px',
-                  fontWeight: 700,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  {savedMessages.length}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setShowSearch(!showSearch)}
-              title="Pesquisar"
-              style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '6px',
-                background: showSearch ? 'var(--stone)' : 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                color: 'var(--brown-light)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              <Search size={18} />
-            </button>
-            {/* Sound toggle */}
-            <button
-              onClick={() => setSoundEnabled(!soundEnabled)}
-              title={soundEnabled ? 'Desativar sons' : 'Ativar sons'}
-              style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '6px',
-                background: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                color: soundEnabled ? 'var(--accent-olive)' : 'var(--brown-light)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
-            </button>
-            {/* Teams Import */}
-            <button
-              onClick={() => setShowTeamsImport(true)}
-              title="Importar do Microsoft Teams"
-              style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '6px',
-                background: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                color: 'var(--brown-light)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              <CloudDownload size={18} />
-            </button>
-          </div>
-        </div>
-
-        {/* Search box */}
-        {showSearch && (
-          <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--stone)' }}>
-            <div style={{ position: 'relative' }}>
-              <Search size={16} style={{
-                position: 'absolute',
-                left: '12px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: 'var(--brown-light)'
-              }} />
-              <input
-                type="text"
-                placeholder="Pesquisar conversas..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px 12px 10px 38px',
-                  border: '1px solid var(--stone)',
-                  borderRadius: '8px',
-                  fontSize: '13px',
-                  background: 'var(--white)',
-                  outline: 'none'
-                }}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Equipas List */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
-          {equipas.map(equipa => {
-            const equipaCanais = getEquipaCanais(equipa.id)
-            const isExpanded = equipasExpanded[equipa.id]
-            const totalUnread = equipaCanais.reduce((sum, c) => sum + (c.unreadCount || 0), 0)
-
-            return (
-              <div key={equipa.id}>
-                {/* Equipa header */}
-                <button
-                  onClick={() => toggleEquipa(equipa.id)}
-                  style={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    padding: '10px 16px',
-                    background: equipaAtiva === equipa.id ? 'rgba(0,0,0,0.03)' : 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    transition: 'background 0.15s'
-                  }}
-                >
-                  <ChevronRight
-                    size={14}
-                    style={{
-                      color: 'var(--brown-light)',
-                      transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
-                      transition: 'transform 0.2s'
-                    }}
-                  />
-                  <div style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '6px',
-                    background: equipa.cor,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'white',
-                    fontSize: '11px',
-                    fontWeight: 700
-                  }}>
-                    {equipa.inicial}
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{
-                      fontSize: '14px',
-                      fontWeight: 600,
-                      color: 'var(--brown)'
-                    }}>
-                      {equipa.nome}
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
-                      {equipaCanais.length} projetos
-                    </div>
-                  </div>
-                  {totalUnread > 0 && (
-                    <span style={{
-                      minWidth: '20px',
-                      height: '20px',
-                      borderRadius: '10px',
-                      background: 'var(--error)',
-                      color: 'white',
-                      fontSize: '11px',
-                      fontWeight: 600,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: '0 6px'
-                    }}>
-                      {totalUnread}
-                    </span>
-                  )}
-                </button>
-
-                {/* Canais */}
-                {isExpanded && (
-                  <div style={{ paddingLeft: '28px' }}>
-                    {equipaCanais
-                      .sort((a, b) => {
-                        const aFav = isFavoriteChannel(a.id)
-                        const bFav = isFavoriteChannel(b.id)
-                        if (aFav && !bFav) return -1
-                        if (!aFav && bFav) return 1
-                        return 0
-                      })
-                      .map(canal => {
-                      const isActive = canalAtivo?.id === canal.id
-                      const isFav = isFavoriteChannel(canal.id)
-                      return (
-                        <div
-                          key={canal.id}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            marginRight: '8px',
-                            marginBottom: '2px'
-                          }}
-                          className="channel-item"
-                        >
-                          <button
-                            onClick={() => selectCanal(canal)}
-                            style={{
-                              flex: 1,
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '10px',
-                              padding: '8px 8px 8px 12px',
-                              background: isActive ? 'var(--stone)' : 'transparent',
-                              border: 'none',
-                              cursor: 'pointer',
-                              textAlign: 'left',
-                              borderRadius: '6px 0 0 6px',
-                              transition: 'background 0.15s'
-                            }}
-                          >
-                            {isFav ? (
-                              <Star size={16} fill="var(--warning)" style={{ color: 'var(--warning)', flexShrink: 0 }} />
-                            ) : (
-                              <Hash size={16} style={{ color: isActive ? 'var(--brown)' : 'var(--brown-light)', flexShrink: 0 }} />
-                            )}
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{
-                                fontSize: '13px',
-                                fontWeight: isActive ? 600 : canal.unreadCount > 0 ? 600 : 400,
-                                color: isActive ? 'var(--brown)' : 'var(--brown-light)',
-                                whiteSpace: 'nowrap',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis'
-                              }}>
-                                {canal.codigo}
-                              </div>
-                            </div>
-                            {canal.unreadCount > 0 && (
-                              <span style={{
-                                width: '8px',
-                                height: '8px',
-                                borderRadius: '50%',
-                                background: 'var(--accent-olive)',
-                                flexShrink: 0
-                              }} />
-                            )}
-                          </button>
-                          {/* Favorite star button */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              toggleFavoriteChannel(canal.id)
-                            }}
-                            title={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
-                            style={{
-                              width: '28px',
-                              height: '32px',
-                              background: isActive ? 'var(--stone)' : 'transparent',
-                              border: 'none',
-                              cursor: 'pointer',
-                              color: isFav ? 'var(--warning)' : 'var(--brown-light)',
-                              opacity: isFav ? 1 : 0,
-                              transition: 'opacity 0.15s',
-                              borderRadius: '0 6px 6px 0',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center'
-                            }}
-                            className="favorite-btn"
-                          >
-                            <Star size={14} fill={isFav ? 'var(--warning)' : 'none'} />
-                          </button>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      </div>
+      <WorkspaceSidebar
+        equipas={EQUIPAS_GAVINHO}
+        equipasExpanded={equipasExpanded}
+        toggleEquipa={toggleEquipa}
+        getEquipaCanais={getEquipaCanais}
+        canalAtivo={canalAtivo}
+        selectCanal={selectCanal}
+        isFavoriteChannel={isFavorite}
+        toggleFavoriteChannel={toggleFavorite}
+        showSearch={showSearch}
+        setShowSearch={setShowSearch}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        showActivityLog={showActivityLog}
+        setShowActivityLog={setShowActivityLog}
+        showSavedMessages={showSavedMessages}
+        setShowSavedMessages={setShowSavedMessages}
+        soundEnabled={soundEnabled}
+        setSoundEnabled={setSoundEnabled}
+        setShowTeamsImport={setShowTeamsImport}
+        getTotalUnreadCount={getTotalUnreadCount}
+        getUnreadActivityCount={getUnreadActivityCount}
+        savedMessages={savedMessages}
+        equipaAtiva={equipaAtiva}
+        privateChannels={privateChannels}
+        onCreatePrivateChannel={() => setShowCreatePrivateChannel(true)}
+        selectPrivateChannel={selectCanal}
+      />
 
       {/* ========== ACTIVITY LOG PANEL ========== */}
-      {showActivityLog && (
-        <div style={{
-          width: '360px',
-          background: 'var(--white)',
-          borderRight: '1px solid var(--stone)',
-          display: 'flex',
-          flexDirection: 'column',
-          flexShrink: 0
-        }}>
-          {/* Activity Header */}
-          <div style={{
-            padding: '16px 20px',
-            borderBottom: '1px solid var(--stone)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Bell size={20} style={{ color: 'var(--accent-olive)' }} />
-              <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--brown)', margin: 0 }}>
-                Atividade
-              </h3>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {getUnreadActivityCount() > 0 && (
-                <button
-                  onClick={markAllActivityAsRead}
-                  style={{
-                    padding: '4px 10px',
-                    borderRadius: '4px',
-                    background: 'var(--cream)',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontSize: '11px',
-                    color: 'var(--brown-light)'
-                  }}
-                >
-                  Marcar como lido
-                </button>
-              )}
-              <button
-                onClick={() => setShowActivityLog(false)}
-                style={{
-                  width: '28px',
-                  height: '28px',
-                  borderRadius: '6px',
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--brown-light)'
-                }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-          </div>
-
-          {/* Activity Filters */}
-          <div style={{
-            display: 'flex',
-            gap: '4px',
-            padding: '12px 16px',
-            borderBottom: '1px solid var(--stone)'
-          }}>
-            {[
-              { id: 'all', label: 'Não lido' },
-              { id: 'mentions', label: '@Menções' },
-              { id: 'unread', label: 'Menções de etiqueta' }
-            ].map(filter => (
-              <button
-                key={filter.id}
-                onClick={() => setActivityFilter(filter.id)}
-                style={{
-                  padding: '6px 12px',
-                  borderRadius: '14px',
-                  background: activityFilter === filter.id ? 'var(--brown)' : 'var(--cream)',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  fontWeight: activityFilter === filter.id ? 600 : 400,
-                  color: activityFilter === filter.id ? 'white' : 'var(--brown)'
-                }}
-              >
-                {filter.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Activity List */}
-          <div style={{ flex: 1, overflowY: 'auto' }}>
-            {getFilteredActivity().length === 0 ? (
-              <div style={{
-                textAlign: 'center',
-                padding: '40px 20px',
-                color: 'var(--brown-light)'
-              }}>
-                <Bell size={40} style={{ opacity: 0.3, marginBottom: '12px' }} />
-                <p style={{ margin: 0, fontSize: '13px' }}>
-                  Sem notificações
-                </p>
-              </div>
-            ) : (
-              getFilteredActivity().map(activity => (
-                <div
-                  key={activity.id}
-                  onClick={() => navigateToActivity(activity)}
-                  style={{
-                    display: 'flex',
-                    gap: '12px',
-                    padding: '14px 16px',
-                    cursor: 'pointer',
-                    borderBottom: '1px solid var(--stone)',
-                    background: activity.unread
-                      ? activity.type === 'mention'
-                        ? 'rgba(139, 155, 123, 0.12)'
-                        : 'var(--cream)'
-                      : 'transparent',
-                    borderLeft: activity.type === 'mention' && activity.unread
-                      ? '3px solid var(--accent-olive)'
-                      : '3px solid transparent'
-                  }}
-                >
-                  {/* Avatar */}
-                  <div style={{ position: 'relative', flexShrink: 0 }}>
-                    <div style={{
-                      width: '44px',
-                      height: '44px',
-                      borderRadius: '50%',
-                      background: 'linear-gradient(135deg, var(--blush) 0%, var(--blush-dark) 100%)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '14px',
-                      fontWeight: 600,
-                      color: 'var(--brown-dark)'
-                    }}>
-                      {getInitials(activity.autor?.nome)}
-                    </div>
-                    {activity.type === 'mention' && (
-                      <div style={{
-                        position: 'absolute',
-                        bottom: '-2px',
-                        right: '-2px',
-                        width: '18px',
-                        height: '18px',
-                        borderRadius: '50%',
-                        background: 'var(--error)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        border: '2px solid var(--white)'
-                      }}>
-                        <AtSign size={10} style={{ color: 'white' }} />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Content */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
-                      <div>
-                        <div style={{
-                          fontSize: '13px',
-                          fontWeight: activity.unread ? 700 : 500,
-                          color: 'var(--brown)',
-                          marginBottom: '2px'
-                        }}>
-                          {activity.autor.nome}
-                        </div>
-                        <div style={{
-                          fontSize: '12px',
-                          color: 'var(--brown-light)',
-                          marginBottom: '4px'
-                        }}>
-                          {activity.preview}
-                        </div>
-                      </div>
-                      <span style={{
-                        fontSize: '11px',
-                        color: 'var(--brown-light)',
-                        whiteSpace: 'nowrap'
-                      }}>
-                        {formatDateTime(activity.created_at).split(' ')[0]}
-                      </span>
-                    </div>
-
-                    <p style={{
-                      margin: '0 0 6px 0',
-                      fontSize: '12px',
-                      color: activity.unread ? 'var(--brown)' : 'var(--brown-light)',
-                      lineHeight: 1.4,
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis'
-                    }}>
-                      {activity.conteudo}
-                    </p>
-
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      fontSize: '11px',
-                      color: 'var(--brown-light)'
-                    }}>
-                      <span style={{ opacity: 0.7 }}>{activity.equipa}</span>
-                      <span style={{ opacity: 0.5 }}>›</span>
-                      <span style={{ fontFamily: 'monospace', color: 'var(--gold)' }}>
-                        {activity.canal.codigo}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
+      <ActivityLogPanel
+        isOpen={showActivityLog}
+        activityLog={activityLog}
+        activityFilter={activityFilter}
+        setActivityFilter={setActivityFilter}
+        onClose={() => setShowActivityLog(false)}
+        onMarkAllAsRead={markAllActivityAsRead}
+      />
 
       {/* ========== SAVED MESSAGES PANEL ========== */}
-      {showSavedMessages && (
-        <div style={{
-          width: '320px',
-          background: 'var(--white)',
-          borderRight: '1px solid var(--stone)',
-          display: 'flex',
-          flexDirection: 'column',
-          flexShrink: 0
-        }}>
-          <div style={{
-            padding: '16px 20px',
-            borderBottom: '1px solid var(--stone)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <BookmarkCheck size={20} style={{ color: 'var(--accent-olive)' }} />
-              <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--brown)', margin: 0 }}>
-                Mensagens Guardadas
-              </h3>
-            </div>
-            <button
-              onClick={() => setShowSavedMessages(false)}
-              style={{
-                width: '28px',
-                height: '28px',
-                borderRadius: '6px',
-                background: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                color: 'var(--brown-light)'
-              }}
-            >
-              <X size={18} />
-            </button>
-          </div>
-
-          <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
-            {savedMessages.length === 0 ? (
-              <div style={{
-                textAlign: 'center',
-                padding: '40px 20px',
-                color: 'var(--brown-light)'
-              }}>
-                <Bookmark size={40} style={{ opacity: 0.3, marginBottom: '12px' }} />
-                <p style={{ margin: 0, fontSize: '13px' }}>
-                  Nenhuma mensagem guardada
-                </p>
-                <p style={{ margin: '8px 0 0', fontSize: '12px', opacity: 0.7 }}>
-                  Clica no ícone de bookmark nas mensagens para guardar
-                </p>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {savedMessages.map(msg => (
-                  <div
-                    key={msg.id}
-                    style={{
-                      padding: '12px',
-                      background: 'var(--cream)',
-                      borderRadius: '10px',
-                      cursor: 'pointer'
-                    }}
-                    onClick={() => {
-                      // Navigate to the message's channel
-                      const msgCanal = canais.find(c => c.id === msg.canal_id)
-                      if (msgCanal) selectCanal(msgCanal)
-                      setShowSavedMessages(false)
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                      <div style={{
-                        width: '28px',
-                        height: '28px',
-                        borderRadius: '50%',
-                        background: 'linear-gradient(135deg, var(--blush) 0%, var(--blush-dark) 100%)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '10px',
-                        fontWeight: 600,
-                        color: 'var(--brown-dark)'
-                      }}>
-                        {getInitials(msg.autor?.nome)}
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--brown)' }}>
-                          {msg.autor?.nome}
-                        </div>
-                        <div style={{ fontSize: '10px', color: 'var(--brown-light)' }}>
-                          {formatDateTime(msg.created_at)}
-                        </div>
-                      </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          toggleSaveMessage(msg)
-                        }}
-                        style={{
-                          width: '24px',
-                          height: '24px',
-                          borderRadius: '4px',
-                          background: 'transparent',
-                          border: 'none',
-                          cursor: 'pointer',
-                          color: 'var(--warning)'
-                        }}
-                      >
-                        <BookmarkCheck size={14} />
-                      </button>
-                    </div>
-                    <p style={{
-                      margin: 0,
-                      fontSize: '12px',
-                      color: 'var(--brown)',
-                      lineHeight: 1.4,
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden'
-                    }}>
-                      {msg.conteudo}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      <SavedMessagesPanel
+        isOpen={showSavedMessages}
+        savedMessages={savedMessages}
+        onClose={() => setShowSavedMessages(false)}
+        onUnsaveMessage={toggleSaveMessage}
+        onNavigateToMessage={(msg) => {
+          const msgCanal = canais.find(c => c.id === msg.canal_id)
+          if (msgCanal) selectCanal(msgCanal)
+          setShowSavedMessages(false)
+        }}
+      />
 
       {/* ========== ÁREA PRINCIPAL ========== */}
       <div
@@ -3162,600 +1740,49 @@ export default function Workspace() {
         )}
 
         {/* Header do canal */}
-        {canalAtivo && (
-          <div style={{
-            padding: '12px 24px',
-            borderBottom: '1px solid var(--stone)',
-            background: 'var(--white)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '8px',
-                background: equipas.find(e => e.id === canalAtivo.equipa)?.cor || 'var(--accent-olive)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                fontSize: '12px',
-                fontWeight: 700
-              }}>
-                {equipas.find(e => e.id === canalAtivo.equipa)?.inicial || 'G'}
-              </div>
-              <div>
-                <h2 style={{
-                  fontSize: '16px',
-                  fontWeight: 700,
-                  color: 'var(--brown)',
-                  margin: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}>
-                  {canalAtivo.codigo}
-                  <span style={{ fontWeight: 400, color: 'var(--brown-light)' }}>
-                    {canalAtivo.nome}
-                  </span>
-                </h2>
-                <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginTop: '2px' }}>
-                  {membros.length} membros • {posts.length} mensagens
-                </div>
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-              {/* Copy Link Button */}
-              <button
-                onClick={copyChannelLink}
-                title={linkCopied ? 'Link copiado!' : 'Copiar link do canal'}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  background: linkCopied ? 'var(--success)' : 'var(--cream)',
-                  border: linkCopied ? '1px solid var(--success)' : '1px solid var(--stone)',
-                  cursor: 'pointer',
-                  color: linkCopied ? 'white' : 'var(--brown)',
-                  fontSize: '12px',
-                  fontWeight: 500,
-                  transition: 'all 0.2s'
-                }}
-              >
-                {linkCopied ? <Check size={14} /> : <Link2 size={14} />}
-                {linkCopied ? 'Copiado!' : 'Copiar Link'}
-              </button>
-
-              <div style={{ width: '1px', height: '24px', background: 'var(--stone)', margin: '0 8px' }} />
-
-              {/* Video Call */}
-              <button onClick={() => startCall('video', membros.slice(0, 3))} title="Iniciar reunião" style={{ width: '36px', height: '36px', borderRadius: '6px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--brown-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Video size={18} />
-              </button>
-              {/* Voice Call */}
-              <button onClick={() => startCall('audio', membros.slice(0, 3))} title="Chamada de voz" style={{ width: '36px', height: '36px', borderRadius: '6px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--brown-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Phone size={18} />
-              </button>
-              {/* DM */}
-              <button onClick={() => setShowDMPanel(true)} title="Mensagens diretas" style={{ width: '36px', height: '36px', borderRadius: '6px', background: showDMPanel ? 'var(--stone)' : 'transparent', border: 'none', cursor: 'pointer', color: 'var(--brown-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <MessageCircle size={18} />
-              </button>
-              {/* AI Assistant */}
-              <button onClick={() => setShowAIAssistant(true)} title="Assistente IA" style={{ width: '36px', height: '36px', borderRadius: '6px', background: showAIAssistant ? 'var(--stone)' : 'transparent', border: 'none', cursor: 'pointer', color: 'var(--brown-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Sparkles size={18} />
-              </button>
-              {/* Analytics */}
-              <button onClick={loadChannelAnalytics} title="Analytics" style={{ width: '36px', height: '36px', borderRadius: '6px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--brown-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <BarChart3 size={18} />
-              </button>
-              {/* Export */}
-              <button onClick={() => setShowExportModal(true)} title="Exportar conversa" style={{ width: '36px', height: '36px', borderRadius: '6px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--brown-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <FileDown size={18} />
-              </button>
-              {/* Schedule Meeting */}
-              <button onClick={() => scheduleMeetingFromChat()} title="Agendar reunião" style={{ width: '36px', height: '36px', borderRadius: '6px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--brown-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <CalendarPlus size={18} />
-              </button>
-              {/* Settings */}
-              <button title="Definições" style={{ width: '36px', height: '36px', borderRadius: '6px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--brown-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Settings size={18} />
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Tabs */}
-        {canalAtivo && (
-          <div style={{
-            display: 'flex',
-            gap: '0',
-            borderBottom: '1px solid var(--stone)',
-            padding: '0 24px',
-            background: 'var(--white)',
-            justifyContent: 'space-between',
-            alignItems: 'center'
-          }}>
-            <div style={{ display: 'flex' }}>
-              {[
-                { id: 'publicacoes', label: 'Publicações', icon: MessageSquare },
-                { id: 'ficheiros', label: 'Ficheiros', icon: FileText },
-                { id: 'wiki', label: 'Wiki', icon: StickyNote },
-                { id: 'tarefas', label: 'Tarefas', icon: CheckSquare }
-              ].map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '14px 20px',
-                    background: 'transparent',
-                    border: 'none',
-                    borderBottom: activeTab === tab.id ? '2px solid var(--accent-olive)' : '2px solid transparent',
-                    cursor: 'pointer',
-                    color: activeTab === tab.id ? 'var(--brown)' : 'var(--brown-light)',
-                    fontWeight: activeTab === tab.id ? 600 : 500,
-                    fontSize: '13px',
-                    marginBottom: '-1px',
-                    transition: 'color 0.15s'
-                  }}
-                >
-                  <tab.icon size={16} />
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Filters */}
-            {activeTab === 'publicacoes' && (
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', paddingRight: '8px' }}>
-                {/* Quick filters */}
-                <div style={{ display: 'flex', gap: '4px', position: 'relative' }}>
-                  {FILTER_OPTIONS.map(filter => (
-                    <button
-                      key={filter.id}
-                      onClick={() => setActiveFilter(filter.id)}
-                      title={filter.label}
-                      style={{
-                        padding: '6px 10px',
-                        borderRadius: '6px',
-                        background: activeFilter === filter.id ? 'var(--accent-olive)' : 'var(--cream)',
-                        border: activeFilter === filter.id ? 'none' : '1px solid var(--stone)',
-                        cursor: 'pointer',
-                        color: activeFilter === filter.id ? 'white' : 'var(--brown-light)',
-                        fontSize: '11px',
-                        fontWeight: 500,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        transition: 'all 0.15s'
-                      }}
-                    >
-                      <filter.icon size={12} />
-                      {filter.label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Advanced search toggle */}
-                <button
-                  onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
-                  title="Pesquisa avançada"
-                  style={{
-                    padding: '6px 10px',
-                    borderRadius: '6px',
-                    background: showAdvancedSearch ? 'var(--brown)' : 'transparent',
-                    border: '1px solid var(--stone)',
-                    cursor: 'pointer',
-                    color: showAdvancedSearch ? 'white' : 'var(--brown-light)',
-                    fontSize: '11px',
-                    fontWeight: 500,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}
-                >
-                  <SlidersHorizontal size={12} />
-                  Avançada
-                </button>
-
-                {/* Reset filters */}
-                {(activeFilter !== 'all' || searchQuery || showAdvancedSearch) && (
-                  <button
-                    onClick={resetFilters}
-                    style={{
-                      padding: '6px 10px',
-                      borderRadius: '6px',
-                      background: 'var(--error)',
-                      border: 'none',
-                      cursor: 'pointer',
-                      color: 'white',
-                      fontSize: '11px',
-                      fontWeight: 500,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    <X size={12} />
-                    Limpar
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Topics Bar */}
-        {canalAtivo && activeTab === 'publicacoes' && (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '10px 24px',
-            background: 'var(--off-white)',
-            borderBottom: '1px solid var(--stone)',
-            overflowX: 'auto'
-          }}>
-            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--brown-light)', marginRight: '4px' }}>
-              Tópicos:
-            </span>
-            {getCurrentChannelTopics().map(topic => {
-              const IconComponent = getTopicIcon(topic.icon)
-              const isActive = activeTopic === topic.id
-              return (
-                <button
-                  key={topic.id}
-                  onClick={() => setActiveTopic(topic.id)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '6px 12px',
-                    borderRadius: '16px',
-                    background: isActive ? topic.cor : 'var(--white)',
-                    border: isActive ? 'none' : '1px solid var(--stone)',
-                    cursor: 'pointer',
-                    color: isActive ? 'white' : 'var(--brown)',
-                    fontSize: '12px',
-                    fontWeight: isActive ? 600 : 400,
-                    whiteSpace: 'nowrap',
-                    transition: 'all 0.15s'
-                  }}
-                >
-                  <IconComponent size={14} />
-                  {topic.nome}
-                  {topic.custom && isActive && (
-                    <X
-                      size={12}
-                      style={{ marginLeft: '4px', cursor: 'pointer' }}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        removeCustomTopic(topic.id)
-                      }}
-                    />
-                  )}
-                </button>
-              )
-            })}
-
-            {/* Add Topic Button */}
-            {!showAddTopic ? (
-              <button
-                onClick={() => setShowAddTopic(true)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  padding: '6px 10px',
-                  borderRadius: '16px',
-                  background: 'transparent',
-                  border: '1px dashed var(--stone)',
-                  cursor: 'pointer',
-                  color: 'var(--brown-light)',
-                  fontSize: '12px'
-                }}
-              >
-                <Plus size={14} />
-                Tópico
-              </button>
-            ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <input
-                  type="text"
-                  value={newTopicName}
-                  onChange={(e) => setNewTopicName(e.target.value)}
-                  placeholder="Nome do tópico..."
-                  style={{
-                    padding: '6px 10px',
-                    border: '1px solid var(--accent-olive)',
-                    borderRadius: '16px',
-                    fontSize: '12px',
-                    width: '120px',
-                    outline: 'none'
-                  }}
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') addCustomTopic()
-                    if (e.key === 'Escape') setShowAddTopic(false)
-                  }}
-                />
-                <button
-                  onClick={addCustomTopic}
-                  style={{
-                    width: '28px',
-                    height: '28px',
-                    borderRadius: '50%',
-                    background: 'var(--accent-olive)',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: 'white',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  <Check size={14} />
-                </button>
-                <button
-                  onClick={() => setShowAddTopic(false)}
-                  style={{
-                    width: '28px',
-                    height: '28px',
-                    borderRadius: '50%',
-                    background: 'var(--stone)',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: 'var(--brown-light)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Advanced Search Panel */}
-        {showAdvancedSearch && activeTab === 'publicacoes' && canalAtivo && (
-          <div style={{
-            padding: '16px 24px',
-            background: 'var(--cream)',
-            borderBottom: '1px solid var(--stone)',
-            display: 'flex',
-            gap: '16px',
-            alignItems: 'flex-end',
-            flexWrap: 'wrap'
-          }}>
-            {/* Author search */}
-            <div style={{ minWidth: '180px' }}>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--brown-light)', marginBottom: '6px' }}>
-                <User size={12} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
-                Autor
-              </label>
-              <input
-                type="text"
-                placeholder="Nome do autor..."
-                value={searchFilters.author}
-                onChange={e => setSearchFilters(prev => ({ ...prev, author: e.target.value }))}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  border: '1px solid var(--stone)',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  background: 'var(--white)',
-                  outline: 'none'
-                }}
-              />
-            </div>
-
-            {/* Date from */}
-            <div style={{ minWidth: '140px' }}>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--brown-light)', marginBottom: '6px' }}>
-                <CalendarDays size={12} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
-                De
-              </label>
-              <input
-                type="date"
-                value={searchFilters.dateFrom}
-                onChange={e => setSearchFilters(prev => ({ ...prev, dateFrom: e.target.value }))}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  border: '1px solid var(--stone)',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  background: 'var(--white)',
-                  outline: 'none'
-                }}
-              />
-            </div>
-
-            {/* Date to */}
-            <div style={{ minWidth: '140px' }}>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--brown-light)', marginBottom: '6px' }}>
-                <CalendarDays size={12} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
-                Até
-              </label>
-              <input
-                type="date"
-                value={searchFilters.dateTo}
-                onChange={e => setSearchFilters(prev => ({ ...prev, dateTo: e.target.value }))}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  border: '1px solid var(--stone)',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  background: 'var(--white)',
-                  outline: 'none'
-                }}
-              />
-            </div>
-
-            {/* Checkboxes */}
-            <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--brown)', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={searchFilters.hasAttachments}
-                  onChange={e => setSearchFilters(prev => ({ ...prev, hasAttachments: e.target.checked }))}
-                  style={{ accentColor: 'var(--accent-olive)' }}
-                />
-                <Paperclip size={14} />
-                Com anexos
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--brown)', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={searchFilters.hasMentions}
-                  onChange={e => setSearchFilters(prev => ({ ...prev, hasMentions: e.target.checked }))}
-                  style={{ accentColor: 'var(--accent-olive)' }}
-                />
-                <AtSign size={14} />
-                Com menções
-              </label>
-            </div>
-
-            {/* Results count */}
-            <div style={{
-              marginLeft: 'auto',
-              fontSize: '12px',
-              color: 'var(--brown-light)',
-              background: 'var(--white)',
-              padding: '8px 12px',
-              borderRadius: '6px',
-              fontWeight: 500
-            }}>
-              {filteredPosts.length} {filteredPosts.length === 1 ? 'resultado' : 'resultados'}
-            </div>
-          </div>
-        )}
-
-        {/* Pinned Messages Bar */}
-        {canalAtivo && getCurrentChannelPinnedMessages().length > 0 && (
-          <div style={{
-            padding: '10px 24px',
-            background: 'rgba(201, 168, 130, 0.1)',
-            borderBottom: '1px solid var(--stone)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px'
-          }}>
-            <Pin size={16} style={{ color: 'var(--warning)' }} />
-            <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--brown)' }}>
-              {getCurrentChannelPinnedMessages().length} mensagem(ns) fixada(s)
-            </span>
-            <button
-              onClick={() => setShowPinnedMessages(!showPinnedMessages)}
-              style={{
-                marginLeft: 'auto',
-                padding: '4px 12px',
-                borderRadius: '4px',
-                background: showPinnedMessages ? 'var(--accent-olive)' : 'var(--white)',
-                border: '1px solid var(--stone)',
-                cursor: 'pointer',
-                color: showPinnedMessages ? 'white' : 'var(--brown)',
-                fontSize: '12px'
-              }}
-            >
-              {showPinnedMessages ? 'Ocultar' : 'Ver todas'}
-            </button>
-          </div>
-        )}
-
-        {/* Pinned Messages Panel */}
-        {showPinnedMessages && canalAtivo && getCurrentChannelPinnedMessages().length > 0 && (
-          <div style={{
-            padding: '16px 24px',
-            background: 'var(--cream)',
-            borderBottom: '1px solid var(--stone)',
-            maxHeight: '200px',
-            overflowY: 'auto'
-          }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {getCurrentChannelPinnedMessages().map(msg => (
-                <div
-                  key={msg.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '12px',
-                    padding: '12px',
-                    background: 'var(--white)',
-                    borderRadius: '8px',
-                    borderLeft: '3px solid var(--warning)'
-                  }}
-                >
-                  <div style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '50%',
-                    background: 'linear-gradient(135deg, var(--blush) 0%, var(--blush-dark) 100%)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    color: 'var(--brown-dark)',
-                    flexShrink: 0
-                  }}>
-                    {getInitials(msg.autor?.nome)}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                      <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--brown)' }}>
-                        {msg.autor?.nome}
-                      </span>
-                      <span style={{ fontSize: '10px', color: 'var(--brown-light)' }}>
-                        {formatDateTime(msg.pinnedAt)}
-                      </span>
-                    </div>
-                    <p style={{
-                      margin: 0,
-                      fontSize: '12px',
-                      color: 'var(--brown)',
-                      lineHeight: 1.4,
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden'
-                    }}>
-                      {msg.conteudo}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => togglePinMessage(msg)}
-                    title="Desafixar"
-                    style={{
-                      width: '28px',
-                      height: '28px',
-                      borderRadius: '4px',
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      color: 'var(--brown-light)'
-                    }}
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
+        <ChannelHeader
+          canalAtivo={canalAtivo}
+          equipas={EQUIPAS_GAVINHO}
+          membros={membros}
+          posts={posts}
+          filteredPosts={filteredPosts}
+          linkCopied={linkCopied}
+          onCopyLink={copyChannelLink}
+          showDMPanel={showDMPanel}
+          onToggleDMPanel={() => setShowDMPanel(!showDMPanel)}
+          showAIAssistant={showAIAssistant}
+          onToggleAIAssistant={() => setShowAIAssistant(!showAIAssistant)}
+          onLoadAnalytics={loadChannelAnalytics}
+          onShowExportModal={() => setShowExportModal(true)}
+          onScheduleMeeting={() => setShowScheduleMeetingModal(true)}
+          onScheduleMessage={() => setShowScheduleMessage(true)}
+          onEmailSettings={() => setShowEmailSettings(true)}
+          onStartCall={() => startCall('audio')}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          activeFilter={activeFilter}
+          setActiveFilter={setActiveFilter}
+          showAdvancedSearch={showAdvancedSearch}
+          setShowAdvancedSearch={setShowAdvancedSearch}
+          onResetFilters={resetFilters}
+          searchQuery={searchQuery}
+          searchFilters={searchFilters}
+          setSearchFilters={setSearchFilters}
+          activeTopic={activeTopic}
+          setActiveTopic={setActiveTopic}
+          getCurrentChannelTopics={getCurrentChannelTopics}
+          getTopicIcon={getTopicIcon}
+          showAddTopic={showAddTopic}
+          setShowAddTopic={setShowAddTopic}
+          newTopicName={newTopicName}
+          setNewTopicName={setNewTopicName}
+          onAddCustomTopic={addCustomTopic}
+          onRemoveCustomTopic={removeCustomTopic}
+          onRenameCustomTopic={renameCustomTopic}
+          showPinnedMessages={showPinnedMessages}
+          setShowPinnedMessages={setShowPinnedMessages}
+          getCurrentChannelPinnedMessages={getCurrentChannelPinnedMessages}
+        />
         {/* Messages Area */}
         <div style={{
           flex: 1,
@@ -3793,1312 +1820,73 @@ export default function Workspace() {
                   )}
 
                   {/* Messages */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    {filteredPosts.map((post, index) => {
-                      const showAuthor = index === 0 ||
-                        filteredPosts[index - 1]?.autor?.id !== post.autor?.id ||
-                        (new Date(post.created_at) - new Date(filteredPosts[index - 1]?.created_at)) > 300000
-
-                      return (
-                        <div
-                          key={post.id}
-                          style={{
-                            padding: showAuthor ? '16px' : '4px 16px 4px 64px',
-                            borderRadius: '8px',
-                            background: 'var(--white)',
-                            marginTop: showAuthor ? '12px' : '0',
-                            boxShadow: 'var(--shadow-sm)'
-                          }}
-                          className="message-card"
-                        >
-                          {showAuthor && (
-                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: '8px' }}>
-                              <div style={{ position: 'relative', flexShrink: 0 }}>
-                                <div style={{
-                                  width: '40px',
-                                  height: '40px',
-                                  borderRadius: '50%',
-                                  background: post.autor?.avatar_url
-                                    ? `url(${post.autor.avatar_url}) center/cover`
-                                    : 'linear-gradient(135deg, var(--blush) 0%, var(--blush-dark) 100%)',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  color: 'var(--brown-dark)',
-                                  fontSize: '14px',
-                                  fontWeight: 600
-                                }}>
-                                  {!post.autor?.avatar_url && getInitials(post.autor?.nome)}
-                                </div>
-                                {/* Online status indicator */}
-                                <div style={{
-                                  position: 'absolute',
-                                  bottom: '0',
-                                  right: '0',
-                                  width: '12px',
-                                  height: '12px',
-                                  borderRadius: '50%',
-                                  background: getPresenceColor(post.autor?.id),
-                                  border: '2px solid var(--white)'
-                                }} title={onlineUsers[post.autor?.id] === 'online' ? 'Online' : onlineUsers[post.autor?.id] === 'away' ? 'Ausente' : 'Offline'} />
-                              </div>
-                              <div style={{ flex: 1 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <span style={{ fontWeight: 600, fontSize: '14px', color: 'var(--brown)' }}>
-                                    {post.autor?.nome || 'Utilizador'}
-                                  </span>
-                                  {post.autor?.funcao && (
-                                    <span style={{
-                                      fontSize: '11px',
-                                      color: 'var(--brown-light)',
-                                      background: 'var(--stone)',
-                                      padding: '2px 8px',
-                                      borderRadius: '4px'
-                                    }}>
-                                      {post.autor.funcao}
-                                    </span>
-                                  )}
-                                  <span style={{ fontSize: '12px', color: 'var(--brown-light)' }}>
-                                    {formatDateTime(post.created_at)}
-                                  </span>
-                                  {post.pinned && <Pin size={14} style={{ color: 'var(--warning)' }} />}
-                                </div>
-                              </div>
-
-                              {/* Message actions */}
-                              <div style={{ display: 'flex', gap: '2px', opacity: 0, position: 'relative' }} className="message-actions">
-                                {REACTIONS.slice(0, 4).map(reaction => (
-                                  <button
-                                    key={reaction.name}
-                                    onClick={() => handleReaction(post.id, reaction.emoji)}
-                                    style={{
-                                      width: '28px',
-                                      height: '28px',
-                                      borderRadius: '4px',
-                                      background: 'transparent',
-                                      border: 'none',
-                                      cursor: 'pointer',
-                                      fontSize: '14px'
-                                    }}
-                                  >
-                                    {reaction.emoji}
-                                  </button>
-                                ))}
-                                {/* Reply button */}
-                                <button
-                                  onClick={() => startReplyTo(post)}
-                                  title="Responder"
-                                  style={{
-                                    width: '28px',
-                                    height: '28px',
-                                    borderRadius: '4px',
-                                    background: 'transparent',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    color: 'var(--brown-light)'
-                                  }}
-                                >
-                                  <CornerUpLeft size={16} />
-                                </button>
-                                {/* Thread button */}
-                                <button
-                                  onClick={() => openThread(post)}
-                                  title="Abrir conversa"
-                                  style={{
-                                    width: '28px',
-                                    height: '28px',
-                                    borderRadius: '4px',
-                                    background: 'transparent',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    color: 'var(--brown-light)'
-                                  }}
-                                >
-                                  <MessageSquare size={16} />
-                                </button>
-                                {/* Bookmark button */}
-                                <button
-                                  onClick={() => toggleSaveMessage(post)}
-                                  title={isMessageSaved(post.id) ? 'Remover dos guardados' : 'Guardar mensagem'}
-                                  style={{
-                                    width: '28px',
-                                    height: '28px',
-                                    borderRadius: '4px',
-                                    background: isMessageSaved(post.id) ? 'rgba(201, 168, 130, 0.2)' : 'transparent',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    color: isMessageSaved(post.id) ? 'var(--warning)' : 'var(--brown-light)'
-                                  }}
-                                >
-                                  {isMessageSaved(post.id) ? <BookmarkCheck size={16} /> : <Bookmark size={16} />}
-                                </button>
-                                {/* More options menu */}
-                                <div style={{ position: 'relative' }}>
-                                  <button
-                                    onClick={() => setShowMessageMenu(showMessageMenu === post.id ? null : post.id)}
-                                    style={{
-                                      width: '28px',
-                                      height: '28px',
-                                      borderRadius: '4px',
-                                      background: showMessageMenu === post.id ? 'var(--stone)' : 'transparent',
-                                      border: 'none',
-                                      cursor: 'pointer',
-                                      color: 'var(--brown-light)'
-                                    }}
-                                  >
-                                    <MoreHorizontal size={16} />
-                                  </button>
-
-                                  {/* Context menu */}
-                                  {showMessageMenu === post.id && (
-                                    <div style={{
-                                      position: 'absolute',
-                                      top: '100%',
-                                      right: '0',
-                                      marginTop: '4px',
-                                      background: 'var(--white)',
-                                      borderRadius: '8px',
-                                      boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
-                                      border: '1px solid var(--stone)',
-                                      minWidth: '160px',
-                                      zIndex: 1000,
-                                      overflow: 'hidden'
-                                    }}>
-                                      <button
-                                        onClick={() => startReplyTo(post)}
-                                        style={{
-                                          width: '100%',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '10px',
-                                          padding: '10px 14px',
-                                          border: 'none',
-                                          background: 'transparent',
-                                          cursor: 'pointer',
-                                          fontSize: '13px',
-                                          color: 'var(--brown)',
-                                          textAlign: 'left'
-                                        }}
-                                        onMouseEnter={e => e.currentTarget.style.background = 'var(--cream)'}
-                                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                                      >
-                                        <CornerUpLeft size={16} />
-                                        Responder
-                                      </button>
-                                      <button
-                                        onClick={() => openThread(post)}
-                                        style={{
-                                          width: '100%',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '10px',
-                                          padding: '10px 14px',
-                                          border: 'none',
-                                          background: 'transparent',
-                                          cursor: 'pointer',
-                                          fontSize: '13px',
-                                          color: 'var(--brown)',
-                                          textAlign: 'left'
-                                        }}
-                                        onMouseEnter={e => e.currentTarget.style.background = 'var(--cream)'}
-                                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                                      >
-                                        <MessageSquare size={16} />
-                                        Abrir conversa
-                                      </button>
-                                      <button
-                                        onClick={() => toggleSaveMessage(post)}
-                                        style={{
-                                          width: '100%',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '10px',
-                                          padding: '10px 14px',
-                                          border: 'none',
-                                          background: 'transparent',
-                                          cursor: 'pointer',
-                                          fontSize: '13px',
-                                          color: isMessageSaved(post.id) ? 'var(--warning)' : 'var(--brown)',
-                                          textAlign: 'left'
-                                        }}
-                                        onMouseEnter={e => e.currentTarget.style.background = 'var(--cream)'}
-                                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                                      >
-                                        {isMessageSaved(post.id) ? <BookmarkCheck size={16} /> : <Bookmark size={16} />}
-                                        {isMessageSaved(post.id) ? 'Remover guardado' : 'Guardar'}
-                                      </button>
-                                      <button
-                                        onClick={() => togglePinMessage(post)}
-                                        style={{
-                                          width: '100%',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '10px',
-                                          padding: '10px 14px',
-                                          border: 'none',
-                                          background: 'transparent',
-                                          cursor: 'pointer',
-                                          fontSize: '13px',
-                                          color: isMessagePinned(post.id) ? 'var(--warning)' : 'var(--brown)',
-                                          textAlign: 'left'
-                                        }}
-                                        onMouseEnter={e => e.currentTarget.style.background = 'var(--cream)'}
-                                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                                      >
-                                        <Pin size={16} />
-                                        {isMessagePinned(post.id) ? 'Desafixar' : 'Fixar no canal'}
-                                      </button>
-                                      <button
-                                        onClick={() => openForwardModal(post)}
-                                        style={{
-                                          width: '100%',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '10px',
-                                          padding: '10px 14px',
-                                          border: 'none',
-                                          background: 'transparent',
-                                          cursor: 'pointer',
-                                          fontSize: '13px',
-                                          color: 'var(--brown)',
-                                          textAlign: 'left'
-                                        }}
-                                        onMouseEnter={e => e.currentTarget.style.background = 'var(--cream)'}
-                                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                                      >
-                                        <Forward size={16} />
-                                        Reencaminhar
-                                      </button>
-                                      <button
-                                        onClick={() => openCreateTaskModal(post)}
-                                        style={{
-                                          width: '100%',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '10px',
-                                          padding: '10px 14px',
-                                          border: 'none',
-                                          background: 'transparent',
-                                          cursor: 'pointer',
-                                          fontSize: '13px',
-                                          color: 'var(--brown)',
-                                          textAlign: 'left'
-                                        }}
-                                        onMouseEnter={e => e.currentTarget.style.background = 'var(--cream)'}
-                                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                                      >
-                                        <CheckSquare size={16} />
-                                        Criar tarefa
-                                      </button>
-                                      {isOwnMessage(post) && (
-                                        <>
-                                          <div style={{ height: '1px', background: 'var(--stone)', margin: '4px 0' }} />
-                                          <button
-                                            onClick={() => startEditMessage(post)}
-                                            style={{
-                                              width: '100%',
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              gap: '10px',
-                                              padding: '10px 14px',
-                                              border: 'none',
-                                              background: 'transparent',
-                                              cursor: 'pointer',
-                                              fontSize: '13px',
-                                              color: 'var(--brown)',
-                                              textAlign: 'left'
-                                            }}
-                                            onMouseEnter={e => e.currentTarget.style.background = 'var(--cream)'}
-                                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                                          >
-                                            <Edit size={16} />
-                                            Editar
-                                          </button>
-                                          <button
-                                            onClick={() => deleteMessage(post.id)}
-                                            style={{
-                                              width: '100%',
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              gap: '10px',
-                                              padding: '10px 14px',
-                                              border: 'none',
-                                              background: 'transparent',
-                                              cursor: 'pointer',
-                                              fontSize: '13px',
-                                              color: 'var(--error)',
-                                              textAlign: 'left'
-                                            }}
-                                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(220,53,69,0.1)'}
-                                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                                          >
-                                            <Trash2 size={16} />
-                                            Eliminar
-                                          </button>
-                                        </>
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Content */}
-                          <div style={{ paddingLeft: showAuthor ? '52px' : '0' }}>
-                            {/* Reply quote if this message is replying to another */}
-                            {post.replyTo && (
-                              <div style={{
-                                display: 'flex',
-                                alignItems: 'flex-start',
-                                gap: '8px',
-                                padding: '8px 12px',
-                                background: 'var(--cream)',
-                                borderRadius: '8px',
-                                borderLeft: '3px solid var(--accent-olive)',
-                                marginBottom: '8px'
-                              }}>
-                                <Quote size={14} style={{ color: 'var(--brown-light)', flexShrink: 0, marginTop: '2px' }} />
-                                <div>
-                                  <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--brown-light)', marginBottom: '2px' }}>
-                                    {post.replyTo.autor?.nome}
-                                  </div>
-                                  <div style={{ fontSize: '12px', color: 'var(--brown)', opacity: 0.8 }}>
-                                    {post.replyTo.conteudo?.substring(0, 100)}{post.replyTo.conteudo?.length > 100 ? '...' : ''}
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Editing mode */}
-                            {editingMessage?.id === post.id ? (
-                              <div>
-                                <textarea
-                                  value={editingContent}
-                                  onChange={e => setEditingContent(e.target.value)}
-                                  style={{
-                                    width: '100%',
-                                    padding: '10px 12px',
-                                    border: '2px solid var(--accent-olive)',
-                                    borderRadius: '8px',
-                                    fontSize: '14px',
-                                    resize: 'vertical',
-                                    minHeight: '60px',
-                                    outline: 'none'
-                                  }}
-                                  autoFocus
-                                />
-                                <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-                                  <button
-                                    onClick={saveEditMessage}
-                                    style={{
-                                      padding: '6px 14px',
-                                      background: 'var(--accent-olive)',
-                                      color: 'white',
-                                      border: 'none',
-                                      borderRadius: '6px',
-                                      fontSize: '12px',
-                                      fontWeight: 500,
-                                      cursor: 'pointer'
-                                    }}
-                                  >
-                                    Guardar
-                                  </button>
-                                  <button
-                                    onClick={cancelEditMessage}
-                                    style={{
-                                      padding: '6px 14px',
-                                      background: 'var(--stone)',
-                                      color: 'var(--brown)',
-                                      border: 'none',
-                                      borderRadius: '6px',
-                                      fontSize: '12px',
-                                      fontWeight: 500,
-                                      cursor: 'pointer'
-                                    }}
-                                  >
-                                    Cancelar
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <div>
-                                <p style={{
-                                  fontSize: '14px',
-                                  color: 'var(--brown)',
-                                  margin: 0,
-                                  lineHeight: 1.6,
-                                  whiteSpace: 'pre-wrap'
-                                }}>
-                                  {renderFormattedText(post.conteudo)}
-                                  {post.editado && (
-                                    <span style={{ fontSize: '11px', color: 'var(--brown-light)', marginLeft: '6px' }}>
-                                      (editado)
-                                    </span>
-                                  )}
-                                </p>
-
-                                {/* Link Preview */}
-                                {extractUrls(post.conteudo).slice(0, 1).map((url, idx) => (
-                                  <div
-                                    key={idx}
-                                    style={{
-                                      marginTop: '10px',
-                                      padding: '12px',
-                                      background: 'var(--cream)',
-                                      borderRadius: '8px',
-                                      borderLeft: '3px solid var(--accent-olive)',
-                                      maxWidth: '400px'
-                                    }}
-                                  >
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                                      <ExternalLink size={14} style={{ color: 'var(--brown-light)' }} />
-                                      <span style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
-                                        {new URL(url).hostname}
-                                      </span>
-                                    </div>
-                                    <a
-                                      href={url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      style={{
-                                        fontSize: '13px',
-                                        color: 'var(--accent-olive)',
-                                        textDecoration: 'none',
-                                        fontWeight: 500
-                                      }}
-                                    >
-                                      {url.length > 60 ? url.substring(0, 60) + '...' : url}
-                                    </a>
-                                  </div>
-                                ))}
-
-                                {/* Read Receipt (for own messages) */}
-                                {isOwnMessage(post) && (
-                                  <div style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '4px',
-                                    marginTop: '4px',
-                                    justifyContent: 'flex-end'
-                                  }}>
-                                    {getReadStatus(post) === 'read' ? (
-                                      <CheckCheck size={14} style={{ color: 'var(--accent-olive)' }} title="Lido" />
-                                    ) : getReadStatus(post) === 'delivered' ? (
-                                      <CheckCheck size={14} style={{ color: 'var(--brown-light)' }} title="Entregue" />
-                                    ) : (
-                                      <Check size={14} style={{ color: 'var(--brown-light)' }} title="Enviado" />
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-
-                            {/* Image */}
-                            {post.imagem_url && (
-                              <div style={{ marginTop: '12px' }}>
-                                <img
-                                  src={post.imagem_url}
-                                  alt=""
-                                  style={{
-                                    maxWidth: '400px',
-                                    maxHeight: '300px',
-                                    borderRadius: '8px',
-                                    objectFit: 'cover',
-                                    cursor: 'pointer'
-                                  }}
-                                />
-                              </div>
-                            )}
-
-                            {/* Attachments */}
-                            {post.attachments?.length > 0 && (
-                              <div style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
-                                {post.attachments.map((file, idx) => {
-                                  const isImage = file.type === 'image' || file.name?.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i)
-
-                                  if (isImage && file.url) {
-                                    return (
-                                      <a
-                                        key={idx}
-                                        href={file.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        style={{
-                                          display: 'block',
-                                          maxWidth: '300px',
-                                          borderRadius: '8px',
-                                          overflow: 'hidden',
-                                          border: '1px solid var(--stone)'
-                                        }}
-                                      >
-                                        <img
-                                          src={file.url}
-                                          alt={file.name}
-                                          style={{
-                                            width: '100%',
-                                            maxHeight: '200px',
-                                            objectFit: 'cover',
-                                            display: 'block'
-                                          }}
-                                        />
-                                        <div style={{
-                                          padding: '6px 10px',
-                                          background: 'var(--cream)',
-                                          fontSize: '11px',
-                                          color: 'var(--brown-light)'
-                                        }}>
-                                          {file.name} • {file.sizeFormatted || (typeof file.size === 'number' ? formatFileSize(file.size) : file.size)}
-                                        </div>
-                                      </a>
-                                    )
-                                  }
-
-                                  return (
-                                    <a
-                                      key={idx}
-                                      href={file.url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px',
-                                        padding: '10px 14px',
-                                        background: 'var(--cream)',
-                                        borderRadius: '8px',
-                                        cursor: 'pointer',
-                                        textDecoration: 'none'
-                                      }}
-                                    >
-                                      <FileText size={18} style={{ color: 'var(--accent-olive)' }} />
-                                      <div>
-                                        <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--brown)' }}>
-                                          {file.name}
-                                        </div>
-                                        <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
-                                          {file.sizeFormatted || (typeof file.size === 'number' ? formatFileSize(file.size) : file.size)}
-                                        </div>
-                                      </div>
-                                    </a>
-                                  )
-                                })}
-                              </div>
-                            )}
-
-                            {/* Reactions */}
-                            {post.reacoes?.length > 0 && (
-                              <div style={{ display: 'flex', gap: '6px', marginTop: '12px' }}>
-                                {post.reacoes.map((reaction, idx) => (
-                                  <button
-                                    key={idx}
-                                    onClick={() => handleReaction(post.id, reaction.emoji)}
-                                    style={{
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '4px',
-                                      padding: '4px 10px',
-                                      background: reaction.users.includes(profile?.nome || 'Eu')
-                                        ? 'rgba(122, 158, 122, 0.15)'
-                                        : 'var(--stone)',
-                                      border: reaction.users.includes(profile?.nome || 'Eu')
-                                        ? '1px solid var(--success)'
-                                        : '1px solid transparent',
-                                      borderRadius: '16px',
-                                      cursor: 'pointer',
-                                      fontSize: '13px'
-                                    }}
-                                  >
-                                    <span>{reaction.emoji}</span>
-                                    <span style={{ fontSize: '12px', color: 'var(--brown)', fontWeight: 500 }}>
-                                      {reaction.users.length}
-                                    </span>
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-
-                            {/* Thread preview */}
-                            {post.replyCount > 0 && (
-                              <button
-                                onClick={() => openThread(post)}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '8px',
-                                  padding: '8px 12px',
-                                  marginTop: '12px',
-                                  background: 'var(--cream)',
-                                  border: '1px solid var(--stone)',
-                                  borderRadius: '8px',
-                                  cursor: 'pointer',
-                                  fontSize: '13px',
-                                  color: 'var(--accent-olive)',
-                                  fontWeight: 500
-                                }}
-                              >
-                                <MessageSquare size={14} />
-                                {post.replyCount} {post.replyCount === 1 ? 'resposta' : 'respostas'}
-                                <ChevronRight size={14} />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-
-                  {filteredPosts.length === 0 && (
-                    <div style={{
-                      textAlign: 'center',
-                      padding: '80px 20px',
-                      color: 'var(--brown-light)'
-                    }}>
-                      <MessageSquare size={56} style={{ opacity: 0.3, marginBottom: '16px' }} />
-                      <h3 style={{ margin: '0 0 8px 0', color: 'var(--brown)' }}>
-                        Sem mensagens
-                      </h3>
-                      <p style={{ margin: 0 }}>
-                        Sê o primeiro a publicar neste canal!
-                      </p>
-                    </div>
-                  )}
-
-                  <div ref={messagesEndRef} />
+                  <MessageList
+                    posts={filteredPosts}
+                    profile={profile}
+                    onlineUsers={onlineUsers}
+                    editingMessage={editingMessage}
+                    editingContent={editingContent}
+                    setEditingContent={setEditingContent}
+                    onSaveEdit={saveEditMessage}
+                    onCancelEdit={cancelEditMessage}
+                    onReaction={handleReaction}
+                    onReply={startReplyTo}
+                    onOpenThread={openThread}
+                    onSaveMessage={toggleSaveMessage}
+                    onPinMessage={togglePinMessage}
+                    onForward={openForwardModal}
+                    onCreateTask={openCreateTaskModal}
+                    onEditMessage={startEditMessage}
+                    onDeleteMessage={deleteMessage}
+                    isMessageSaved={isMessageSaved}
+                    isMessagePinned={isMessagePinned}
+                    getReadStatus={getReadStatus}
+                    markMessageAsRead={markMessageAsRead}
+                    messagesEndRef={messagesEndRef}
+                    hasMoreMessages={hasMoreMessages}
+                    loadingMoreMessages={loadingMoreMessages}
+                    onLoadMore={loadMorePosts}
+                  />
                 </div>
 
                 {/* Input area */}
-                <div style={{
-                  padding: '16px 24px',
-                  borderTop: '1px solid var(--stone)',
-                  background: 'var(--white)'
-                }}>
-                  {/* Typing Indicator */}
-                  {typingUsers.length > 0 && (
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      padding: '8px 12px',
-                      marginBottom: '10px',
-                      fontSize: '12px',
-                      color: 'var(--brown-light)'
-                    }}>
-                      <div style={{ display: 'flex', gap: '3px' }}>
-                        <span style={{
-                          width: '6px',
-                          height: '6px',
-                          borderRadius: '50%',
-                          background: 'var(--brown-light)',
-                          animation: 'bounce 1.4s ease-in-out infinite'
-                        }} />
-                        <span style={{
-                          width: '6px',
-                          height: '6px',
-                          borderRadius: '50%',
-                          background: 'var(--brown-light)',
-                          animation: 'bounce 1.4s ease-in-out infinite',
-                          animationDelay: '0.2s'
-                        }} />
-                        <span style={{
-                          width: '6px',
-                          height: '6px',
-                          borderRadius: '50%',
-                          background: 'var(--brown-light)',
-                          animation: 'bounce 1.4s ease-in-out infinite',
-                          animationDelay: '0.4s'
-                        }} />
-                      </div>
-                      <span>
-                        {typingUsers.length === 1
-                          ? `${typingUsers[0]} está a escrever...`
-                          : `${typingUsers.slice(0, 2).join(', ')} estão a escrever...`}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Formatting Toolbar */}
-                  {showFormattingToolbar && (
-                    <div style={{
-                      display: 'flex',
-                      gap: '2px',
-                      marginBottom: '10px',
-                      padding: '6px 8px',
-                      background: 'var(--cream)',
-                      borderRadius: '8px',
-                      alignItems: 'center'
-                    }}>
-                      <button
-                        onClick={() => applyFormatting('bold')}
-                        title="Negrito (Ctrl+B)"
-                        style={{
-                          width: '30px',
-                          height: '30px',
-                          borderRadius: '4px',
-                          background: 'transparent',
-                          border: 'none',
-                          cursor: 'pointer',
-                          color: 'var(--brown-light)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                      >
-                        <Bold size={16} />
-                      </button>
-                      <button
-                        onClick={() => applyFormatting('italic')}
-                        title="Itálico (Ctrl+I)"
-                        style={{
-                          width: '30px',
-                          height: '30px',
-                          borderRadius: '4px',
-                          background: 'transparent',
-                          border: 'none',
-                          cursor: 'pointer',
-                          color: 'var(--brown-light)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                      >
-                        <Italic size={16} />
-                      </button>
-                      <button
-                        onClick={() => applyFormatting('code')}
-                        title="Código inline (Ctrl+Shift+C)"
-                        style={{
-                          width: '30px',
-                          height: '30px',
-                          borderRadius: '4px',
-                          background: 'transparent',
-                          border: 'none',
-                          cursor: 'pointer',
-                          color: 'var(--brown-light)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                      >
-                        <Code size={16} />
-                      </button>
-                      <button
-                        onClick={() => applyFormatting('codeblock')}
-                        title="Bloco de código"
-                        style={{
-                          width: '30px',
-                          height: '30px',
-                          borderRadius: '4px',
-                          background: 'transparent',
-                          border: 'none',
-                          cursor: 'pointer',
-                          color: 'var(--brown-light)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                      >
-                        <FileCode size={16} />
-                      </button>
-                      <div style={{ width: '1px', height: '20px', background: 'var(--stone)', margin: '0 6px' }} />
-                      <button
-                        onClick={() => applyFormatting('list')}
-                        title="Lista"
-                        style={{
-                          width: '30px',
-                          height: '30px',
-                          borderRadius: '4px',
-                          background: 'transparent',
-                          border: 'none',
-                          cursor: 'pointer',
-                          color: 'var(--brown-light)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                      >
-                        <List size={16} />
-                      </button>
-                      <button
-                        onClick={() => applyFormatting('numbered')}
-                        title="Lista numerada"
-                        style={{
-                          width: '30px',
-                          height: '30px',
-                          borderRadius: '4px',
-                          background: 'transparent',
-                          border: 'none',
-                          cursor: 'pointer',
-                          color: 'var(--brown-light)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                      >
-                        <ListOrdered size={16} />
-                      </button>
-                      <button
-                        onClick={() => applyFormatting('link')}
-                        title="Inserir link"
-                        style={{
-                          width: '30px',
-                          height: '30px',
-                          borderRadius: '4px',
-                          background: 'transparent',
-                          border: 'none',
-                          cursor: 'pointer',
-                          color: 'var(--brown-light)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                      >
-                        <Link2 size={16} />
-                      </button>
-                      <div style={{ flex: 1 }} />
-                      <button
-                        onClick={() => setShowKeyboardShortcuts(true)}
-                        title="Atalhos de teclado (?)"
-                        style={{
-                          padding: '4px 8px',
-                          borderRadius: '4px',
-                          background: 'transparent',
-                          border: '1px solid var(--stone)',
-                          cursor: 'pointer',
-                          color: 'var(--brown-light)',
-                          fontSize: '10px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px'
-                        }}
-                      >
-                        <Keyboard size={12} />
-                        Atalhos
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Reply-to quote */}
-                  {replyingTo && (
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '12px',
-                      padding: '12px 14px',
-                      background: 'var(--cream)',
-                      borderRadius: '10px',
-                      borderLeft: '4px solid var(--accent-olive)',
-                      marginBottom: '12px'
-                    }}>
-                      <CornerUpLeft size={18} style={{ color: 'var(--accent-olive)', flexShrink: 0, marginTop: '2px' }} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent-olive)', marginBottom: '4px' }}>
-                          A responder a {replyingTo.autor?.nome}
-                        </div>
-                        <div style={{
-                          fontSize: '13px',
-                          color: 'var(--brown)',
-                          opacity: 0.8,
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis'
-                        }}>
-                          {replyingTo.conteudo?.substring(0, 150)}{replyingTo.conteudo?.length > 150 ? '...' : ''}
-                        </div>
-                      </div>
-                      <button
-                        onClick={cancelReply}
-                        style={{
-                          width: '28px',
-                          height: '28px',
-                          borderRadius: '6px',
-                          background: 'var(--stone)',
-                          border: 'none',
-                          cursor: 'pointer',
-                          color: 'var(--brown-light)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0
-                        }}
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Selected files preview */}
-                  {selectedFiles.length > 0 && (
-                    <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
-                      {selectedFiles.map((file, idx) => (
-                        <div key={idx} style={{ position: 'relative' }}>
-                          {file.preview ? (
-                            <img
-                              src={file.preview}
-                              alt={file.name}
-                              style={{
-                                width: '80px',
-                                height: '80px',
-                                objectFit: 'cover',
-                                borderRadius: '8px'
-                              }}
-                            />
-                          ) : (
-                            <div style={{
-                              width: '80px',
-                              height: '80px',
-                              borderRadius: '8px',
-                              background: 'var(--cream)',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '4px'
-                            }}>
-                              <FileText size={24} style={{ color: 'var(--brown-light)' }} />
-                              <span style={{ fontSize: '9px', color: 'var(--brown-light)', maxWidth: '70px', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                                {file.name}
-                              </span>
-                            </div>
-                          )}
-                          <button
-                            onClick={() => setSelectedFiles(prev => prev.filter((_, i) => i !== idx))}
-                            style={{
-                              position: 'absolute',
-                              top: '-6px',
-                              right: '-6px',
-                              width: '20px',
-                              height: '20px',
-                              borderRadius: '50%',
-                              background: 'var(--error)',
-                              color: 'white',
-                              border: 'none',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center'
-                            }}
-                          >
-                            <X size={12} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'flex-end',
-                    gap: '12px',
-                    background: 'var(--cream)',
-                    borderRadius: '12px',
-                    padding: '12px 16px',
-                    border: '1px solid var(--stone)'
-                  }}>
-                    <div style={{ display: 'flex', gap: '4px' }}>
-                      <input
-                        type="file"
-                        ref={fileInputRef}
-                        onChange={handleFileSelect}
-                        multiple
-                        style={{ display: 'none' }}
-                      />
-                      <button
-                        onClick={() => fileInputRef.current?.click()}
-                        style={{
-                          width: '36px',
-                          height: '36px',
-                          borderRadius: '8px',
-                          background: 'transparent',
-                          border: 'none',
-                          cursor: 'pointer',
-                          color: 'var(--brown-light)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                      >
-                        <Paperclip size={20} />
-                      </button>
-                      {/* Emoji Picker Button */}
-                      <div style={{ position: 'relative' }}>
-                        <button
-                          onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                          style={{
-                            width: '36px',
-                            height: '36px',
-                            borderRadius: '8px',
-                            background: showEmojiPicker ? 'var(--stone)' : 'transparent',
-                            border: 'none',
-                            cursor: 'pointer',
-                            color: showEmojiPicker ? 'var(--brown)' : 'var(--brown-light)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                          }}
-                        >
-                          <Smile size={20} />
-                        </button>
-
-                        {/* Emoji Picker Popup */}
-                        {showEmojiPicker && (
-                          <div style={{
-                            position: 'absolute',
-                            bottom: '48px',
-                            left: '0',
-                            width: '320px',
-                            maxHeight: '350px',
-                            background: 'var(--white)',
-                            borderRadius: '12px',
-                            boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
-                            border: '1px solid var(--stone)',
-                            zIndex: 1000,
-                            overflow: 'hidden'
-                          }}>
-                            {/* Category tabs */}
-                            <div style={{
-                              display: 'flex',
-                              gap: '2px',
-                              padding: '8px',
-                              borderBottom: '1px solid var(--stone)',
-                              overflowX: 'auto',
-                              background: 'var(--off-white)'
-                            }}>
-                              {EMOJI_CATEGORIES.map(cat => (
-                                <button
-                                  key={cat.name}
-                                  onClick={() => setEmojiCategory(cat.name)}
-                                  style={{
-                                    padding: '6px 10px',
-                                    borderRadius: '6px',
-                                    border: 'none',
-                                    background: emojiCategory === cat.name ? 'var(--white)' : 'transparent',
-                                    cursor: 'pointer',
-                                    fontSize: '11px',
-                                    fontWeight: emojiCategory === cat.name ? 600 : 400,
-                                    color: emojiCategory === cat.name ? 'var(--brown)' : 'var(--brown-light)',
-                                    whiteSpace: 'nowrap',
-                                    boxShadow: emojiCategory === cat.name ? 'var(--shadow-sm)' : 'none'
-                                  }}
-                                >
-                                  {cat.name}
-                                </button>
-                              ))}
-                            </div>
-
-                            {/* Emoji grid */}
-                            <div style={{
-                              padding: '8px',
-                              maxHeight: '280px',
-                              overflowY: 'auto'
-                            }}>
-                              <div style={{
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(8, 1fr)',
-                                gap: '4px'
-                              }}>
-                                {EMOJI_CATEGORIES.find(c => c.name === emojiCategory)?.emojis.map((emoji, idx) => (
-                                  <button
-                                    key={idx}
-                                    onClick={() => insertEmoji(emoji)}
-                                    style={{
-                                      width: '36px',
-                                      height: '36px',
-                                      border: 'none',
-                                      background: 'transparent',
-                                      borderRadius: '6px',
-                                      cursor: 'pointer',
-                                      fontSize: '20px',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      transition: 'background 0.1s'
-                                    }}
-                                    onMouseEnter={e => e.currentTarget.style.background = 'var(--cream)'}
-                                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                                  >
-                                    {emoji}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Mention Button */}
-                      <button
-                        onClick={() => {
-                          const input = messageInputRef.current
-                          if (input) {
-                            const pos = input.selectionStart
-                            const newValue = messageInput.substring(0, pos) + '@' + messageInput.substring(pos)
-                            setMessageInput(newValue)
-                            setMentionStartIndex(pos)
-                            setMentionQuery('')
-                            setShowMentions(true)
-                            setTimeout(() => {
-                              input.selectionStart = input.selectionEnd = pos + 1
-                              input.focus()
-                            }, 0)
-                          }
-                        }}
-                        style={{
-                          width: '36px',
-                          height: '36px',
-                          borderRadius: '8px',
-                          background: showMentions ? 'var(--stone)' : 'transparent',
-                          border: 'none',
-                          cursor: 'pointer',
-                          color: showMentions ? 'var(--brown)' : 'var(--brown-light)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                      >
-                        <AtSign size={20} />
-                      </button>
-                    </div>
-
-                    {/* Input area with mention autocomplete */}
-                    <div style={{ flex: 1, position: 'relative' }}>
-                      {/* Mention Autocomplete Dropdown */}
-                      {showMentions && filteredMembros.length > 0 && (
-                        <div style={{
-                          position: 'absolute',
-                          bottom: '100%',
-                          left: '0',
-                          right: '0',
-                          marginBottom: '8px',
-                          background: 'var(--white)',
-                          borderRadius: '10px',
-                          boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                          border: '1px solid var(--stone)',
-                          maxHeight: '200px',
-                          overflowY: 'auto',
-                          zIndex: 1000
-                        }}>
-                          <div style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 600, color: 'var(--brown-light)', borderBottom: '1px solid var(--stone)' }}>
-                            Mencionar alguém
-                          </div>
-                          {filteredMembros.map(membro => (
-                            <button
-                              key={membro.id}
-                              onClick={() => insertMention(membro)}
-                              style={{
-                                width: '100%',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '10px',
-                                padding: '10px 12px',
-                                border: 'none',
-                                background: 'transparent',
-                                cursor: 'pointer',
-                                textAlign: 'left',
-                                transition: 'background 0.1s'
-                              }}
-                              onMouseEnter={e => e.currentTarget.style.background = 'var(--cream)'}
-                              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                            >
-                              <div style={{
-                                width: '32px',
-                                height: '32px',
-                                borderRadius: '50%',
-                                background: membro.avatar_url
-                                  ? `url(${membro.avatar_url}) center/cover`
-                                  : 'linear-gradient(135deg, var(--blush) 0%, var(--blush-dark) 100%)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: '11px',
-                                fontWeight: 600,
-                                color: 'var(--brown-dark)'
-                              }}>
-                                {!membro.avatar_url && getInitials(membro.nome)}
-                              </div>
-                              <div>
-                                <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--brown)' }}>
-                                  {membro.nome}
-                                </div>
-                                {membro.funcao && (
-                                  <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
-                                    {membro.funcao}
-                                  </div>
-                                )}
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-
-                      <textarea
-                        ref={messageInputRef}
-                        value={messageInput}
-                        onChange={handleMessageChange}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter' && !e.shiftKey && !showMentions) {
-                            e.preventDefault()
-                            handleSendMessage()
-                          }
-                          if (e.key === 'Escape') {
-                            setShowEmojiPicker(false)
-                            setShowMentions(false)
-                          }
-                        }}
-                        onBlur={() => {
-                          // Delay to allow click on mention item
-                          setTimeout(() => setShowMentions(false), 150)
-                        }}
-                        placeholder="Escreve uma mensagem... Use @ para mencionar"
-                        style={{
-                          width: '100%',
-                          border: 'none',
-                          background: 'transparent',
-                          resize: 'none',
-                          fontSize: '14px',
-                          lineHeight: 1.5,
-                          outline: 'none',
-                          minHeight: '24px',
-                          maxHeight: '120px'
-                        }}
-                        rows={1}
-                      />
-                    </div>
-
-                    <button
-                      onClick={handleSendMessage}
-                      disabled={uploading || (!messageInput.trim() && selectedFiles.length === 0)}
-                      style={{
-                        width: '40px',
-                        height: '40px',
-                        borderRadius: '10px',
-                        background: messageInput.trim() || selectedFiles.length > 0 ? 'var(--accent-olive)' : 'var(--stone)',
-                        border: 'none',
-                        cursor: messageInput.trim() || selectedFiles.length > 0 ? 'pointer' : 'default',
-                        color: messageInput.trim() || selectedFiles.length > 0 ? 'white' : 'var(--brown-light)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        transition: 'all 0.15s'
-                      }}
-                    >
-                      <Send size={18} />
-                    </button>
-                  </div>
-
-                  <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--brown-light)' }}>
-                    Prima <strong>Enter</strong> para enviar, <strong>Shift+Enter</strong> para nova linha
-                  </div>
-                </div>
+                <MessageInput
+                  messageInput={messageInput}
+                  setMessageInput={setMessageInput}
+                  onSend={handleSendMessage}
+                  selectedFiles={selectedFiles}
+                  onFileSelect={(e) => handleFileSelect(e.target.files)}
+                  onRemoveFile={(index) => setSelectedFiles(prev => prev.filter((_, i) => i !== index))}
+                  showEmojiPicker={showEmojiPicker}
+                  setShowEmojiPicker={setShowEmojiPicker}
+                  emojiCategory={emojiCategory}
+                  setEmojiCategory={setEmojiCategory}
+                  onInsertEmoji={insertEmoji}
+                  showMentions={showMentions}
+                  setShowMentions={setShowMentions}
+                  filteredMembros={filteredMembros}
+                  onInsertMention={insertMention}
+                  replyingTo={replyingTo}
+                  onCancelReply={cancelReply}
+                  showFormattingToolbar={showFormattingToolbar}
+                  onApplyFormatting={applyFormatting}
+                  onShowKeyboardShortcuts={() => setShowKeyboardShortcuts(true)}
+                  uploading={uploading}
+                  messageInputRef={messageInputRef}
+                  typingUsers={typingUsers}
+                  handleMessageChange={handleMessageChange}
+                />
               </>
             )}
 
             {activeTab === 'ficheiros' && (
-              <div style={{ padding: '40px', textAlign: 'center', color: 'var(--brown-light)' }}>
-                <FileText size={56} style={{ opacity: 0.3, marginBottom: '16px' }} />
-                <h3 style={{ margin: '0 0 8px 0', color: 'var(--brown)' }}>Ficheiros do Canal</h3>
-                <p>Todos os ficheiros partilhados neste canal aparecerão aqui</p>
-              </div>
+              <CentralEntregasChat
+                canalAtivo={canalAtivo}
+                onNavigateToEntregaveis={(canal) => {
+                  // Navigate to project page with entregaveis tab
+                  window.open(`/projetos/${canal.id}?tab=entregaveis`, '_blank')
+                }}
+              />
             )}
 
             {activeTab === 'wiki' && (
@@ -5119,207 +1907,15 @@ export default function Workspace() {
           </div>
 
           {/* Thread panel */}
-          {activeThread && (
-            <div style={{
-              width: '400px',
-              borderLeft: '1px solid var(--stone)',
-              background: 'var(--white)',
-              display: 'flex',
-              flexDirection: 'column',
-              flexShrink: 0
-            }}>
-              {/* Thread header */}
-              <div style={{
-                padding: '16px 20px',
-                borderBottom: '1px solid var(--stone)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between'
-              }}>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: 'var(--brown)' }}>
-                    Conversa
-                  </h3>
-                  <span style={{ fontSize: '12px', color: 'var(--brown-light)' }}>
-                    {(threadReplies[activeThread.id]?.length || 0) + 1} mensagens
-                  </span>
-                </div>
-                <button
-                  onClick={() => setActiveThread(null)}
-                  style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '6px',
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: 'var(--brown-light)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              {/* Thread messages */}
-              <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
-                {/* Original message */}
-                <div style={{
-                  padding: '16px',
-                  background: 'var(--cream)',
-                  borderRadius: '12px',
-                  marginBottom: '16px'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-                    <div style={{
-                      width: '36px',
-                      height: '36px',
-                      borderRadius: '50%',
-                      background: 'linear-gradient(135deg, var(--blush) 0%, var(--blush-dark) 100%)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      color: 'var(--brown-dark)'
-                    }}>
-                      {getInitials(activeThread.autor?.nome)}
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--brown)' }}>
-                        {activeThread.autor?.nome}
-                      </div>
-                      <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
-                        {formatDateTime(activeThread.created_at)}
-                      </div>
-                    </div>
-                  </div>
-                  <p style={{ margin: 0, fontSize: '14px', color: 'var(--brown)', lineHeight: 1.6 }}>
-                    {activeThread.conteudo}
-                  </p>
-                </div>
-
-                {/* Replies */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {threadReplies[activeThread.id]?.map(reply => (
-                    <div key={reply.id} style={{
-                      display: 'flex',
-                      gap: '10px'
-                    }}>
-                      <div style={{
-                        width: '32px',
-                        height: '32px',
-                        borderRadius: '50%',
-                        background: 'linear-gradient(135deg, var(--blush) 0%, var(--blush-dark) 100%)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '11px',
-                        fontWeight: 600,
-                        color: 'var(--brown-dark)',
-                        flexShrink: 0
-                      }}>
-                        {getInitials(reply.autor?.nome)}
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                          <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--brown)' }}>
-                            {reply.autor?.nome}
-                          </span>
-                          <span style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
-                            {formatTime(reply.created_at)}
-                          </span>
-                        </div>
-                        <p style={{ margin: 0, fontSize: '13px', color: 'var(--brown)', lineHeight: 1.5 }}>
-                          {reply.conteudo}
-                        </p>
-
-                        {/* Reply reactions */}
-                        {reply.reacoes?.length > 0 && (
-                          <div style={{ display: 'flex', gap: '4px', marginTop: '8px' }}>
-                            {reply.reacoes.map((reaction, idx) => (
-                              <button
-                                key={idx}
-                                onClick={() => handleReaction(activeThread.id, reaction.emoji, true, reply.id)}
-                                style={{
-                                  padding: '2px 8px',
-                                  background: 'var(--stone)',
-                                  border: 'none',
-                                  borderRadius: '12px',
-                                  cursor: 'pointer',
-                                  fontSize: '12px'
-                                }}
-                              >
-                                {reaction.emoji} {reaction.users?.length || 1}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Reply input */}
-              <div style={{
-                padding: '16px',
-                borderTop: '1px solid var(--stone)'
-              }}>
-                <div style={{
-                  display: 'flex',
-                  gap: '10px',
-                  background: 'var(--cream)',
-                  borderRadius: '10px',
-                  padding: '10px 14px',
-                  border: '1px solid var(--stone)'
-                }}>
-                  <textarea
-                    value={replyInput}
-                    onChange={e => setReplyInput(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault()
-                        handleSendReply(activeThread.id)
-                      }
-                    }}
-                    placeholder="Responder..."
-                    style={{
-                      flex: 1,
-                      border: 'none',
-                      background: 'transparent',
-                      resize: 'none',
-                      fontSize: '13px',
-                      outline: 'none',
-                      minHeight: '20px',
-                      maxHeight: '80px'
-                    }}
-                    rows={1}
-                  />
-                  <button
-                    onClick={() => handleSendReply(activeThread.id)}
-                    disabled={!replyInput.trim()}
-                    style={{
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '8px',
-                      background: replyInput.trim() ? 'var(--accent-olive)' : 'var(--stone)',
-                      border: 'none',
-                      cursor: replyInput.trim() ? 'pointer' : 'default',
-                      color: replyInput.trim() ? 'white' : 'var(--brown-light)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                  >
-                    <Send size={14} />
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+          <ThreadPanel
+            activeThread={activeThread}
+            threadReplies={threadReplies}
+            onClose={closeThread}
+            onSendReply={handleSendReply}
+            replyInput={replyInput}
+            setReplyInput={setReplyInput}
+            onReaction={handleReaction}
+          />
         </div>
       </div>
 
@@ -5370,347 +1966,28 @@ export default function Workspace() {
       {/* ========== MODALS ========== */}
 
       {/* Keyboard Shortcuts Modal */}
-      {showKeyboardShortcuts && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 2000
-        }} onClick={() => setShowKeyboardShortcuts(false)}>
-          <div
-            style={{
-              background: 'var(--white)',
-              borderRadius: '16px',
-              padding: '24px',
-              width: '400px',
-              maxHeight: '80vh',
-              overflow: 'auto'
-            }}
-            onClick={e => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--brown)' }}>
-                <Keyboard size={20} style={{ verticalAlign: 'middle', marginRight: '8px' }} />
-                Atalhos de Teclado
-              </h3>
-              <button
-                onClick={() => setShowKeyboardShortcuts(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--brown-light)' }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {KEYBOARD_SHORTCUTS.map((shortcut, idx) => (
-                <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '13px', color: 'var(--brown)' }}>{shortcut.description}</span>
-                  <div style={{ display: 'flex', gap: '4px' }}>
-                    {shortcut.keys.map((key, kidx) => (
-                      <span key={kidx} style={{
-                        padding: '4px 8px',
-                        background: 'var(--cream)',
-                        borderRadius: '4px',
-                        fontSize: '11px',
-                        fontWeight: 600,
-                        color: 'var(--brown)',
-                        border: '1px solid var(--stone)'
-                      }}>
-                        {key}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+      <KeyboardShortcutsModal
+        isOpen={showKeyboardShortcuts}
+        onClose={() => setShowKeyboardShortcuts(false)}
+      />
 
       {/* Create Task Modal */}
-      {showCreateTaskModal && taskFromMessage && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 2000
-        }} onClick={() => setShowCreateTaskModal(false)}>
-          <div
-            style={{
-              background: 'var(--white)',
-              borderRadius: '16px',
-              padding: '24px',
-              width: '480px',
-              maxHeight: '80vh',
-              overflow: 'auto'
-            }}
-            onClick={e => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--brown)' }}>
-                <CheckSquare size={20} style={{ verticalAlign: 'middle', marginRight: '8px' }} />
-                Criar Tarefa
-              </h3>
-              <button
-                onClick={() => setShowCreateTaskModal(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--brown-light)' }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div style={{
-              padding: '12px',
-              background: 'var(--cream)',
-              borderRadius: '8px',
-              borderLeft: '3px solid var(--accent-olive)',
-              marginBottom: '20px'
-            }}>
-              <div style={{ fontSize: '11px', color: 'var(--brown-light)', marginBottom: '4px' }}>
-                Mensagem de {taskFromMessage.autor?.nome}
-              </div>
-              <p style={{ margin: 0, fontSize: '13px', color: 'var(--brown)' }}>
-                {taskFromMessage.conteudo?.substring(0, 150)}{taskFromMessage.conteudo?.length > 150 ? '...' : ''}
-              </p>
-            </div>
-
-            <form onSubmit={(e) => {
-              e.preventDefault()
-              const formData = new FormData(e.target)
-              handleCreateTask({
-                titulo: formData.get('titulo'),
-                descricao: formData.get('descricao'),
-                prioridade: formData.get('prioridade'),
-                prazo: formData.get('prazo'),
-                mensagem_origem: taskFromMessage.id
-              })
-            }}>
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--brown-light)', marginBottom: '6px' }}>
-                  Título da tarefa
-                </label>
-                <input
-                  name="titulo"
-                  type="text"
-                  defaultValue={taskFromMessage.conteudo?.substring(0, 50)}
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    border: '1px solid var(--stone)',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    outline: 'none'
-                  }}
-                />
-              </div>
-
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--brown-light)', marginBottom: '6px' }}>
-                  Descrição
-                </label>
-                <textarea
-                  name="descricao"
-                  rows={3}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    border: '1px solid var(--stone)',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    outline: 'none',
-                    resize: 'vertical'
-                  }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', gap: '16px', marginBottom: '20px' }}>
-                <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--brown-light)', marginBottom: '6px' }}>
-                    Prioridade
-                  </label>
-                  <select
-                    name="prioridade"
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      border: '1px solid var(--stone)',
-                      borderRadius: '8px',
-                      fontSize: '14px',
-                      outline: 'none',
-                      background: 'white'
-                    }}
-                  >
-                    <option value="baixa">Baixa</option>
-                    <option value="media">Média</option>
-                    <option value="alta">Alta</option>
-                    <option value="urgente">Urgente</option>
-                  </select>
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--brown-light)', marginBottom: '6px' }}>
-                    Prazo
-                  </label>
-                  <input
-                    name="prazo"
-                    type="date"
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      border: '1px solid var(--stone)',
-                      borderRadius: '8px',
-                      fontSize: '14px',
-                      outline: 'none'
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-                <button
-                  type="button"
-                  onClick={() => setShowCreateTaskModal(false)}
-                  style={{
-                    padding: '10px 20px',
-                    borderRadius: '8px',
-                    background: 'var(--stone)',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: 'var(--brown)',
-                    fontWeight: 500
-                  }}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  style={{
-                    padding: '10px 20px',
-                    borderRadius: '8px',
-                    background: 'var(--accent-olive)',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: 'white',
-                    fontWeight: 500
-                  }}
-                >
-                  Criar Tarefa
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <CreateTaskModal
+        isOpen={showCreateTaskModal}
+        onClose={() => setShowCreateTaskModal(false)}
+        message={taskFromMessage}
+        onCreateTask={handleCreateTask}
+      />
 
       {/* Forward Message Modal */}
-      {showForwardModal && messageToForward && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 2000
-        }} onClick={() => setShowForwardModal(false)}>
-          <div
-            style={{
-              background: 'var(--white)',
-              borderRadius: '16px',
-              padding: '24px',
-              width: '400px',
-              maxHeight: '80vh',
-              overflow: 'auto'
-            }}
-            onClick={e => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--brown)' }}>
-                <Forward size={20} style={{ verticalAlign: 'middle', marginRight: '8px' }} />
-                Reencaminhar Mensagem
-              </h3>
-              <button
-                onClick={() => setShowForwardModal(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--brown-light)' }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div style={{
-              padding: '12px',
-              background: 'var(--cream)',
-              borderRadius: '8px',
-              marginBottom: '20px'
-            }}>
-              <div style={{ fontSize: '11px', color: 'var(--brown-light)', marginBottom: '4px' }}>
-                De: {messageToForward.autor?.nome}
-              </div>
-              <p style={{ margin: 0, fontSize: '13px', color: 'var(--brown)' }}>
-                {messageToForward.conteudo?.substring(0, 100)}{messageToForward.conteudo?.length > 100 ? '...' : ''}
-              </p>
-            </div>
-
-            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--brown-light)', marginBottom: '12px' }}>
-              Selecionar canal de destino
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '250px', overflowY: 'auto' }}>
-              {canais.filter(c => c.id !== canalAtivo?.id).map(canal => (
-                <button
-                  key={canal.id}
-                  onClick={() => handleForwardMessage(canal.id)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    padding: '12px',
-                    background: 'var(--off-white)',
-                    border: '1px solid var(--stone)',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    transition: 'all 0.15s'
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.background = 'var(--cream)'
-                    e.currentTarget.style.borderColor = 'var(--accent-olive)'
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.background = 'var(--off-white)'
-                    e.currentTarget.style.borderColor = 'var(--stone)'
-                  }}
-                >
-                  <Hash size={16} style={{ color: 'var(--brown-light)' }} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--brown)' }}>
-                      {canal.codigo}
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
-                      {canal.nome}
-                    </div>
-                  </div>
-                  <Forward size={14} style={{ color: 'var(--brown-light)' }} />
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+      <ForwardMessageModal
+        isOpen={showForwardModal}
+        onClose={() => setShowForwardModal(false)}
+        message={messageToForward}
+        canais={canais}
+        currentCanalId={canalAtivo?.id}
+        onForward={handleForwardMessage}
+      />
 
       {/* ========== DM PANEL ========== */}
       {showDMPanel && (
@@ -5830,7 +2107,7 @@ export default function Workspace() {
             {aiMessages.length === 0 && (
               <div style={{ textAlign: 'center', padding: '20px', color: 'var(--brown-light)' }}>
                 <Bot size={48} style={{ opacity: 0.5, marginBottom: '12px' }} />
-                <p style={{ fontSize: '14px' }}>Olá! Sou o assistente IA do Workspace.</p>
+                <p style={{ fontSize: '14px' }}>Olá! Sou o assistente IA do Team Chat.</p>
                 <p style={{ fontSize: '12px' }}>Posso ajudar-te a resumir conversas, encontrar informação ou responder a questões.</p>
               </div>
             )}
@@ -5928,30 +2205,70 @@ export default function Workspace() {
       )}
 
       {/* ========== EXPORT MODAL ========== */}
-      {showExportModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }} onClick={() => setShowExportModal(false)}>
-          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--white)', borderRadius: '16px', padding: '24px', width: '400px' }}>
-            <h3 style={{ margin: '0 0 20px 0', fontSize: '18px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <FileDown size={20} style={{ color: 'var(--accent-olive)' }} /> Exportar Conversa
-            </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--brown-light)', display: 'block', marginBottom: '8px' }}>Formato</label>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  {['txt', 'html'].map(fmt => (
-                    <button key={fmt} onClick={() => setExportFormat(fmt)} style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid', borderColor: exportFormat === fmt ? 'var(--accent-olive)' : 'var(--stone)', background: exportFormat === fmt ? 'var(--success-bg)' : 'transparent', cursor: 'pointer', fontWeight: exportFormat === fmt ? 600 : 400 }}>
-                      {fmt.toUpperCase()}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <button onClick={exportConversation} style={{ padding: '14px', background: 'var(--accent-olive)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                <Download size={18} /> Exportar {posts.length} mensagens
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ExportModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        channelInfo={canalAtivo}
+        messages={posts}
+        onSuccess={(result) => {
+          showToast(`Exportação concluída: ${result.filename}`, 'success')
+        }}
+        onError={(error) => {
+          showToast(`Erro na exportação: ${error}`, 'error')
+        }}
+      />
+
+      {/* ========== CREATE PRIVATE CHANNEL MODAL ========== */}
+      <CreatePrivateChannelModal
+        isOpen={showCreatePrivateChannel}
+        onClose={() => setShowCreatePrivateChannel(false)}
+        membros={membros}
+        currentUserId={profile?.id}
+        onCreateChannel={(channelData) => {
+          const channel = {
+            id: `private-${Date.now()}`,
+            nome: channelData.name,
+            members: channelData.members,
+            type: channelData.type,
+            isPrivate: true,
+            created_at: new Date().toISOString(),
+            createdBy: profile?.id
+          }
+          setPrivateChannels(prev => [...prev, channel])
+          showToast(`Canal privado "${channelData.name}" criado`, 'success')
+        }}
+      />
+
+      {/* ========== WEBHOOK SETTINGS MODAL ========== */}
+      <WebhookSettingsModal
+        isOpen={showWebhookSettings}
+        onClose={() => setShowWebhookSettings(false)}
+        webhooks={webhooks}
+        onAddWebhook={addWebhook}
+        onDeleteWebhook={deleteWebhook}
+        onToggleWebhook={toggleWebhook}
+        onTestWebhook={testWebhook}
+        channelInfo={canalAtivo}
+      />
+
+      {/* ========== SCHEDULE MESSAGE MODAL ========== */}
+      <ScheduleMessageModal
+        isOpen={showScheduleMessage}
+        onClose={() => setShowScheduleMessage(false)}
+        onSchedule={scheduleMessage}
+        channelInfo={canalAtivo}
+      />
+
+      {/* ========== EMAIL SETTINGS MODAL ========== */}
+      <EmailSettingsModal
+        isOpen={showEmailSettings}
+        onClose={() => setShowEmailSettings(false)}
+        emailSyncEnabled={emailSyncEnabled}
+        onToggleEmailSync={toggleEmailSync}
+        emailDigestFrequency={emailDigestFrequency}
+        onSetDigestFrequency={setEmailDigestFrequency}
+        email={profile?.email}
+      />
 
       {/* ========== STATUS MENU ========== */}
       {showStatusMenu && (
@@ -6317,6 +2634,22 @@ export default function Workspace() {
         </div>
       )}
 
+      {/* Toast Notifications */}
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmState.isOpen}
+        onClose={closeConfirm}
+        onConfirm={confirmState.onConfirm}
+        title={confirmState.title}
+        message={confirmState.message}
+        type={confirmState.type}
+        confirmText={confirmState.confirmText}
+        cancelText={confirmState.cancelText}
+        isLoading={confirmState.isLoading}
+      />
+
       <style>{`
         @keyframes spin {
           from { transform: rotate(0deg); }
@@ -6327,5 +2660,6 @@ export default function Workspace() {
         }
       `}</style>
     </div>
+    </ThemeProvider>
   )
 }

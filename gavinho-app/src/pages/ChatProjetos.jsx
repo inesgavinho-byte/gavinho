@@ -112,7 +112,9 @@ export default function ChatProjetos() {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState([])
   const [searching, setSearching] = useState(false)
-  
+  const [editingCanal, setEditingCanal] = useState(null) // Canal a editar
+  const [showDeleteCanalConfirm, setShowDeleteCanalConfirm] = useState(null) // Canal a eliminar
+
   const [novoCanal, setNovoCanal] = useState({ nome: '', descricao: '', tipo: 'publico', icone: 'hash' })
   const [novoTopico, setNovoTopico] = useState({ titulo: '', descricao: '' })
   
@@ -552,7 +554,7 @@ export default function ChatProjetos() {
 
   const handleCriarCanal = async () => {
     if (!novoCanal.nome.trim() || !projetoAtivo) return
-    
+
     try {
       const { data, error } = await supabase
         .from('chat_canais')
@@ -567,15 +569,93 @@ export default function ChatProjetos() {
         })
         .select()
         .single()
-      
+
       if (error) throw error
-      
+
+      // Criar tópico "Geral" automaticamente para o novo canal
+      const { data: topicoGeral, error: topicoError } = await supabase
+        .from('chat_topicos')
+        .insert({
+          canal_id: data.id,
+          titulo: 'Geral',
+          descricao: 'Tópico geral do canal',
+          criado_por: profile?.id
+        })
+        .select()
+        .single()
+
+      if (topicoError) {
+        console.error('Erro ao criar tópico Geral:', topicoError)
+      }
+
       setCanais([...canais, data])
       setCanalAtivo(data)
+
+      // Selecionar o tópico Geral automaticamente
+      if (topicoGeral) {
+        setTopicos([topicoGeral])
+        setTopicoAtivo(topicoGeral)
+      }
+
       setShowNovoCanal(false)
       setNovoCanal({ nome: '', descricao: '', tipo: 'publico', icone: 'hash' })
     } catch (err) {
       alert('Erro ao criar canal: ' + err.message)
+    }
+  }
+
+  const handleEditarCanal = async () => {
+    if (!editingCanal?.nome?.trim()) return
+
+    try {
+      const { error } = await supabase
+        .from('chat_canais')
+        .update({
+          nome: editingCanal.nome,
+          descricao: editingCanal.descricao || null,
+          tipo: editingCanal.tipo,
+          icone: editingCanal.icone
+        })
+        .eq('id', editingCanal.id)
+
+      if (error) throw error
+
+      // Atualizar lista de canais
+      setCanais(canais.map(c => c.id === editingCanal.id ? { ...c, ...editingCanal } : c))
+
+      // Se for o canal ativo, atualizar também
+      if (canalAtivo?.id === editingCanal.id) {
+        setCanalAtivo({ ...canalAtivo, ...editingCanal })
+      }
+
+      setEditingCanal(null)
+    } catch (err) {
+      alert('Erro ao editar canal: ' + err.message)
+    }
+  }
+
+  const handleArquivarCanal = async (canal) => {
+    try {
+      const { error } = await supabase
+        .from('chat_canais')
+        .update({ arquivado: true })
+        .eq('id', canal.id)
+
+      if (error) throw error
+
+      // Remover da lista de canais
+      const novosCanais = canais.filter(c => c.id !== canal.id)
+      setCanais(novosCanais)
+
+      // Se for o canal ativo, selecionar outro
+      if (canalAtivo?.id === canal.id) {
+        setCanalAtivo(novosCanais.length > 0 ? novosCanais[0] : null)
+        setTopicoAtivo(null)
+      }
+
+      setShowDeleteCanalConfirm(null)
+    } catch (err) {
+      alert('Erro ao eliminar canal: ' + err.message)
     }
   }
 
@@ -606,7 +686,12 @@ export default function ChatProjetos() {
   }
 
   const handleEnviarMensagem = async () => {
-    if (!novaMensagem.trim() || !topicoAtivo) return
+    if (!novaMensagem.trim()) return
+
+    if (!topicoAtivo) {
+      alert('Por favor, seleciona ou cria um tópico antes de enviar mensagens.')
+      return
+    }
 
     try {
       const mentionRegex = /@\[([^\]]+)\]\(([^)]+)\)/g
@@ -988,30 +1073,90 @@ export default function ChatProjetos() {
                         return (
                           <div key={canal.id}>
                             {/* Canal */}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setCanalAtivo(canal)
-                              }}
+                            <div
+                              className="canal-item"
                               style={{
-                                width: '100%',
+                                position: 'relative',
                                 display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                padding: '6px 14px 6px 32px',
-                                background: 'transparent',
-                                border: 'none',
-                                color: isCanalAtivo ? 'white' : 'rgba(255,255,255,0.5)',
-                                cursor: 'pointer',
-                                fontSize: '12px',
-                                textAlign: 'left',
-                                fontWeight: isCanalAtivo ? 500 : 400
+                                alignItems: 'center'
                               }}
                             >
-                              <IconComponent size={12} />
-                              <span>{canal.nome}</span>
-                              {canal.tipo === 'privado' && <Lock size={10} style={{ opacity: 0.4 }} />}
-                            </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setCanalAtivo(canal)
+                                }}
+                                style={{
+                                  flex: 1,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  padding: '6px 14px 6px 32px',
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: isCanalAtivo ? 'white' : 'rgba(255,255,255,0.5)',
+                                  cursor: 'pointer',
+                                  fontSize: '12px',
+                                  textAlign: 'left',
+                                  fontWeight: isCanalAtivo ? 500 : 400
+                                }}
+                              >
+                                <IconComponent size={12} />
+                                <span style={{ flex: 1 }}>{canal.nome}</span>
+                                {canal.tipo === 'privado' && <Lock size={10} style={{ opacity: 0.4 }} />}
+                              </button>
+                              {/* Ações do canal (visíveis no hover) */}
+                              <div
+                                className="canal-actions"
+                                style={{
+                                  position: 'absolute',
+                                  right: '8px',
+                                  display: 'flex',
+                                  gap: '2px',
+                                  opacity: 0,
+                                  transition: 'opacity 0.15s'
+                                }}
+                              >
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setEditingCanal({ ...canal })
+                                  }}
+                                  style={{
+                                    padding: '3px',
+                                    background: 'rgba(255,255,255,0.1)',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    color: 'rgba(255,255,255,0.7)',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center'
+                                  }}
+                                  title="Editar canal"
+                                >
+                                  <Edit size={11} />
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setShowDeleteCanalConfirm(canal)
+                                  }}
+                                  style={{
+                                    padding: '3px',
+                                    background: 'rgba(255,255,255,0.1)',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    color: 'rgba(239,68,68,0.9)',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center'
+                                  }}
+                                  title="Eliminar canal"
+                                >
+                                  <Trash2 size={11} />
+                                </button>
+                              </div>
+                            </div>
                             
                             {/* Tópicos do canal */}
                             {isCanalAtivo && canalTopicos.length > 0 && (
@@ -2168,6 +2313,246 @@ export default function ChatProjetos() {
           </div>
         )}
 
+        {/* Modal Editar Canal */}
+        {editingCanal && (
+          <div className="modal-overlay" onClick={() => setEditingCanal(null)}>
+            <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '420px', borderRadius: '16px' }}>
+              <div style={{ padding: '24px 24px 0' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                  <div style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '10px',
+                    background: 'linear-gradient(135deg, #1e1e2d 0%, #2d2d3d 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <Edit size={20} style={{ color: '#C9A882' }} />
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--brown)' }}>Editar Canal</h3>
+                    <p style={{ margin: 0, fontSize: '12px', color: 'var(--brown-light)' }}>{projetoAtivo?.codigo}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setEditingCanal(null)}
+                  style={{
+                    position: 'absolute',
+                    top: '16px',
+                    right: '16px',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: 'var(--brown-light)',
+                    padding: '4px'
+                  }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div style={{ padding: '20px 24px' }}>
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '8px', color: 'var(--brown)' }}>
+                    Nome do Canal
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <Hash size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--brown-light)' }} />
+                    <input
+                      type="text"
+                      value={editingCanal.nome}
+                      onChange={e => setEditingCanal({ ...editingCanal, nome: e.target.value })}
+                      placeholder="nome-do-canal"
+                      style={{
+                        width: '100%',
+                        padding: '12px 12px 12px 38px',
+                        border: '2px solid var(--stone)',
+                        borderRadius: '10px',
+                        fontSize: '14px',
+                        transition: 'border-color 0.2s',
+                        outline: 'none'
+                      }}
+                      onFocus={e => e.target.style.borderColor = 'var(--gold)'}
+                      onBlur={e => e.target.style.borderColor = 'var(--stone)'}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '8px', color: 'var(--brown)' }}>
+                    Ícone
+                  </label>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    {CANAL_ICONS.map(({ id, icon: Icon, label }) => (
+                      <button
+                        key={id}
+                        onClick={() => setEditingCanal({ ...editingCanal, icone: id })}
+                        style={{
+                          flex: 1,
+                          padding: '10px',
+                          border: `2px solid ${editingCanal.icone === id ? 'var(--gold)' : 'var(--stone)'}`,
+                          borderRadius: '8px',
+                          background: editingCanal.icone === id ? 'rgba(201, 168, 130, 0.08)' : 'white',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        <Icon size={18} style={{ color: editingCanal.icone === id ? 'var(--gold)' : 'var(--brown-light)' }} />
+                        <span style={{ fontSize: '10px', color: 'var(--brown-light)' }}>{label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '10px', color: 'var(--brown)' }}>
+                    Visibilidade
+                  </label>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button
+                      onClick={() => setEditingCanal({ ...editingCanal, tipo: 'publico' })}
+                      style={{
+                        flex: 1,
+                        padding: '14px 12px',
+                        border: `2px solid ${editingCanal.tipo === 'publico' ? 'var(--gold)' : 'var(--stone)'}`,
+                        borderRadius: '10px',
+                        background: editingCanal.tipo === 'publico' ? 'rgba(201, 168, 130, 0.08)' : 'white',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      <Hash size={22} style={{ margin: '0 auto 6px', display: 'block', color: editingCanal.tipo === 'publico' ? 'var(--gold)' : 'var(--brown-light)' }} />
+                      <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--brown)' }}>Público</div>
+                      <div style={{ fontSize: '11px', color: 'var(--brown-light)', marginTop: '2px' }}>Toda a equipa</div>
+                    </button>
+                    <button
+                      onClick={() => setEditingCanal({ ...editingCanal, tipo: 'privado' })}
+                      style={{
+                        flex: 1,
+                        padding: '14px 12px',
+                        border: `2px solid ${editingCanal.tipo === 'privado' ? 'var(--gold)' : 'var(--stone)'}`,
+                        borderRadius: '10px',
+                        background: editingCanal.tipo === 'privado' ? 'rgba(201, 168, 130, 0.08)' : 'white',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      <Lock size={22} style={{ margin: '0 auto 6px', display: 'block', color: editingCanal.tipo === 'privado' ? 'var(--gold)' : 'var(--brown-light)' }} />
+                      <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--brown)' }}>Privado</div>
+                      <div style={{ fontSize: '11px', color: 'var(--brown-light)', marginTop: '2px' }}>Só convidados</div>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ padding: '16px 24px 24px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => setEditingCanal(null)}
+                  style={{
+                    padding: '10px 20px',
+                    border: '1px solid var(--stone)',
+                    borderRadius: '8px',
+                    background: 'white',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    color: 'var(--brown)'
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleEditarCanal}
+                  disabled={!editingCanal.nome?.trim()}
+                  style={{
+                    padding: '10px 24px',
+                    border: 'none',
+                    borderRadius: '8px',
+                    background: editingCanal.nome?.trim() ? 'var(--brown)' : 'var(--stone)',
+                    cursor: editingCanal.nome?.trim() ? 'pointer' : 'not-allowed',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    color: 'white'
+                  }}
+                >
+                  Guardar Alterações
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Eliminar Canal */}
+        {showDeleteCanalConfirm && (
+          <div className="modal-overlay" onClick={() => setShowDeleteCanalConfirm(null)}>
+            <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px', borderRadius: '16px' }}>
+              <div style={{ padding: '24px' }}>
+                <div style={{
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '12px',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 16px'
+                }}>
+                  <Trash2 size={24} style={{ color: '#ef4444' }} />
+                </div>
+                <h3 style={{ margin: '0 0 8px', fontSize: '18px', fontWeight: 600, color: 'var(--brown)', textAlign: 'center' }}>
+                  Eliminar Canal?
+                </h3>
+                <p style={{ margin: '0 0 8px', fontSize: '14px', color: 'var(--brown-light)', textAlign: 'center' }}>
+                  Tens a certeza que queres eliminar o canal <strong>#{showDeleteCanalConfirm.nome}</strong>?
+                </p>
+                <p style={{ margin: '0', fontSize: '12px', color: 'var(--brown-light)', textAlign: 'center', opacity: 0.7 }}>
+                  Esta ação irá arquivar o canal e todas as mensagens. O canal pode ser recuperado mais tarde.
+                </p>
+              </div>
+
+              <div style={{ padding: '0 24px 24px', display: 'flex', gap: '10px' }}>
+                <button
+                  onClick={() => setShowDeleteCanalConfirm(null)}
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    border: '1px solid var(--stone)',
+                    borderRadius: '8px',
+                    background: 'white',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    color: 'var(--brown)'
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => handleArquivarCanal(showDeleteCanalConfirm)}
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    border: 'none',
+                    borderRadius: '8px',
+                    background: '#ef4444',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    color: 'white'
+                  }}
+                >
+                  Eliminar Canal
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Modal Pesquisa */}
         {showSearch && (
           <div className="modal-overlay" onClick={() => setShowSearch(false)}>
@@ -2264,6 +2649,12 @@ export default function ChatProjetos() {
           }
           .hover-bg:hover {
             background: var(--cream);
+          }
+          .canal-item:hover {
+            background: rgba(255,255,255,0.05);
+          }
+          .canal-item:hover .canal-actions {
+            opacity: 1 !important;
           }
           @keyframes typingBounce {
             0%, 60%, 100% { transform: translateY(0); }

@@ -3203,3 +3203,421 @@ tbody tr:last-child td {
 *:hover > .moleskine-hover-overlay {
   opacity: 1 !important;
 }
+
+/* =====================================================
+   MARKDOWN RENDERING STYLES
+   For Team Chat message formatting
+   ===================================================== */
+
+.md-content {
+  line-height: 1.6;
+}
+
+/* Headers */
+.md-h2 {
+  font-size: 1.4em;
+  font-weight: 700;
+  margin: 0.8em 0 0.4em;
+  color: var(--brown);
+}
+
+.md-h3 {
+  font-size: 1.2em;
+  font-weight: 600;
+  margin: 0.6em 0 0.3em;
+  color: var(--brown);
+}
+
+.md-h4 {
+  font-size: 1.1em;
+  font-weight: 600;
+  margin: 0.5em 0 0.25em;
+  color: var(--brown);
+}
+
+/* Code blocks */
+.md-codeblock {
+  position: relative;
+  margin: 12px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #1e1e1e;
+}
+
+.md-codeblock .code-lang {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  font-size: 11px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.md-codeblock pre {
+  margin: 0;
+  padding: 16px;
+  overflow-x: auto;
+  font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.md-codeblock code {
+  color: #d4d4d4;
+  background: none;
+  padding: 0;
+}
+
+/* Syntax Highlighting - Dark theme (VS Code inspired) */
+.sh-keyword {
+  color: #569cd6;
+  font-weight: 500;
+}
+
+.sh-string {
+  color: #ce9178;
+}
+
+.sh-number {
+  color: #b5cea8;
+}
+
+.sh-comment {
+  color: #6a9955;
+  font-style: italic;
+}
+
+.sh-function {
+  color: #dcdcaa;
+}
+
+.sh-operator {
+  color: #d4d4d4;
+}
+
+.sh-punctuation {
+  color: #d4d4d4;
+}
+
+.sh-property {
+  color: #9cdcfe;
+}
+
+.sh-class {
+  color: #4ec9b0;
+}
+
+.sh-builtin {
+  color: #c586c0;
+}
+
+.sh-variable {
+  color: #9cdcfe;
+}
+
+.sh-tag {
+  color: #569cd6;
+}
+
+.sh-attribute {
+  color: #9cdcfe;
+}
+
+.sh-selector {
+  color: #d7ba7d;
+}
+
+.sh-regex {
+  color: #d16969;
+}
+
+/* Dark mode adjustments for syntax highlighting */
+[data-theme="dark"] .md-code {
+  background: var(--stone);
+  border-color: var(--stone-dark);
+  color: #d4d4d4;
+}
+
+/* Inline code */
+.md-code {
+  padding: 2px 6px;
+  background: var(--cream);
+  border: 1px solid var(--stone);
+  border-radius: 4px;
+  font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+  font-size: 0.9em;
+  color: var(--brown);
+}
+
+/* Links */
+.md-link {
+  color: var(--accent-olive);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.15s;
+}
+
+.md-link:hover {
+  border-bottom-color: var(--accent-olive);
+}
+
+/* Blockquotes */
+.md-quote {
+  margin: 8px 0;
+  padding: 8px 16px;
+  border-left: 4px solid var(--accent-olive);
+  background: var(--cream);
+  border-radius: 0 8px 8px 0;
+  color: var(--brown-light);
+  font-style: italic;
+}
+
+/* Horizontal rule */
+.md-hr {
+  border: none;
+  border-top: 2px solid var(--stone);
+  margin: 16px 0;
+}
+
+/* Lists */
+.md-ul, .md-ol {
+  margin: 8px 0;
+  padding-left: 24px;
+}
+
+.md-li, .md-li-num {
+  margin: 4px 0;
+  line-height: 1.5;
+}
+
+/* Mentions */
+.md-mention {
+  display: inline-block;
+  padding: 1px 6px;
+  background: rgba(122, 139, 110, 0.15);
+  color: var(--accent-olive);
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.md-mention-me {
+  background: rgba(201, 168, 108, 0.25);
+  color: var(--warning);
+}
+
+/* Strikethrough */
+.md-content del {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+/* Typing indicator animation */
+@keyframes bounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+  }
+  30% {
+    transform: translateY(-4px);
+  }
+}
+
+/* ===========================================
+   PINTEREST/MASONRY LAYOUT - Renders & Images
+   =========================================== */
+
+/* Masonry Grid Container */
+.masonry-grid {
+  column-count: 4;
+  column-gap: 16px;
+}
+
+/* Masonry Card */
+.masonry-card {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--cream);
+  break-inside: avoid;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.masonry-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Masonry Image */
+.masonry-card-image {
+  width: 100%;
+  height: auto;
+  display: block;
+  cursor: pointer;
+}
+
+/* Masonry Card Overlay */
+.masonry-card-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 10px;
+  background: linear-gradient(transparent, rgba(0,0,0,0.8));
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.masonry-card:hover .masonry-card-overlay {
+  opacity: 1;
+}
+
+/* Masonry Badge */
+.masonry-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 5px 10px;
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--brown);
+  border-radius: 16px;
+  font-size: 11px;
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(4px);
+}
+
+.masonry-badge.dark {
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+}
+
+.masonry-badge.success {
+  background: var(--success);
+  color: white;
+}
+
+/* Masonry Actions */
+.masonry-card-actions {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.masonry-card:hover .masonry-card-actions {
+  opacity: 1;
+}
+
+.masonry-action-btn {
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.95);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--brown);
+  transition: all 0.2s;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.masonry-action-btn:hover {
+  background: white;
+  transform: scale(1.1);
+}
+
+.masonry-action-btn.danger:hover {
+  color: var(--error);
+  background: #fef2f2;
+}
+
+.masonry-action-btn.success {
+  background: var(--success);
+  color: white;
+}
+
+.masonry-action-btn.success:hover {
+  background: var(--accent-olive-dark);
+}
+
+/* Masonry Card Info Footer */
+.masonry-card-info {
+  padding: 10px 12px;
+  background: white;
+}
+
+.masonry-card-info-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--brown);
+  margin-bottom: 2px;
+}
+
+.masonry-card-info-subtitle {
+  font-size: 11px;
+  color: var(--brown-light);
+}
+
+/* Final Images - Clean minimal style like Pinterest */
+.masonry-card.is-final {
+  /* No border - clean minimalist look */
+}
+
+/* Loading Placeholder */
+.masonry-placeholder {
+  width: 100%;
+  min-height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--cream);
+  color: var(--brown-light);
+  opacity: 0.5;
+}
+
+/* Responsive Masonry */
+@media (max-width: 1400px) {
+  .masonry-grid {
+    column-count: 3;
+  }
+}
+
+@media (max-width: 1100px) {
+  .masonry-grid {
+    column-count: 3;
+  }
+}
+
+@media (max-width: 900px) {
+  .masonry-grid {
+    column-count: 2;
+    column-gap: 12px;
+  }
+
+  .masonry-card {
+    margin-bottom: 12px;
+    border-radius: 12px;
+  }
+}
+
+@media (max-width: 600px) {
+  .masonry-grid {
+    column-count: 2;
+    column-gap: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .masonry-grid {
+    column-count: 1;
+  }
+}

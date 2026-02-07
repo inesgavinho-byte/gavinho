@@ -668,6 +668,9 @@ export default function ChatObras() {
     }))
 
     try {
+      // Encontrar a sugestão nos dados locais
+      const suggestion = aiSuggestions?.[tipo]?.find(item => item.id === id)
+
       // Atualizar status na base de dados
       await supabase
         .from('ia_sugestoes')
@@ -677,8 +680,81 @@ export default function ChatObras() {
         })
         .eq('id', id)
 
-      // TODO: Criar entidade correspondente (requisição, tarefa, etc.)
-      // Dependendo do tipo, criar na tabela apropriada
+      // Criar entidade correspondente baseado no tipo
+      if (suggestion && selectedObra) {
+        switch (tipo) {
+          case 'materiais':
+            // Criar requisição de material
+            await supabase
+              .from('requisicoes_materiais')
+              .insert({
+                obra_id: selectedObra.id,
+                descricao: suggestion.material || suggestion.texto,
+                quantidade: suggestion.quantidade || 1,
+                unidade: suggestion.unidade || 'un',
+                urgencia: suggestion.urgente ? 'urgente' : 'normal',
+                estado: 'pendente',
+                solicitado_por_nome: suggestion.autor || 'Via WhatsApp'
+              })
+            break
+
+          case 'tarefas':
+            // Criar tarefa
+            await supabase
+              .from('tarefas')
+              .insert({
+                obra_id: selectedObra.id,
+                titulo: suggestion.tarefa || suggestion.texto,
+                prioridade: suggestion.prioridade || 'media',
+                status: 'pendente',
+                categoria: 'obra',
+                origem_tipo: 'sistema',
+                notas: `Criada automaticamente a partir de mensagem WhatsApp: "${suggestion.texto}"`
+              })
+            break
+
+          case 'naoConformidades':
+            // Criar não conformidade
+            await supabase
+              .from('nao_conformidades')
+              .insert({
+                obra_id: selectedObra.id,
+                descricao: suggestion.descricao || suggestion.texto,
+                gravidade: suggestion.gravidade || 'media',
+                status: 'aberta',
+                origem: 'whatsapp'
+              })
+            break
+
+          case 'trabalhos':
+            // Registar no diário da obra
+            await supabase
+              .from('obra_diario')
+              .insert({
+                obra_id: selectedObra.id,
+                tipo: 'geral',
+                descricao: `${suggestion.trabalho || suggestion.texto} - Progresso: ${suggestion.percentagem || 0}%`,
+                data: new Date().toISOString().split('T')[0]
+              })
+            break
+
+          case 'horas':
+            // Registar horas no diário da obra
+            await supabase
+              .from('obra_diario')
+              .insert({
+                obra_id: selectedObra.id,
+                tipo: 'mao_obra',
+                descricao: suggestion.texto,
+                mao_obra_propria: suggestion.pessoas || 1,
+                data: suggestion.data || new Date().toISOString().split('T')[0]
+              })
+            break
+
+          default:
+            console.log('Tipo de sugestão não suportado:', tipo)
+        }
+      }
     } catch (err) {
       console.error('Erro ao aceitar sugestão:', err)
     }

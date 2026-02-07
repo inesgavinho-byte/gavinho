@@ -6,6 +6,7 @@ import {
   Star, MessageSquare, Eye, Loader2, Send,
   User, AlertCircle, HelpCircle, RefreshCw
 } from 'lucide-react'
+import { SkeletonArchvizPage } from './ui/Skeleton'
 
 // Image cache for prefetching
 const imageCache = new Map()
@@ -610,12 +611,7 @@ export default function ProjetoArchviz({ projeto, userId, userName }) {
   }, [renders])
 
   if (loading) {
-    return (
-      <div className="archviz-loading">
-        <Loader2 size={32} className="spin" />
-        <p>A carregar visualizacoes...</p>
-      </div>
-    )
+    return <SkeletonArchvizPage />
   }
 
   if (loadError) {
