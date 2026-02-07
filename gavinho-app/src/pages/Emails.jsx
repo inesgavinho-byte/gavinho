@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useToast } from '../components/ui/Toast'
 import {
   Mail, Star, Search, RefreshCw, Paperclip, ChevronRight,
   Reply, Forward, Trash2, Archive, Sparkles, Plus, Loader2,
@@ -650,6 +651,7 @@ const EmailDetail = ({
 // MAIN EMAILS PAGE
 // ============================================
 export default function Emails() {
+  const toast = useToast()
   const [searchParams, setSearchParams] = useSearchParams()
 
   // State
@@ -803,11 +805,11 @@ export default function Emails() {
   }
 
   const handleReply = (email) => {
-    alert('Funcionalidade de resposta em desenvolvimento')
+    toast.info('Info', 'Funcionalidade de resposta em desenvolvimento')
   }
 
   const handleForward = (email) => {
-    alert('Funcionalidade de encaminhar em desenvolvimento')
+    toast.info('Info', 'Funcionalidade de encaminhar em desenvolvimento')
   }
 
   const handleSuggestReply = async (email) => {
@@ -829,13 +831,13 @@ export default function Emails() {
       if (error) throw error
 
       if (data?.resposta) {
-        alert(`Sugestão de resposta:\n\n${data.resposta}`)
+        toast.info('Sugestão de Resposta', data.resposta)
       } else {
-        alert('Não foi possível gerar uma sugestão.')
+        toast.warning('Aviso', 'Não foi possível gerar uma sugestão.')
       }
     } catch (err) {
       console.error('Erro ao obter sugestão:', err)
-      alert('Erro ao gerar sugestão: ' + err.message)
+      toast.error('Erro', 'Erro ao gerar sugestão: ' + err.message)
     } finally {
       setLoadingSuggestion(false)
     }
@@ -846,7 +848,7 @@ export default function Emails() {
 
     const projetoId = email.projeto_id || email.obra_id
     if (!projetoId) {
-      alert('Este email não está associado a nenhum projeto ou obra.\n\nPara processar o email, precisa estar associado a um projeto.')
+      toast.warning('Aviso', 'Este email não está associado a nenhum projeto ou obra. Para processar o email, precisa estar associado a um projeto.')
       return
     }
 

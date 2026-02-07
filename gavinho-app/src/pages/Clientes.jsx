@@ -13,9 +13,11 @@ import {
   User
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { useToast } from '../components/ui/Toast'
 
 export default function Clientes() {
   const navigate = useNavigate()
+  const toast = useToast()
   const [clients, setClients] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -146,7 +148,7 @@ export default function Clientes() {
       loadClients()
     } catch (err) {
       console.error('Erro ao guardar cliente:', err)
-      alert('Erro ao guardar cliente')
+      toast.error('Erro', 'Erro ao guardar cliente')
     }
   }
 
@@ -158,7 +160,7 @@ export default function Clientes() {
       loadClients()
     } catch (err) {
       console.error('Erro ao eliminar cliente:', err)
-      alert('Erro ao eliminar cliente. Verifique se não tem projetos associados.')
+      toast.error('Erro', 'Erro ao eliminar cliente. Verifique se não tem projetos associados.')
     }
   }
 

@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { useToast } from './ui/Toast'
+import ConfirmModal from './ui/ConfirmModal'
 import {
   Plus, Search, Filter, Calendar, User, Mail, CheckSquare, PenTool,
   Box, Truck, Users, StickyNote, FileText, X, Edit2, Trash2, Tag,
@@ -20,6 +22,8 @@ export default function DiarioObraProjeto({ obra }) {
   const [showModal, setShowModal] = useState(false)
   const [editingItem, setEditingItem] = useState(null)
   const [utilizadores, setUtilizadores] = useState([])
+  const toast = useToast()
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null })
 
   // Filtros
   const [filtroCategoria, setFiltroCategoria] = useState('')
@@ -101,7 +105,7 @@ export default function DiarioObraProjeto({ obra }) {
 
   const handleSave = async () => {
     if (!formData.titulo.trim()) {
-      alert('Título é obrigatório')
+      toast.warning('Aviso', 'Título é obrigatório')
       return
     }
 
@@ -148,19 +152,27 @@ export default function DiarioObraProjeto({ obra }) {
       loadData()
     } catch (err) {
       console.error('Erro ao guardar:', err)
-      alert('Erro ao guardar: ' + err.message)
+      toast.error('Erro', 'Erro ao guardar: ' + err.message)
     }
   }
 
   const handleDelete = async (entrada) => {
-    if (!confirm('Tem certeza que deseja apagar esta entrada?')) return
-
-    try {
-      await supabase.from('obra_diario_projeto').delete().eq('id', entrada.id)
-      loadData()
-    } catch (err) {
-      console.error('Erro ao apagar:', err)
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Apagar Entrada',
+      message: 'Tem certeza que deseja apagar esta entrada?',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          await supabase.from('obra_diario_projeto').delete().eq('id', entrada.id)
+          loadData()
+        } catch (err) {
+          console.error('Erro ao apagar:', err)
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      }
+    })
+    return
   }
 
   const handleEdit = (entrada) => {
@@ -574,6 +586,16 @@ export default function DiarioObraProjeto({ obra }) {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type || 'danger'}
+        confirmText="Confirmar"
+      />
     </div>
   )
 }

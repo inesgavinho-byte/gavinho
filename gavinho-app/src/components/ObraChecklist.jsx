@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { ConfirmModal } from './ui/ConfirmModal'
 import {
   CheckCircle2, Circle, Clock, AlertTriangle, Calendar, User,
   ChevronRight, Plus, X, Edit, Trash2, ExternalLink, Mail, FileText,
@@ -47,6 +48,7 @@ export default function ObraChecklist({ obraId }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [showAddModal, setShowAddModal] = useState(false)
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', type: 'danger', onConfirm: null })
   const [expandedPriority, setExpandedPriority] = useState({
     urgente: true,
     esta_semana: true,
@@ -160,20 +162,27 @@ export default function ObraChecklist({ obraId }) {
     }
   }
 
-  const eliminarItem = async (itemId) => {
-    if (!confirm('Eliminar este item da checklist?')) return
+  const eliminarItem = (itemId) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar Item',
+      message: 'Eliminar este item da checklist?',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase
+            .from('checklist_items')
+            .delete()
+            .eq('id', itemId)
 
-    try {
-      const { error } = await supabase
-        .from('checklist_items')
-        .delete()
-        .eq('id', itemId)
-
-      if (error) throw error
-      setItems(items.filter(i => i.id !== itemId))
-    } catch (err) {
-      console.error('Erro ao eliminar item:', err)
-    }
+          if (error) throw error
+          setItems(items.filter(i => i.id !== itemId))
+        } catch (err) {
+          console.error('Erro ao eliminar item:', err)
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      }
+    })
   }
 
   // Agrupar itens por prioridade
@@ -664,6 +673,15 @@ export default function ObraChecklist({ obraId }) {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type}
+      />
     </div>
   )
 }

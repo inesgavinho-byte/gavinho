@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { useToast } from './ui/Toast'
+import { ConfirmModal } from './ui/ConfirmModal'
 import {
   Camera, Plus, Upload, X, Calendar, MapPin, Tag, Search, Filter,
   Grid, List, ChevronDown, ChevronRight, Image as ImageIcon,
@@ -7,6 +9,8 @@ import {
 } from 'lucide-react'
 
 export default function ObraFotografias({ obra }) {
+  const toast = useToast()
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', type: 'danger', onConfirm: null })
   const [fotografias, setFotografias] = useState([])
   const [zonas, setZonas] = useState([])
   const [especialidades, setEspecialidades] = useState([])
@@ -99,7 +103,7 @@ export default function ObraFotografias({ obra }) {
 
   const handleUpload = async () => {
     if (selectedFiles.length === 0) {
-      alert('Selecione pelo menos uma fotografia')
+      toast.warning('Atenção', 'Selecione pelo menos uma fotografia')
       return
     }
 
@@ -154,30 +158,37 @@ export default function ObraFotografias({ obra }) {
       loadData()
     } catch (err) {
       console.error('Erro ao fazer upload:', err)
-      alert('Erro ao fazer upload: ' + err.message)
+      toast.error('Erro', 'Erro ao fazer upload: ' + err.message)
     } finally {
       setUploading(false)
     }
   }
 
-  const handleDelete = async (foto) => {
-    if (!confirm('Tem certeza que deseja apagar esta fotografia?')) return
+  const handleDelete = (foto) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Apagar Fotografia',
+      message: 'Tem certeza que deseja apagar esta fotografia?',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          // Delete from database
+          const { error } = await supabase
+            .from('obra_fotografias')
+            .delete()
+            .eq('id', foto.id)
 
-    try {
-      // Delete from database
-      const { error } = await supabase
-        .from('obra_fotografias')
-        .delete()
-        .eq('id', foto.id)
+          if (error) throw error
 
-      if (error) throw error
-
-      // Note: Could also delete from storage, but keeping for now
-      loadData()
-    } catch (err) {
-      console.error('Erro ao apagar:', err)
-      alert('Erro ao apagar fotografia')
-    }
+          // Note: Could also delete from storage, but keeping for now
+          loadData()
+        } catch (err) {
+          console.error('Erro ao apagar:', err)
+          toast.error('Erro', 'Erro ao apagar fotografia')
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      }
+    })
   }
 
   const handleEdit = (foto) => {
@@ -224,7 +235,7 @@ export default function ObraFotografias({ obra }) {
       loadData()
     } catch (err) {
       console.error('Erro ao atualizar:', err)
-      alert('Erro ao atualizar fotografia')
+      toast.error('Erro', 'Erro ao atualizar fotografia')
     }
   }
 
@@ -807,6 +818,15 @@ export default function ObraFotografias({ obra }) {
           opacity: 1 !important;
         }
       `}</style>
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type}
+      />
     </div>
   )
 }

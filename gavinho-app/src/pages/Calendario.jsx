@@ -4,6 +4,8 @@ import {
   ChevronLeft, ChevronRight, Plus, Clock, MapPin, X, Edit, Trash2,
   Flag, Building2, RefreshCw, Link2, Palmtree, CheckCircle, AlertCircle
 } from 'lucide-react'
+import { useToast } from '../components/ui/Toast'
+import { ConfirmModal } from '../components/ui/ConfirmModal'
 
 const TIPOS_EVENTO = [
   { id: 'reuniao_cliente', label: 'Reunião Cliente', color: '#C9A882' },
@@ -99,13 +101,8 @@ export default function Calendario() {
     hora_inicio: '09:00', hora_fim: '10:00', local: '', descricao: ''
   })
 
-  // Toast state
-  const [toast, setToast] = useState({ show: false, message: '', type: 'success' })
-
-  const showToast = (message, type = 'success') => {
-    setToast({ show: true, message, type })
-    setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 4000)
-  }
+  const toast = useToast()
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null })
 
   useEffect(() => {
     fetchData()
@@ -347,20 +344,29 @@ export default function Calendario() {
       fetchData()
     } catch (err) {
       console.error('Erro:', err)
-      showToast('Erro ao guardar evento', 'error')
+      toast.error('Erro', 'Erro ao guardar evento')
     }
   }
 
   const handleDelete = async (evento) => {
-    if (!confirm('Eliminar este evento?')) return
-    try {
-      await supabase.from('eventos').delete().eq('id', evento.id)
-      setShowEventDetail(null)
-      fetchData()
-      showToast('Evento eliminado', 'success')
-    } catch (err) {
-      showToast('Erro ao eliminar', 'error')
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar Evento',
+      message: 'Eliminar este evento?',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          await supabase.from('eventos').delete().eq('id', evento.id)
+          setShowEventDetail(null)
+          fetchData()
+          toast.success('Sucesso', 'Evento eliminado')
+        } catch (err) {
+          toast.error('Erro', 'Erro ao eliminar')
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      }
+    })
+    return
   }
 
   const resetForm = () => {
@@ -427,7 +433,7 @@ export default function Calendario() {
             {OUTLOOK_ACCOUNTS.map(account => (
               <button
                 key={account.email}
-                onClick={() => showToast(`Configurar sincronização com ${account.email}`, 'info')}
+                onClick={() => toast.info('Info', `Configurar sincronização com ${account.email}`)}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -449,7 +455,7 @@ export default function Calendario() {
               </button>
             ))}
             <button
-              onClick={() => showToast('Calendários sincronizados com sucesso', 'success')}
+              onClick={() => toast.success('Sucesso', 'Calendários sincronizados com sucesso')}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -924,64 +930,15 @@ export default function Calendario() {
         </div>
       )}
 
-      {/* Toast Notification */}
-      {toast.show && (
-        <div
-          style={{
-            position: 'fixed',
-            bottom: '24px',
-            right: '24px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            padding: '14px 20px',
-            background: toast.type === 'success' ? 'var(--success)' :
-                       toast.type === 'error' ? 'var(--error)' :
-                       toast.type === 'info' ? 'var(--info)' : 'var(--warning)',
-            color: 'white',
-            borderRadius: '10px',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-            zIndex: 10000,
-            animation: 'slideInRight 0.3s ease-out',
-            maxWidth: '400px'
-          }}
-        >
-          {toast.type === 'success' && <CheckCircle size={20} />}
-          {toast.type === 'error' && <AlertCircle size={20} />}
-          {toast.type === 'info' && <AlertCircle size={20} />}
-          <span style={{ fontSize: '14px', fontWeight: 500 }}>{toast.message}</span>
-          <button
-            onClick={() => setToast({ show: false, message: '', type: 'success' })}
-            style={{
-              background: 'rgba(255,255,255,0.2)',
-              border: 'none',
-              borderRadius: '4px',
-              padding: '4px',
-              cursor: 'pointer',
-              marginLeft: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            <X size={14} color="white" />
-          </button>
-        </div>
-      )}
-
-      {/* Toast animation */}
-      <style>{`
-        @keyframes slideInRight {
-          from {
-            transform: translateX(100%);
-            opacity: 0;
-          }
-          to {
-            transform: translateX(0);
-            opacity: 1;
-          }
-        }
-      `}</style>
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type || 'danger'}
+        confirmText="Confirmar"
+      />
     </div>
   )
 }

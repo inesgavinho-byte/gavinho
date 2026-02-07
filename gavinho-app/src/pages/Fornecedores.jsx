@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { useToast } from '../components/ui/Toast'
+import { ConfirmModal } from '../components/ui/ConfirmModal'
 import {
   Plus, Search, Edit2, Trash2, Phone, Mail, Globe, MapPin,
   Star, Building2, User, X, Loader2, Upload, Download,
@@ -17,8 +19,10 @@ const STATUS_FORNECEDOR = {
 
 export default function Fornecedores() {
   const { profile } = useAuth()
+  const toast = useToast()
   const fileInputRef = useRef(null)
-  
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null })
+
   const [fornecedores, setFornecedores] = useState([])
   const [especialidades, setEspecialidades] = useState([])
   const [loading, setLoading] = useState(true)
@@ -66,7 +70,7 @@ export default function Fornecedores() {
   }
 
   const handleSave = async () => {
-    if (!form.nome) { alert('Nome é obrigatório'); return }
+    if (!form.nome) { toast.warning('Aviso', 'Nome é obrigatório'); return }
     setSaving(true)
     try {
       const data = { ...form, updated_at: new Date().toISOString() }
@@ -78,7 +82,7 @@ export default function Fornecedores() {
       }
       setShowModal(false); setEditingFornecedor(null); resetForm(); loadData()
     } catch (err) {
-      alert(`Erro: ${err.message}`)
+      toast.error('Erro', err.message)
     } finally {
       setSaving(false)
     }
@@ -97,17 +101,26 @@ export default function Fornecedores() {
   }
 
   const handleDelete = async (f) => {
-    if (!confirm(`Eliminar "${f.nome}"?`)) return
-    try {
-      const { error } = await supabase.from('fornecedores').delete().eq('id', f.id)
-      if (error) {
-        alert(`Erro ao eliminar: ${error.message}`)
-      } else {
-        loadData()
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar Fornecedor',
+      message: `Eliminar "${f.nome}"?`,
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase.from('fornecedores').delete().eq('id', f.id)
+          if (error) {
+            toast.error('Erro', 'Erro ao eliminar: ' + error.message)
+          } else {
+            loadData()
+          }
+        } catch (err) {
+          toast.error('Erro', err.message)
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
       }
-    } catch (err) {
-      alert(`Erro: ${err.message}`)
-    }
+    })
+    return
   }
 
   const handleImportExcel = async (e) => {
@@ -162,10 +175,10 @@ export default function Fornecedores() {
         console.error('Erros na importação:', errors)
       }
       
-      alert(`Importados ${inserted} fornecedores (${toInsert.length - inserted} já existiam ou com erro)`)
+      toast.success('Importação Concluída', `Importados ${inserted} fornecedores (${toInsert.length - inserted} já existiam ou com erro)`)
       loadData()
     } catch (err) {
-      alert(`Erro: ${err.message}`)
+      toast.error('Erro', err.message)
     } finally {
       setLoading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
@@ -407,6 +420,16 @@ export default function Fornecedores() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type || 'danger'}
+        confirmText="Confirmar"
+      />
     </div>
   )
 }

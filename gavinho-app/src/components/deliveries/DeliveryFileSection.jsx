@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { Upload, Eye, Download, History, Shield, Loader2, FileX } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
+import { useToast } from '../ui/Toast'
+import ConfirmModal from '../ui/ConfirmModal'
 import FileTypeIcon, { formatFileSize } from './FileTypeIcon'
 import ApprovalBadge from './ApprovalBadge'
 import FileUploadModal from './FileUploadModal'
@@ -14,6 +16,8 @@ export default function DeliveryFileSection({
   compact = false
 }) {
   const { user } = useAuth()
+  const toast = useToast()
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null })
   const [currentFile, setCurrentFile] = useState(null)
   const [versionCount, setVersionCount] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -61,30 +65,39 @@ export default function DeliveryFileSection({
 
   const handleApproveForConstruction = async () => {
     if (!currentFile || !isAdmin) return
-    if (!confirm('Tem certeza que deseja marcar este ficheiro como "Bom para Construção"?')) return
 
-    setApproving(true)
-    try {
-      const { error } = await supabase
-        .from('entrega_ficheiros')
-        .update({
-          aprovado_construcao: true,
-          aprovado_em: new Date().toISOString(),
-          aprovado_por: user?.id || null,
-          aprovado_por_nome: user?.nome || user?.email || 'Admin'
-        })
-        .eq('id', currentFile.id)
+    setConfirmModal({
+      isOpen: true,
+      title: 'Bom para Construção',
+      message: 'Tem certeza que deseja marcar este ficheiro como "Bom para Construção"?',
+      type: 'danger',
+      onConfirm: async () => {
+        setApproving(true)
+        try {
+          const { error } = await supabase
+            .from('entrega_ficheiros')
+            .update({
+              aprovado_construcao: true,
+              aprovado_em: new Date().toISOString(),
+              aprovado_por: user?.id || null,
+              aprovado_por_nome: user?.nome || user?.email || 'Admin'
+            })
+            .eq('id', currentFile.id)
 
-      if (error) throw error
+          if (error) throw error
 
-      // Recarregar ficheiro
-      loadCurrentFile()
-    } catch (err) {
-      console.error('Erro ao aprovar:', err)
-      alert('Erro ao aprovar ficheiro: ' + err.message)
-    } finally {
-      setApproving(false)
-    }
+          // Recarregar ficheiro
+          loadCurrentFile()
+        } catch (err) {
+          console.error('Erro ao aprovar:', err)
+          toast.error('Erro', 'Erro ao aprovar ficheiro: ' + err.message)
+        } finally {
+          setApproving(false)
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      }
+    })
+    return
   }
 
   const handleUploaded = () => {
@@ -407,6 +420,16 @@ export default function DeliveryFileSection({
           onClose={() => setShowHistoryModal(false)}
         />
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type || 'danger'}
+        confirmText="Confirmar"
+      />
     </>
   )
 }

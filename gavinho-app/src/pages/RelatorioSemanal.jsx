@@ -9,6 +9,7 @@ import {
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
          Header, AlignmentType, BorderStyle, WidthType, ShadingType } from 'docx'
 import { saveAs } from 'file-saver'
+import { useToast } from '../components/ui/Toast'
 
 // Helper to get week dates
 const getWeekDates = (date) => {
@@ -47,6 +48,7 @@ export default function RelatorioSemanal() {
   const { id } = useParams()
   const navigate = useNavigate()
   const reportRef = useRef(null)
+  const toast = useToast()
   
   const [obra, setObra] = useState(null)
   const [diarios, setDiarios] = useState([])
@@ -442,7 +444,7 @@ export default function RelatorioSemanal() {
       
     } catch (err) {
       console.error('Erro ao gerar relatório:', err)
-      alert('Erro ao gerar relatório. Tente novamente.')
+      toast.error('Erro', 'Erro ao gerar relatório. Tente novamente.')
     }
     
     setGenerating(false)

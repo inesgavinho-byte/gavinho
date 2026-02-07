@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useToast } from '../components/ui/Toast'
 import { 
   Plus, 
   Search,
@@ -65,6 +66,7 @@ const CAPITULOS_TEMPLATE = {
 
 export default function Orcamentos() {
   const navigate = useNavigate()
+  const toast = useToast()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [orcamentos, setOrcamentos] = useState([])
@@ -169,7 +171,7 @@ export default function Orcamentos() {
   // Criar novo orçamento
   const handleCreateOrcamento = async () => {
     if (!newOrcamento.projeto_id) {
-      alert('Seleciona um projeto')
+      toast.warning('Aviso', 'Seleciona um projeto')
       return
     }
 
@@ -246,7 +248,7 @@ export default function Orcamentos() {
 
     } catch (error) {
       console.error('Erro ao criar orçamento:', error)
-      alert('Erro ao criar orçamento: ' + error.message)
+      toast.error('Erro', 'Erro ao criar orçamento: ' + error.message)
     } finally {
       setSaving(false)
     }
@@ -287,7 +289,7 @@ export default function Orcamentos() {
 
     } catch (error) {
       console.error('Erro ao atualizar status:', error)
-      alert('Erro ao atualizar: ' + error.message)
+      toast.error('Erro', 'Erro ao atualizar: ' + error.message)
     } finally {
       setSaving(false)
     }
@@ -353,7 +355,7 @@ export default function Orcamentos() {
 
     } catch (error) {
       console.error('Erro ao duplicar:', error)
-      alert('Erro ao duplicar: ' + error.message)
+      toast.error('Erro', 'Erro ao duplicar: ' + error.message)
     } finally {
       setSaving(false)
     }

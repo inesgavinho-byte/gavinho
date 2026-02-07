@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { useToast } from './ui/Toast'
+import { ConfirmModal } from './ui/ConfirmModal'
 import {
   FileText, Plus, X, Calendar, Edit2, Trash2, Eye, Download,
   ChevronDown, ChevronRight, Send, Save, Clock, Loader2,
@@ -20,6 +22,8 @@ const ESTADOS_RELATORIO = {
 }
 
 export default function ObraRelatorios({ obra }) {
+  const toast = useToast()
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', type: 'danger', onConfirm: null })
   const [relatorios, setRelatorios] = useState([])
   const [especialidades, setEspecialidades] = useState([])
   const [fotografias, setFotografias] = useState([])
@@ -99,7 +103,7 @@ export default function ObraRelatorios({ obra }) {
 
   const handleCreate = async () => {
     if (!formData.titulo || !formData.data_inicio || !formData.data_fim) {
-      alert('Preencha todos os campos obrigatórios')
+      toast.warning('Atenção', 'Preencha todos os campos obrigatórios')
       return
     }
 
@@ -129,7 +133,7 @@ export default function ObraRelatorios({ obra }) {
       handleEdit(data)
     } catch (err) {
       console.error('Erro ao criar:', err)
-      alert('Erro ao criar relatório: ' + err.message)
+      toast.error('Erro', 'Erro ao criar relatório: ' + err.message)
     } finally {
       setSaving(false)
     }
@@ -184,27 +188,34 @@ export default function ObraRelatorios({ obra }) {
       loadData()
     } catch (err) {
       console.error('Erro ao guardar:', err)
-      alert('Erro ao guardar: ' + err.message)
+      toast.error('Erro', 'Erro ao guardar: ' + err.message)
     } finally {
       setSaving(false)
     }
   }
 
-  const handleDelete = async (relatorio) => {
-    if (!confirm('Tem certeza que deseja apagar este relatório?')) return
+  const handleDelete = (relatorio) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Apagar Relatório',
+      message: 'Tem certeza que deseja apagar este relatório?',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase
+            .from('obra_relatorios')
+            .delete()
+            .eq('id', relatorio.id)
 
-    try {
-      const { error } = await supabase
-        .from('obra_relatorios')
-        .delete()
-        .eq('id', relatorio.id)
-
-      if (error) throw error
-      loadData()
-    } catch (err) {
-      console.error('Erro ao apagar:', err)
-      alert('Erro ao apagar relatório')
-    }
+          if (error) throw error
+          loadData()
+        } catch (err) {
+          console.error('Erro ao apagar:', err)
+          toast.error('Erro', 'Erro ao apagar relatório')
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      }
+    })
   }
 
   const updateEspecialidadeProgresso = (espId, value) => {
@@ -667,6 +678,15 @@ export default function ObraRelatorios({ obra }) {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type}
+      />
     </div>
   )
 }

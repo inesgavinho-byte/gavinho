@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { useToast } from '../components/ui/Toast'
 import { 
   Euro,
   TrendingUp,
@@ -45,6 +46,7 @@ const CAPITULOS_PADRAO = [
 ]
 
 export default function Finance() {
+  const toast = useToast()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [projectsFinance, setProjectsFinance] = useState([])
@@ -212,7 +214,7 @@ export default function Finance() {
   // Guardar novo custo
   const handleSaveCost = async () => {
     if (!newCost.projeto_id || !newCost.capitulo || !newCost.valor_bruto || !newCost.descricao) {
-      alert('Preenche todos os campos obrigatórios')
+      toast.warning('Aviso', 'Preenche todos os campos obrigatórios')
       return
     }
 
@@ -263,7 +265,7 @@ export default function Finance() {
 
     } catch (error) {
       console.error('Erro ao guardar custo:', error)
-      alert('Erro ao guardar custo: ' + error.message)
+      toast.error('Erro', 'Erro ao guardar custo: ' + error.message)
     } finally {
       setSaving(false)
     }

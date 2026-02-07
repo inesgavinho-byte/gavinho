@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { useToast } from '../ui/Toast'
 import {
   Search, Plus, Filter, AlertCircle, Mail, Mic, MessageSquare, Edit3,
   ChevronRight, ArrowRight, ArrowLeft, Check, XCircle, X, ExternalLink,
@@ -32,6 +33,8 @@ const FONTE_CONFIG = {
 }
 
 export default function ProjetoDecisoes({ projetoId }) {
+  const toast = useToast()
+
   // Estados principais
   const [decisoes, setDecisoes] = useState([])
   const [pendentes, setPendentes] = useState([])
@@ -176,7 +179,7 @@ export default function ProjetoDecisoes({ projetoId }) {
       fetchPendentes()
     } catch (err) {
       console.error('Erro ao aprovar:', err)
-      alert('Erro ao aprovar decisão')
+      toast.error('Erro', 'Erro ao aprovar decisão')
     }
   }
 
@@ -203,14 +206,14 @@ export default function ProjetoDecisoes({ projetoId }) {
       fetchPendentes()
     } catch (err) {
       console.error('Erro ao rejeitar:', err)
-      alert('Erro ao rejeitar decisão')
+      toast.error('Erro', 'Erro ao rejeitar decisão')
     }
   }
 
   const handleCriarDecisao = async (e) => {
     e.preventDefault()
     if (!formData.titulo || !formData.descricao || !formData.decidido_por) {
-      alert('Preencha todos os campos obrigatórios')
+      toast.warning('Aviso', 'Preencha todos os campos obrigatórios')
       return
     }
 
@@ -260,7 +263,7 @@ export default function ProjetoDecisoes({ projetoId }) {
       fetchDecisoes()
     } catch (err) {
       console.error('Erro ao criar:', err)
-      alert('Erro ao criar decisão')
+      toast.error('Erro', 'Erro ao criar decisão')
     } finally {
       setSaving(false)
     }

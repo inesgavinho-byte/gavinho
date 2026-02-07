@@ -5,6 +5,7 @@ import {
   Edit, Trash2, Eye, FolderKanban, ChevronDown
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { useToast } from '../components/ui/Toast'
 
 const fases = ['Todas', 'Proposta', 'Conceito', 'Projeto', 'Licenciamento', 'Construção', 'Fit-out', 'Entrega']
 const tipologias = ['Residencial', 'Hospitalidade', 'Comercial', 'Misto']
@@ -13,6 +14,7 @@ const prioridades = ['Todas', 'Urgente', 'Alta', 'Média', 'Baixa']
 
 export default function Projetos() {
   const navigate = useNavigate()
+  const toast = useToast()
   const [projects, setProjects] = useState([])
   const [clientes, setClientes] = useState([])
   const [loading, setLoading] = useState(true)
@@ -215,11 +217,11 @@ export default function Projetos() {
   // Guardar projeto (criar ou atualizar)
   const handleSaveProject = async () => {
     if (!formData.codigo.trim()) {
-      alert('O código do projeto é obrigatório')
+      toast.warning('Aviso', 'O código do projeto é obrigatório')
       return
     }
     if (!formData.nome.trim()) {
-      alert('O nome do projeto é obrigatório')
+      toast.warning('Aviso', 'O nome do projeto é obrigatório')
       return
     }
 
@@ -290,7 +292,7 @@ export default function Projetos() {
       setProjects(data || [])
     } catch (err) {
       console.error('Erro ao guardar projeto:', err)
-      alert('Erro ao guardar projeto: ' + (err.message || JSON.stringify(err)))
+      toast.error('Erro', 'Erro ao guardar projeto: ' + (err.message || JSON.stringify(err)))
     }
   }
 
@@ -304,7 +306,7 @@ export default function Projetos() {
       setProjects(projects.filter(p => p.id !== project.id))
     } catch (err) {
       console.error('Erro ao eliminar projeto:', err)
-      alert('Erro ao eliminar projeto. Verifique se não tem dados associados.')
+      toast.error('Erro', 'Erro ao eliminar projeto. Verifique se não tem dados associados.')
     }
   }
 

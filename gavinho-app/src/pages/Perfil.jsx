@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
+import { useToast } from '../components/ui/Toast'
 import { 
   User, Mail, Phone, MapPin, Briefcase, Building2, Calendar, 
   Save, Camera, Shield, Bell, Key, Loader2, CheckCircle, X,
@@ -47,6 +48,7 @@ const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
 
 export default function Perfil() {
   const { profile, getUserName, getUserInitials, getUserAvatar, refreshProfile } = useAuth()
+  const toast = useToast()
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState(false)
@@ -164,7 +166,7 @@ export default function Perfil() {
 
       if (uploadError) {
         console.error('Upload error:', uploadError)
-        alert(`Erro no upload: ${uploadError.message}`)
+        toast.error('Erro', `Erro no upload: ${uploadError.message}`)
         return
       }
 
@@ -180,7 +182,7 @@ export default function Perfil() {
       await refreshProfile()
     } catch (err) {
       console.error('Erro ao carregar foto:', err)
-      alert(`Erro: ${err.message}`)
+      toast.error('Erro', `Erro: ${err.message}`)
     } finally {
       setUploadingAvatar(false)
     }
@@ -208,7 +210,7 @@ export default function Perfil() {
       setTimeout(() => setSuccess(false), 3000)
     } catch (err) {
       console.error('Erro ao guardar:', err)
-      alert(`Erro ao guardar: ${err.message || 'Verifique as permissões'}`)
+      toast.error('Erro', `Erro ao guardar: ${err.message || 'Verifique as permissões'}`)
     } finally {
       setSaving(false)
     }
@@ -217,7 +219,7 @@ export default function Perfil() {
   // Submeter pedido de ausência
   const handleSubmitAusencia = async () => {
     if (!ausenciaForm.data_inicio || !ausenciaForm.data_fim) {
-      alert('Preencha as datas')
+      toast.warning('Aviso', 'Preencha as datas')
       return
     }
 
@@ -252,14 +254,14 @@ export default function Perfil() {
       loadRHData()
     } catch (err) {
       console.error('Erro:', err)
-      alert(`Erro ao submeter: ${err.message}`)
+      toast.error('Erro', `Erro ao submeter: ${err.message}`)
     }
   }
 
   // Submeter recibo
   const handleSubmitRecibo = async () => {
     if (!reciboForm.valor_bruto) {
-      alert('Preencha o valor')
+      toast.warning('Aviso', 'Preencha o valor')
       return
     }
 
@@ -282,7 +284,7 @@ export default function Perfil() {
       loadRHData()
     } catch (err) {
       console.error('Erro:', err)
-      alert(`Erro ao submeter: ${err.message}`)
+      toast.error('Erro', `Erro ao submeter: ${err.message}`)
     }
   }
 

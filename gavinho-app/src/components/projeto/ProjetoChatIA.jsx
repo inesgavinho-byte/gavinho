@@ -7,6 +7,7 @@ import ChatMessages from './ChatMessages'
 import ChatInput from './ChatInput'
 import SkillsManager from './SkillsManager'
 import { useToast } from '../ui/Toast'
+import ConfirmModal from '../ui/ConfirmModal'
 import { SkeletonText, SkeletonAvatar } from '../ui/Skeleton'
 
 export default function ProjetoChatIA({ projetoId, projeto }) {
@@ -21,6 +22,7 @@ export default function ProjetoChatIA({ projetoId, projeto }) {
 
   const messagesEndRef = useRef(null)
   const toast = useToast()
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null })
 
   // Carregar chats do projecto
   useEffect(() => {
@@ -103,22 +105,28 @@ export default function ProjetoChatIA({ projetoId, projeto }) {
   }
 
   const deleteChat = async (chatId) => {
-    if (!confirm('Tens a certeza que queres apagar este chat? Esta accao nao pode ser desfeita.')) {
-      return
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Apagar Chat',
+      message: 'Tens a certeza que queres apagar este chat? Esta ação não pode ser desfeita.',
+      type: 'danger',
+      onConfirm: async () => {
+        const { error } = await supabase
+          .from('projeto_chats')
+          .delete()
+          .eq('id', chatId)
 
-    const { error } = await supabase
-      .from('projeto_chats')
-      .delete()
-      .eq('id', chatId)
-
-    if (!error) {
-      setChats(prev => prev.filter(c => c.id !== chatId))
-      if (activeChat?.id === chatId) {
-        setActiveChat(chats.find(c => c.id !== chatId) || null)
+        if (!error) {
+          setChats(prev => prev.filter(c => c.id !== chatId))
+          if (activeChat?.id === chatId) {
+            setActiveChat(chats.find(c => c.id !== chatId) || null)
+          }
+        }
+        setShowChatMenu(null)
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
       }
-    }
-    setShowChatMenu(null)
+    })
+    return
   }
 
   const togglePinChat = async (chat) => {
@@ -433,6 +441,16 @@ export default function ProjetoChatIA({ projetoId, projeto }) {
           to { transform: rotate(360deg); }
         }
       `}</style>
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type || 'danger'}
+        confirmText="Confirmar"
+      />
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useToast } from '../components/ui/Toast'
 import {
   Send, Camera, Image, Mic, Menu, ArrowLeft, Plus, Check, CheckCheck,
   Clock, Package, AlertTriangle, LogOut, Settings, Bell, BellOff,
@@ -21,7 +22,6 @@ function usePushNotifications() {
 
   const requestPermission = async () => {
     if (!('Notification' in window)) {
-      alert('Este browser não suporta notificações')
       return false
     }
 
@@ -67,6 +67,7 @@ function urlBase64ToUint8Array(base64String) {
 export default function ObraApp() {
   const navigate = useNavigate()
   const location = useLocation()
+  const toast = useToast()
   const [user, setUser] = useState(null)
   const [obras, setObras] = useState([])
   const [obra, setObra] = useState(null)
@@ -187,13 +188,13 @@ export default function ObraApp() {
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      alert('Por favor seleciona uma imagem')
+      toast.warning('Aviso', 'Por favor seleciona uma imagem')
       return
     }
 
     // Validate file size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
-      alert('A imagem deve ter no máximo 10MB')
+      toast.warning('Aviso', 'A imagem deve ter no máximo 10MB')
       return
     }
 
@@ -313,10 +314,14 @@ export default function ObraApp() {
   }
 
   const enableNotifications = async () => {
+    if (!('Notification' in window)) {
+      toast.warning('Aviso', 'Este browser não suporta notificações')
+      return
+    }
     const granted = await requestPermission()
     if (granted) {
       await subscribe()
-      alert('Notificações ativadas!')
+      toast.success('Sucesso', 'Notificações ativadas!')
     }
   }
 
@@ -944,6 +949,7 @@ function ObraSelector({ obras, onSelect }) {
 
 // Componente Pedir Materiais
 function PedirMateriais({ obra, user }) {
+  const toast = useToast()
   const [material, setMaterial] = useState('')
   const [quantidade, setQuantidade] = useState('')
   const [unidade, setUnidade] = useState('un')
@@ -1018,7 +1024,7 @@ function PedirMateriais({ obra, user }) {
       setTimeout(() => setSuccess(false), 3000)
     } catch (err) {
       console.error('Erro ao enviar requisição:', err)
-      alert('Erro ao enviar requisição: ' + (err.message || 'Erro desconhecido'))
+      toast.error('Erro', 'Erro ao enviar requisição: ' + (err.message || 'Erro desconhecido'))
     } finally {
       setSending(false)
     }
@@ -1333,6 +1339,7 @@ const requisicaoStyles = {
 
 // Componente Registo de Presença (Check-in/Check-out)
 function RegistoPresenca({ obra, user }) {
+  const toast = useToast()
   const [presencaHoje, setPresencaHoje] = useState(null)
   const [historico, setHistorico] = useState([])
   const [loading, setLoading] = useState(true)
@@ -1414,7 +1421,7 @@ function RegistoPresenca({ obra, user }) {
       loadPresencas()
     } catch (err) {
       console.error('Erro ao fazer check-in:', err)
-      alert('Erro ao fazer check-in: ' + (err.message || 'Erro desconhecido'))
+      toast.error('Erro', 'Erro ao fazer check-in: ' + (err.message || 'Erro desconhecido'))
     } finally {
       setActionLoading(false)
     }
@@ -1455,7 +1462,7 @@ function RegistoPresenca({ obra, user }) {
       loadPresencas()
     } catch (err) {
       console.error('Erro ao fazer check-out:', err)
-      alert('Erro ao fazer check-out')
+      toast.error('Erro', 'Erro ao fazer check-out')
     } finally {
       setActionLoading(false)
     }

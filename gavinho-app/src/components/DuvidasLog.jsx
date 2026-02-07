@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { useToast } from './ui/Toast'
+import ConfirmModal from './ui/ConfirmModal'
 import {
   Plus, Search, MessageCircle, CheckCircle, Clock, AlertCircle, X,
   Upload, Image, User, Calendar, FileText, ChevronRight, Edit2, Trash2
@@ -20,6 +22,8 @@ export default function DuvidasLog({ projeto }) {
   const [showNewModal, setShowNewModal] = useState(false)
   const [entregaveis, setEntregaveis] = useState([])
   const [utilizadores, setUtilizadores] = useState([])
+  const toast = useToast()
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null })
 
   useEffect(() => {
     if (projeto?.id) {
@@ -115,19 +119,27 @@ export default function DuvidasLog({ projeto }) {
   }
 
   const handleDeleteDecision = async (decision) => {
-    if (!confirm(`Eliminar a dúvida "${decision.titulo}"?`)) return
-
-    try {
-      const { error } = await supabase
-        .from('projeto_duvidas')
-        .delete()
-        .eq('id', decision.id)
-      if (error) throw error
-      fetchDecisions()
-    } catch (err) {
-      console.error('Erro ao eliminar:', err)
-      alert('Erro ao eliminar')
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar Dúvida',
+      message: `Eliminar a dúvida "${decision.titulo}"?`,
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase
+            .from('projeto_duvidas')
+            .delete()
+            .eq('id', decision.id)
+          if (error) throw error
+          fetchDecisions()
+        } catch (err) {
+          console.error('Erro ao eliminar:', err)
+          toast.error('Erro', 'Erro ao eliminar')
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      }
+    })
+    return
   }
 
   if (loading) {
@@ -237,6 +249,16 @@ export default function DuvidasLog({ projeto }) {
           onCreated={handleDecisionCreated}
         />
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type || 'danger'}
+        confirmText="Confirmar"
+      />
     </div>
   )
 }
@@ -430,6 +452,7 @@ function DecisionModal({ decision, utilizadores, onClose, onResponseSubmitted })
   const [resolving, setResolving] = useState(false)
   const [showResolveForm, setShowResolveForm] = useState(false)
   const [resolucaoFinal, setResolucaoFinal] = useState('')
+  const toast = useToast()
   const status = STATUS_CONFIG[decision.status]
 
   // Carregar comentários ao abrir
@@ -460,7 +483,7 @@ function DecisionModal({ decision, utilizadores, onClose, onResponseSubmitted })
   // Adicionar novo comentário
   const handleAddComment = async () => {
     if (!newComment.trim()) {
-      alert('Por favor escreva um comentário')
+      toast.warning('Aviso', 'Por favor escreva um comentário')
       return
     }
 
@@ -485,7 +508,7 @@ function DecisionModal({ decision, utilizadores, onClose, onResponseSubmitted })
       onResponseSubmitted()
     } catch (err) {
       console.error('Erro ao adicionar comentário:', err)
-      alert('Erro ao adicionar comentário: ' + err.message)
+      toast.error('Erro', 'Erro ao adicionar comentário: ' + err.message)
     } finally {
       setSubmitting(false)
     }
@@ -494,7 +517,7 @@ function DecisionModal({ decision, utilizadores, onClose, onResponseSubmitted })
   // Marcar como resolvido
   const handleResolve = async () => {
     if (!resolucaoFinal.trim()) {
-      alert('Por favor escreva a resolução final')
+      toast.warning('Aviso', 'Por favor escreva a resolução final')
       return
     }
 
@@ -517,7 +540,7 @@ function DecisionModal({ decision, utilizadores, onClose, onResponseSubmitted })
       onResponseSubmitted()
     } catch (err) {
       console.error('Erro ao resolver:', err)
-      alert('Erro ao marcar como resolvido: ' + err.message)
+      toast.error('Erro', 'Erro ao marcar como resolvido: ' + err.message)
     } finally {
       setResolving(false)
     }
@@ -810,6 +833,7 @@ function NewDecisionModal({ projetoId, entregaveis, utilizadores, onClose, onCre
   const [submitting, setSubmitting] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef(null)
+  const toast = useToast()
 
   const handleImageSelect = (file) => {
     if (!file || !file.type.startsWith('image/')) return
@@ -837,7 +861,7 @@ function NewDecisionModal({ projetoId, entregaveis, utilizadores, onClose, onCre
 
   const handleSubmit = async () => {
     if (!titulo.trim() || !descricao.trim()) {
-      alert('Por favor preencha o título e descrição')
+      toast.warning('Aviso', 'Por favor preencha o título e descrição')
       return
     }
 
@@ -889,7 +913,7 @@ function NewDecisionModal({ projetoId, entregaveis, utilizadores, onClose, onCre
       onCreated()
     } catch (err) {
       console.error('Erro ao criar decisão:', err)
-      alert('Erro ao criar dúvida: ' + err.message)
+      toast.error('Erro', 'Erro ao criar dúvida: ' + err.message)
     } finally {
       setSubmitting(false)
     }

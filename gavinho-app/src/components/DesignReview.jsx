@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Document, Page, pdfjs } from 'react-pdf'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { useToast } from './ui/Toast'
+import ConfirmModal from './ui/ConfirmModal'
 import {
   MessageCircle,
   Pencil,
@@ -78,6 +80,8 @@ const getStatusColor = (status) => {
 
 export default function DesignReview({ projeto, initialReviewId }) {
   const { user, profile } = useAuth()
+  const toast = useToast()
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null })
   const containerRef = useRef(null)
   const pdfContainerRef = useRef(null)
 
@@ -888,23 +892,31 @@ export default function DesignReview({ projeto, initialReviewId }) {
   }
 
   const handleDeleteAnnotation = async (annotation) => {
-    if (!confirm('Tem certeza que deseja apagar esta anotação?')) return
+    setConfirmModal({
+      isOpen: true,
+      title: 'Apagar Anotação',
+      message: 'Tem certeza que deseja apagar esta anotação?',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase
+            .from('design_review_annotations')
+            .delete()
+            .eq('id', annotation.id)
 
-    try {
-      const { error } = await supabase
-        .from('design_review_annotations')
-        .delete()
-        .eq('id', annotation.id)
+          if (error) throw error
 
-      if (error) throw error
-
-      setAnnotations(prev => prev.filter(a => a.id !== annotation.id))
-      if (selectedAnnotation?.id === annotation.id) {
-        setSelectedAnnotation(null)
+          setAnnotations(prev => prev.filter(a => a.id !== annotation.id))
+          if (selectedAnnotation?.id === annotation.id) {
+            setSelectedAnnotation(null)
+          }
+        } catch (err) {
+          console.error('Error deleting annotation:', err)
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
       }
-    } catch (err) {
-      console.error('Error deleting annotation:', err)
-    }
+    })
+    return
   }
 
   const handleReopenAnnotation = async (annotation) => {
@@ -1513,9 +1525,16 @@ export default function DesignReview({ projeto, initialReviewId }) {
           {['pencil', 'rectangle', 'arrow', 'circle', 'line'].includes(activeTool) && drawings.length > 0 && (
             <button
               onClick={() => {
-                if (confirm('Apagar todos os desenhos desta página?')) {
-                  drawings.forEach(d => deleteDrawing(d.id))
-                }
+                setConfirmModal({
+                  isOpen: true,
+                  title: 'Apagar Desenhos',
+                  message: 'Apagar todos os desenhos desta página?',
+                  type: 'danger',
+                  onConfirm: async () => {
+                    drawings.forEach(d => deleteDrawing(d.id))
+                    setConfirmModal(prev => ({ ...prev, isOpen: false }))
+                  }
+                })
               }}
               title="Apagar desenhos"
               style={{
@@ -2613,6 +2632,16 @@ export default function DesignReview({ projeto, initialReviewId }) {
           onClick={() => setShowReviewSelector(false)}
         />
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type || 'danger'}
+        confirmText="Confirmar"
+      />
       </div>
     </div>
   )

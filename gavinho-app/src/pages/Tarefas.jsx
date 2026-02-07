@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { 
+import {
   Plus, Search, Calendar, CheckCircle2, Circle, ChevronRight, ChevronDown,
   MoreVertical, X, Edit, Trash2, FolderOpen, User
 } from 'lucide-react'
+import { useToast } from '../components/ui/Toast'
 
 const STATUS_OPTIONS = [
   { id: 'pendente', label: 'A Fazer', color: 'var(--brown-light)' },
@@ -20,6 +21,7 @@ const PRIORIDADES = [
 ]
 
 export default function Tarefas() {
+  const toast = useToast()
   const [tarefas, setTarefas] = useState([])
   const [projetos, setProjetos] = useState([])
   const [equipa, setEquipa] = useState([])
@@ -121,7 +123,7 @@ export default function Tarefas() {
       fetchData()
     } catch (err) {
       console.error('Erro:', err)
-      alert('Erro ao guardar tarefa')
+      toast.error('Erro', 'Erro ao guardar tarefa')
     }
   }
 
@@ -142,7 +144,7 @@ export default function Tarefas() {
       setExpandedTasks(prev => ({ ...prev, [parentTask.id]: true }))
       fetchData()
     } catch (err) {
-      alert('Erro ao criar sub-tarefa')
+      toast.error('Erro', 'Erro ao criar sub-tarefa')
     }
   }
 
@@ -152,7 +154,7 @@ export default function Tarefas() {
       setShowDeleteConfirm(null)
       fetchData()
     } catch (err) {
-      alert('Erro ao eliminar')
+      toast.error('Erro', 'Erro ao eliminar')
     }
   }
 

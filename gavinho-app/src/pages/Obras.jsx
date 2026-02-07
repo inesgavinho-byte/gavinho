@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useToast } from '../components/ui/Toast'
 import {
   Plus, Search, HardHat, MapPin, Calendar, Users,
   MoreVertical, Eye, X, Edit, Trash2, Play, Pause, CheckCircle,
@@ -12,6 +13,7 @@ const tipoOptions = ['Todos', 'Construção Nova', 'Remodelação', 'Ampliação
 
 export default function Obras() {
   const navigate = useNavigate()
+  const toast = useToast()
   const [obras, setObras] = useState([])
   const [projetos, setProjetos] = useState([])
   const [loading, setLoading] = useState(true)
@@ -137,7 +139,7 @@ export default function Obras() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!formData.nome.trim()) {
-      alert('O nome da obra é obrigatório')
+      toast.warning('Aviso', 'O nome da obra é obrigatório')
       return
     }
     setSaving(true)
@@ -180,7 +182,7 @@ export default function Obras() {
       fetchObras()
     } catch (error) {
       console.error('Erro ao guardar obra:', error)
-      alert('Erro ao guardar obra: ' + error.message)
+      toast.error('Erro', 'Erro ao guardar obra: ' + error.message)
     } finally {
       setSaving(false)
     }
@@ -198,7 +200,7 @@ export default function Obras() {
       fetchObras()
     } catch (error) {
       console.error('Erro ao eliminar obra:', error)
-      alert('Erro ao eliminar obra: ' + (error.message || JSON.stringify(error)))
+      toast.error('Erro', 'Erro ao eliminar obra: ' + (error.message || JSON.stringify(error)))
     }
   }
 

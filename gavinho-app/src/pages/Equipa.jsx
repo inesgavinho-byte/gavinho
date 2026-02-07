@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../components/ui/Toast';
+import { ConfirmModal } from '../components/ui/ConfirmModal';
 import {
   Users,
   User,
@@ -40,6 +42,8 @@ import {
 
 export default function Equipa() {
   const { profile, isAdmin } = useAuth();
+  const toast = useToast();
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
   const [utilizadores, setUtilizadores] = useState([]);
   const [pendingUsers, setPendingUsers] = useState([]);
   const [projetos, setProjetos] = useState([]);
@@ -221,7 +225,7 @@ export default function Equipa() {
   // Adicionar encerramento
   const handleAddEncerramento = async () => {
     if (!encerramentoForm.data) {
-      alert('Selecione uma data');
+      toast.warning('Aviso', 'Selecione uma data');
       return;
     }
     try {
@@ -239,19 +243,28 @@ export default function Equipa() {
       setEncerramentoForm({ data: '', descricao: '', conta_como_ferias: true });
       loadRHData();
     } catch (err) {
-      alert(`Erro: ${err.message}`);
+      toast.error('Erro', err.message);
     }
   };
 
   // Remover encerramento
   const handleDeleteEncerramento = async (id) => {
-    if (!confirm('Remover este dia de encerramento?')) return;
-    try {
-      await supabase.from('encerramentos_empresa').delete().eq('id', id);
-      loadRHData();
-    } catch (err) {
-      alert(`Erro: ${err.message}`);
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Remover Encerramento',
+      message: 'Remover este dia de encerramento?',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          await supabase.from('encerramentos_empresa').delete().eq('id', id);
+          loadRHData();
+        } catch (err) {
+          toast.error('Erro', err.message);
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+      }
+    });
+    return;
   };
 
   // Aprovar/Rejeitar pedido de ausência
@@ -269,7 +282,7 @@ export default function Equipa() {
       if (error) throw error;
       loadRHData();
     } catch (err) {
-      alert(`Erro: ${err.message}`);
+      toast.error('Erro', err.message);
     }
   };
 
@@ -291,7 +304,7 @@ export default function Equipa() {
       if (error) throw error;
       loadRHData();
     } catch (err) {
-      alert(`Erro: ${err.message}`);
+      toast.error('Erro', err.message);
     }
   };
 
@@ -323,25 +336,33 @@ export default function Equipa() {
       setPendingUsers(prev => prev.filter(u => u.id !== approvalModal.id));
       setApprovalModal(null);
       fetchAllUsers(); // Refresh lista
-      alert(`${approvalModal.nome} foi aprovado como ${ROLES.find(r => r.value === approvalData.role)?.label}!`);
+      toast.success('Sucesso', `${approvalModal.nome} foi aprovado como ${ROLES.find(r => r.value === approvalData.role)?.label}!`);
     } catch (err) {
       console.error('Erro ao aprovar:', err);
-      alert('Erro ao aprovar utilizador');
+      toast.error('Erro', 'Erro ao aprovar utilizador');
     }
   };
 
   const handleRejectUser = async (user) => {
-    if (!confirm(`Rejeitar o pedido de ${user.nome}? Esta ação não pode ser revertida.`)) return;
-
-    try {
-      const { error } = await supabase.from('utilizadores').delete().eq('id', user.id);
-      if (error) throw error;
-      setPendingUsers(prev => prev.filter(u => u.id !== user.id));
-      alert(`Pedido de ${user.nome} foi rejeitado.`);
-    } catch (err) {
-      console.error('Erro ao rejeitar:', err);
-      alert('Erro ao rejeitar utilizador');
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Rejeitar Pedido',
+      message: `Rejeitar o pedido de ${user.nome}? Esta ação não pode ser revertida.`,
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase.from('utilizadores').delete().eq('id', user.id);
+          if (error) throw error;
+          setPendingUsers(prev => prev.filter(u => u.id !== user.id));
+          toast.success('Sucesso', `Pedido de ${user.nome} foi rejeitado.`);
+        } catch (err) {
+          console.error('Erro ao rejeitar:', err);
+          toast.error('Erro', 'Erro ao rejeitar utilizador');
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+      }
+    });
+    return;
   };
 
   // Editar utilizador
@@ -408,28 +429,36 @@ export default function Equipa() {
       setSelectedUser(updatedUser);
       setUtilizadores(prev => prev.map(u => u.id === selectedUser.id ? updatedUser : u));
       setIsEditing(false);
-      alert('Utilizador atualizado com sucesso!');
+      toast.success('Sucesso', 'Utilizador atualizado com sucesso!');
     } catch (err) {
       console.error('Erro ao guardar:', err);
-      alert(`Erro ao guardar: ${err.message || 'Verifique permissões RLS no Supabase'}`);
+      toast.error('Erro', `Erro ao guardar: ${err.message || 'Verifique permissões RLS no Supabase'}`);
     } finally {
       setSavingEdit(false);
     }
   };
 
   const deleteUser = async () => {
-    if (!confirm(`Tem a certeza que deseja remover ${selectedUser.nome}? Esta ação não pode ser revertida.`)) return;
-
-    try {
-      const { error } = await supabase.from('utilizadores').delete().eq('id', selectedUser.id);
-      if (error) throw error;
-      setUtilizadores(prev => prev.filter(u => u.id !== selectedUser.id));
-      setSelectedUser(null);
-      alert('Utilizador removido com sucesso.');
-    } catch (err) {
-      console.error('Erro ao remover:', err);
-      alert('Erro ao remover utilizador');
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Remover Utilizador',
+      message: `Tem a certeza que deseja remover ${selectedUser.nome}? Esta ação não pode ser revertida.`,
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase.from('utilizadores').delete().eq('id', selectedUser.id);
+          if (error) throw error;
+          setUtilizadores(prev => prev.filter(u => u.id !== selectedUser.id));
+          setSelectedUser(null);
+          toast.success('Sucesso', 'Utilizador removido com sucesso.');
+        } catch (err) {
+          console.error('Erro ao remover:', err);
+          toast.error('Erro', 'Erro ao remover utilizador');
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+      }
+    });
+    return;
   };
 
   const loadUserDetails = async (user) => {
@@ -486,7 +515,7 @@ export default function Equipa() {
   // Criar ausência
   const handleCreateAusencia = async () => {
     if (!ausenciaForm.data_inicio || !ausenciaForm.data_fim) {
-      alert('Preencha as datas');
+      toast.warning('Aviso', 'Preencha as datas');
       return;
     }
 
@@ -509,14 +538,14 @@ export default function Equipa() {
       loadUserDetails(selectedUser);
     } catch (error) {
       console.error('Erro ao criar ausência:', error);
-      alert('Erro ao criar ausência');
+      toast.error('Erro', 'Erro ao criar ausência');
     }
   };
 
   // Aprovar/Rejeitar ausência (só admin)
   const handleAusenciaAction = async (ausencia, action) => {
     if (!isAdmin()) {
-      alert('Sem permissão');
+      toast.warning('Aviso', 'Sem permissão');
       return;
     }
 
@@ -548,7 +577,7 @@ export default function Equipa() {
   // Registar timesheet
   const handleCreateTimesheet = async () => {
     if (!timesheetForm.horas) {
-      alert('Preencha as horas');
+      toast.warning('Aviso', 'Preencha as horas');
       return;
     }
 
@@ -570,14 +599,14 @@ export default function Equipa() {
       loadUserDetails(selectedUser);
     } catch (error) {
       console.error('Erro ao registar timesheet:', error);
-      alert('Erro ao registar horas');
+      toast.error('Erro', 'Erro ao registar horas');
     }
   };
 
   // Submeter recibo
   const handleSubmitRecibo = async () => {
     if (!reciboForm.valor_bruto) {
-      alert('Preencha o valor');
+      toast.warning('Aviso', 'Preencha o valor');
       return;
     }
 
@@ -650,7 +679,7 @@ export default function Equipa() {
       loadUserDetails(selectedUser);
     } catch (error) {
       console.error('Erro ao submeter recibo:', error);
-      alert('Erro ao submeter recibo');
+      toast.error('Erro', 'Erro ao submeter recibo');
     } finally {
       setUploadingRecibo(false);
     }
@@ -659,7 +688,7 @@ export default function Equipa() {
   // Marcar recibo como pago (só admin)
   const handleMarcarPago = async (recibo) => {
     if (!isAdmin()) {
-      alert('Sem permissão');
+      toast.warning('Aviso', 'Sem permissão');
       return;
     }
 
@@ -2345,6 +2374,16 @@ export default function Equipa() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type || 'danger'}
+        confirmText="Confirmar"
+      />
     </>
   );
 }

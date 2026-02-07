@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { 
-  Shield, Plus, Edit, Trash2, AlertTriangle, Calendar, Clock, 
+import { useToast } from './ui/Toast'
+import { ConfirmModal } from './ui/ConfirmModal'
+import {
+  Shield, Plus, Edit, Trash2, AlertTriangle, Calendar, Clock,
   CheckCircle2, XCircle, AlertCircle, FileText, Bell, X, ChevronDown
 } from 'lucide-react'
 
@@ -36,6 +38,8 @@ const getStatusLicenca = (diasRestantes) => {
 }
 
 export default function ObraLicencas({ obraId, obraCodigo }) {
+  const toast = useToast()
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', type: 'danger', onConfirm: null })
   const [licencas, setLicencas] = useState([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
@@ -136,24 +140,31 @@ export default function ObraLicencas({ obraId, obraCodigo }) {
       handleCloseModal()
     } catch (err) {
       console.error('Erro ao guardar licença:', err)
-      alert('Erro ao guardar: ' + err.message)
+      toast.error('Erro', 'Erro ao guardar: ' + err.message)
     }
   }
 
-  const handleDelete = async (id) => {
-    if (!confirm('Eliminar esta licença?')) return
-    
-    try {
-      const { error } = await supabase
-        .from('obra_licencas')
-        .delete()
-        .eq('id', id)
-      
-      if (error) throw error
-      await loadLicencas()
-    } catch (err) {
-      console.error('Erro ao eliminar:', err)
-    }
+  const handleDelete = (id) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar Licença',
+      message: 'Eliminar esta licença?',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase
+            .from('obra_licencas')
+            .delete()
+            .eq('id', id)
+
+          if (error) throw error
+          await loadLicencas()
+        } catch (err) {
+          console.error('Erro ao eliminar:', err)
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      }
+    })
   }
 
   const handleEdit = (licenca) => {
@@ -1045,6 +1056,15 @@ export default function ObraLicencas({ obraId, obraCodigo }) {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type}
+      />
     </div>
   )
 }

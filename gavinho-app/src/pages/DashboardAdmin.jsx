@@ -1,14 +1,18 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { 
+import {
   TrendingUp, Euro, Users, FolderKanban, FileText,
   CheckCircle, Clock, ArrowUpRight, UserPlus, X, Check, Mail, Phone,
   Hammer, MapPin, Calendar, Percent, LayoutGrid, List
 } from 'lucide-react'
+import { useToast } from '../components/ui/Toast'
+import { ConfirmModal } from '../components/ui/ConfirmModal'
 
 export default function DashboardAdmin() {
   const navigate = useNavigate()
+  const toast = useToast()
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null })
   const [loading, setLoading] = useState(true)
   const [pendingUsers, setPendingUsers] = useState([])
   const [projetos, setProjetos] = useState([])
@@ -164,25 +168,33 @@ export default function DashboardAdmin() {
       if (error) throw error
       setPendingUsers(prev => prev.filter(u => u.id !== approvalModal.id))
       setApprovalModal(null)
-      alert(`${approvalModal.nome} foi aprovado como ${ROLES.find(r => r.value === approvalData.role)?.label}!`)
+      toast.success('Sucesso', `${approvalModal.nome} foi aprovado como ${ROLES.find(r => r.value === approvalData.role)?.label}!`)
     } catch (err) {
       console.error('Erro ao aprovar:', err)
-      alert('Erro ao aprovar utilizador')
+      toast.error('Erro', 'Erro ao aprovar utilizador')
     }
   }
 
   const handleRejectUser = async (user) => {
-    if (!confirm(`Rejeitar o pedido de ${user.nome}? Esta ação não pode ser revertida.`)) return
-
-    try {
-      const { error } = await supabase.from('utilizadores').delete().eq('id', user.id)
-      if (error) throw error
-      setPendingUsers(prev => prev.filter(u => u.id !== user.id))
-      alert(`Pedido de ${user.nome} foi rejeitado.`)
-    } catch (err) {
-      console.error('Erro ao rejeitar:', err)
-      alert('Erro ao rejeitar utilizador')
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Rejeitar Pedido',
+      message: `Rejeitar o pedido de ${user.nome}? Esta ação não pode ser revertida.`,
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase.from('utilizadores').delete().eq('id', user.id)
+          if (error) throw error
+          setPendingUsers(prev => prev.filter(u => u.id !== user.id))
+          toast.success('Sucesso', `Pedido de ${user.nome} foi rejeitado.`)
+        } catch (err) {
+          console.error('Erro ao rejeitar:', err)
+          toast.error('Erro', 'Erro ao rejeitar utilizador')
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      }
+    })
+    return
   }
 
   const getInitials = (nome) => nome?.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || '?'
@@ -642,6 +654,16 @@ export default function DashboardAdmin() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type || 'danger'}
+        confirmText="Confirmar"
+      />
     </div>
   )
 }

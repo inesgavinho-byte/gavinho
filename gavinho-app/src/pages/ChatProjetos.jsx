@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { useToast } from '../components/ui/Toast'
+import { ConfirmModal } from '../components/ui/ConfirmModal'
 import {
   Hash, Lock, Plus, Send, Paperclip, Smile, AtSign, Search,
   MoreVertical, Edit, Trash2, Reply, Pin, X, ChevronDown, ChevronRight,
@@ -81,6 +83,8 @@ const GARVIS_USER = {
 
 export default function ChatProjetos() {
   const { profile } = useAuth()
+  const toast = useToast()
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null })
   const [projetos, setProjetos] = useState([])
   const [projetoAtivo, setProjetoAtivo] = useState(null)
   const [projetosExpanded, setProjetosExpanded] = useState({})
@@ -600,7 +604,7 @@ export default function ChatProjetos() {
       setShowNovoCanal(false)
       setNovoCanal({ nome: '', descricao: '', tipo: 'publico', icone: 'hash' })
     } catch (err) {
-      alert('Erro ao criar canal: ' + err.message)
+      toast.error('Erro', 'Erro ao criar canal: ' + err.message)
     }
   }
 
@@ -630,7 +634,7 @@ export default function ChatProjetos() {
 
       setEditingCanal(null)
     } catch (err) {
-      alert('Erro ao editar canal: ' + err.message)
+      toast.error('Erro', 'Erro ao editar canal: ' + err.message)
     }
   }
 
@@ -655,7 +659,7 @@ export default function ChatProjetos() {
 
       setShowDeleteCanalConfirm(null)
     } catch (err) {
-      alert('Erro ao eliminar canal: ' + err.message)
+      toast.error('Erro', 'Erro ao eliminar canal: ' + err.message)
     }
   }
 
@@ -681,7 +685,7 @@ export default function ChatProjetos() {
       setShowNovoTopico(false)
       setNovoTopico({ titulo: '', descricao: '' })
     } catch (err) {
-      alert('Erro ao criar tópico: ' + err.message)
+      toast.error('Erro', 'Erro ao criar tópico: ' + err.message)
     }
   }
 
@@ -689,7 +693,7 @@ export default function ChatProjetos() {
     if (!novaMensagem.trim()) return
 
     if (!topicoAtivo) {
-      alert('Por favor, seleciona ou cria um tópico antes de enviar mensagens.')
+      toast.warning('Aviso', 'Por favor, seleciona ou cria um tópico antes de enviar mensagens.')
       return
     }
 
@@ -766,7 +770,7 @@ export default function ChatProjetos() {
         }
       }
     } catch (err) {
-      alert('Erro ao enviar mensagem: ' + err.message)
+      toast.error('Erro', 'Erro ao enviar mensagem: ' + err.message)
     }
   }
 
@@ -804,7 +808,7 @@ export default function ChatProjetos() {
       // Recarregar mensagens após upload
       loadMensagens(topicoAtivo.id)
     } catch (err) {
-      alert('Erro ao enviar ficheiro: ' + err.message)
+      toast.error('Erro', 'Erro ao enviar ficheiro: ' + err.message)
     } finally {
       setUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
@@ -839,22 +843,30 @@ export default function ChatProjetos() {
   }
 
   const handleEliminarMensagem = async (mensagem) => {
-    if (!confirm('Eliminar esta mensagem?')) return
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar Mensagem',
+      message: 'Eliminar esta mensagem?',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          await supabase
+            .from('chat_mensagens')
+            .update({
+              eliminado: true,
+              eliminado_at: new Date().toISOString(),
+              eliminado_por: profile?.id
+            })
+            .eq('id', mensagem.id)
 
-    try {
-      await supabase
-        .from('chat_mensagens')
-        .update({
-          eliminado: true,
-          eliminado_at: new Date().toISOString(),
-          eliminado_por: profile?.id
-        })
-        .eq('id', mensagem.id)
-
-      loadMensagens(topicoAtivo.id)
-    } catch (err) {
-      alert('Erro ao eliminar: ' + err.message)
-    }
+          loadMensagens(topicoAtivo.id)
+        } catch (err) {
+          toast.error('Erro', 'Erro ao eliminar: ' + err.message)
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      }
+    })
+    return
   }
 
   // Iniciar edição de mensagem
@@ -879,7 +891,7 @@ export default function ChatProjetos() {
       setNovaMensagem('')
       loadMensagens(topicoAtivo.id)
     } catch (err) {
-      alert('Erro ao editar: ' + err.message)
+      toast.error('Erro', 'Erro ao editar: ' + err.message)
     }
   }
 
@@ -2662,6 +2674,16 @@ export default function ChatProjetos() {
           }
         `}</style>
       </div>
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type || 'danger'}
+        confirmText="Confirmar"
+      />
     </div>
   )
 }

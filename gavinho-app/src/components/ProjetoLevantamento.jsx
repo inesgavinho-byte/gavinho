@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, memo, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
+import { useToast } from './ui/Toast'
+import ConfirmModal from './ui/ConfirmModal'
 import {
   Plus, Upload, Image, X, ChevronLeft, ChevronRight,
   Star, Trash2, Edit, Loader2, FolderPlus, Camera,
@@ -105,6 +107,9 @@ const LazyImage = memo(({ src, alt, className, onClick }) => {
 })
 
 export default function ProjetoLevantamento({ projeto, userId, userName }) {
+  const toast = useToast()
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null })
+
   // State
   const [compartimentos, setCompartimentos] = useState([])
   const [fotos, setFotos] = useState({}) // Mapa de compartimento_id -> fotos[]
@@ -216,41 +221,49 @@ export default function ProjetoLevantamento({ projeto, userId, userName }) {
       setShowAddCompartimentoModal(false)
     } catch (err) {
       console.error('Erro ao criar compartimento:', err)
-      alert('Erro ao criar compartimento: ' + err.message)
+      toast.error('Erro', 'Erro ao criar compartimento: ' + err.message)
     }
   }
 
   // Delete compartimento
   const handleDeleteCompartimento = async (compartimento) => {
-    if (!confirm(`Eliminar "${compartimento.nome}" e todas as suas fotos?`)) return
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar Compartimento',
+      message: `Eliminar "${compartimento.nome}" e todas as suas fotos?`,
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          // Delete fotos from storage first
+          const compartimentoFotos = fotos[compartimento.id] || []
+          for (const foto of compartimentoFotos) {
+            if (foto.file_path) {
+              await supabase.storage.from('projeto-files').remove([foto.file_path])
+            }
+          }
 
-    try {
-      // Delete fotos from storage first
-      const compartimentoFotos = fotos[compartimento.id] || []
-      for (const foto of compartimentoFotos) {
-        if (foto.file_path) {
-          await supabase.storage.from('projeto-files').remove([foto.file_path])
+          // Delete compartimento (cascade will delete fotos records)
+          const { error } = await supabase
+            .from('projeto_levantamento_compartimentos')
+            .delete()
+            .eq('id', compartimento.id)
+
+          if (error) throw error
+
+          setCompartimentos(prev => prev.filter(c => c.id !== compartimento.id))
+          setFotos(prev => {
+            const newFotos = { ...prev }
+            delete newFotos[compartimento.id]
+            return newFotos
+          })
+        } catch (err) {
+          console.error('Erro ao eliminar compartimento:', err)
+          toast.error('Erro', 'Erro ao eliminar: ' + err.message)
         }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
       }
-
-      // Delete compartimento (cascade will delete fotos records)
-      const { error } = await supabase
-        .from('projeto_levantamento_compartimentos')
-        .delete()
-        .eq('id', compartimento.id)
-
-      if (error) throw error
-
-      setCompartimentos(prev => prev.filter(c => c.id !== compartimento.id))
-      setFotos(prev => {
-        const newFotos = { ...prev }
-        delete newFotos[compartimento.id]
-        return newFotos
-      })
-    } catch (err) {
-      console.error('Erro ao eliminar compartimento:', err)
-      alert('Erro ao eliminar: ' + err.message)
-    }
+    })
+    return
   }
 
   // Edit compartimento
@@ -277,7 +290,7 @@ export default function ProjetoLevantamento({ projeto, userId, userName }) {
       setEditForm({ nome: '', descricao: '' })
     } catch (err) {
       console.error('Erro ao editar compartimento:', err)
-      alert('Erro ao editar: ' + err.message)
+      toast.error('Erro', 'Erro ao editar: ' + err.message)
     }
   }
 
@@ -375,7 +388,7 @@ export default function ProjetoLevantamento({ projeto, userId, userName }) {
       if (fileInputRef.current) fileInputRef.current.value = ''
     } catch (err) {
       console.error('Erro no upload:', err)
-      alert('Erro ao fazer upload: ' + err.message)
+      toast.error('Erro', 'Erro ao fazer upload: ' + err.message)
     } finally {
       setUploading(false)
     }
@@ -383,30 +396,38 @@ export default function ProjetoLevantamento({ projeto, userId, userName }) {
 
   // Delete foto
   const handleDeleteFoto = async (compartimentoId, foto) => {
-    if (!confirm('Eliminar esta foto?')) return
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar Foto',
+      message: 'Eliminar esta foto?',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          // Delete from storage
+          if (foto.file_path) {
+            await supabase.storage.from('projeto-files').remove([foto.file_path])
+          }
 
-    try {
-      // Delete from storage
-      if (foto.file_path) {
-        await supabase.storage.from('projeto-files').remove([foto.file_path])
+          // Delete record
+          const { error } = await supabase
+            .from('projeto_levantamento_fotos')
+            .delete()
+            .eq('id', foto.id)
+
+          if (error) throw error
+
+          setFotos(prev => ({
+            ...prev,
+            [compartimentoId]: prev[compartimentoId].filter(f => f.id !== foto.id)
+          }))
+        } catch (err) {
+          console.error('Erro ao eliminar foto:', err)
+          toast.error('Erro', 'Erro ao eliminar: ' + err.message)
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
       }
-
-      // Delete record
-      const { error } = await supabase
-        .from('projeto_levantamento_fotos')
-        .delete()
-        .eq('id', foto.id)
-
-      if (error) throw error
-
-      setFotos(prev => ({
-        ...prev,
-        [compartimentoId]: prev[compartimentoId].filter(f => f.id !== foto.id)
-      }))
-    } catch (err) {
-      console.error('Erro ao eliminar foto:', err)
-      alert('Erro ao eliminar: ' + err.message)
-    }
+    })
+    return
   }
 
   // Toggle destaque
@@ -855,6 +876,16 @@ export default function ProjetoLevantamento({ projeto, userId, userName }) {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type || 'danger'}
+        confirmText="Confirmar"
+      />
     </div>
   )
 }

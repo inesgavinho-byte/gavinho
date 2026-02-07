@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useToast } from '../components/ui/Toast'
 import {
   ArrowLeft,
   Building2,
@@ -36,6 +37,7 @@ const TABS = [
 export default function FornecedorDetalhe() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const toast = useToast()
   const [fornecedor, setFornecedor] = useState(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
@@ -168,7 +170,7 @@ export default function FornecedorDetalhe() {
       fetchFornecedor()
     } catch (error) {
       console.error('Erro ao guardar:', error)
-      alert('Erro ao guardar: ' + error.message)
+      toast.error('Erro', 'Erro ao guardar: ' + error.message)
     } finally {
       setSaving(false)
     }
@@ -214,7 +216,7 @@ export default function FornecedorDetalhe() {
       fetchFornecedor() // Refresh para atualizar médias
     } catch (error) {
       console.error('Erro ao adicionar avaliação:', error)
-      alert('Erro ao adicionar: ' + error.message)
+      toast.error('Erro', 'Erro ao adicionar: ' + error.message)
     } finally {
       setSaving(false)
     }

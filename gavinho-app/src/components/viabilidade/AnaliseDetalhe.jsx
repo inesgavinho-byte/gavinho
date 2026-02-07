@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { ClassificacaoBadge, EstadoBadge } from './ViabilidadeModule'
 import ChatViabilidade from './ChatViabilidade'
+import { useToast } from '../ui/Toast'
 
 // Categorias de solo
 const CATEGORIAS_URBANO = [
@@ -55,6 +56,7 @@ const TIPOS_USO = [
 
 export default function AnaliseDetalhe({ analiseId, onBack }) {
   const { user } = useAuth()
+  const toast = useToast()
   const [analise, setAnalise] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -121,7 +123,7 @@ export default function AnaliseDetalhe({ analiseId, onBack }) {
       await loadAnalise()
     } catch (error) {
       console.error('Erro ao guardar:', error)
-      alert('Erro ao guardar alterações')
+      toast.error('Erro', 'Erro ao guardar alterações')
     } finally {
       setSaving(false)
     }

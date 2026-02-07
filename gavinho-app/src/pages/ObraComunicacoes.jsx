@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useToast } from '../components/ui/Toast'
 import {
   ArrowLeft, MessageSquare, Mail, Phone, Filter, Search, Plus, Clock,
   AlertTriangle, CheckCircle2, Calendar, FileText, Paperclip, Users,
@@ -1068,6 +1069,7 @@ export default function ObraComunicacoes() {
 
 // Modal para criar nova acao
 function ModalNovaAcao({ obraId, canais, onClose, onSave }) {
+  const toast = useToast()
   const [formData, setFormData] = useState({
     tipo_acao: 'tarefa',
     titulo: '',
@@ -1101,7 +1103,7 @@ function ModalNovaAcao({ obraId, canais, onClose, onSave }) {
       onSave()
     } catch (err) {
       console.error('Erro ao criar acao:', err)
-      alert('Erro ao criar acao')
+      toast.error('Erro', 'Erro ao criar ação')
     } finally {
       setSaving(false)
     }

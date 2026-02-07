@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { useToast } from './ui/Toast'
+import { ConfirmModal } from './ui/ConfirmModal'
 import {
   Plus, FileText, Edit2, Trash2, Save, X, Calendar, User, CheckCircle,
   Clock, AlertCircle, Download, Upload, Send, Package, Users, Building2,
@@ -39,6 +41,8 @@ export default function CentralEntregas({ projeto, onNavigateToDesignReview }) {
   const [convertEntrega, setConvertEntrega] = useState(null)
   const [convertName, setConvertName] = useState('')
   const [convertCodigo, setConvertCodigo] = useState('')
+  const toast = useToast()
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', type: 'danger', onConfirm: null })
 
   const [formData, setFormData] = useState({
     titulo: '',
@@ -228,7 +232,7 @@ export default function CentralEntregas({ projeto, onNavigateToDesignReview }) {
 
   const handleSave = async () => {
     if (!formData.titulo.trim()) {
-      alert('O título é obrigatório')
+      toast.warning('Atenção', 'O título é obrigatório')
       return
     }
 
@@ -272,32 +276,40 @@ export default function CentralEntregas({ projeto, onNavigateToDesignReview }) {
       loadEntregas()
     } catch (err) {
       console.error('Erro ao guardar:', err)
-      alert('Erro ao guardar: ' + err.message)
+      toast.error('Erro', 'Erro ao guardar: ' + err.message)
     } finally {
       setSaving(false)
     }
   }
 
-  const handleDelete = async (item) => {
-    if (!confirm('Tem certeza que deseja eliminar esta entrega?')) return
+  const handleDelete = (item) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar Entrega',
+      message: 'Tem certeza que deseja eliminar esta entrega?',
+      type: 'danger',
+      onConfirm: async () => {
+        if (item.id.startsWith('sample-')) {
+          setEntregas(prev => prev.filter(e => e.id !== item.id))
+          setConfirmModal(prev => ({ ...prev, isOpen: false }))
+          return
+        }
 
-    if (item.id.startsWith('sample-')) {
-      setEntregas(prev => prev.filter(e => e.id !== item.id))
-      return
-    }
+        try {
+          const { error } = await supabase
+            .from('projeto_entregas')
+            .delete()
+            .eq('id', item.id)
 
-    try {
-      const { error } = await supabase
-        .from('projeto_entregas')
-        .delete()
-        .eq('id', item.id)
-
-      if (error) throw error
-      loadEntregas()
-    } catch (err) {
-      console.error('Erro ao eliminar:', err)
-      alert('Erro ao eliminar: ' + err.message)
-    }
+          if (error) throw error
+          loadEntregas()
+        } catch (err) {
+          console.error('Erro ao eliminar:', err)
+          toast.error('Erro', 'Erro ao eliminar: ' + err.message)
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      }
+    })
   }
 
   const updateStatus = async (item, newStatus) => {
@@ -401,11 +413,11 @@ export default function CentralEntregas({ projeto, onNavigateToDesignReview }) {
       if (onNavigateToDesignReview) {
         onNavigateToDesignReview(reviewData.id)
       } else {
-        alert('Design Review criado com sucesso!')
+        toast.success('Sucesso', 'Design Review criado com sucesso!')
       }
     } catch (err) {
       console.error('Erro ao converter para Design Review:', err)
-      alert('Erro: ' + err.message)
+      toast.error('Erro', err.message)
     } finally {
       setConvertingToReview(false)
     }
@@ -1424,6 +1436,15 @@ export default function CentralEntregas({ projeto, onNavigateToDesignReview }) {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type}
+      />
     </div>
   )
 }

@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
+import { useToast } from './ui/Toast'
+import { ConfirmModal } from './ui/ConfirmModal'
 import { 
   ChevronLeft, ChevronRight, Plus, X, Calendar, Clock, 
   Shield, AlertTriangle, Users, FileText, Edit, Trash2
@@ -28,6 +30,9 @@ export default function ObraCalendario({ obraId, obraCodigo, obraNome }) {
   const [editingEvento, setEditingEvento] = useState(null)
   const [view, setView] = useState('month') // 'month' ou 'list'
   
+  const toast = useToast()
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', type: 'danger', onConfirm: null })
+
   const [formData, setFormData] = useState({
     titulo: '',
     descricao: '',
@@ -179,23 +184,30 @@ export default function ObraCalendario({ obraId, obraCodigo, obraNome }) {
       handleCloseModal()
     } catch (err) {
       console.error('Erro ao guardar evento:', err)
-      alert('Erro: ' + err.message)
+      toast.error('Erro', err.message)
     }
   }
 
-  const handleDelete = async (id) => {
-    if (!confirm('Eliminar este evento?')) return
-    
-    try {
-      const { error } = await supabase
-        .from('calendario_eventos')
-        .delete()
-        .eq('id', id)
-      if (error) throw error
-      await loadEventos()
-    } catch (err) {
-      console.error('Erro ao eliminar:', err)
-    }
+  const handleDelete = (id) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar Evento',
+      message: 'Eliminar este evento?',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase
+            .from('calendario_eventos')
+            .delete()
+            .eq('id', id)
+          if (error) throw error
+          await loadEventos()
+        } catch (err) {
+          console.error('Erro ao eliminar:', err)
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      }
+    })
   }
 
   const handleEdit = (evento) => {
@@ -674,6 +686,15 @@ export default function ObraCalendario({ obraId, obraCodigo, obraNome }) {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type}
+      />
     </div>
   )
 }

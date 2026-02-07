@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useToast } from '../components/ui/Toast'
 import { 
   ArrowLeft, Plus, Edit, Trash2, X, ChevronDown, ChevronRight, Euro, Percent,
   CheckCircle2, XCircle, Send, Copy, Download, AlertCircle, Save, Calculator
@@ -20,6 +21,7 @@ const UNIDADES = ['vg', 'un', 'm²', 'ml', 'm³', 'kg', 'h', 'dia', 'mês']
 export default function OrcamentoDetalhe() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const toast = useToast()
   
   const [orcamento, setOrcamento] = useState(null)
   const [capitulos, setCapitulos] = useState([])
@@ -139,7 +141,7 @@ export default function OrcamentoDetalhe() {
       fetchOrcamento()
     } catch (err) {
       console.error('Erro:', err)
-      alert('Erro ao guardar capítulo')
+      toast.error('Erro', 'Erro ao guardar capítulo')
     }
   }
 
@@ -150,7 +152,7 @@ export default function OrcamentoDetalhe() {
       fetchOrcamento()
       recalcularOrcamento()
     } catch (err) {
-      alert('Erro ao eliminar capítulo')
+      toast.error('Erro', 'Erro ao eliminar capítulo')
     }
   }
 
@@ -204,7 +206,7 @@ export default function OrcamentoDetalhe() {
       recalcularOrcamento()
     } catch (err) {
       console.error('Erro:', err)
-      alert('Erro ao guardar item')
+      toast.error('Erro', 'Erro ao guardar item')
     }
   }
 
@@ -215,7 +217,7 @@ export default function OrcamentoDetalhe() {
       fetchOrcamento()
       recalcularOrcamento()
     } catch (err) {
-      alert('Erro ao eliminar item')
+      toast.error('Erro', 'Erro ao eliminar item')
     }
   }
 
@@ -264,7 +266,7 @@ export default function OrcamentoDetalhe() {
       setShowAprovarModal(false)
       fetchOrcamento()
     } catch (err) {
-      alert('Erro ao aprovar')
+      toast.error('Erro', 'Erro ao aprovar')
     }
   }
 
@@ -281,7 +283,7 @@ export default function OrcamentoDetalhe() {
       
       fetchOrcamento()
     } catch (err) {
-      alert('Erro ao enviar')
+      toast.error('Erro', 'Erro ao enviar')
     }
   }
 

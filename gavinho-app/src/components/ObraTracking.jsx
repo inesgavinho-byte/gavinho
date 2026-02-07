@@ -9,6 +9,8 @@ import {
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import * as pdfjsLib from 'pdfjs-dist'
+import { useToast } from './ui/Toast'
+import { ConfirmModal } from './ui/ConfirmModal'
 
 // Configurar worker do PDF.js
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
@@ -57,6 +59,8 @@ export default function ObraTracking({ obra, onStatsUpdate }) {
   })
   
   const fileInputRef = useRef(null)
+  const toast = useToast()
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', type: 'danger', onConfirm: null })
 
   useEffect(() => {
     if (obra?.id) fetchData()
@@ -146,14 +150,14 @@ export default function ObraTracking({ obra, onStatsUpdate }) {
         })
       } else {
         // Sem items extraídos
-        alert('Não foi possível extrair items automaticamente. Verifique o formato do ficheiro.')
+        toast.warning('Atenção', 'Não foi possível extrair items automaticamente. Verifique o formato do ficheiro.')
         fetchData()
       }
 
       setShowUploadModal(false)
     } catch (err) {
       console.error('Erro no upload:', err)
-      alert('Erro ao processar ficheiro: ' + err.message)
+      toast.error('Erro', 'Erro ao processar ficheiro: ' + err.message)
     } finally {
       setUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
@@ -632,7 +636,7 @@ export default function ObraTracking({ obra, onStatsUpdate }) {
       fetchData()
     } catch (err) {
       console.error('Erro ao importar:', err)
-      alert('Erro ao importar items')
+      toast.error('Erro', 'Erro ao importar items')
     } finally {
       setExtracting(false)
     }
@@ -641,7 +645,7 @@ export default function ObraTracking({ obra, onStatsUpdate }) {
   // CRUD Items
   const handleSaveItem = async () => {
     if (!itemForm.descricao.trim()) {
-      alert('Descrição é obrigatória')
+      toast.warning('Atenção', 'Descrição é obrigatória')
       return
     }
     
@@ -676,18 +680,26 @@ export default function ObraTracking({ obra, onStatsUpdate }) {
       fetchData()
     } catch (err) {
       console.error('Erro:', err)
-      alert('Erro ao guardar item')
+      toast.error('Erro', 'Erro ao guardar item')
     }
   }
 
-  const handleDeleteItem = async (item) => {
-    if (!confirm('Eliminar este item?')) return
-    try {
-      await supabase.from('obra_items').delete().eq('id', item.id)
-      fetchData()
-    } catch (err) {
-      alert('Erro ao eliminar')
-    }
+  const handleDeleteItem = (item) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar Item',
+      message: 'Eliminar este item?',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          await supabase.from('obra_items').delete().eq('id', item.id)
+          fetchData()
+        } catch (err) {
+          toast.error('Erro', 'Erro ao eliminar')
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      }
+    })
   }
 
   // Funções de seleção múltipla
@@ -736,7 +748,7 @@ export default function ObraTracking({ obra, onStatsUpdate }) {
       fetchData()
     } catch (err) {
       console.error('Erro ao eliminar items:', err)
-      alert('Erro ao eliminar items: ' + err.message)
+      toast.error('Erro', 'Erro ao eliminar items: ' + err.message)
     } finally {
       setDeleting(false)
     }
@@ -772,7 +784,7 @@ export default function ObraTracking({ obra, onStatsUpdate }) {
       fetchData()
     } catch (err) {
       console.error('Erro ao eliminar proposta:', err)
-      alert('Erro ao eliminar proposta: ' + err.message)
+      toast.error('Erro', 'Erro ao eliminar proposta: ' + err.message)
     } finally {
       setDeleting(false)
     }
@@ -1586,6 +1598,15 @@ export default function ObraTracking({ obra, onStatsUpdate }) {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type}
+      />
     </div>
   )
 }

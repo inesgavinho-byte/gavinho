@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useToast } from '../components/ui/Toast'
+import { ConfirmModal } from '../components/ui/ConfirmModal'
 import {
   Search, Send, Image, X, HardHat, MessageSquare, Loader2, AlertCircle,
   Phone, Settings, Check, CheckCheck, Clock, Package, Users, Wrench,
@@ -48,6 +50,8 @@ const MOCK_WHATSAPP_MESSAGES = [
 
 export default function ChatObras() {
   const navigate = useNavigate()
+  const toast = useToast()
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null })
   const [obras, setObras] = useState([])
   const [selectedObra, setSelectedObra] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -378,7 +382,7 @@ export default function ChatObras() {
       await loadObraContacts()
     } catch (err) {
       console.error('Erro ao guardar contacto:', err)
-      alert('Erro ao guardar contacto')
+      toast.error('Erro', 'Erro ao guardar contacto')
     } finally {
       setSavingContact(false)
     }
@@ -386,19 +390,27 @@ export default function ChatObras() {
 
   // Eliminar contacto
   const deleteContact = async (contactId) => {
-    if (!confirm('Eliminar este contacto?')) return
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar Contacto',
+      message: 'Eliminar este contacto?',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase
+            .from('whatsapp_contactos')
+            .delete()
+            .eq('id', contactId)
 
-    try {
-      const { error } = await supabase
-        .from('whatsapp_contactos')
-        .delete()
-        .eq('id', contactId)
-
-      if (error) throw error
-      await loadObraContacts()
-    } catch (err) {
-      console.error('Erro ao eliminar contacto:', err)
-    }
+          if (error) throw error
+          await loadObraContacts()
+        } catch (err) {
+          console.error('Erro ao eliminar contacto:', err)
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      }
+    })
+    return
   }
 
   // Testar conexão Twilio
@@ -425,7 +437,7 @@ export default function ChatObras() {
 
       if (response.ok) {
         setConfigError('')
-        alert('Conexão bem sucedida!')
+        toast.success('Sucesso', 'Conexão bem sucedida!')
       } else {
         const data = await response.json()
         throw new Error(data.message || 'Credenciais inválidas')
@@ -645,9 +657,9 @@ export default function ChatObras() {
       if (!whatsappConnected) {
         // Silently save locally
       } else if (obraContacts.length === 0) {
-        alert('Adiciona um contacto WhatsApp para esta obra primeiro')
+        toast.warning('Aviso', 'Adiciona um contacto WhatsApp para esta obra primeiro')
       } else {
-        alert('Erro ao enviar mensagem: ' + err.message)
+        toast.error('Erro', 'Erro ao enviar mensagem: ' + err.message)
       }
     } finally {
       setSending(false)
@@ -2030,6 +2042,16 @@ function SuggestionSection({ title, icon, color, items, tipo, renderItem, onAcce
           })}
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type || 'danger'}
+        confirmText="Confirmar"
+      />
     </div>
   )
 }
