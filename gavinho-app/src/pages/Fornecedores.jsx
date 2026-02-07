@@ -10,6 +10,9 @@ import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../components/ui/Toast'
 import { ConfirmModal } from '../components/ui/ConfirmModal'
 import GarvisPanel from '../components/GarvisPanel'
+import { useGarvisAlerts } from '../hooks/useGarvisAlerts'
+import { useDealRooms } from '../hooks/useDealRooms'
+import { useGarvisKPIs } from '../hooks/useGarvisKPIs'
 import {
   Plus, Search, Edit2, Trash2, Phone, Mail, Globe, MapPin,
   Star, Building2, User, X, Loader2, Upload, Download,
@@ -26,46 +29,6 @@ const STATUS_FORNECEDOR = {
   bloqueado: { label: 'Bloqueado', color: '#dc2626', bg: '#fee2e2' }
 }
 
-// Mock data for G.A.R.V.I.S. features (will be replaced with real data)
-const MOCK_ALERTAS = [
-  {
-    id: '1',
-    tipo: 'orcamento',
-    prioridade: 'critico',
-    titulo: 'Orçamento acima do mercado',
-    mensagem: 'Africa Stone cotou Lioz a €272/m² — 18% acima da média (€230/m²). Pode haver margem para negociar.',
-    acao_label: 'Analisar orçamento',
-    tempo: 'Agora'
-  },
-  {
-    id: '2',
-    tipo: 'compliance',
-    prioridade: 'importante',
-    titulo: 'Certificação ISO a expirar',
-    mensagem: 'Certificado ISO 9001 da Cantarias do Alentejo expira em 22 dias.',
-    acao_label: 'Ver fornecedor',
-    tempo: '2h'
-  }
-]
-
-const MOCK_DEAL_ROOMS = [
-  {
-    id: '1',
-    titulo: 'Caixilharia Casa Myriad',
-    codigo: 'GA00489',
-    detalhe: 'Decisão até 15/02',
-    badge: '3 orçamentos',
-    badgeColor: 'olive'
-  },
-  {
-    id: '2',
-    titulo: 'Cantaria Moradia Sintra',
-    codigo: 'GA00478',
-    detalhe: '2 convidados',
-    badge: 'A aguardar',
-    badgeColor: 'warning'
-  }
-]
 
 export default function Fornecedores() {
   const { profile } = useAuth()
@@ -73,6 +36,11 @@ export default function Fornecedores() {
   const navigate = useNavigate()
   const fileInputRef = useRef(null)
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null })
+
+  // G.A.R.V.I.S. real data hooks
+  const { alertas, topAlert, criticalCount, unreadCount } = useGarvisAlerts()
+  const { activeDealRooms } = useDealRooms()
+  const { kpis: garvisKPIs } = useGarvisKPIs()
 
   const [fornecedores, setFornecedores] = useState([])
   const [loading, setLoading] = useState(true)
@@ -228,13 +196,13 @@ export default function Fornecedores() {
   const especialidadesUnicas = [...new Set(fornecedores.map(f => f.especialidade).filter(Boolean))]
   const fornecedoresAtivos = fornecedores.filter(f => f.status === 'ativo' || f.status === 'preferencial').length
 
-  // Mock KPI data (will be real queries later)
+  // Real KPI data from hooks
   const kpis = {
-    total: fornecedores.length,
-    volumeYTD: '€0',
-    dealRooms: MOCK_DEAL_ROOMS.length,
-    orcamentos: 0,
-    alertas: MOCK_ALERTAS.filter(a => a.prioridade === 'critico').length
+    total: garvisKPIs.totalFornecedores || fornecedores.length,
+    volumeYTD: garvisKPIs.volumeYTDFormatted || '€0',
+    dealRooms: garvisKPIs.dealRoomsAtivos || activeDealRooms.length,
+    orcamentos: garvisKPIs.orcamentosPendentes || 0,
+    alertas: garvisKPIs.alertasCriticos || criticalCount
   }
 
   if (loading && fornecedores.length === 0) {
@@ -249,41 +217,48 @@ export default function Fornecedores() {
     <div className="fade-in" style={{ display: 'flex', height: 'calc(100vh - 60px)', overflow: 'hidden' }}>
       {/* Main Content */}
       <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-        {/* Alert Banner */}
-        {!dismissedAlert && MOCK_ALERTAS.length > 0 && (
+        {/* Alert Banner - Real data from GARVIS */}
+        {!dismissedAlert && topAlert && (
           <div style={{
-            background: 'linear-gradient(90deg, #FEF3C7 0%, #FDE68A 100%)',
+            background: topAlert.prioridade === 'critico'
+              ? 'linear-gradient(90deg, #FEE2E2 0%, #FECACA 100%)'
+              : 'linear-gradient(90deg, #FEF3C7 0%, #FDE68A 100%)',
             padding: '12px 24px',
             display: 'flex',
             alignItems: 'center',
             gap: '12px',
-            borderBottom: '1px solid #F59E0B'
+            borderBottom: topAlert.prioridade === 'critico' ? '1px solid #dc2626' : '1px solid #F59E0B'
           }}>
-            <AlertTriangle size={18} style={{ color: '#92400E', flexShrink: 0 }} />
+            <AlertTriangle size={18} style={{ color: topAlert.prioridade === 'critico' ? '#991b1b' : '#92400E', flexShrink: 0 }} />
             <div style={{ flex: 1 }}>
-              <span style={{ fontWeight: 600, color: '#92400E', fontSize: '13px' }}>
-                Orçamento com desvio crítico detectado
+              <span style={{ fontWeight: 600, color: topAlert.prioridade === 'critico' ? '#991b1b' : '#92400E', fontSize: '13px' }}>
+                {topAlert.titulo}
               </span>
-              <span style={{ color: '#78350F', fontSize: '13px', marginLeft: '8px' }}>
-                Africa Stone para GA00489 — 23% acima do preço de referência (€8.450 extra)
+              <span style={{ color: topAlert.prioridade === 'critico' ? '#7f1d1d' : '#78350F', fontSize: '13px', marginLeft: '8px' }}>
+                {topAlert.mensagem}
               </span>
             </div>
-            <button style={{
-              padding: '6px 14px',
-              background: '#92400E',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '12px',
-              fontWeight: 600
-            }}>
-              Analisar Agora
-            </button>
+            {topAlert.acao_label && (
+              <button
+                onClick={() => topAlert.acao_sugerida && navigate(topAlert.acao_sugerida)}
+                style={{
+                  padding: '6px 14px',
+                  background: topAlert.prioridade === 'critico' ? '#991b1b' : '#92400E',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: 600
+                }}
+              >
+                {topAlert.acao_label}
+              </button>
+            )}
             <button style={{
               padding: '6px 14px',
               background: 'rgba(146, 64, 14, 0.1)',
-              color: '#92400E',
+              color: topAlert.prioridade === 'critico' ? '#991b1b' : '#92400E',
               border: '1px solid rgba(146, 64, 14, 0.2)',
               borderRadius: '6px',
               cursor: 'pointer',
@@ -312,7 +287,7 @@ export default function Fornecedores() {
                 Fornecedores
               </h1>
               <p style={{ fontSize: '13px', color: 'var(--brown-light)', margin: '4px 0 0' }}>
-                {fornecedores.length} fornecedores · {MOCK_DEAL_ROOMS.length} deal rooms ativos · {kpis.orcamentos} orçamentos pendentes
+                {fornecedores.length} fornecedores · {kpis.dealRooms} deal rooms ativos · {kpis.orcamentos} orçamentos pendentes
               </p>
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
@@ -357,177 +332,11 @@ export default function Fornecedores() {
           </div>
 
           {/* G.A.R.V.I.S. Recommendation Card */}
-          <div style={{
-            background: 'var(--white)',
-            borderRadius: '16px',
-            border: '1px solid var(--stone)',
-            padding: '24px',
-            marginBottom: '24px',
-            position: 'relative'
-          }}>
-            {/* Badge */}
-            <div style={{
-              position: 'absolute',
-              top: '-8px',
-              right: '20px',
-              background: 'var(--accent-olive)',
-              color: 'white',
-              borderRadius: '12px',
-              width: '24px',
-              height: '24px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '11px',
-              fontWeight: 700
-            }}>
-              1
-            </div>
-
-            {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-              <div style={{
-                width: '32px', height: '32px',
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, var(--blush) 0%, var(--blush-dark) 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '12px',
-                fontWeight: 700,
-                color: 'var(--brown-dark)'
-              }}>
-                G
-              </div>
-              <span style={{
-                fontFamily: "'Cormorant Garamond', Georgia, serif",
-                fontSize: '16px',
-                fontWeight: 600,
-                color: 'var(--brown)'
-              }}>
-                Recomendação G.A.R.V.I.S.
-              </span>
-              <div style={{ marginLeft: 'auto' }}>
-                <span style={{
-                  fontSize: '12px',
-                  padding: '4px 12px',
-                  background: 'var(--cream)',
-                  borderRadius: '8px',
-                  color: 'var(--brown-light)',
-                  fontWeight: 500
-                }}>
-                  Para: Casa Myriad — Caixilharia
-                </span>
-              </div>
-            </div>
-
-            <p style={{ fontSize: '13px', color: 'var(--brown-light)', margin: '0 0 16px', lineHeight: 1.5 }}>
-              Baseado no perfil do projeto (ultra-luxo contemporâneo) e histórico de colaborações, recomendo:
-            </p>
-
-            {/* Supplier Match Card */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '16px',
-              padding: '16px',
-              background: 'var(--cream)',
-              borderRadius: '12px',
-              marginBottom: '12px'
-            }}>
-              <div style={{
-                width: '48px', height: '48px',
-                borderRadius: '12px',
-                background: 'var(--brown-dark)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'var(--accent-olive)',
-                fontWeight: 700,
-                fontSize: '14px',
-                flexShrink: 0
-              }}>
-                20
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{
-                  fontFamily: "'Cormorant Garamond', Georgia, serif",
-                  fontSize: '18px',
-                  fontWeight: 700,
-                  color: 'var(--brown)'
-                }}>
-                  20MILÍMETROS
-                </div>
-                <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>
-                  Caixilharia Minimalista · Rating 4.8 · 3 projetos anteriores
-                </div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{
-                  fontFamily: "'Cormorant Garamond', Georgia, serif",
-                  fontSize: '32px',
-                  fontWeight: 700,
-                  color: 'var(--accent-olive)',
-                  lineHeight: 1
-                }}>
-                  95%
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>match</div>
-              </div>
-            </div>
-
-            {/* Match tags */}
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '16px' }}>
-              {[
-                { text: 'Especialista em minimalista', type: 'success' },
-                { text: 'Trabalhou no projeto anterior', type: 'success' },
-                { text: 'Melhor rating em qualidade', type: 'success' },
-                { text: 'Preço 8% acima da média', type: 'warning' }
-              ].map((tag, i) => (
-                <span key={i} style={{
-                  fontSize: '11px',
-                  padding: '4px 10px',
-                  borderRadius: '6px',
-                  border: `1px solid ${tag.type === 'success' ? 'rgba(122, 139, 110, 0.3)' : 'rgba(201, 168, 108, 0.4)'}`,
-                  color: tag.type === 'success' ? 'var(--accent-olive)' : 'var(--warning)',
-                  background: tag.type === 'success' ? 'rgba(122, 139, 110, 0.06)' : 'rgba(201, 168, 108, 0.06)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}>
-                  {tag.type === 'success' ? '✓' : '⚠'} {tag.text}
-                </span>
-              ))}
-            </div>
-
-            {/* Action buttons */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <button style={{
-                padding: '12px',
-                background: 'var(--blush)',
-                color: 'var(--white)',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontSize: '13px',
-                fontWeight: 600
-              }}>
-                Criar Deal Room com 20Milímetros
-              </button>
-              <button style={{
-                padding: '12px',
-                background: 'transparent',
-                color: 'var(--brown)',
-                border: '1px solid var(--stone)',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontSize: '13px',
-                fontWeight: 500
-              }}>
-                Ver 4 alternativas
-              </button>
-            </div>
-          </div>
+          <GarvisRecommendation
+            fornecedores={fornecedores}
+            activeDealRooms={activeDealRooms}
+            toast={toast}
+          />
 
           {/* KPI Cards */}
           <div style={{
@@ -739,9 +548,9 @@ export default function Fornecedores() {
       {/* G.A.R.V.I.S. Side Panel */}
       {showGarvis && (
         <GarvisPanel
-          alertas={MOCK_ALERTAS}
-          dealRooms={MOCK_DEAL_ROOMS}
           onClose={() => setShowGarvis(false)}
+          fornecedores={fornecedores}
+          kpis={kpis}
         />
       )}
 
@@ -846,6 +655,167 @@ export default function Fornecedores() {
         type={confirmModal.type || 'danger'}
         confirmText="Confirmar"
       />
+    </div>
+  )
+}
+
+// G.A.R.V.I.S. Recommendation Component - Dynamic from real data
+function GarvisRecommendation({ fornecedores, activeDealRooms, toast }) {
+  // Find best supplier: highest rated with a specialty
+  const topSupplier = fornecedores
+    .filter(f => f.rating && f.rating >= 4 && f.especialidade && (f.status === 'ativo' || f.status === 'preferencial'))
+    .sort((a, b) => (b.rating || 0) - (a.rating || 0))[0]
+
+  if (!topSupplier && fornecedores.length < 3) {
+    return (
+      <div style={{
+        background: 'var(--white)',
+        borderRadius: '16px',
+        border: '1px solid var(--stone)',
+        padding: '24px',
+        marginBottom: '24px',
+        textAlign: 'center'
+      }}>
+        <div style={{
+          width: '48px', height: '48px', borderRadius: '50%', margin: '0 auto 12px',
+          background: 'linear-gradient(135deg, var(--blush) 0%, var(--blush-dark) 100%)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: '18px', fontWeight: 700, color: 'var(--brown-dark)'
+        }}>G</div>
+        <div style={{
+          fontFamily: "'Cormorant Garamond', Georgia, serif",
+          fontSize: '16px', fontWeight: 600, color: 'var(--brown)', marginBottom: '8px'
+        }}>
+          G.A.R.V.I.S. a analisar...
+        </div>
+        <p style={{ fontSize: '13px', color: 'var(--brown-light)', margin: 0, lineHeight: 1.5 }}>
+          Adicione mais fornecedores com ratings e especialidades para ativar as recomendações inteligentes.
+        </p>
+      </div>
+    )
+  }
+
+  if (!topSupplier) return null
+
+  const matchScore = Math.min(70 + (topSupplier.rating || 0) * 5 + (topSupplier.is_preferencial ? 5 : 0), 99)
+  const initials = topSupplier.nome?.substring(0, 2).toUpperCase() || '??'
+
+  const tags = []
+  if (topSupplier.especialidade) tags.push({ text: `Especialista em ${topSupplier.especialidade}`, type: 'success' })
+  if (topSupplier.rating >= 4) tags.push({ text: `Rating ${topSupplier.rating}/5`, type: 'success' })
+  if (topSupplier.is_preferencial) tags.push({ text: 'Fornecedor preferencial', type: 'success' })
+  if (topSupplier.prazo_pagamento && topSupplier.prazo_pagamento > 30) tags.push({ text: `Prazo ${topSupplier.prazo_pagamento} dias`, type: 'warning' })
+
+  return (
+    <div style={{
+      background: 'var(--white)',
+      borderRadius: '16px',
+      border: '1px solid var(--stone)',
+      padding: '24px',
+      marginBottom: '24px',
+      position: 'relative'
+    }}>
+      <div style={{
+        position: 'absolute', top: '-8px', right: '20px',
+        background: 'var(--accent-olive)', color: 'white', borderRadius: '12px',
+        width: '24px', height: '24px', display: 'flex', alignItems: 'center',
+        justifyContent: 'center', fontSize: '11px', fontWeight: 700
+      }}>1</div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+        <div style={{
+          width: '32px', height: '32px', borderRadius: '50%',
+          background: 'linear-gradient(135deg, var(--blush) 0%, var(--blush-dark) 100%)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: '12px', fontWeight: 700, color: 'var(--brown-dark)'
+        }}>G</div>
+        <span style={{
+          fontFamily: "'Cormorant Garamond', Georgia, serif",
+          fontSize: '16px', fontWeight: 600, color: 'var(--brown)'
+        }}>
+          Recomendação G.A.R.V.I.S.
+        </span>
+        {topSupplier.especialidade && (
+          <div style={{ marginLeft: 'auto' }}>
+            <span style={{
+              fontSize: '12px', padding: '4px 12px', background: 'var(--cream)',
+              borderRadius: '8px', color: 'var(--brown-light)', fontWeight: 500
+            }}>
+              Especialidade: {topSupplier.especialidade}
+            </span>
+          </div>
+        )}
+      </div>
+
+      <p style={{ fontSize: '13px', color: 'var(--brown-light)', margin: '0 0 16px', lineHeight: 1.5 }}>
+        Baseado nos ratings, especialidades e histórico de colaborações dos seus fornecedores:
+      </p>
+
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '16px', padding: '16px',
+        background: 'var(--cream)', borderRadius: '12px', marginBottom: '12px'
+      }}>
+        <div style={{
+          width: '48px', height: '48px', borderRadius: '12px', background: 'var(--brown-dark)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: 'var(--accent-olive)', fontWeight: 700, fontSize: '14px', flexShrink: 0
+        }}>{initials}</div>
+        <div style={{ flex: 1 }}>
+          <div style={{
+            fontFamily: "'Cormorant Garamond', Georgia, serif",
+            fontSize: '18px', fontWeight: 700, color: 'var(--brown)'
+          }}>{topSupplier.nome}</div>
+          <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>
+            {topSupplier.especialidade || 'Geral'} · Rating {topSupplier.rating}/5
+            {topSupplier.responsavel ? ` · ${topSupplier.responsavel}` : ''}
+          </div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div style={{
+            fontFamily: "'Cormorant Garamond', Georgia, serif",
+            fontSize: '32px', fontWeight: 700, color: 'var(--accent-olive)', lineHeight: 1
+          }}>{matchScore}%</div>
+          <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>match</div>
+        </div>
+      </div>
+
+      {tags.length > 0 && (
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '16px' }}>
+          {tags.map((tag, i) => (
+            <span key={i} style={{
+              fontSize: '11px', padding: '4px 10px', borderRadius: '6px',
+              border: `1px solid ${tag.type === 'success' ? 'rgba(122, 139, 110, 0.3)' : 'rgba(201, 168, 108, 0.4)'}`,
+              color: tag.type === 'success' ? 'var(--accent-olive)' : 'var(--warning)',
+              background: tag.type === 'success' ? 'rgba(122, 139, 110, 0.06)' : 'rgba(201, 168, 108, 0.06)',
+              display: 'flex', alignItems: 'center', gap: '4px'
+            }}>
+              {tag.type === 'success' ? '✓' : '⚠'} {tag.text}
+            </span>
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+        <button
+          onClick={() => toast.info('Deal Rooms', 'Aplique a migration SQL no Supabase para ativar Deal Rooms')}
+          style={{
+            padding: '12px', background: 'var(--blush)', color: 'var(--white)',
+            border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600
+          }}
+        >
+          Criar Deal Room
+        </button>
+        <button
+          onClick={() => toast.info('Alternativas', `Existem ${fornecedores.filter(f => f.rating >= 3 && f.id !== topSupplier.id).length} fornecedores alternativos`)}
+          style={{
+            padding: '12px', background: 'transparent', color: 'var(--brown)',
+            border: '1px solid var(--stone)', borderRadius: '8px', cursor: 'pointer',
+            fontSize: '13px', fontWeight: 500
+          }}
+        >
+          Ver alternativas
+        </button>
+      </div>
     </div>
   )
 }
