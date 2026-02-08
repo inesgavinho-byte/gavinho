@@ -281,7 +281,22 @@ async function handleStatus(args, context) {
  * Send message to Claude AI (non-command)
  */
 async function sendAIMessage(message, context = {}) {
-  const apiKey = localStorage.getItem('claude_api_key')
+  let apiKey = localStorage.getItem('claude_api_key')
+
+  // Fallback: try to load from garvis_configuracao table
+  if (!apiKey) {
+    try {
+      const { data } = await supabase
+        .from('garvis_configuracao')
+        .select('valor')
+        .eq('chave', 'claude_api_key')
+        .single()
+      if (data?.valor) {
+        apiKey = data.valor
+        localStorage.setItem('claude_api_key', apiKey)
+      }
+    } catch { /* table may not exist */ }
+  }
 
   if (!apiKey) {
     return {

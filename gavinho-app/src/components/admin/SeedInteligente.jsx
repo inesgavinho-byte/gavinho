@@ -276,11 +276,16 @@ export function SeedInteligente({ onSuccess, linkedProjectId }) {
     setLogs(prev => [...prev, { message, type, timestamp }])
   }, [])
 
-  // Guardar API key
+  // Guardar API key (localStorage + Supabase para persistência)
   const saveApiKey = useCallback((key) => {
     setApiKey(key)
     if (key) {
       localStorage.setItem('claude_api_key', key)
+      // Also persist to Supabase for cross-session persistence
+      supabase.from('garvis_configuracao')
+        .upsert({ chave: 'claude_api_key', valor: key }, { onConflict: 'chave' })
+        .then(() => {})
+        .catch(() => {})
     }
   }, [])
 

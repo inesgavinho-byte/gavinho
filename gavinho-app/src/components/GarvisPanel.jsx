@@ -116,15 +116,31 @@ export default function GarvisPanel({ onClose, fornecedores = [], kpis = null, o
   }
 
   return (
-    <div style={{
-      width: '400px',
-      background: 'var(--cream)',
-      borderLeft: '1px solid var(--stone)',
-      display: 'flex',
-      flexDirection: 'column',
-      height: '100%',
-      flexShrink: 0
-    }}>
+    <>
+      {/* Backdrop overlay */}
+      <div
+        onClick={onClose}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.15)',
+          zIndex: 90
+        }}
+      />
+      <div style={{
+        position: 'fixed',
+        right: 0,
+        top: 0,
+        bottom: 0,
+        width: '400px',
+        maxWidth: '90vw',
+        background: 'var(--cream)',
+        borderLeft: '1px solid var(--stone)',
+        display: 'flex',
+        flexDirection: 'column',
+        zIndex: 91,
+        boxShadow: '-4px 0 24px rgba(0,0,0,0.08)'
+      }}>
       {/* Header */}
       <div style={{
         padding: '16px 20px',
@@ -491,6 +507,7 @@ export default function GarvisPanel({ onClose, fornecedores = [], kpis = null, o
         )}
       </div>
     </div>
+    </>
   )
 }
 
