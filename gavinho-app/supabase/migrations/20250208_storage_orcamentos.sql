@@ -1,0 +1,23 @@
+-- =====================================================
+-- Storage bucket for deal room quote files (PDF, docs)
+-- =====================================================
+
+-- Create the 'orcamentos' bucket (public for download links)
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('orcamentos', 'orcamentos', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Allow authenticated users to upload files
+CREATE POLICY "orcamentos_upload"
+  ON storage.objects FOR INSERT
+  WITH CHECK (bucket_id = 'orcamentos');
+
+-- Allow public read access (download links)
+CREATE POLICY "orcamentos_read"
+  ON storage.objects FOR SELECT
+  USING (bucket_id = 'orcamentos');
+
+-- Allow delete by authenticated users
+CREATE POLICY "orcamentos_delete"
+  ON storage.objects FOR DELETE
+  USING (bucket_id = 'orcamentos');

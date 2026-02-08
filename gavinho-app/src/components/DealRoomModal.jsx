@@ -9,7 +9,7 @@ import { useAuth } from '../contexts/AuthContext'
 import {
   X, Plus, Search, Users, FileText, CheckCircle, Loader2,
   Calendar, DollarSign, Tag, Building2, Star, Upload,
-  ChevronRight, Award, AlertCircle
+  ChevronRight, Award, AlertCircle, Download, Paperclip
 } from 'lucide-react'
 
 const STATUS_LABELS = {
@@ -36,7 +36,7 @@ export default function DealRoomModal({
   const [saving, setSaving] = useState(false)
   const [searchForn, setSearchForn] = useState('')
   const [showQuoteForm, setShowQuoteForm] = useState(null)
-  const [quoteForm, setQuoteForm] = useState({ valor_total: '', referencia_fornecedor: '', notas: '' })
+  const [quoteForm, setQuoteForm] = useState({ valor_total: '', referencia_fornecedor: '', notas: '', file: null })
   const [justificacao, setJustificacao] = useState('')
 
   const [form, setForm] = useState({
@@ -106,8 +106,30 @@ export default function DealRoomModal({
     if (!dealRoom?.id || !quoteForm.valor_total) return
     setSaving(true)
     try {
+      let ficheiroUrl = null
+
+      // Upload file to Supabase Storage if provided
+      if (quoteForm.file) {
+        const file = quoteForm.file
+        const ext = file.name.split('.').pop()
+        const filePath = `${dealRoom.id}/${fornecedorId}_${Date.now()}.${ext}`
+
+        const { error: uploadErr } = await supabase.storage
+          .from('orcamentos')
+          .upload(filePath, file)
+
+        if (uploadErr) {
+          console.error('Upload error:', uploadErr)
+        } else {
+          const { data: urlData } = supabase.storage
+            .from('orcamentos')
+            .getPublicUrl(filePath)
+          ficheiroUrl = urlData?.publicUrl || null
+        }
+      }
+
       // Create quote record
-      const { error } = await supabase.from('orcamentos_recebidos').insert({
+      const insertData = {
         fornecedor_id: fornecedorId,
         deal_room_id: dealRoom.id,
         projeto_id: dealRoom.projeto_id,
@@ -115,13 +137,16 @@ export default function DealRoomModal({
         referencia_fornecedor: quoteForm.referencia_fornecedor,
         notas: quoteForm.notas,
         status: 'pendente'
-      })
+      }
+      if (ficheiroUrl) insertData.ficheiro_url = ficheiroUrl
+
+      const { error } = await supabase.from('orcamentos_recebidos').insert(insertData)
       if (error) throw error
 
       // Update supplier status to orcamento_recebido
       await handleStatusChange(fornecedorId, 'orcamento_recebido')
       setShowQuoteForm(null)
-      setQuoteForm({ valor_total: '', referencia_fornecedor: '', notas: '' })
+      setQuoteForm({ valor_total: '', referencia_fornecedor: '', notas: '', file: null })
     } catch (err) {
       console.error('Quote error:', err)
     } finally {
@@ -288,6 +313,25 @@ export default function DealRoomModal({
                   <div style={{ marginBottom: '12px' }}>
                     <label style={labelStyle}>Notas</label>
                     <textarea value={quoteForm.notas} onChange={e => setQuoteForm({ ...quoteForm, notas: e.target.value })} rows={2} style={{ ...inputStyle, resize: 'vertical' }} />
+                  </div>
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={labelStyle}>Ficheiro (PDF / Proposta)</label>
+                    <label style={fileInputLabelStyle}>
+                      <Paperclip size={14} />
+                      {quoteForm.file ? quoteForm.file.name : 'Selecionar ficheiro...'}
+                      <input
+                        type="file"
+                        accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.png"
+                        onChange={e => setQuoteForm({ ...quoteForm, file: e.target.files[0] || null })}
+                        style={{ display: 'none' }}
+                      />
+                    </label>
+                    {quoteForm.file && (
+                      <div style={{ fontSize: '11px', color: 'var(--brown-light)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        {(quoteForm.file.size / 1024).toFixed(0)} KB
+                        <button onClick={() => setQuoteForm({ ...quoteForm, file: null })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--error)', fontSize: '11px', padding: '0 4px' }}>✕</button>
+                      </div>
+                    )}
                   </div>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button onClick={() => handleRegisterQuote(showQuoteForm)} disabled={saving || !quoteForm.valor_total} style={{ ...btnPrimary, opacity: saving || !quoteForm.valor_total ? 0.5 : 1 }}>
@@ -464,6 +508,12 @@ function QuoteComparison({ dealRoom, invited, fornecedores }) {
               {q.referencia_fornecedor && (
                 <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>Ref: {q.referencia_fornecedor}</div>
               )}
+              {q.ficheiro_url && (
+                <a href={q.ficheiro_url} target="_blank" rel="noopener noreferrer"
+                  style={{ fontSize: '11px', color: 'var(--accent-olive)', display: 'inline-flex', alignItems: 'center', gap: '3px', marginTop: '2px', textDecoration: 'none' }}>
+                  <Download size={10} /> Ver ficheiro
+                </a>
+              )}
             </div>
             <div style={{ textAlign: 'right' }}>
               <div style={{
@@ -517,3 +567,4 @@ const avatarStyle = { width: '32px', height: '32px', borderRadius: '8px', backgr
 const btnPrimary = { padding: '8px 20px', background: 'var(--brown)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }
 const btnSecondary = { padding: '8px 16px', background: 'transparent', border: '1px solid var(--stone)', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', color: 'var(--brown)' }
 const smallBtnStyle = { padding: '4px 10px', background: 'rgba(122, 139, 110, 0.08)', border: '1px solid rgba(122, 139, 110, 0.2)', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', color: 'var(--accent-olive)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }
+const fileInputLabelStyle = { display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 12px', border: '1px dashed var(--stone)', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: 'var(--brown-light)', background: 'var(--white)', transition: 'border-color 0.2s' }
