@@ -29,7 +29,7 @@ INSERT INTO utilizadores (
   ativo
 )
 VALUES (
-  'garvis-bot-001'::UUID,
+  '00000000-0000-0000-0000-000000000001'::UUID,
   'G.A.R.V.I.S.',
   'garvis@gavinho.internal',
   'Assistente IA',
@@ -49,12 +49,12 @@ CREATE TABLE IF NOT EXISTS garvis_chat_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
   -- Contexto
-  projeto_id UUID REFERENCES projetos(id) ON DELETE SET NULL,
-  topico_id UUID REFERENCES chat_topicos(id) ON DELETE SET NULL,
+  projeto_id UUID,
+  topico_id UUID,
 
   -- Mensagens
-  mensagem_utilizador_id UUID REFERENCES chat_mensagens(id) ON DELETE SET NULL,
-  mensagem_resposta_id UUID REFERENCES chat_mensagens(id) ON DELETE SET NULL,
+  mensagem_utilizador_id UUID,
+  mensagem_resposta_id UUID,
 
   -- Conteúdo original
   prompt_usuario TEXT NOT NULL,
@@ -117,12 +117,17 @@ ALTER TABLE garvis_config_projeto ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "garvis_config_all" ON garvis_config_projeto;
 CREATE POLICY "garvis_config_all" ON garvis_config_projeto FOR ALL USING (true);
 
--- Trigger for updated_at
-DROP TRIGGER IF EXISTS trigger_garvis_config_updated ON garvis_config_projeto;
-CREATE TRIGGER trigger_garvis_config_updated
-  BEFORE UPDATE ON garvis_config_projeto
-  FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at();
+-- Trigger for updated_at (only if function exists)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'update_updated_at') THEN
+    DROP TRIGGER IF EXISTS trigger_garvis_config_updated ON garvis_config_projeto;
+    CREATE TRIGGER trigger_garvis_config_updated
+      BEFORE UPDATE ON garvis_config_projeto
+      FOR EACH ROW
+      EXECUTE FUNCTION update_updated_at();
+  END IF;
+END $$;
 
 -- =====================================================
 -- Comments for documentation
