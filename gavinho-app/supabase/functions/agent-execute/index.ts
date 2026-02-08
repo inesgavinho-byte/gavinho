@@ -238,6 +238,279 @@ const updateSupplierRecord: ActionExecutor = async (supabase, action, _email) =>
   return { success: true, result: { updated: true } }
 }
 
+// --- PROCUREMENT AGENT ---
+
+const registarCotacaoProcurement: ActionExecutor = async (supabase, action, email) => {
+  const entities = action.action_payload?.entities || {}
+  const values = entities.monetary_values || []
+  const projectId = action.project_id
+  const obraId = action.obra_id
+  const supplierId = action.action_payload?.entities?.supplier_id || null
+
+  // Find matching requisição (open and for same project)
+  let requisicaoId: string | null = null
+  if (projectId || obraId) {
+    const { data: req } = await supabase
+      .from('requisicoes')
+      .select('id')
+      .or(`projeto_id.eq.${projectId || '00000000-0000-0000-0000-000000000000'},obra_id.eq.${obraId || '00000000-0000-0000-0000-000000000000'}`)
+      .in('estado', ['aberta', 'em_cotacao'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+    if (req) requisicaoId = req.id
+  }
+
+  // Generate cotação code
+  const year = new Date().getFullYear()
+  const { data: seqData } = await supabase.rpc('nextval', { seq_name: 'cot_seq' }).single()
+  const seqNum = seqData || Date.now() % 10000
+  const codigo = `COT-${year}-${String(seqNum).padStart(4, '0')}`
+
+  const { data, error } = await supabase
+    .from('cotacoes')
+    .insert({
+      codigo,
+      requisicao_id: requisicaoId,
+      fornecedor_id: supplierId,
+      email_queue_id: action.email_id,
+      projeto_id: projectId,
+      obra_id: obraId,
+      estado: 'recebida',
+      valor_total: values[0] || null,
+      moeda: 'EUR',
+      validade_dias: 30,
+      prazo_entrega_dias: entities.delivery_days || null,
+      condicoes_pagamento: entities.payment_terms || null,
+      notas: action.action_payload?.summary || email?.subject || '',
+      metadata: {
+        action_id: action.id,
+        email_id: email?.id,
+        auto_extracted: true,
+        materials: entities.materials || [],
+      }
+    })
+    .select('id')
+    .single()
+
+  if (error) {
+    // If table doesn't exist, fall back to notify
+    if (error.code === '42P01') return { success: true, result: { message: 'Procurement tables not yet created, notification sent' } }
+    return { success: false, result: { error: error.message } }
+  }
+
+  // Update requisição state if linked
+  if (requisicaoId) {
+    await supabase
+      .from('requisicoes')
+      .update({ estado: 'em_cotacao' })
+      .eq('id', requisicaoId)
+      .eq('estado', 'aberta')
+  }
+
+  return {
+    success: true,
+    result: { cotacao_id: data.id, codigo },
+    rollback_payload: { table: 'cotacoes', id: data.id }
+  }
+}
+
+const actualizarPoEstado: ActionExecutor = async (supabase, action, email) => {
+  const entities = action.action_payload?.entities || {}
+  const projectId = action.project_id
+  const obraId = action.obra_id
+
+  // Find most recent PO for this project/supplier
+  let query = supabase
+    .from('purchase_orders')
+    .select('id, codigo, estado')
+    .not('estado', 'in', '("cancelada","concluida")')
+    .order('created_at', { ascending: false })
+    .limit(1)
+
+  if (projectId) query = query.eq('projeto_id', projectId)
+  else if (obraId) query = query.eq('obra_id', obraId)
+
+  const { data: po, error: poError } = await query.single()
+
+  if (poError) {
+    if (poError.code === '42P01') return { success: true, result: { message: 'Procurement tables not yet created' } }
+    return { success: true, result: { message: 'No matching PO found' } }
+  }
+
+  // Determine new state based on email category
+  const subcategory = email?.subcategory || action.action_payload?.subcategory || ''
+  let newState = po.estado
+  if (subcategory === 'confirmacao') newState = 'confirmada'
+  else if (subcategory === 'modificacao') newState = 'em_revisao'
+
+  const { error } = await supabase
+    .from('purchase_orders')
+    .update({
+      estado: newState,
+      notas_internas: `Atualizado automaticamente a partir do email: ${email?.subject || ''}`,
+    })
+    .eq('id', po.id)
+
+  if (error) return { success: false, result: { error: error.message } }
+  return { success: true, result: { po_id: po.id, codigo: po.codigo, new_state: newState } }
+}
+
+const actualizarEntregaPo: ActionExecutor = async (supabase, action, email) => {
+  const entities = action.action_payload?.entities || {}
+  const projectId = action.project_id
+  const obraId = action.obra_id
+
+  // Find PO with pending deliveries
+  let query = supabase
+    .from('purchase_orders')
+    .select('id, codigo')
+    .in('estado', ['confirmada', 'entrega_parcial'])
+    .order('created_at', { ascending: false })
+    .limit(1)
+
+  if (projectId) query = query.eq('projeto_id', projectId)
+  else if (obraId) query = query.eq('obra_id', obraId)
+
+  const { data: po, error: poError } = await query.single()
+
+  if (poError) {
+    if (poError.code === '42P01') return { success: true, result: { message: 'Procurement tables not yet created' } }
+    return { success: true, result: { message: 'No matching PO with pending delivery' } }
+  }
+
+  // Determine delivery state
+  const subcategory = email?.subcategory || ''
+  let newState = 'entrega_parcial'
+  if (subcategory === 'confirmacao') newState = 'entregue'
+
+  const { error } = await supabase
+    .from('purchase_orders')
+    .update({
+      estado: newState,
+      data_entrega_real: new Date().toISOString().split('T')[0],
+    })
+    .eq('id', po.id)
+
+  if (error) return { success: false, result: { error: error.message } }
+  return { success: true, result: { po_id: po.id, codigo: po.codigo, delivery_state: newState } }
+}
+
+const matchFaturaPo: ActionExecutor = async (supabase, action, email) => {
+  const entities = action.action_payload?.entities || {}
+  const values = entities.monetary_values || []
+  const projectId = action.project_id
+  const obraId = action.obra_id
+
+  // Find matching PO
+  let poQuery = supabase
+    .from('purchase_orders')
+    .select('id, codigo, valor_total')
+    .in('estado', ['confirmada', 'entregue', 'entrega_parcial'])
+    .order('created_at', { ascending: false })
+    .limit(1)
+
+  if (projectId) poQuery = poQuery.eq('projeto_id', projectId)
+  else if (obraId) poQuery = poQuery.eq('obra_id', obraId)
+
+  const { data: po } = await poQuery.single()
+
+  // Generate fatura code
+  const year = new Date().getFullYear()
+  const { data: seqData } = await supabase.rpc('nextval', { seq_name: 'fat_proc_seq' }).single()
+  const seqNum = seqData || Date.now() % 10000
+  const codigo = `PFAT-${year}-${String(seqNum).padStart(4, '0')}`
+
+  const invoiceValue = values[0] || 0
+
+  const { data, error } = await supabase
+    .from('procurement_facturas')
+    .insert({
+      codigo,
+      po_id: po?.id || null,
+      fornecedor_id: entities.supplier_id || null,
+      projeto_id: projectId,
+      obra_id: obraId,
+      numero_fatura_fornecedor: entities.invoice_number || `AUTO-${Date.now()}`,
+      data_fatura: new Date().toISOString().split('T')[0],
+      valor_sem_iva: invoiceValue,
+      taxa_iva: 23,
+      valor_com_iva: invoiceValue * 1.23,
+      estado: po ? 'pendente_validacao' : 'sem_po',
+      desvio_valor: po ? invoiceValue - (po.valor_total || 0) : null,
+      desvio_percentagem: po?.valor_total ? ((invoiceValue - po.valor_total) / po.valor_total * 100) : null,
+      notas: `Registada automaticamente a partir do email: ${email?.subject || ''}`,
+      metadata: { action_id: action.id, email_id: email?.id, auto_matched: !!po }
+    })
+    .select('id')
+    .single()
+
+  if (error) {
+    if (error.code === '42P01') return { success: true, result: { message: 'Procurement tables not yet created' } }
+    return { success: false, result: { error: error.message } }
+  }
+
+  return {
+    success: true,
+    result: { fatura_id: data.id, codigo, matched_po: po?.codigo || null },
+    rollback_payload: { table: 'procurement_facturas', id: data.id }
+  }
+}
+
+const alertarDesvioPrecoPo: ActionExecutor = async (supabase, action, email) => {
+  const entities = action.action_payload?.entities || {}
+  const values = entities.monetary_values || []
+  const invoiceValue = values[0] || 0
+  const projectId = action.project_id
+  const obraId = action.obra_id
+
+  // Find PO to compare
+  let poQuery = supabase
+    .from('purchase_orders')
+    .select('id, codigo, valor_total')
+    .order('created_at', { ascending: false })
+    .limit(1)
+
+  if (projectId) poQuery = poQuery.eq('projeto_id', projectId)
+  else if (obraId) poQuery = poQuery.eq('obra_id', obraId)
+
+  const { data: po } = await poQuery.single()
+
+  if (!po || !invoiceValue) {
+    return { success: true, result: { message: 'No PO or value to compare' } }
+  }
+
+  const desvio = ((invoiceValue - (po.valor_total || 0)) / (po.valor_total || 1)) * 100
+
+  // Only alert if deviation > 5%
+  if (Math.abs(desvio) <= 5) {
+    return { success: true, result: { message: 'Price deviation within tolerance (±5%)', desvio_pct: desvio.toFixed(2) } }
+  }
+
+  // Create notification for the user
+  const { data: notif, error } = await supabase
+    .from('agent_notifications')
+    .insert({
+      user_id: action.assigned_to || '00000000-0000-0000-0000-000000000000',
+      type: 'price_deviation',
+      title: `Desvio de preço: ${desvio > 0 ? '+' : ''}${desvio.toFixed(1)}%`,
+      body: `Fatura de €${invoiceValue.toLocaleString('pt-PT')} vs PO ${po.codigo} de €${(po.valor_total || 0).toLocaleString('pt-PT')}`,
+      priority: Math.abs(desvio) > 20 ? 'critical' : Math.abs(desvio) > 10 ? 'high' : 'normal',
+      metadata: { po_id: po.id, po_codigo: po.codigo, valor_fatura: invoiceValue, valor_po: po.valor_total, desvio_pct: desvio },
+      action_id: action.id,
+      email_queue_id: action.email_id,
+    })
+    .select('id')
+    .single()
+
+  if (error) return { success: false, result: { error: error.message } }
+  return {
+    success: true,
+    result: { notification_id: notif.id, desvio_pct: desvio.toFixed(2), po_codigo: po.codigo },
+    rollback_payload: { table: 'agent_notifications', id: notif.id }
+  }
+}
+
 // Notification-only actions (no database mutation)
 const notifyOnly: ActionExecutor = async (_supabase, action, _email) => {
   return { success: true, result: { message: `Notification sent: ${action.action_description}` } }
@@ -248,15 +521,23 @@ const notifyOnly: ActionExecutor = async (_supabase, action, _email) => {
 // ═══════════════════════════════════════
 
 const ACTION_EXECUTORS: Record<string, ActionExecutor> = {
+  // Construction Agent
   create_diary_entry: createDiaryEntry,
   create_follow_up_task: createFollowUpTask,
   create_rfi_task: createFollowUpTask,
   register_nc: registerNC,
+  create_calendar_event: createCalendarEvent,
+  create_meeting_minutes: createDiaryEntry,
+  // Financial Agent
   register_invoice: registerInvoice,
   register_decision: registerDecision,
-  create_calendar_event: createCalendarEvent,
   update_supplier_record: updateSupplierRecord,
-  create_meeting_minutes: createDiaryEntry,
+  // Procurement Agent
+  registar_cotacao_procurement: registarCotacaoProcurement,
+  actualizar_po_estado: actualizarPoEstado,
+  actualizar_entrega_po: actualizarEntregaPo,
+  match_fatura_po: matchFaturaPo,
+  alertar_desvio_preco: alertarDesvioPrecoPo,
   // Notification-only
   notify_procurement_team: notifyOnly,
   notify_site_manager: notifyOnly,

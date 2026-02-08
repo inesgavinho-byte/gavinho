@@ -66,6 +66,7 @@ const GestaoIntegrada = lazy(() => import('./pages/GestaoIntegrada'))
 const CustosFixos = lazy(() => import('./pages/CustosFixos'))
 const Faturacao = lazy(() => import('./pages/Faturacao'))
 const ComprasFinanceiro = lazy(() => import('./pages/ComprasFinanceiro'))
+const ProcurementDashboard = lazy(() => import('./pages/ProcurementDashboard'))
 
 // PWA App - separate chunk
 const ObraApp = lazy(() => import('./pages/ObraApp'))
@@ -254,6 +255,11 @@ function App() {
                   <Route path="gestao-projeto/integrada" element={
                     <Suspense fallback={<PageLoader />}>
                       <GestaoIntegrada />
+                    </Suspense>
+                  } />
+                  <Route path="gestao-projeto/procurement" element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ProcurementDashboard />
                     </Suspense>
                   } />
                   <Route path="gestao" element={

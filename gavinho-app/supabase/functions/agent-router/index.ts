@@ -138,20 +138,21 @@ function calculateApprovalTier(confidence: number, riskLevel: string): string {
 
 const CATEGORY_ACTIONS: Record<string, { action_type: string; description: string; risk: string }[]> = {
   pedido_cotacao: [
-    { action_type: 'create_procurement_entry', description: 'Registar pedido de cotação no procurement', risk: 'low' },
+    { action_type: 'registar_cotacao_procurement', description: 'Registar cotação no pipeline de procurement', risk: 'low' },
     { action_type: 'notify_procurement_team', description: 'Notificar equipa de procurement', risk: 'low' },
   ],
   encomenda: [
-    { action_type: 'create_purchase_order', description: 'Criar encomenda no sistema', risk: 'medium' },
+    { action_type: 'actualizar_po_estado', description: 'Atualizar estado da purchase order', risk: 'medium' },
     { action_type: 'update_supplier_status', description: 'Atualizar estado do fornecedor', risk: 'low' },
   ],
   aviso_entrega: [
+    { action_type: 'actualizar_entrega_po', description: 'Atualizar entrega na purchase order', risk: 'low' },
     { action_type: 'create_diary_entry', description: 'Registar entrega no diário de obra', risk: 'low' },
     { action_type: 'notify_site_manager', description: 'Notificar encarregado de obra', risk: 'low' },
   ],
   faturacao: [
-    { action_type: 'register_invoice', description: 'Registar fatura no sistema financeiro', risk: 'medium' },
-    { action_type: 'match_purchase_order', description: 'Associar fatura a encomenda', risk: 'medium' },
+    { action_type: 'match_fatura_po', description: 'Associar fatura à purchase order', risk: 'medium' },
+    { action_type: 'alertar_desvio_preco', description: 'Alertar desvio de preço vs PO', risk: 'medium' },
   ],
   proposta_financeira: [
     { action_type: 'register_proposal', description: 'Registar proposta financeira', risk: 'medium' },
@@ -347,7 +348,7 @@ Responde SEMPRE usando a ferramenta classify_email.`
               }
             },
             suggested_actions: { type: 'array', items: { type: 'string' } },
-            target_agent: { type: 'string', enum: ['construction', 'financial', 'licensing', 'client_relations', 'general'] },
+            target_agent: { type: 'string', enum: ['construction', 'financial', 'licensing', 'client_relations', 'procurement', 'general'] },
           },
           required: ['domain', 'category', 'confidence', 'urgency', 'summary_pt', 'target_agent']
         }

@@ -43,7 +43,8 @@ import {
   ChevronUp,
   Pencil,
   MessageSquare,
-  Camera
+  Camera,
+  ShoppingCart
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -67,6 +68,7 @@ import ProjetoNotebook from '../components/ProjetoNotebook'
 import ProjetoMoodboards from '../components/ProjetoMoodboards'
 import ProjetoLevantamento from '../components/ProjetoLevantamento'
 import ProjetoInspiracoes from '../components/ProjetoInspiracoes'
+import { useProcurement } from '../hooks/useProcurement'
 
 // Importar componentes de modais
 import {
@@ -1668,7 +1670,8 @@ export default function ProjetoDetalhe() {
     { id: 'archviz', label: 'Archviz', icon: Image, hasSubtabs: true },
     { id: 'notebook', label: 'Notebook', icon: BookOpen },
     { id: 'biblioteca', label: 'Biblioteca', icon: Library },
-    { id: 'gestao', label: 'Gestão de Projeto', icon: Settings, hasSubtabs: true }
+    { id: 'gestao', label: 'Gestão de Projeto', icon: Settings, hasSubtabs: true },
+    { id: 'procurement', label: 'Procurement', icon: ShoppingCart }
   ]
 
   // Secções dentro de Briefing & Conceito
@@ -3361,6 +3364,10 @@ export default function ProjetoDetalhe() {
         </div>
       )}
 
+      {/* Tab Procurement */}
+      {activeTab === 'procurement' && (
+        <ProjetoProcurement projectId={project?.id} obraId={null} />
+      )}
 
       {/* Modal de Upload */}
       {showUploadModal && (
@@ -3596,6 +3603,134 @@ export default function ProjetoDetalhe() {
         confirmText="Confirmar"
       />
 
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════
+// PROCUREMENT TAB (inline component)
+// ═══════════════════════════════════════
+
+function ProjetoProcurement({ projectId, obraId }) {
+  const { requisicoes, cotacoes, purchaseOrders, facturas, stats, loading } = useProcurement(projectId, obraId)
+
+  const formatCurrency = (val) => {
+    if (!val && val !== 0) return '—'
+    return new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(val)
+  }
+
+  const formatDate = (d) => {
+    if (!d) return '—'
+    return new Date(d).toLocaleDateString('pt-PT')
+  }
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '48px' }}>
+        <Loader2 size={24} style={{ animation: 'spin 1s linear infinite', color: 'var(--accent-olive)' }} />
+      </div>
+    )
+  }
+
+  const activeReqs = requisicoes.filter(r => !['fechada', 'cancelada'].includes(r.estado))
+  const activePOs = purchaseOrders.filter(p => !['concluida', 'cancelada'].includes(p.estado))
+
+  const isEmpty = requisicoes.length === 0 && cotacoes.length === 0 && purchaseOrders.length === 0 && facturas.length === 0
+
+  if (isEmpty) {
+    return (
+      <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
+        <ShoppingCart size={48} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '16px' }} />
+        <h3 style={{ margin: '0 0 8px', color: 'var(--brown)' }}>Procurement</h3>
+        <p style={{ color: 'var(--brown-light)', margin: '0 0 16px' }}>
+          Nenhuma requisição ou encomenda associada a este projeto.
+        </p>
+        <p style={{ color: 'var(--brown-light)', fontSize: '13px' }}>
+          As requisições e cotações serão criadas automaticamente pelo sistema de agentes ou manualmente no painel de Procurement.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      {/* Summary Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+        {[
+          { label: 'Requisições', value: activeReqs.length, color: '#3B82F6' },
+          { label: 'Cotações', value: cotacoes.length, color: '#D97706' },
+          { label: 'POs Ativas', value: activePOs.length, color: '#059669' },
+          { label: 'Valor POs', value: formatCurrency(stats.valor_pos_aprovadas), color: '#10B981' },
+        ].map(card => (
+          <div key={card.label} className="card" style={{
+            padding: '14px 16px', borderLeft: `3px solid ${card.color}`
+          }}>
+            <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--brown)' }}>{card.value}</div>
+            <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>{card.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Requisições List */}
+      {activeReqs.length > 0 && (
+        <div className="card" style={{ padding: '20px' }}>
+          <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', color: 'var(--brown)' }}>Requisições Ativas</h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {activeReqs.map(req => (
+              <div key={req.id} style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '8px 12px', borderRadius: '6px', background: 'var(--cream)', fontSize: '13px'
+              }}>
+                <div>
+                  <span style={{ fontWeight: 600, color: 'var(--accent-olive)', marginRight: '8px' }}>{req.codigo}</span>
+                  <span style={{ color: 'var(--brown)' }}>{req.titulo}</span>
+                </div>
+                <span style={{
+                  padding: '2px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 500,
+                  background: req.estado === 'em_cotacao' ? '#FFF7ED' : req.estado === 'decidida' ? '#ECFDF5' : '#EFF6FF',
+                  color: req.estado === 'em_cotacao' ? '#D97706' : req.estado === 'decidida' ? '#059669' : '#3B82F6'
+                }}>
+                  {req.estado?.replace(/_/g, ' ')}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Purchase Orders */}
+      {activePOs.length > 0 && (
+        <div className="card" style={{ padding: '20px' }}>
+          <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', color: 'var(--brown)' }}>Purchase Orders</h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {activePOs.map(po => (
+              <div key={po.id} style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '8px 12px', borderRadius: '6px', background: 'var(--cream)', fontSize: '13px'
+              }}>
+                <div>
+                  <span style={{ fontWeight: 600, color: 'var(--accent-olive)', marginRight: '8px' }}>{po.codigo}</span>
+                  <span style={{ color: 'var(--brown)' }}>{formatCurrency(po.valor_total)}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {po.data_entrega_prevista && (
+                    <span style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
+                      Entrega: {formatDate(po.data_entrega_prevista)}
+                    </span>
+                  )}
+                  <span style={{
+                    padding: '2px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 500,
+                    background: po.estado === 'entregue' ? '#ECFDF5' : po.estado === 'confirmada' ? '#EFF6FF' : '#FFF7ED',
+                    color: po.estado === 'entregue' ? '#059669' : po.estado === 'confirmada' ? '#3B82F6' : '#D97706'
+                  }}>
+                    {po.estado?.replace(/_/g, ' ')}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
