@@ -1,6 +1,7 @@
 // =====================================================
 // FORNECEDORES + G.A.R.V.I.S. PROCUREMENT
 // Módulo de gestão de fornecedores com inteligência
+// Deal Rooms, Matching, Orçamentos, Chat IA
 // =====================================================
 
 import { useState, useEffect, useRef } from 'react'
@@ -10,15 +11,15 @@ import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../components/ui/Toast'
 import { ConfirmModal } from '../components/ui/ConfirmModal'
 import GarvisPanel from '../components/GarvisPanel'
+import DealRoomModal from '../components/DealRoomModal'
 import { useGarvisAlerts } from '../hooks/useGarvisAlerts'
 import { useDealRooms } from '../hooks/useDealRooms'
 import { useGarvisKPIs } from '../hooks/useGarvisKPIs'
+import { getTopRecommendations } from '../services/garvisMatching'
 import {
-  Plus, Search, Edit2, Trash2, Phone, Mail, Globe, MapPin,
-  Star, Building2, User, X, Loader2, Upload, Download,
-  Filter, ChevronDown, ChevronRight, FileSpreadsheet, MoreVertical,
-  AlertTriangle, TrendingUp, Users, ShoppingCart, Bell,
-  ExternalLink, Eye, BarChart3
+  Plus, Search, Edit2, Trash2, Phone, Mail,
+  Star, X, Loader2, Upload, Download,
+  AlertTriangle, TrendingUp, Users
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 
@@ -39,7 +40,11 @@ export default function Fornecedores() {
 
   // G.A.R.V.I.S. real data hooks
   const { alertas, topAlert, criticalCount, unreadCount } = useGarvisAlerts()
-  const { activeDealRooms } = useDealRooms()
+  const {
+    dealRooms, activeDealRooms, fetchDealRooms,
+    createDealRoom, updateDealRoom, inviteSupplier,
+    updateSupplierStatus, selectWinner
+  } = useDealRooms()
   const { kpis: garvisKPIs } = useGarvisKPIs()
 
   const [fornecedores, setFornecedores] = useState([])
@@ -52,6 +57,10 @@ export default function Fornecedores() {
   const [editingFornecedor, setEditingFornecedor] = useState(null)
   const [showGarvis, setShowGarvis] = useState(true)
   const [dismissedAlert, setDismissedAlert] = useState(false)
+
+  // Deal Room Modal state
+  const [showDealRoomModal, setShowDealRoomModal] = useState(false)
+  const [selectedDealRoom, setSelectedDealRoom] = useState(null)
 
   const [form, setForm] = useState({
     nome: '', nif: '', morada: '', codigo_postal: '', cidade: '', website: '',
@@ -184,6 +193,51 @@ export default function Fornecedores() {
     XLSX.writeFile(wb, 'fornecedores_gavinho.xlsx')
   }
 
+  // Deal Room handlers
+  const handleCreateDealRoom = () => {
+    setSelectedDealRoom(null)
+    setShowDealRoomModal(true)
+  }
+
+  const handleOpenDealRoom = (dr) => {
+    setSelectedDealRoom(dr)
+    setShowDealRoomModal(true)
+  }
+
+  const handleSaveDealRoom = async (data, existingId) => {
+    if (existingId) {
+      const result = await updateDealRoom(existingId, data)
+      if (result.error) toast.error('Erro', result.error)
+      else toast.success('Deal Room atualizado')
+      return result
+    } else {
+      const result = await createDealRoom(data)
+      if (result.error) toast.error('Erro', result.error)
+      else toast.success('Deal Room criado', `Código: ${result.data?.codigo}`)
+      return result
+    }
+  }
+
+  const handleInviteSupplier = async (dealRoomId, fornecedorId) => {
+    const result = await inviteSupplier(dealRoomId, fornecedorId)
+    if (result.error) toast.error('Erro', result.error)
+    else toast.success('Fornecedor convidado')
+    return result
+  }
+
+  const handleUpdateSupplierStatus = async (dealRoomId, fornecedorId, newStatus) => {
+    const result = await updateSupplierStatus(dealRoomId, fornecedorId, newStatus)
+    if (result.error) toast.error('Erro', result.error)
+    return result
+  }
+
+  const handleSelectWinner = async (dealRoomId, fornecedorId, justificacao) => {
+    const result = await selectWinner(dealRoomId, fornecedorId, justificacao)
+    if (result.error) toast.error('Erro', result.error)
+    else toast.success('Fornecedor selecionado', 'Deal Room concluído com sucesso')
+    return result
+  }
+
   const fornecedoresFiltrados = fornecedores.filter(f => {
     if (search && !f.nome?.toLowerCase().includes(search.toLowerCase()) &&
         !f.responsavel?.toLowerCase().includes(search.toLowerCase()) &&
@@ -194,7 +248,6 @@ export default function Fornecedores() {
   })
 
   const especialidadesUnicas = [...new Set(fornecedores.map(f => f.especialidade).filter(Boolean))]
-  const fornecedoresAtivos = fornecedores.filter(f => f.status === 'ativo' || f.status === 'preferencial').length
 
   // Real KPI data from hooks
   const kpis = {
@@ -293,25 +346,7 @@ export default function Fornecedores() {
             <div style={{ display: 'flex', gap: '8px' }}>
               <input type="file" ref={fileInputRef} onChange={handleImportExcel} accept=".xlsx,.xls" style={{ display: 'none' }} />
               <button
-                onClick={() => toast.info('Em breve', 'Comparador de fornecedores disponível em breve')}
-                style={{
-                  padding: '8px 16px',
-                  background: 'transparent',
-                  color: 'var(--brown)',
-                  border: '1px solid var(--stone)',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  fontWeight: 500,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-              >
-                <Search size={14} /> Comparar
-              </button>
-              <button
-                onClick={() => toast.info('Em breve', 'Deal Rooms disponíveis em breve')}
+                onClick={handleCreateDealRoom}
                 style={{
                   padding: '8px 16px',
                   background: 'var(--brown)',
@@ -335,7 +370,7 @@ export default function Fornecedores() {
           <GarvisRecommendation
             fornecedores={fornecedores}
             activeDealRooms={activeDealRooms}
-            toast={toast}
+            onCreateDealRoom={handleCreateDealRoom}
           />
 
           {/* KPI Cards */}
@@ -346,11 +381,68 @@ export default function Fornecedores() {
             marginBottom: '24px'
           }}>
             <KPICard value={kpis.total} label="Total Fornecedores" />
-            <KPICard value={kpis.volumeYTD} label="Volume YTD" trend="+23%" />
+            <KPICard value={kpis.volumeYTD} label="Volume YTD" />
             <KPICard value={kpis.dealRooms} label="Deal Rooms Ativos" />
             <KPICard value={kpis.orcamentos} label="Orçamentos Pendentes" />
             <KPICard value={kpis.alertas} label="Alertas Críticos" />
           </div>
+
+          {/* Active Deal Rooms strip */}
+          {activeDealRooms.length > 0 && (
+            <div style={{
+              display: 'flex',
+              gap: '8px',
+              marginBottom: '16px',
+              overflowX: 'auto',
+              paddingBottom: '4px'
+            }}>
+              <span style={{
+                fontSize: '11px',
+                fontWeight: 700,
+                color: 'var(--brown-light)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                whiteSpace: 'nowrap',
+                alignSelf: 'center'
+              }}>
+                <Users size={12} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
+                Deal Rooms:
+              </span>
+              {activeDealRooms.map(dr => (
+                <button
+                  key={dr.id}
+                  onClick={() => handleOpenDealRoom(dr)}
+                  style={{
+                    padding: '6px 12px',
+                    background: 'var(--white)',
+                    border: '1px solid var(--stone)',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    color: 'var(--brown)',
+                    whiteSpace: 'nowrap',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  {dr.titulo}
+                  {dr.badge && (
+                    <span style={{
+                      fontSize: '10px',
+                      padding: '1px 6px',
+                      borderRadius: '6px',
+                      background: dr.badgeColor === 'olive' ? 'var(--success-bg)' : 'var(--warning-bg)',
+                      color: dr.badgeColor === 'olive' ? 'var(--success)' : 'var(--warning)',
+                      fontWeight: 600
+                    }}>
+                      {dr.badge}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Filters */}
           <div style={{
@@ -551,8 +643,21 @@ export default function Fornecedores() {
           onClose={() => setShowGarvis(false)}
           fornecedores={fornecedores}
           kpis={kpis}
+          onOpenDealRoom={handleOpenDealRoom}
         />
       )}
+
+      {/* Deal Room Modal */}
+      <DealRoomModal
+        isOpen={showDealRoomModal}
+        onClose={() => { setShowDealRoomModal(false); setSelectedDealRoom(null); fetchDealRooms() }}
+        dealRoom={selectedDealRoom}
+        fornecedores={fornecedores}
+        onSave={handleSaveDealRoom}
+        onInvite={handleInviteSupplier}
+        onUpdateSupplierStatus={handleUpdateSupplierStatus}
+        onSelectWinner={handleSelectWinner}
+      />
 
       {/* Modal - Novo/Editar Fornecedor */}
       {showModal && (
@@ -659,14 +764,60 @@ export default function Fornecedores() {
   )
 }
 
-// G.A.R.V.I.S. Recommendation Component - Dynamic from real data
-function GarvisRecommendation({ fornecedores, activeDealRooms, toast }) {
-  // Find best supplier: highest rated with a specialty
-  const topSupplier = fornecedores
-    .filter(f => f.rating && f.rating >= 4 && f.especialidade && (f.status === 'ativo' || f.status === 'preferencial'))
-    .sort((a, b) => (b.rating || 0) - (a.rating || 0))[0]
+// G.A.R.V.I.S. Recommendation Component - Dynamic with matching
+function GarvisRecommendation({ fornecedores, activeDealRooms, onCreateDealRoom }) {
+  const [recommendation, setRecommendation] = useState(null)
+  const [loading, setLoading] = useState(false)
 
-  if (!topSupplier && fornecedores.length < 3) {
+  useEffect(() => {
+    if (fornecedores.length >= 3) {
+      loadRecommendation()
+    }
+  }, [fornecedores])
+
+  const loadRecommendation = async () => {
+    setLoading(true)
+    try {
+      // Get the most common specialty
+      const specs = fornecedores.map(f => f.especialidade).filter(Boolean)
+      const specCount = {}
+      specs.forEach(s => { specCount[s] = (specCount[s] || 0) + 1 })
+      const topSpec = Object.entries(specCount).sort((a, b) => b[1] - a[1])[0]?.[0]
+
+      if (topSpec) {
+        const top = await getTopRecommendations(fornecedores, topSpec, 1)
+        if (top.length > 0) {
+          setRecommendation({ ...top[0], especialidade: topSpec })
+        }
+      }
+
+      // Fallback to highest rated
+      if (!recommendation) {
+        const topRated = fornecedores
+          .filter(f => f.rating && f.rating >= 4 && (f.status === 'ativo' || f.status === 'preferencial'))
+          .sort((a, b) => (b.rating || 0) - (a.rating || 0))[0]
+
+        if (topRated) {
+          setRecommendation({
+            fornecedor: topRated,
+            score: Math.min(70 + (topRated.rating || 0) * 5, 99),
+            justificacao: [
+              topRated.especialidade && `Especialista em ${topRated.especialidade}`,
+              `Rating ${topRated.rating}/5`,
+              topRated.is_preferencial && 'Fornecedor preferencial'
+            ].filter(Boolean),
+            especialidade: topRated.especialidade
+          })
+        }
+      }
+    } catch {
+      // Silent - recommendation is non-critical
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (fornecedores.length < 3) {
     return (
       <div style={{
         background: 'var(--white)',
@@ -695,16 +846,10 @@ function GarvisRecommendation({ fornecedores, activeDealRooms, toast }) {
     )
   }
 
-  if (!topSupplier) return null
+  if (loading || !recommendation) return null
 
-  const matchScore = Math.min(70 + (topSupplier.rating || 0) * 5 + (topSupplier.is_preferencial ? 5 : 0), 99)
-  const initials = topSupplier.nome?.substring(0, 2).toUpperCase() || '??'
-
-  const tags = []
-  if (topSupplier.especialidade) tags.push({ text: `Especialista em ${topSupplier.especialidade}`, type: 'success' })
-  if (topSupplier.rating >= 4) tags.push({ text: `Rating ${topSupplier.rating}/5`, type: 'success' })
-  if (topSupplier.is_preferencial) tags.push({ text: 'Fornecedor preferencial', type: 'success' })
-  if (topSupplier.prazo_pagamento && topSupplier.prazo_pagamento > 30) tags.push({ text: `Prazo ${topSupplier.prazo_pagamento} dias`, type: 'warning' })
+  const f = recommendation.fornecedor
+  const initials = f.nome?.substring(0, 2).toUpperCase() || '??'
 
   return (
     <div style={{
@@ -735,20 +880,20 @@ function GarvisRecommendation({ fornecedores, activeDealRooms, toast }) {
         }}>
           Recomendação G.A.R.V.I.S.
         </span>
-        {topSupplier.especialidade && (
+        {recommendation.especialidade && (
           <div style={{ marginLeft: 'auto' }}>
             <span style={{
               fontSize: '12px', padding: '4px 12px', background: 'var(--cream)',
               borderRadius: '8px', color: 'var(--brown-light)', fontWeight: 500
             }}>
-              Especialidade: {topSupplier.especialidade}
+              Especialidade: {recommendation.especialidade}
             </span>
           </div>
         )}
       </div>
 
       <p style={{ fontSize: '13px', color: 'var(--brown-light)', margin: '0 0 16px', lineHeight: 1.5 }}>
-        Baseado nos ratings, especialidades e histórico de colaborações dos seus fornecedores:
+        Baseado no algoritmo de matching, ratings e histórico de colaborações:
       </p>
 
       <div style={{
@@ -764,32 +909,32 @@ function GarvisRecommendation({ fornecedores, activeDealRooms, toast }) {
           <div style={{
             fontFamily: "'Cormorant Garamond', Georgia, serif",
             fontSize: '18px', fontWeight: 700, color: 'var(--brown)'
-          }}>{topSupplier.nome}</div>
+          }}>{f.nome}</div>
           <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>
-            {topSupplier.especialidade || 'Geral'} · Rating {topSupplier.rating}/5
-            {topSupplier.responsavel ? ` · ${topSupplier.responsavel}` : ''}
+            {f.especialidade || 'Geral'} · Rating {f.rating}/5
+            {f.responsavel ? ` · ${f.responsavel}` : ''}
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
           <div style={{
             fontFamily: "'Cormorant Garamond', Georgia, serif",
             fontSize: '32px', fontWeight: 700, color: 'var(--accent-olive)', lineHeight: 1
-          }}>{matchScore}%</div>
+          }}>{recommendation.score}%</div>
           <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>match</div>
         </div>
       </div>
 
-      {tags.length > 0 && (
+      {recommendation.justificacao?.length > 0 && (
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '16px' }}>
-          {tags.map((tag, i) => (
+          {recommendation.justificacao.map((tag, i) => (
             <span key={i} style={{
               fontSize: '11px', padding: '4px 10px', borderRadius: '6px',
-              border: `1px solid ${tag.type === 'success' ? 'rgba(122, 139, 110, 0.3)' : 'rgba(201, 168, 108, 0.4)'}`,
-              color: tag.type === 'success' ? 'var(--accent-olive)' : 'var(--warning)',
-              background: tag.type === 'success' ? 'rgba(122, 139, 110, 0.06)' : 'rgba(201, 168, 108, 0.06)',
+              border: '1px solid rgba(122, 139, 110, 0.3)',
+              color: 'var(--accent-olive)',
+              background: 'rgba(122, 139, 110, 0.06)',
               display: 'flex', alignItems: 'center', gap: '4px'
             }}>
-              {tag.type === 'success' ? '✓' : '⚠'} {tag.text}
+              ✓ {tag}
             </span>
           ))}
         </div>
@@ -797,7 +942,7 @@ function GarvisRecommendation({ fornecedores, activeDealRooms, toast }) {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
         <button
-          onClick={() => toast.info('Deal Rooms', 'Aplique a migration SQL no Supabase para ativar Deal Rooms')}
+          onClick={onCreateDealRoom}
           style={{
             padding: '12px', background: 'var(--blush)', color: 'var(--white)',
             border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600
@@ -806,7 +951,7 @@ function GarvisRecommendation({ fornecedores, activeDealRooms, toast }) {
           Criar Deal Room
         </button>
         <button
-          onClick={() => toast.info('Alternativas', `Existem ${fornecedores.filter(f => f.rating >= 3 && f.id !== topSupplier.id).length} fornecedores alternativos`)}
+          onClick={() => {}}
           style={{
             padding: '12px', background: 'transparent', color: 'var(--brown)',
             border: '1px solid var(--stone)', borderRadius: '8px', cursor: 'pointer',
@@ -821,7 +966,7 @@ function GarvisRecommendation({ fornecedores, activeDealRooms, toast }) {
 }
 
 // KPI Card Component
-function KPICard({ value, label, trend }) {
+function KPICard({ value, label }) {
   return (
     <div style={{
       background: 'var(--white)',
@@ -843,19 +988,6 @@ function KPICard({ value, label, trend }) {
       <div style={{ fontSize: '11px', color: 'var(--brown-light)', fontWeight: 500 }}>
         {label}
       </div>
-      {trend && (
-        <div style={{
-          fontSize: '11px',
-          color: 'var(--accent-olive)',
-          marginTop: '4px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '2px'
-        }}>
-          <TrendingUp size={12} /> {trend}
-        </div>
-      )}
     </div>
   )
 }

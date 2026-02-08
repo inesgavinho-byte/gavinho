@@ -1,9 +1,12 @@
 // =====================================================
 // G.A.R.V.I.S. Chat Service
 // Claude API integration for procurement intelligence
+// Command processing + AI chat
 // =====================================================
 
 import { supabase } from '../lib/supabase'
+import { rankSuppliers, compareSuppliers } from './garvisMatching'
+import { compareDealRoomQuotes } from './garvisQuoteAnalysis'
 
 const GARVIS_SYSTEM_PROMPT = `Tu és o G.A.R.V.I.S. (Gavinho Assistant for Responsive Virtual Intelligence Support), o assistente de inteligência de procurement da plataforma Gavinho — uma empresa portuguesa de Design & Build focada em construção de luxo.
 
@@ -30,10 +33,254 @@ REGRAS:
 4. Menciona preços em EUR e datas no formato DD/MM/YYYY
 5. Mantém respostas com max 200 palavras salvo se o utilizador pedir mais detalhe`
 
+// Command definitions
+const COMMANDS = {
+  '/recomendar': {
+    pattern: /^\/recomendar\s+(.+)/i,
+    description: 'Recomendar fornecedores por especialidade',
+    handler: handleRecomendar
+  },
+  '/comparar': {
+    pattern: /^\/comparar\s+(.+)/i,
+    description: 'Comparar fornecedores',
+    handler: handleComparar
+  },
+  '/analise': {
+    pattern: /^\/analis[ea]r?\s*(.*)/i,
+    description: 'Analisar deal room ou orçamento',
+    handler: handleAnalise
+  },
+  '/status': {
+    pattern: /^\/status\s*(.*)/i,
+    description: 'Status dos deal rooms',
+    handler: handleStatus
+  }
+}
+
 /**
- * Send a message to GARVIS and get a response
+ * Process a message - check for commands first, then AI
  */
 export async function sendGarvisMessage(message, context = {}) {
+  // Check for commands
+  const commandResult = await processCommand(message, context)
+  if (commandResult) return commandResult
+
+  // Regular AI message
+  return sendAIMessage(message, context)
+}
+
+/**
+ * Process slash commands
+ */
+async function processCommand(message, context) {
+  const trimmed = message.trim()
+
+  // Help command
+  if (trimmed === '/ajuda' || trimmed === '/help') {
+    return {
+      success: true,
+      response: `**Comandos disponíveis:**\n\n` +
+        `**/recomendar [especialidade]** — Encontrar melhores fornecedores\n` +
+        `Ex: /recomendar caixilharia\n\n` +
+        `**/comparar [nomes]** — Comparar fornecedores lado a lado\n` +
+        `Ex: /comparar Alumiber, Cortizo\n\n` +
+        `**/analisar** — Analisar deal rooms ativos e orçamentos\n\n` +
+        `**/status** — Resumo de deal rooms ativos\n\n` +
+        `Pode também fazer perguntas em linguagem natural.`,
+      isCommand: true,
+      tempo_ms: 0
+    }
+  }
+
+  for (const [, cmd] of Object.entries(COMMANDS)) {
+    const match = trimmed.match(cmd.pattern)
+    if (match) {
+      try {
+        const startTime = Date.now()
+        const result = await cmd.handler(match[1]?.trim(), context)
+        return {
+          success: true,
+          response: result,
+          isCommand: true,
+          tempo_ms: Date.now() - startTime
+        }
+      } catch (err) {
+        return {
+          success: false,
+          response: `Erro ao processar comando: ${err.message}`,
+          isCommand: true,
+          tempo_ms: 0
+        }
+      }
+    }
+  }
+
+  return null
+}
+
+/**
+ * /recomendar [especialidade] - Recommend suppliers
+ */
+async function handleRecomendar(especialidade, context) {
+  const fornecedores = context.fornecedores || []
+
+  if (fornecedores.length === 0) {
+    return 'Sem fornecedores registados. Adicione fornecedores para ativar recomendações.'
+  }
+
+  const ranked = await rankSuppliers(fornecedores, { especialidade })
+  const top = ranked.slice(0, 5)
+
+  if (top.length === 0) {
+    return `Nenhum fornecedor ativo encontrado para "${especialidade}". Verifique os fornecedores registados.`
+  }
+
+  let response = `**Top ${top.length} fornecedores para ${especialidade}:**\n\n`
+
+  top.forEach((r, i) => {
+    const f = r.fornecedor
+    response += `**${i + 1}. ${f.nome}** — Score: ${r.score}/100\n`
+    if (r.justificacao.length > 0) {
+      response += `   ${r.justificacao.join(' · ')}\n`
+    }
+    if (f.email) response += `   Contacto: ${f.email}\n`
+    response += '\n'
+  })
+
+  if (top.length > 0 && top[0].score >= 70) {
+    response += `\n💡 **Recomendação:** ${top[0].fornecedor.nome} é a melhor opção (${top[0].score}% match).`
+  }
+
+  return response
+}
+
+/**
+ * /comparar [nomes separados por vírgula] - Compare suppliers
+ */
+async function handleComparar(args, context) {
+  const fornecedores = context.fornecedores || []
+  const nomes = args.split(',').map(n => n.trim().toLowerCase())
+
+  const matchedIds = []
+  for (const nome of nomes) {
+    const found = fornecedores.find(f =>
+      f.nome?.toLowerCase().includes(nome) || nome.includes(f.nome?.toLowerCase())
+    )
+    if (found) matchedIds.push(found.id)
+  }
+
+  if (matchedIds.length < 2) {
+    return `Necessário pelo menos 2 fornecedores para comparar. Encontrados: ${matchedIds.length}.\nUse nomes separados por vírgula: /comparar Nome1, Nome2`
+  }
+
+  const comparison = await compareSuppliers(matchedIds, fornecedores)
+
+  let response = `**Comparação de ${comparison.length} fornecedores:**\n\n`
+
+  response += '| | ' + comparison.map(c => `**${c.nome}**`).join(' | ') + ' |\n'
+  response += '|---|' + comparison.map(() => '---').join('|') + '|\n'
+  response += '| Especialidade | ' + comparison.map(c => c.especialidade || '—').join(' | ') + ' |\n'
+  response += '| Rating | ' + comparison.map(c => c.rating ? `${c.rating}/5` : '—').join(' | ') + ' |\n'
+  response += '| Status | ' + comparison.map(c => c.status).join(' | ') + ' |\n'
+  response += '| Colaborações | ' + comparison.map(c => c.fornecimentosCount || 0).join(' | ') + ' |\n'
+
+  if (comparison.some(c => c.avgQualidade)) {
+    response += '| Qualidade (avg) | ' + comparison.map(c => c.avgQualidade ? `${c.avgQualidade.toFixed(1)}/5` : '—').join(' | ') + ' |\n'
+  }
+  if (comparison.some(c => c.avgPrazo)) {
+    response += '| Prazos (avg) | ' + comparison.map(c => c.avgPrazo ? `${c.avgPrazo.toFixed(1)}/5` : '—').join(' | ') + ' |\n'
+  }
+  if (comparison.some(c => c.avgQuoteDeviation !== undefined)) {
+    response += '| Desvio preço | ' + comparison.map(c =>
+      c.avgQuoteDeviation !== undefined ? `${c.avgQuoteDeviation > 0 ? '+' : ''}${c.avgQuoteDeviation.toFixed(1)}%` : '—'
+    ).join(' | ') + ' |\n'
+  }
+
+  response += '| Preferencial | ' + comparison.map(c => c.is_preferencial ? '✓' : '—').join(' | ') + ' |\n'
+
+  return response
+}
+
+/**
+ * /analisar - Analyze deal rooms or quotes
+ */
+async function handleAnalise(args, context) {
+  const dealRooms = context.dealRooms || []
+
+  if (dealRooms.length === 0) {
+    return 'Sem deal rooms ativos para analisar. Crie um deal room primeiro.'
+  }
+
+  // If specific deal room code given
+  if (args) {
+    const dr = dealRooms.find(d =>
+      d.codigo?.toLowerCase() === args.toLowerCase() ||
+      d.titulo?.toLowerCase().includes(args.toLowerCase())
+    )
+    if (dr) {
+      const comparison = await compareDealRoomQuotes(dr.id)
+      if (comparison.quotes?.length > 0) {
+        let response = `**Análise Deal Room: ${dr.titulo}** [${dr.codigo}]\n\n`
+        response += `Orçamentos recebidos: ${comparison.total_quotes}\n`
+        if (comparison.budget) response += `Orçamento disponível: €${parseFloat(comparison.budget).toLocaleString('pt-PT')}\n`
+        response += `Valor mais baixo: €${comparison.lowest?.toLocaleString('pt-PT')}\n`
+        response += `Valor mais alto: €${comparison.highest?.toLocaleString('pt-PT')}\n`
+        if (comparison.spread > 0) response += `Amplitude: €${comparison.spread.toLocaleString('pt-PT')} (${comparison.spread_pct}%)\n`
+
+        if (comparison.recomendacao) {
+          response += `\n💡 **Recomendação:** ${comparison.recomendacao.fornecedor_nome} — ${comparison.recomendacao.motivo} (€${comparison.recomendacao.valor?.toLocaleString('pt-PT')})`
+        }
+        return response
+      }
+      return `Deal Room "${dr.titulo}" ainda não tem orçamentos recebidos.`
+    }
+    return `Deal Room "${args}" não encontrado. Deal rooms ativos: ${dealRooms.map(d => d.codigo).join(', ')}`
+  }
+
+  // General analysis of all deal rooms
+  let response = `**Análise geral — ${dealRooms.length} deal rooms ativos:**\n\n`
+  for (const dr of dealRooms.slice(0, 5)) {
+    const orcRecebidos = dr.orcamentosRecebidos || 0
+    const total = dr.fornecedoresCount || 0
+    response += `**${dr.titulo}** [${dr.codigo}] — ${dr.status}\n`
+    response += `  ${total} fornecedores convidados, ${orcRecebidos} orçamentos recebidos\n`
+    if (dr.prazo_necessario) {
+      response += `  Prazo: ${new Date(dr.prazo_necessario).toLocaleDateString('pt-PT')}\n`
+    }
+    response += '\n'
+  }
+
+  return response
+}
+
+/**
+ * /status - Quick status of deal rooms
+ */
+async function handleStatus(args, context) {
+  const dealRooms = context.dealRooms || []
+  const kpis = context.kpis || {}
+
+  let response = `**Status G.A.R.V.I.S.**\n\n`
+  response += `📊 Fornecedores: ${kpis.total || kpis.totalFornecedores || '—'}\n`
+  response += `💰 Volume YTD: ${kpis.volumeYTD || kpis.volumeYTDFormatted || '—'}\n`
+  response += `🏗️ Deal Rooms ativos: ${dealRooms.length}\n`
+  response += `📋 Orçamentos pendentes: ${kpis.orcamentos || kpis.orcamentosPendentes || 0}\n`
+  response += `🚨 Alertas críticos: ${kpis.alertas || kpis.alertasCriticos || 0}\n`
+
+  if (dealRooms.length > 0) {
+    response += '\n**Deal Rooms:**\n'
+    for (const dr of dealRooms) {
+      response += `• ${dr.titulo} [${dr.codigo}] — ${dr.badge || dr.status}\n`
+    }
+  }
+
+  return response
+}
+
+/**
+ * Send message to Claude AI (non-command)
+ */
+async function sendAIMessage(message, context = {}) {
   const apiKey = localStorage.getItem('claude_api_key')
 
   if (!apiKey) {
@@ -138,7 +385,8 @@ function buildContextString(context) {
   }
 
   if (context.kpis) {
-    parts.push(`KPIs: ${context.kpis.totalFornecedores} fornecedores, ${context.kpis.dealRoomsAtivos} deal rooms, ${context.kpis.orcamentosPendentes} orçamentos pendentes, Volume YTD: ${context.kpis.volumeYTDFormatted}`)
+    const k = context.kpis
+    parts.push(`KPIs: ${k.totalFornecedores || k.total || '—'} fornecedores, ${k.dealRoomsAtivos || k.dealRooms || 0} deal rooms, ${k.orcamentosPendentes || k.orcamentos || 0} orçamentos pendentes, Volume YTD: ${k.volumeYTDFormatted || k.volumeYTD || '€0'}`)
   }
 
   return parts.length > 0 ? parts.join('\n\n') : 'Sem dados de contexto disponíveis.'

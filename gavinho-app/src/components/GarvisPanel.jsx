@@ -14,12 +14,14 @@ import {
 } from 'lucide-react'
 
 const GARVIS_SUGGESTIONS = [
-  'Quem tem melhor preço para Lioz?',
-  'Analisa último orçamento',
-  'Sugere fornecedor para serralharia'
+  '/recomendar caixilharia',
+  '/status',
+  '/ajuda',
+  'Sugere fornecedor para serralharia',
+  'Quem tem melhor preço para Lioz?'
 ]
 
-export default function GarvisPanel({ onClose, fornecedores = [], kpis = null }) {
+export default function GarvisPanel({ onClose, fornecedores = [], kpis = null, onOpenDealRoom = null }) {
   const [activeTab, setActiveTab] = useState('alertas')
   const [chatInput, setChatInput] = useState('')
   const [chatMessages, setChatMessages] = useState([])
@@ -284,6 +286,18 @@ export default function GarvisPanel({ onClose, fornecedores = [], kpis = null })
                 title="Deal Rooms ativos"
                 text={`Tem ${activeDealRooms.length} deal room${activeDealRooms.length > 1 ? 's' : ''} em curso. Verifique se há orçamentos por analisar.`}
                 actionLabel="Ver deal rooms"
+                action={() => {
+                  if (onOpenDealRoom && activeDealRooms[0]) onOpenDealRoom(activeDealRooms[0])
+                }}
+              />
+            )}
+            {fornecedores.length > 0 && (
+              <SuggestionCard
+                icon="🔍"
+                title="Comandos rápidos"
+                text="Use /recomendar [especialidade] para encontrar o melhor fornecedor, /comparar para comparar, ou /status para um resumo."
+                actionLabel="Ver comandos"
+                action={() => setChatInput('/ajuda')}
               />
             )}
             <SuggestionCard
@@ -355,7 +369,7 @@ export default function GarvisPanel({ onClose, fornecedores = [], kpis = null })
           </div>
         ) : (
           activeDealRooms.slice(0, 4).map(deal => (
-            <DealRoomCard key={deal.id} deal={deal} />
+            <DealRoomCard key={deal.id} deal={deal} onClick={() => onOpenDealRoom && onOpenDealRoom(deal)} />
           ))
         )}
       </div>
@@ -565,9 +579,11 @@ function AlertCard({ alerta, onMarkRead, onArchive, timeAgo }) {
   )
 }
 
-function DealRoomCard({ deal }) {
+function DealRoomCard({ deal, onClick }) {
   return (
-    <div style={{
+    <div
+      onClick={onClick}
+      style={{
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
