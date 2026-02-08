@@ -655,13 +655,14 @@ function PresencasTab() {
   const [trabalhadores, setTrabalhadores] = useState([])
   const [obras, setObras] = useState([])
   const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState({ total: 0, horasTotal: 0, mediaHoras: 0 })
+  const [stats, setStats] = useState({ total: 0, horasTotal: 0, mediaHoras: 0, trabalhadoresUnicos: 0, obrasUnicos: 0 })
+  const [collapsedDates, setCollapsedDates] = useState({})
 
   const [filtroObra, setFiltroObra] = useState('')
   const [filtroTrabalhador, setFiltroTrabalhador] = useState('')
   const [dataInicio, setDataInicio] = useState(() => {
     const d = new Date()
-    d.setDate(d.getDate() - 7)
+    d.setDate(d.getDate() - 14)
     return d.toISOString().split('T')[0]
   })
   const [dataFim, setDataFim] = useState(() => new Date().toISOString().split('T')[0])
@@ -702,8 +703,8 @@ function PresencasTab() {
         `)
         .gte('data', dataInicio)
         .lte('data', dataFim)
-        .order('data', { ascending: false })
-        .order('hora_entrada', { ascending: false })
+        .order('data', { ascending: true })
+        .order('hora_entrada', { ascending: true })
 
       if (filtroObra) {
         query = query.eq('obra_id', filtroObra)
@@ -721,8 +722,12 @@ function PresencasTab() {
 
       const total = data?.length || 0
       let horasTotal = 0
+      const trabSet = new Set()
+      const obraSet = new Set()
 
       data?.forEach(p => {
+        if (p.trabalhador_id) trabSet.add(p.trabalhador_id)
+        if (p.obra_id) obraSet.add(p.obra_id)
         if (p.hora_entrada && p.hora_saida) {
           const diff = new Date(p.hora_saida) - new Date(p.hora_entrada)
           horasTotal += diff / (1000 * 60 * 60)
@@ -732,7 +737,9 @@ function PresencasTab() {
       setStats({
         total,
         horasTotal: horasTotal.toFixed(1),
-        mediaHoras: total > 0 ? (horasTotal / total).toFixed(1) : 0
+        mediaHoras: total > 0 ? (horasTotal / total).toFixed(1) : 0,
+        trabalhadoresUnicos: trabSet.size,
+        obrasUnicos: obraSet.size
       })
     } catch (err) {
       console.error('Erro ao carregar presenças:', err)
@@ -746,25 +753,26 @@ function PresencasTab() {
     return new Date(timestamp).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
   }
 
-  const formatDate = (dateStr) => {
-    const date = new Date(dateStr)
-    return date.toLocaleDateString('pt-PT', { weekday: 'short', day: 'numeric', month: 'short' })
+  const formatDateFull = (dateStr) => {
+    const date = new Date(dateStr + 'T00:00:00')
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const yesterday = new Date(today)
+    yesterday.setDate(yesterday.getDate() - 1)
+    const dateOnly = new Date(date)
+    dateOnly.setHours(0, 0, 0, 0)
+
+    let prefix = ''
+    if (dateOnly.getTime() === today.getTime()) prefix = 'Hoje — '
+    else if (dateOnly.getTime() === yesterday.getTime()) prefix = 'Ontem — '
+
+    return prefix + date.toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' })
   }
 
   const calcularHoras = (entrada, saida) => {
     if (!entrada || !saida) return null
     const diff = new Date(saida) - new Date(entrada)
     return (diff / (1000 * 60 * 60)).toFixed(1)
-  }
-
-  const getStatusBadge = (presenca) => {
-    if (!presenca.hora_entrada) {
-      return { text: 'Sem entrada', color: '#F44336', bg: '#FFEBEE' }
-    }
-    if (!presenca.hora_saida) {
-      return { text: 'Em trabalho', color: '#4CAF50', bg: '#E8F5E9' }
-    }
-    return { text: 'Completo', color: '#2196F3', bg: '#E3F2FD' }
   }
 
   const exportCSV = () => {
@@ -789,15 +797,66 @@ function PresencasTab() {
     link.click()
   }
 
+  const toggleDateCollapse = (data) => {
+    setCollapsedDates(prev => ({ ...prev, [data]: !prev[data] }))
+  }
+
+  const collapseAll = () => {
+    const all = {}
+    Object.keys(presencasPorData).forEach(d => { all[d] = true })
+    setCollapsedDates(all)
+  }
+
+  const expandAll = () => setCollapsedDates({})
+
+  // Group by date — ascending order preserved from query
   const presencasPorData = presencas.reduce((acc, p) => {
     if (!acc[p.data]) acc[p.data] = []
     acc[p.data].push(p)
     return acc
   }, {})
 
+  const dateEntries = Object.entries(presencasPorData)
+
+  // Calculate hours per date group
+  const horasPorData = (registos) => {
+    let h = 0
+    registos.forEach(p => {
+      if (p.hora_entrada && p.hora_saida) {
+        h += (new Date(p.hora_saida) - new Date(p.hora_entrada)) / (1000 * 60 * 60)
+      }
+    })
+    return h.toFixed(1)
+  }
+
+  // Loading skeleton
+  const LoadingSkeleton = () => (
+    <div style={{ padding: '20px' }}>
+      {[1, 2, 3].map(group => (
+        <div key={group} style={{ marginBottom: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 0', borderBottom: '1px solid var(--stone)' }}>
+            <div style={{ width: 120, height: 14, background: 'var(--stone)', borderRadius: 4, animation: 'pulse 1.5s ease-in-out infinite' }} />
+            <div style={{ flex: 1 }} />
+            <div style={{ width: 60, height: 12, background: 'var(--stone)', borderRadius: 4, animation: 'pulse 1.5s ease-in-out infinite' }} />
+          </div>
+          {[1, 2].map(row => (
+            <div key={row} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '16px 0' }}>
+              <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--stone)', animation: 'pulse 1.5s ease-in-out infinite' }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ width: '40%', height: 14, background: 'var(--stone)', borderRadius: 4, marginBottom: 6, animation: 'pulse 1.5s ease-in-out infinite' }} />
+                <div style={{ width: '25%', height: 10, background: 'var(--stone)', borderRadius: 4, animation: 'pulse 1.5s ease-in-out infinite' }} />
+              </div>
+              <div style={{ width: 80, height: 28, background: 'var(--stone)', borderRadius: 8, animation: 'pulse 1.5s ease-in-out infinite' }} />
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+
   return (
     <div>
-      {/* Header with button */}
+      {/* Header */}
       <div style={tabStyles.tabHeader}>
         <div />
         <button onClick={exportCSV} style={tabStyles.addButton}>
@@ -807,155 +866,400 @@ function PresencasTab() {
       </div>
 
       {/* Stats Cards */}
-      <div style={tabStyles.statsGrid}>
-        <div style={tabStyles.statCard}>
-          <div style={tabStyles.statIcon}>
-            <CalendarDays size={24} style={{ color: 'var(--brown)' }} />
-          </div>
-          <div>
-            <div style={tabStyles.statValue}>{stats.total}</div>
-            <div style={tabStyles.statLabel}>Registos no período</div>
-          </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 20 }}>
+        <div style={pS.statCard}>
+          <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--brown)' }}>{stats.total}</div>
+          <div style={{ fontSize: 11, color: 'var(--brown-light)', marginTop: 2 }}>Registos</div>
         </div>
-        <div style={tabStyles.statCard}>
-          <div style={{ ...tabStyles.statIcon, background: '#E8F5E9' }}>
-            <Clock size={24} style={{ color: '#2e7d32' }} />
-          </div>
-          <div>
-            <div style={tabStyles.statValue}>{stats.horasTotal}h</div>
-            <div style={tabStyles.statLabel}>Total de horas</div>
-          </div>
+        <div style={pS.statCard}>
+          <div style={{ fontSize: 22, fontWeight: 700, color: '#2e7d32' }}>{stats.horasTotal}h</div>
+          <div style={{ fontSize: 11, color: 'var(--brown-light)', marginTop: 2 }}>Total de horas</div>
         </div>
-        <div style={tabStyles.statCard}>
-          <div style={{ ...tabStyles.statIcon, background: '#E3F2FD' }}>
-            <TrendingUp size={24} style={{ color: '#1976d2' }} />
-          </div>
-          <div>
-            <div style={tabStyles.statValue}>{stats.mediaHoras}h</div>
-            <div style={tabStyles.statLabel}>Média por dia</div>
-          </div>
+        <div style={pS.statCard}>
+          <div style={{ fontSize: 22, fontWeight: 700, color: '#1976d2' }}>{stats.mediaHoras}h</div>
+          <div style={{ fontSize: 11, color: 'var(--brown-light)', marginTop: 2 }}>Média / dia</div>
+        </div>
+        <div style={pS.statCard}>
+          <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--brown)' }}>{stats.trabalhadoresUnicos}</div>
+          <div style={{ fontSize: 11, color: 'var(--brown-light)', marginTop: 2 }}>Trabalhadores</div>
+        </div>
+        <div style={pS.statCard}>
+          <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--brown)' }}>{stats.obrasUnicos}</div>
+          <div style={{ fontSize: 11, color: 'var(--brown-light)', marginTop: 2 }}>Obras</div>
         </div>
       </div>
 
       {/* Filtros */}
-      <div style={tabStyles.filtersCard}>
-        <div style={tabStyles.filtersGrid}>
-          <div style={tabStyles.filterGroup}>
-            <label style={tabStyles.filterLabel}>Data Início</label>
-            <input
-              type="date"
-              value={dataInicio}
-              onChange={(e) => setDataInicio(e.target.value)}
-              style={tabStyles.filterInput}
-            />
-          </div>
-          <div style={tabStyles.filterGroup}>
-            <label style={tabStyles.filterLabel}>Data Fim</label>
-            <input
-              type="date"
-              value={dataFim}
-              onChange={(e) => setDataFim(e.target.value)}
-              style={tabStyles.filterInput}
-            />
-          </div>
-          <div style={tabStyles.filterGroup}>
-            <label style={tabStyles.filterLabel}>Obra</label>
-            <select
-              value={filtroObra}
-              onChange={(e) => setFiltroObra(e.target.value)}
-              style={tabStyles.filterInput}
-            >
-              <option value="">Todas as obras</option>
-              {obras.map(o => (
-                <option key={o.id} value={o.id}>{o.codigo} - {o.nome}</option>
-              ))}
-            </select>
-          </div>
-          <div style={tabStyles.filterGroup}>
-            <label style={tabStyles.filterLabel}>Trabalhador</label>
-            <select
-              value={filtroTrabalhador}
-              onChange={(e) => setFiltroTrabalhador(e.target.value)}
-              style={tabStyles.filterInput}
-            >
-              <option value="">Todos</option>
-              {trabalhadores.map(t => (
-                <option key={t.id} value={t.id}>{t.nome}</option>
-              ))}
-            </select>
-          </div>
+      <div style={pS.filtersRow}>
+        <div style={pS.filterItem}>
+          <label style={pS.filterLabel}>De</label>
+          <input type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)} style={pS.filterInput} />
+        </div>
+        <div style={pS.filterItem}>
+          <label style={pS.filterLabel}>Até</label>
+          <input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} style={pS.filterInput} />
+        </div>
+        <div style={{ ...pS.filterItem, flex: 1.5 }}>
+          <label style={pS.filterLabel}>Obra</label>
+          <select value={filtroObra} onChange={e => setFiltroObra(e.target.value)} style={pS.filterInput}>
+            <option value="">Todas</option>
+            {obras.map(o => <option key={o.id} value={o.id}>{o.codigo} - {o.nome}</option>)}
+          </select>
+        </div>
+        <div style={{ ...pS.filterItem, flex: 1.5 }}>
+          <label style={pS.filterLabel}>Trabalhador</label>
+          <select value={filtroTrabalhador} onChange={e => setFiltroTrabalhador(e.target.value)} style={pS.filterInput}>
+            <option value="">Todos</option>
+            {trabalhadores.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
+          </select>
         </div>
       </div>
 
       {/* Lista de Presenças */}
-      <div style={tabStyles.listCard}>
-        {loading ? (
-          <div style={tabStyles.loadingState}>
-            <Loader2 size={32} style={{ animation: 'spin 1s linear infinite', color: 'var(--brown-light)' }} />
+      <div style={pS.listContainer}>
+        {/* Collapse controls */}
+        {dateEntries.length > 1 && !loading && (
+          <div style={pS.collapseBar}>
+            <span style={{ fontSize: 12, color: 'var(--brown-light)' }}>
+              {dateEntries.length} {dateEntries.length === 1 ? 'dia' : 'dias'} com registos
+            </span>
+            <div style={{ display: 'flex', gap: 4 }}>
+              <button onClick={expandAll} style={pS.collapseBtn}>Expandir todos</button>
+              <button onClick={collapseAll} style={pS.collapseBtn}>Colapsar todos</button>
+            </div>
           </div>
+        )}
+
+        {loading ? (
+          <LoadingSkeleton />
         ) : presencas.length === 0 ? (
           <div style={tabStyles.emptyState}>
             <Clock size={48} style={{ color: 'var(--stone)', marginBottom: 12 }} />
             <p style={{ color: 'var(--brown-light)', margin: 0 }}>Nenhum registo encontrado</p>
-            <p style={{ color: 'var(--brown-light)', fontSize: 13, marginTop: 4 }}>Ajusta os filtros ou aguarda novos registos</p>
+            <p style={{ color: 'var(--brown-light)', fontSize: 13, marginTop: 4 }}>Ajusta os filtros ou aguarda novos registos da app de obra</p>
           </div>
         ) : (
-          Object.entries(presencasPorData).map(([data, registos]) => (
-            <div key={data} style={tabStyles.dateGroup}>
-              <div style={tabStyles.dateHeader}>
-                <Calendar size={16} />
-                {formatDate(data)}
-                <span style={tabStyles.dateCount}>{registos.length} registo(s)</span>
-              </div>
-              {registos.map(p => {
-                const status = getStatusBadge(p)
-                return (
-                  <div key={p.id} style={tabStyles.presencaRow}>
-                    <div style={tabStyles.presencaAvatar}>
-                      {p.trabalhadores?.nome?.charAt(0).toUpperCase() || '?'}
-                    </div>
-                    <div style={tabStyles.presencaInfo}>
-                      <div style={tabStyles.presencaNome}>{p.trabalhadores?.nome}</div>
-                      <div style={tabStyles.presencaMeta}>
-                        <span style={tabStyles.metaItem}>
-                          <Building2 size={12} />
-                          {p.obras?.codigo}
-                        </span>
-                        {p.trabalhadores?.cargo && (
-                          <span style={tabStyles.metaItem}>{p.trabalhadores.cargo}</span>
-                        )}
-                      </div>
-                    </div>
-                    <div style={tabStyles.presencaTimes}>
-                      <div style={tabStyles.timeBlock}>
-                        <LogIn size={14} style={{ color: '#4CAF50' }} />
-                        <span>{formatTime(p.hora_entrada)}</span>
-                      </div>
-                      <div style={tabStyles.timeBlock}>
-                        <LogOutIcon size={14} style={{ color: p.hora_saida ? '#F44336' : '#ccc' }} />
-                        <span style={{ color: p.hora_saida ? 'inherit' : '#ccc' }}>
-                          {formatTime(p.hora_saida)}
-                        </span>
-                      </div>
-                    </div>
-                    <div style={tabStyles.presencaHoras}>
-                      {p.hora_saida ? (
-                        <span style={tabStyles.horasValue}>{calcularHoras(p.hora_entrada, p.hora_saida)}h</span>
-                      ) : (
-                        <span style={{ ...tabStyles.statusBadgeSmall, color: status.color, background: status.bg }}>
-                          {status.text}
-                        </span>
-                      )}
-                    </div>
+          dateEntries.map(([data, registos]) => {
+            const isCollapsed = collapsedDates[data]
+            const totalHoras = horasPorData(registos)
+            const emTrabalho = registos.filter(p => p.hora_entrada && !p.hora_saida).length
+
+            // Group registos by obra within the date
+            const porObra = registos.reduce((acc, p) => {
+              const obraKey = p.obras?.codigo || 'Sem obra'
+              if (!acc[obraKey]) acc[obraKey] = { obra: p.obras, registos: [] }
+              acc[obraKey].registos.push(p)
+              return acc
+            }, {})
+
+            return (
+              <div key={data} style={pS.dateGroup}>
+                <button
+                  onClick={() => toggleDateCollapse(data)}
+                  style={pS.dateHeader}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}>
+                    {isCollapsed
+                      ? <ChevronDown size={16} style={{ color: 'var(--brown-light)' }} />
+                      : <ChevronUp size={16} style={{ color: 'var(--brown-light)' }} />
+                    }
+                    <span style={pS.dateText}>
+                      {formatDateFull(data)}
+                    </span>
                   </div>
-                )
-              })}
-            </div>
-          ))
+                  <div style={pS.dateMeta}>
+                    {emTrabalho > 0 && (
+                      <span style={pS.emTrabalhoBadge}>
+                        {emTrabalho} em obra
+                      </span>
+                    )}
+                    <span style={pS.dateRegistos}>{registos.length} {registos.length === 1 ? 'registo' : 'registos'}</span>
+                    <span style={pS.dateHoras}>{totalHoras}h</span>
+                  </div>
+                </button>
+
+                {!isCollapsed && (
+                  <div style={pS.dateContent}>
+                    {Object.entries(porObra).map(([obraCode, { obra, registos: obraRegistos }]) => (
+                      <div key={obraCode} style={pS.obraGroup}>
+                        {Object.keys(porObra).length > 1 && (
+                          <div style={pS.obraSubheader}>
+                            <Building2 size={13} style={{ color: 'var(--accent-olive)' }} />
+                            <span style={{ fontWeight: 600, color: 'var(--brown)' }}>{obraCode}</span>
+                            {obra?.nome && <span style={{ color: 'var(--brown-light)' }}>— {obra.nome}</span>}
+                            <span style={pS.obraCount}>{obraRegistos.length}</span>
+                          </div>
+                        )}
+                        {obraRegistos.map(p => {
+                          const horas = calcularHoras(p.hora_entrada, p.hora_saida)
+                          const emTrabalhoNow = p.hora_entrada && !p.hora_saida
+                          return (
+                            <div key={p.id} style={pS.presencaCard}>
+                              <div style={{
+                                ...pS.avatar,
+                                background: emTrabalhoNow ? '#2e7d32' : 'var(--brown)'
+                              }}>
+                                {p.trabalhadores?.nome?.charAt(0).toUpperCase() || '?'}
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  <span style={pS.nome}>{p.trabalhadores?.nome}</span>
+                                  {p.trabalhadores?.cargo && (
+                                    <span style={pS.cargoBadge}>{p.trabalhadores.cargo}</span>
+                                  )}
+                                </div>
+                                {Object.keys(porObra).length <= 1 && obra && (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 3, fontSize: 12, color: 'var(--brown-light)' }}>
+                                    <Building2 size={11} />
+                                    {obraCode} — {obra.nome}
+                                  </div>
+                                )}
+                                {p.notas && (
+                                  <div style={{ fontSize: 12, color: 'var(--brown-light)', marginTop: 4, fontStyle: 'italic' }}>
+                                    {p.notas}
+                                  </div>
+                                )}
+                              </div>
+                              <div style={pS.timesColumn}>
+                                <div style={pS.timeRow}>
+                                  <LogIn size={13} style={{ color: '#2e7d32' }} />
+                                  <span style={{ fontSize: 13, fontWeight: 500 }}>{formatTime(p.hora_entrada)}</span>
+                                </div>
+                                <div style={pS.timeRow}>
+                                  <LogOutIcon size={13} style={{ color: p.hora_saida ? '#c62828' : '#D4D1C7' }} />
+                                  <span style={{ fontSize: 13, fontWeight: 500, color: p.hora_saida ? 'var(--brown)' : '#D4D1C7' }}>
+                                    {formatTime(p.hora_saida)}
+                                  </span>
+                                </div>
+                              </div>
+                              <div style={{ minWidth: 56, textAlign: 'right' }}>
+                                {horas ? (
+                                  <span style={pS.horasBadge}>{horas}h</span>
+                                ) : emTrabalhoNow ? (
+                                  <span style={pS.emTrabalhoSmall}>Em obra</span>
+                                ) : (
+                                  <span style={{ fontSize: 12, color: '#D4D1C7' }}>—</span>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })
         )}
       </div>
+
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.4; }
+        }
+      `}</style>
     </div>
   )
+}
+
+// Presenças tab styles
+const pS = {
+  statCard: {
+    background: 'var(--white)',
+    borderRadius: 10,
+    padding: '14px 16px',
+    border: '1px solid var(--stone)',
+    textAlign: 'center',
+  },
+  filtersRow: {
+    display: 'flex',
+    gap: 10,
+    marginBottom: 20,
+    flexWrap: 'wrap',
+    padding: '14px 16px',
+    background: 'var(--white)',
+    borderRadius: 12,
+    border: '1px solid var(--stone)',
+  },
+  filterItem: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 4,
+    flex: 1,
+    minWidth: 130,
+  },
+  filterLabel: {
+    fontSize: 11,
+    fontWeight: 600,
+    color: 'var(--brown-light)',
+    textTransform: 'uppercase',
+    letterSpacing: '0.5px',
+  },
+  filterInput: {
+    padding: '8px 10px',
+    border: '1px solid var(--stone)',
+    borderRadius: 8,
+    fontSize: 13,
+    outline: 'none',
+    background: 'white',
+    color: 'var(--brown)',
+  },
+  listContainer: {
+    background: 'var(--white)',
+    borderRadius: 14,
+    border: '1px solid var(--stone)',
+    overflow: 'hidden',
+  },
+  collapseBar: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '10px 16px',
+    borderBottom: '1px solid var(--stone)',
+    background: 'var(--cream)',
+  },
+  collapseBtn: {
+    padding: '4px 10px',
+    background: 'none',
+    border: '1px solid var(--stone)',
+    borderRadius: 6,
+    fontSize: 11,
+    color: 'var(--brown-light)',
+    cursor: 'pointer',
+    fontWeight: 500,
+  },
+  dateGroup: {
+    borderBottom: '1px solid var(--stone)',
+  },
+  dateHeader: {
+    width: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    padding: '12px 16px',
+    background: '#FAFAF7',
+    border: 'none',
+    cursor: 'pointer',
+    fontFamily: "'Quattrocento Sans', sans-serif",
+    textAlign: 'left',
+  },
+  dateText: {
+    fontSize: 13,
+    fontWeight: 600,
+    color: 'var(--brown)',
+    textTransform: 'capitalize',
+  },
+  dateMeta: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+  },
+  dateRegistos: {
+    fontSize: 11,
+    color: 'var(--brown-light)',
+  },
+  dateHoras: {
+    fontSize: 12,
+    fontWeight: 700,
+    color: 'var(--brown)',
+    background: 'var(--cream)',
+    padding: '2px 8px',
+    borderRadius: 6,
+  },
+  emTrabalhoBadge: {
+    fontSize: 10,
+    fontWeight: 600,
+    color: '#2e7d32',
+    background: '#E8F5E9',
+    padding: '2px 8px',
+    borderRadius: 6,
+    whiteSpace: 'nowrap',
+  },
+  dateContent: {
+    padding: '0',
+  },
+  obraGroup: {},
+  obraSubheader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    padding: '8px 16px 4px',
+    fontSize: 12,
+    color: 'var(--brown-light)',
+    borderTop: '1px solid var(--stone)',
+  },
+  obraCount: {
+    marginLeft: 'auto',
+    fontSize: 11,
+    color: 'var(--brown-light)',
+    background: 'var(--cream)',
+    padding: '1px 6px',
+    borderRadius: 4,
+    fontWeight: 600,
+  },
+  presencaCard: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+    padding: '10px 16px',
+    borderTop: '1px solid #F0EDE6',
+    transition: 'background 0.15s',
+  },
+  avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: 'white',
+    fontWeight: 600,
+    fontSize: 14,
+    flexShrink: 0,
+  },
+  nome: {
+    fontWeight: 600,
+    color: 'var(--brown)',
+    fontSize: 14,
+  },
+  cargoBadge: {
+    fontSize: 10,
+    fontWeight: 500,
+    color: 'var(--brown-light)',
+    background: 'var(--cream)',
+    padding: '2px 6px',
+    borderRadius: 4,
+  },
+  timesColumn: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 2,
+  },
+  timeRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 5,
+    color: 'var(--brown)',
+  },
+  horasBadge: {
+    fontSize: 13,
+    fontWeight: 700,
+    color: 'var(--brown)',
+    background: 'var(--cream)',
+    padding: '4px 10px',
+    borderRadius: 8,
+  },
+  emTrabalhoSmall: {
+    fontSize: 10,
+    fontWeight: 600,
+    color: '#2e7d32',
+    background: '#E8F5E9',
+    padding: '3px 8px',
+    borderRadius: 6,
+    whiteSpace: 'nowrap',
+  },
 }
 
 // =============================================
