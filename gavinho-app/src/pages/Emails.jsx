@@ -5,7 +5,9 @@ import { useToast } from '../components/ui/Toast'
 import {
   Mail, Star, Search, RefreshCw, Paperclip, ChevronRight,
   Reply, Forward, Trash2, Archive, Sparkles, Plus, Loader2,
-  ClipboardCheck, CheckCircle2, AlertCircle, FileText, ListTodo
+  ClipboardCheck, CheckCircle2, AlertCircle, FileText, ListTodo,
+  Bot, ChevronUp, ChevronDown, Check, X, Undo2, Zap, Clock, Eye,
+  Brain, Shield
 } from 'lucide-react'
 
 // ============================================
@@ -725,12 +727,19 @@ export default function Emails() {
   const [loadingSuggestion, setLoadingSuggestion] = useState(false)
   const [associating, setAssociating] = useState(false)
 
+  // Agent states
+  const [agentPanelOpen, setAgentPanelOpen] = useState(false)
+  const [agentActions, setAgentActions] = useState([])
+  const [agentQueue, setAgentQueue] = useState([])
+  const [agentLoading, setAgentLoading] = useState(false)
+
   // Stats
   const [stats, setStats] = useState({ total: 0, naoLidos: 0, urgentes: 0 })
 
   useEffect(() => {
     loadEmails()
     loadObras()
+    loadAgentData()
   }, [])
 
   useEffect(() => {
@@ -814,6 +823,98 @@ export default function Emails() {
       setObras([...projetos, ...obrasData])
     } catch (err) {
       console.error('Erro ao carregar projetos/obras:', err)
+    }
+  }
+
+  const loadAgentData = async () => {
+    try {
+      setAgentLoading(true)
+      const [actionsRes, queueRes] = await Promise.all([
+        supabase
+          .from('agent_actions')
+          .select('*, email:email_id(subject, from_address, category, summary_pt)')
+          .in('status', ['pending', 'approved', 'executed'])
+          .order('created_at', { ascending: false })
+          .limit(50),
+        supabase
+          .from('email_processing_queue')
+          .select('id, subject, from_address, status, category, confidence, summary_pt, urgency, created_at')
+          .in('status', ['pending', 'fetching', 'classifying', 'routing', 'completed', 'needs_review'])
+          .order('created_at', { ascending: false })
+          .limit(30)
+      ])
+
+      if (actionsRes.data) setAgentActions(actionsRes.data)
+      if (queueRes.data) setAgentQueue(queueRes.data)
+    } catch (err) {
+      // Tables may not exist yet — graceful degradation
+      if (err?.code !== '42P01') {
+        console.error('Erro ao carregar dados do agente:', err)
+      }
+    } finally {
+      setAgentLoading(false)
+    }
+  }
+
+  const handleApproveAction = async (actionId) => {
+    try {
+      const { error } = await supabase
+        .from('agent_actions')
+        .update({ status: 'approved', approved_at: new Date().toISOString() })
+        .eq('id', actionId)
+      if (error) throw error
+
+      // Execute via edge function
+      await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/agent-execute`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+          },
+          body: JSON.stringify({ action_id: actionId })
+        }
+      )
+
+      toast.success('Aprovado', 'Ação aprovada e executada')
+      loadAgentData()
+    } catch (err) {
+      toast.error('Erro', err.message)
+    }
+  }
+
+  const handleRejectAction = async (actionId) => {
+    try {
+      const { error } = await supabase
+        .from('agent_actions')
+        .update({ status: 'rejected', rejection_reason: 'Rejeitado pelo utilizador' })
+        .eq('id', actionId)
+      if (error) throw error
+      toast.info('Rejeitado', 'Ação rejeitada')
+      loadAgentData()
+    } catch (err) {
+      toast.error('Erro', err.message)
+    }
+  }
+
+  const handleRollbackAction = async (actionId) => {
+    try {
+      await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/agent-execute`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+          },
+          body: JSON.stringify({ rollback_action_id: actionId })
+        }
+      )
+      toast.success('Revertido', 'Ação revertida com sucesso')
+      loadAgentData()
+    } catch (err) {
+      toast.error('Erro', err.message)
     }
   }
 
@@ -1259,6 +1360,227 @@ export default function Emails() {
             obrasDisponiveis={obras}
             associating={associating}
           />
+        )}
+      </div>
+
+      {/* Agent Activity Panel */}
+      <div style={{
+        borderTop: `2px solid ${brand.oliveGray}`,
+        backgroundColor: brand.white,
+        transition: 'max-height 0.3s ease',
+        maxHeight: agentPanelOpen ? '360px' : '44px',
+        overflow: 'hidden',
+        flexShrink: 0,
+      }}>
+        {/* Toggle Header */}
+        <button
+          onClick={() => {
+            setAgentPanelOpen(!agentPanelOpen)
+            if (!agentPanelOpen) loadAgentData()
+          }}
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '10px 24px',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            fontFamily: "'Quattrocento Sans', sans-serif",
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Bot size={18} stroke={brand.oliveGray} />
+            <span style={{ fontSize: '13px', fontWeight: '600', color: brand.brown }}>
+              Agentes IA
+            </span>
+            {agentActions.filter(a => a.status === 'pending').length > 0 && (
+              <span style={{
+                fontSize: '11px',
+                fontWeight: '700',
+                color: '#fff',
+                backgroundColor: '#EF4444',
+                padding: '2px 8px',
+                borderRadius: '10px',
+                minWidth: '20px',
+                textAlign: 'center'
+              }}>
+                {agentActions.filter(a => a.status === 'pending').length}
+              </span>
+            )}
+            {agentQueue.filter(q => q.status === 'completed').length > 0 && (
+              <span style={{
+                fontSize: '11px',
+                color: brand.oliveGray,
+                backgroundColor: '#F0F0F0',
+                padding: '2px 8px',
+                borderRadius: '10px',
+              }}>
+                {agentQueue.filter(q => q.status === 'completed').length} classificados
+              </span>
+            )}
+          </div>
+          {agentPanelOpen ? <ChevronDown size={16} stroke={brand.brown} /> : <ChevronUp size={16} stroke={brand.brown} />}
+        </button>
+
+        {/* Panel Content */}
+        {agentPanelOpen && (
+          <div style={{ padding: '0 24px 16px', overflowY: 'auto', maxHeight: '300px' }}>
+            {agentLoading ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '16px 0', color: functional.textTertiary, fontSize: '13px' }}>
+                <Loader2 size={16} className="spin" /> A carregar atividade dos agentes...
+              </div>
+            ) : (
+              <>
+                {/* Pending Actions */}
+                {agentActions.filter(a => a.status === 'pending').length > 0 && (
+                  <div style={{ marginBottom: '16px' }}>
+                    <div style={{ fontSize: '11px', fontWeight: '700', color: brand.oliveGray, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                      Ações Pendentes de Aprovação
+                    </div>
+                    {agentActions.filter(a => a.status === 'pending').map(action => (
+                      <div key={action.id} style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '10px 12px',
+                        backgroundColor: '#FFFBEB',
+                        border: '1px solid #FDE68A',
+                        borderRadius: '8px',
+                        marginBottom: '6px',
+                        gap: '12px'
+                      }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                            <Zap size={13} style={{ color: '#D97706', flexShrink: 0 }} />
+                            <span style={{ fontSize: '12px', fontWeight: '600', color: '#92400E', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {action.action_description || action.action_type}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '11px', color: '#A16207' }}>
+                            {action.email?.subject ? `Email: ${action.email.subject.substring(0, 60)}...` : ''} — Confiança: {((action.confidence || 0) * 100).toFixed(0)}%
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleApproveAction(action.id) }}
+                            style={{ padding: '4px 8px', backgroundColor: '#10B981', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: '600' }}
+                            title="Aprovar"
+                          >
+                            <Check size={12} /> Aprovar
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleRejectAction(action.id) }}
+                            style={{ padding: '4px 8px', backgroundColor: '#EF4444', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: '600' }}
+                            title="Rejeitar"
+                          >
+                            <X size={12} /> Rejeitar
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Recently Executed */}
+                {agentActions.filter(a => a.status === 'executed').length > 0 && (
+                  <div style={{ marginBottom: '16px' }}>
+                    <div style={{ fontSize: '11px', fontWeight: '700', color: brand.oliveGray, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                      Executadas Recentemente
+                    </div>
+                    {agentActions.filter(a => a.status === 'executed').slice(0, 5).map(action => (
+                      <div key={action.id} style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '8px 12px',
+                        backgroundColor: '#F0FDF4',
+                        border: '1px solid #BBF7D0',
+                        borderRadius: '8px',
+                        marginBottom: '4px',
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0 }}>
+                          <CheckCircle2 size={13} style={{ color: '#16A34A', flexShrink: 0 }} />
+                          <span style={{ fontSize: '12px', color: '#166534', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {action.action_description || action.action_type}
+                          </span>
+                        </div>
+                        {action.is_reversible && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleRollbackAction(action.id) }}
+                            style={{ padding: '3px 6px', backgroundColor: 'transparent', color: '#6B7280', border: '1px solid #D1D5DB', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px', fontSize: '10px' }}
+                            title="Reverter"
+                          >
+                            <Undo2 size={10} /> Reverter
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Processing Queue */}
+                {agentQueue.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: '11px', fontWeight: '700', color: brand.oliveGray, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                      Fila de Processamento
+                    </div>
+                    {agentQueue.slice(0, 8).map(item => {
+                      const statusColors = {
+                        pending: { bg: '#F3F4F6', border: '#D1D5DB', color: '#6B7280', icon: Clock },
+                        fetching: { bg: '#EFF6FF', border: '#BFDBFE', color: '#2563EB', icon: Loader2 },
+                        classifying: { bg: '#FFF7ED', border: '#FED7AA', color: '#EA580C', icon: Brain },
+                        routing: { bg: '#FFF7ED', border: '#FED7AA', color: '#EA580C', icon: Zap },
+                        completed: { bg: '#F0FDF4', border: '#BBF7D0', color: '#16A34A', icon: CheckCircle2 },
+                        needs_review: { bg: '#FFFBEB', border: '#FDE68A', color: '#D97706', icon: Eye },
+                      }
+                      const s = statusColors[item.status] || statusColors.pending
+                      const StatusIcon = s.icon
+                      return (
+                        <div key={item.id} style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '6px 10px',
+                          backgroundColor: s.bg,
+                          border: `1px solid ${s.border}`,
+                          borderRadius: '6px',
+                          marginBottom: '3px',
+                        }}>
+                          <StatusIcon size={12} style={{ color: s.color, flexShrink: 0 }} className={item.status === 'fetching' || item.status === 'classifying' ? 'spin' : ''} />
+                          <span style={{ fontSize: '11px', color: s.color, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {item.subject || item.from_address || 'Email em processamento'}
+                          </span>
+                          {item.category && (
+                            <span style={{ fontSize: '10px', color: '#6B7280', backgroundColor: '#F3F4F6', padding: '1px 6px', borderRadius: '4px', flexShrink: 0 }}>
+                              {item.category}
+                            </span>
+                          )}
+                          {item.confidence != null && (
+                            <span style={{ fontSize: '10px', color: s.color, fontWeight: '600', flexShrink: 0 }}>
+                              {(item.confidence * 100).toFixed(0)}%
+                            </span>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {/* Empty state */}
+                {agentActions.length === 0 && agentQueue.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: '24px', color: functional.textTertiary }}>
+                    <Bot size={32} style={{ opacity: 0.3, marginBottom: '8px' }} />
+                    <p style={{ fontSize: '13px', margin: 0 }}>Nenhuma atividade de agentes</p>
+                    <p style={{ fontSize: '11px', margin: '4px 0 0', color: '#9CA3AF' }}>
+                      Configure as subscrições do Microsoft Graph para ativar o processamento automático
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         )}
       </div>
 
