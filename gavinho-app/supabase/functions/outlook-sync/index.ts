@@ -79,8 +79,8 @@ async function fetchRecentEmails(accessToken: string, since?: string, limit: num
 // Extrair código de projeto/obra do assunto ou corpo do email
 function extractProjectCode(subject: string, body?: string): string | null {
   const text = `${subject} ${body || ''}`
-  // Procura por padrões como GA00413, GA00489, OB00123, etc.
-  const match = text.match(/(GA|OB)\d{5}/i)
+  // Procura por padrões como GA00413, GB00466, OB00123, OBR-00123, etc.
+  const match = text.match(/(GA|GB|OB)\d{5}/i) || text.match(/OBR-\d{5}/i)
   return match ? match[0].toUpperCase() : null
 }
 
@@ -193,9 +193,10 @@ serve(async (req) => {
       let projetoId: string | null = null
 
       if (projectCode) {
-        // Códigos OB -> obra_id (FK para obras)
+        // Códigos OB/OBR -> obra_id (FK para obras)
+        // Códigos GB -> obra_id (FK para obras)
         // Códigos GA -> projeto_id (FK para projetos)
-        if (projectCode.startsWith('OB')) {
+        if (projectCode.startsWith('OB') || projectCode.startsWith('GB')) {
           obraId = obraMap.get(projectCode) || null
           if (!obraId) {
             console.log(`Email "${email.subject}" has obra code ${projectCode} but not found in database`)
@@ -209,7 +210,38 @@ serve(async (req) => {
           }
         }
       } else {
-        console.log(`Email "${email.subject}" - no project code detected, importing anyway`)
+        // Fallback: try to match by sender email to known fornecedores
+        const senderEmail = email.from.emailAddress.address?.toLowerCase()
+        if (senderEmail) {
+          const { data: fornecedor } = await supabase
+            .from('fornecedores')
+            .select('id')
+            .ilike('email', senderEmail)
+            .limit(1)
+            .single()
+
+          if (fornecedor) {
+            // Find recent emails from this fornecedor that DO have a project
+            const { data: recentLinked } = await supabase
+              .from('obra_emails')
+              .select('obra_id, projeto_id')
+              .eq('de_email', senderEmail)
+              .not('obra_id', 'is', null)
+              .order('data_recebido', { ascending: false })
+              .limit(1)
+              .single()
+
+            if (recentLinked) {
+              obraId = recentLinked.obra_id
+              projetoId = recentLinked.projeto_id
+              console.log(`Email "${email.subject}" - matched by sender ${senderEmail} to previous project/obra`)
+            }
+          }
+        }
+
+        if (!obraId && !projetoId) {
+          console.log(`Email "${email.subject}" - no project code detected, importing anyway`)
+        }
       }
 
       // Detectar urgência

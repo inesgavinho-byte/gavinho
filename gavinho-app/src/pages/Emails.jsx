@@ -241,9 +241,12 @@ const EmailDetail = ({
   onArchive,
   onProcessEmail,
   onSuggestReply,
+  onAssociateProject,
   processando,
   loadingSuggestion,
-  processResult
+  processResult,
+  obrasDisponiveis,
+  associating
 }) => {
   if (!email) {
     return (
@@ -493,6 +496,53 @@ const EmailDetail = ({
         </div>
       </div>
 
+      {/* Manual Project Association */}
+      {!email.projeto_id && !email.obra_id && (
+        <div style={{
+          padding: '10px 24px',
+          borderBottom: `1px solid ${functional.border}`,
+          backgroundColor: '#FFFBEB',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          flexWrap: 'wrap'
+        }}>
+          <AlertCircle size={16} style={{ color: '#D97706', flexShrink: 0 }} />
+          <span style={{
+            fontSize: '12px',
+            fontWeight: '500',
+            color: '#92400E',
+            fontFamily: "'Quattrocento Sans', sans-serif"
+          }}>
+            Sem projeto associado
+          </span>
+          <select
+            onChange={(e) => {
+              if (e.target.value) onAssociateProject(email, e.target.value)
+            }}
+            disabled={associating}
+            style={{
+              padding: '6px 10px',
+              fontSize: '12px',
+              color: brand.brown,
+              backgroundColor: brand.white,
+              border: `1px solid ${brand.borderSubtle}`,
+              borderRadius: '6px',
+              cursor: 'pointer',
+              minWidth: '220px',
+              fontFamily: "'Quattrocento Sans', sans-serif"
+            }}
+            defaultValue=""
+          >
+            <option value="" disabled>Associar a projeto/obra...</option>
+            {(obrasDisponiveis || []).map(o => (
+              <option key={o.id} value={`${o.tipo}:${o.id}`}>{o.label}</option>
+            ))}
+          </select>
+          {associating && <Loader2 size={14} className="spin" style={{ color: '#D97706' }} />}
+        </div>
+      )}
+
       {/* Process Result Panel */}
       {processResult && (
         <div style={{
@@ -673,6 +723,7 @@ export default function Emails() {
   const [processando, setProcessando] = useState(false)
   const [processResult, setProcessResult] = useState(null)
   const [loadingSuggestion, setLoadingSuggestion] = useState(false)
+  const [associating, setAssociating] = useState(false)
 
   // Stats
   const [stats, setStats] = useState({ total: 0, naoLidos: 0, urgentes: 0 })
@@ -840,6 +891,36 @@ export default function Emails() {
       toast.error('Erro', 'Erro ao gerar sugestão: ' + err.message)
     } finally {
       setLoadingSuggestion(false)
+    }
+  }
+
+  const handleAssociateProject = async (email, value) => {
+    if (!email || !value) return
+    setAssociating(true)
+    try {
+      const [tipo, id] = value.split(':')
+      const update = tipo === 'projeto'
+        ? { projeto_id: id, obra_id: null }
+        : { obra_id: id, projeto_id: null }
+
+      const { error } = await supabase
+        .from('obra_emails')
+        .update(update)
+        .eq('id', email.id)
+
+      if (error) throw error
+
+      // Update local state
+      setEmails(prev => prev.map(e =>
+        e.id === email.id ? { ...e, ...update } : e
+      ))
+      setSelectedEmail(prev => prev?.id === email.id ? { ...prev, ...update } : prev)
+      toast.success('Associado', 'Email associado ao projeto/obra com sucesso')
+    } catch (err) {
+      console.error('Erro ao associar:', err)
+      toast.error('Erro', 'Erro ao associar email: ' + err.message)
+    } finally {
+      setAssociating(false)
     }
   }
 
@@ -1171,9 +1252,12 @@ export default function Emails() {
             onArchive={handleArchive}
             onProcessEmail={handleProcessEmail}
             onSuggestReply={handleSuggestReply}
+            onAssociateProject={handleAssociateProject}
             processando={processando}
             processResult={processResult}
             loadingSuggestion={loadingSuggestion}
+            obrasDisponiveis={obras}
+            associating={associating}
           />
         )}
       </div>

@@ -10,6 +10,9 @@ import {
 } from 'lucide-react'
 import ObraChat from '../components/ObraChat'
 import ObraChecklist from '../components/ObraChecklist'
+import ObraFotografias from '../components/ObraFotografias'
+import ObraRelatorios from '../components/ObraRelatorios'
+import ObraNaoConformidades from '../components/ObraNaoConformidades'
 import { useToast } from '../components/ui/Toast'
 import { ConfirmModal } from '../components/ui/ConfirmModal'
 
@@ -2178,8 +2181,11 @@ export default function ObraDetalhe() {
         {activeMainTab === 'tracking' && !tabLoading && activeTrackingSubtab === 'execucao' && renderExecucaoTab()}
         {activeMainTab === 'tracking' && !tabLoading && activeTrackingSubtab === 'autos' && renderAutosTab()}
 
-        {/* Acompanhamento - Placeholder */}
-        {activeMainTab === 'acompanhamento' && (
+        {/* Acompanhamento */}
+        {activeMainTab === 'acompanhamento' && activeAcompanhamentoSubtab === 'fotografias' && (
+          <ObraFotografias obra={obra} />
+        )}
+        {activeMainTab === 'acompanhamento' && activeAcompanhamentoSubtab === 'diario' && (
           <div style={{
             background: colors.white,
             borderRadius: '12px',
@@ -2187,38 +2193,22 @@ export default function ObraDetalhe() {
             textAlign: 'center',
             border: `1px solid ${colors.border}`
           }}>
-            <Camera size={48} style={{ color: colors.textMuted, opacity: 0.3, marginBottom: '16px' }} />
-            <h3 style={{ margin: '0 0 8px', color: colors.text }}>
-              {acompanhamentoSubtabs.find(s => s.id === activeAcompanhamentoSubtab)?.label}
-            </h3>
+            <BookOpen size={48} style={{ color: colors.textMuted, opacity: 0.3, marginBottom: '16px' }} />
+            <h3 style={{ margin: '0 0 8px', color: colors.text }}>Diário de Obra</h3>
             <p style={{ color: colors.textMuted, marginBottom: '16px' }}>Funcionalidades previstas:</p>
             <div style={{ display: 'inline-block', textAlign: 'left', color: colors.textMuted, fontSize: '13px', lineHeight: '1.8' }}>
-              {activeAcompanhamentoSubtab === 'fotografias' && (<>
-                • Registo fotográfico por zona e fase<br/>
-                • Galeria com filtros por data e categoria<br/>
-                • Comparação antes/depois<br/>
-                • Exportação para relatórios
-              </>)}
-              {activeAcompanhamentoSubtab === 'diario' && (<>
-                • Diário de obra com registo diário<br/>
-                • Condições meteorológicas e mão-de-obra<br/>
-                • Registo de equipamentos em obra<br/>
-                • Ocorrências e observações do dia
-              </>)}
-              {activeAcompanhamentoSubtab === 'relatorios' && (<>
-                • Relatórios de visita de acompanhamento<br/>
-                • Relatórios mensais de progresso<br/>
-                • Exportação em PDF<br/>
-                • Histórico de relatórios emitidos
-              </>)}
-              {activeAcompanhamentoSubtab === 'nao-conformidades' && (<>
-                • Registo de não conformidades<br/>
-                • Classificação por gravidade<br/>
-                • Ações corretivas e prazos<br/>
-                • Seguimento e fecho de NC
-              </>)}
+              • Diário de obra com registo diário<br/>
+              • Condições meteorológicas e mão-de-obra<br/>
+              • Registo de equipamentos em obra<br/>
+              • Ocorrências e observações do dia
             </div>
           </div>
+        )}
+        {activeMainTab === 'acompanhamento' && activeAcompanhamentoSubtab === 'relatorios' && (
+          <ObraRelatorios obra={obra} />
+        )}
+        {activeMainTab === 'acompanhamento' && activeAcompanhamentoSubtab === 'nao-conformidades' && (
+          <ObraNaoConformidades obra={obra} />
         )}
 
         {/* Fiscalização - Placeholder */}

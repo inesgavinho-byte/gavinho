@@ -36,13 +36,14 @@ function parseEmailAddress(address: string): { email: string; nome: string } {
   return { email: address.trim(), nome: address.trim().split('@')[0] }
 }
 
-// Função para extrair código da obra do assunto
-function extrairCodigoObra(assunto: string): string | null {
-  // Padrões: GA00402, GB00402, OBR-00402
-  const gaMatch = assunto.match(/G[AB]\d{5}/i)
+// Função para extrair código da obra do assunto e/ou corpo
+function extrairCodigoObra(assunto: string, corpo?: string): string | null {
+  const text = `${assunto} ${corpo || ''}`
+  // Padrões: GA00402, GB00402, OB00123, OBR-00402
+  const gaMatch = text.match(/(GA|GB|OB)\d{5}/i)
   if (gaMatch) return gaMatch[0].toUpperCase()
 
-  const obrMatch = assunto.match(/OBR-\d{5}/i)
+  const obrMatch = text.match(/OBR-\d{5}/i)
   if (obrMatch) return obrMatch[0].toUpperCase()
 
   return null
@@ -98,22 +99,37 @@ serve(async (req) => {
     const destinatarios = emailData.to.split(',').map(parseEmailAddress)
     const cc = emailData.cc ? emailData.cc.split(',').map(parseEmailAddress) : null
 
-    // Extrair código da obra
-    const codigoDetectado = extrairCodigoObra(emailData.subject)
+    // Extrair código da obra (procura no assunto E no corpo)
+    const codigoDetectado = extrairCodigoObra(emailData.subject, emailData.text)
 
-    // Procurar obra correspondente
+    // Procurar obra/projeto correspondente
     let obra_id: string | null = null
+    let projeto_id: string | null = null
     if (codigoDetectado) {
-      const codigoCanonico = gerarCodigoCanonico(codigoDetectado)
+      if (codigoDetectado.startsWith('GA')) {
+        // GA codes -> projetos table
+        const { data: projeto } = await supabase
+          .from('projetos')
+          .select('id')
+          .eq('codigo', codigoDetectado)
+          .single()
 
-      const { data: obra } = await supabase
-        .from('obras')
-        .select('id')
-        .or(`codigo.eq.${codigoDetectado},codigo_canonico.eq.${codigoCanonico}`)
-        .single()
+        if (projeto) {
+          projeto_id = projeto.id
+        }
+      } else {
+        // GB, OB, OBR codes -> obras table
+        const codigoCanonico = gerarCodigoCanonico(codigoDetectado)
 
-      if (obra) {
-        obra_id = obra.id
+        const { data: obra } = await supabase
+          .from('obras')
+          .select('id')
+          .or(`codigo.eq.${codigoDetectado},codigo_canonico.eq.${codigoCanonico}`)
+          .single()
+
+        if (obra) {
+          obra_id = obra.id
+        }
       }
     }
 
@@ -161,6 +177,7 @@ serve(async (req) => {
       .insert({
         message_id: messageId,
         obra_id,
+        projeto_id,
         assunto: emailData.subject,
         de_email: remetente.email,
         de_nome: remetente.nome,
@@ -171,7 +188,7 @@ serve(async (req) => {
         anexos,
         tipo: 'recebido',
         codigo_obra_detectado: codigoDetectado,
-        classificacao_automatica: !!obra_id,
+        classificacao_automatica: !!(obra_id || projeto_id),
         in_reply_to: inReplyTo,
         thread_id,
         data_envio: new Date().toISOString(),
@@ -199,10 +216,10 @@ serve(async (req) => {
         .eq('id', emailSalvo.id)
     }
 
-    console.log('Email guardado:', emailSalvo?.id, 'Obra:', obra_id)
+    console.log('Email guardado:', emailSalvo?.id, 'Obra:', obra_id, 'Projeto:', projeto_id)
 
-    // Se obra não foi encontrada, tentar notificar para classificação manual
-    if (!obra_id && emailSalvo) {
+    // Se obra/projeto não foram encontrados, tentar notificar para classificação manual
+    if (!obra_id && !projeto_id && emailSalvo) {
       console.log('Email sem obra associada - requer classificação manual')
       // Aqui pode-se adicionar notificação ou criar entrada numa fila de classificação
     }
@@ -212,8 +229,9 @@ serve(async (req) => {
         success: true,
         email_id: emailSalvo?.id,
         obra_id,
+        projeto_id,
         codigo_detectado: codigoDetectado,
-        classificado_automaticamente: !!obra_id,
+        classificado_automaticamente: !!(obra_id || projeto_id),
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
