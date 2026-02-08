@@ -1161,6 +1161,9 @@ export default function GestaoProjetoPage() {
             </div>
           </div>
 
+          {/* Procurement Card - GARVIS */}
+          <ProcurementInsightCard navigate={navigate} />
+
           {/* Milestones Card */}
           <div className="card" style={{ padding: '20px' }}>
             <h3 style={{
@@ -1298,6 +1301,90 @@ export default function GestaoProjetoPage() {
           }}>
             <span style={{ fontSize: '14px' }}>⌘</span>
             <span>+ K</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Procurement Insight Card for sidebar
+function ProcurementInsightCard({ navigate }) {
+  const [data, setData] = useState(null)
+
+  useEffect(() => {
+    loadProcurementData()
+  }, [])
+
+  const loadProcurementData = async () => {
+    try {
+      const [fornRes, drRes, alertRes] = await Promise.all([
+        supabase.from('fornecedores').select('id', { count: 'exact', head: true }).in('status', ['ativo', 'preferencial']),
+        supabase.from('deal_rooms').select('id', { count: 'exact', head: true }).in('status', ['aberto', 'em_avaliacao']),
+        supabase.from('alertas_garvis').select('id', { count: 'exact', head: true }).eq('prioridade', 'critico').eq('lida', false)
+      ])
+
+      setData({
+        fornecedores: fornRes.count || 0,
+        dealRooms: drRes.count || 0,
+        alertas: alertRes.count || 0
+      })
+    } catch {
+      // Tables may not exist yet - try fornecedores only
+      try {
+        const { count } = await supabase.from('fornecedores').select('id', { count: 'exact', head: true })
+        setData({ fornecedores: count || 0, dealRooms: 0, alertas: 0 })
+      } catch {
+        setData(null)
+      }
+    }
+  }
+
+  if (!data) return null
+
+  return (
+    <div className="card" style={{ padding: '20px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+        <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
+          Procurement
+        </h3>
+        <button
+          onClick={() => navigate('/fornecedores')}
+          style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            fontSize: '12px', color: 'var(--accent-olive)', fontWeight: 500,
+            display: 'flex', alignItems: 'center', gap: '4px'
+          }}
+        >
+          Ver tudo <ChevronRight size={12} />
+        </button>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            fontFamily: "'Cormorant Garamond', Georgia, serif",
+            fontSize: '24px', fontWeight: 700, color: 'var(--brown)', lineHeight: 1.1
+          }}>{data.fornecedores}</div>
+          <div style={{ fontSize: '10px', color: 'var(--brown-light)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            Fornecedores
+          </div>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            fontFamily: "'Cormorant Garamond', Georgia, serif",
+            fontSize: '24px', fontWeight: 700, color: data.dealRooms > 0 ? 'var(--accent-olive)' : 'var(--brown)', lineHeight: 1.1
+          }}>{data.dealRooms}</div>
+          <div style={{ fontSize: '10px', color: 'var(--brown-light)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            Deal Rooms
+          </div>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            fontFamily: "'Cormorant Garamond', Georgia, serif",
+            fontSize: '24px', fontWeight: 700, color: data.alertas > 0 ? 'var(--error)' : 'var(--brown)', lineHeight: 1.1
+          }}>{data.alertas}</div>
+          <div style={{ fontSize: '10px', color: 'var(--brown-light)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            Alertas
           </div>
         </div>
       </div>

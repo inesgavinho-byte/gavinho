@@ -767,7 +767,10 @@ export default function Fornecedores() {
 // G.A.R.V.I.S. Recommendation Component - Dynamic with matching
 function GarvisRecommendation({ fornecedores, activeDealRooms, onCreateDealRoom }) {
   const [recommendation, setRecommendation] = useState(null)
+  const [alternatives, setAlternatives] = useState([])
+  const [showAlternatives, setShowAlternatives] = useState(false)
   const [loading, setLoading] = useState(false)
+  const navigate = useNavigate()
 
   useEffect(() => {
     if (fornecedores.length >= 3) {
@@ -785,9 +788,10 @@ function GarvisRecommendation({ fornecedores, activeDealRooms, onCreateDealRoom 
       const topSpec = Object.entries(specCount).sort((a, b) => b[1] - a[1])[0]?.[0]
 
       if (topSpec) {
-        const top = await getTopRecommendations(fornecedores, topSpec, 1)
+        const top = await getTopRecommendations(fornecedores, topSpec, 4)
         if (top.length > 0) {
           setRecommendation({ ...top[0], especialidade: topSpec })
+          setAlternatives(top.slice(1))
         }
       }
 
@@ -795,19 +799,25 @@ function GarvisRecommendation({ fornecedores, activeDealRooms, onCreateDealRoom 
       if (!recommendation) {
         const topRated = fornecedores
           .filter(f => f.rating && f.rating >= 4 && (f.status === 'ativo' || f.status === 'preferencial'))
-          .sort((a, b) => (b.rating || 0) - (a.rating || 0))[0]
+          .sort((a, b) => (b.rating || 0) - (a.rating || 0))
 
-        if (topRated) {
+        if (topRated.length > 0) {
+          const best = topRated[0]
           setRecommendation({
-            fornecedor: topRated,
-            score: Math.min(70 + (topRated.rating || 0) * 5, 99),
+            fornecedor: best,
+            score: Math.min(70 + (best.rating || 0) * 5, 99),
             justificacao: [
-              topRated.especialidade && `Especialista em ${topRated.especialidade}`,
-              `Rating ${topRated.rating}/5`,
-              topRated.is_preferencial && 'Fornecedor preferencial'
+              best.especialidade && `Especialista em ${best.especialidade}`,
+              `Rating ${best.rating}/5`,
+              best.is_preferencial && 'Fornecedor preferencial'
             ].filter(Boolean),
-            especialidade: topRated.especialidade
+            especialidade: best.especialidade
           })
+          setAlternatives(topRated.slice(1, 4).map(f => ({
+            fornecedor: f,
+            score: Math.min(60 + (f.rating || 0) * 5, 95),
+            justificacao: [f.especialidade, `Rating ${f.rating}/5`].filter(Boolean)
+          })))
         }
       }
     } catch {
@@ -951,16 +961,61 @@ function GarvisRecommendation({ fornecedores, activeDealRooms, onCreateDealRoom 
           Criar Deal Room
         </button>
         <button
-          onClick={() => {}}
+          onClick={() => setShowAlternatives(!showAlternatives)}
           style={{
             padding: '12px', background: 'transparent', color: 'var(--brown)',
             border: '1px solid var(--stone)', borderRadius: '8px', cursor: 'pointer',
             fontSize: '13px', fontWeight: 500
           }}
         >
-          Ver alternativas
+          {showAlternatives ? 'Esconder' : 'Ver alternativas'}
         </button>
       </div>
+
+      {/* Alternatives */}
+      {showAlternatives && alternatives.length > 0 && (
+        <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {alternatives.map((alt, i) => {
+            const af = alt.fornecedor
+            return (
+              <div key={af.id}
+                onClick={() => navigate(`/fornecedores/${af.id}`)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px',
+                  background: 'var(--cream)', borderRadius: '10px', cursor: 'pointer',
+                  transition: 'all 0.15s'
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--stone)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'var(--cream)'}
+              >
+                <div style={{
+                  width: '24px', height: '24px', borderRadius: '6px', background: 'var(--brown-dark)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: 'var(--accent-olive)', fontWeight: 700, fontSize: '10px', flexShrink: 0
+                }}>{i + 2}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--brown)' }}>{af.nome}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
+                    {af.especialidade || 'Geral'} {af.rating ? `· ${af.rating}/5` : ''}
+                  </div>
+                </div>
+                <div style={{
+                  fontFamily: "'Cormorant Garamond', Georgia, serif",
+                  fontSize: '18px', fontWeight: 700,
+                  color: alt.score >= 60 ? 'var(--accent-olive)' : 'var(--brown-light)'
+                }}>
+                  {alt.score}%
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+      {showAlternatives && alternatives.length === 0 && (
+        <div style={{ marginTop: '12px', fontSize: '12px', color: 'var(--brown-light)', textAlign: 'center', padding: '8px' }}>
+          Sem alternativas suficientes. Adicione mais fornecedores com a mesma especialidade.
+        </div>
+      )}
     </div>
   )
 }

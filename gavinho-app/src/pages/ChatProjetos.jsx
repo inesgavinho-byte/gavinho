@@ -74,7 +74,7 @@ const CANAL_ICONS = [
 
 // G.A.R.V.I.S. - Virtual AI Assistant
 const GARVIS_USER = {
-  id: 'garvis-bot-001',
+  id: '00000000-0000-0000-0000-000000000001',
   nome: 'G.A.R.V.I.S.',
   avatar_url: '/avatars/garvis.png',
   is_bot: true,
