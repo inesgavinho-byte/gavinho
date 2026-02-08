@@ -94,6 +94,7 @@ const navigation = [
         ]
       },
       { name: 'Gestão Integrada', href: '/gestao-projeto/integrada', icon: Layers },
+      { name: 'Fornecedores', href: '/fornecedores', icon: Truck },
     ]
   },
   {
