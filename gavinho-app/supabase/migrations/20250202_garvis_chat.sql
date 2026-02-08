@@ -17,30 +17,10 @@ BEGIN
 END $$;
 
 -- =====================================================
--- 2. Insert GARVIS virtual user
+-- 2. GARVIS bot user - skipped
+-- The utilizadores table has auth constraints (utilizadores_team_requires_auth)
+-- GARVIS works without a bot user row - chat logs stand alone
 -- =====================================================
-INSERT INTO utilizadores (
-  id,
-  nome,
-  email,
-  cargo,
-  avatar_url,
-  is_bot,
-  ativo
-)
-VALUES (
-  '00000000-0000-0000-0000-000000000001'::UUID,
-  'G.A.R.V.I.S.',
-  'garvis@gavinho.internal',
-  'Assistente IA',
-  '/avatars/garvis.png',
-  true,
-  true
-)
-ON CONFLICT (id) DO UPDATE SET
-  nome = EXCLUDED.nome,
-  cargo = EXCLUDED.cargo,
-  is_bot = EXCLUDED.is_bot;
 
 -- =====================================================
 -- 3. Create GARVIS chat logs table
