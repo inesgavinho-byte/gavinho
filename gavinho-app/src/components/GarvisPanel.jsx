@@ -117,7 +117,7 @@ export default function GarvisPanel({ onClose, fornecedores = [], kpis = null, o
 
   return (
     <div style={{
-      width: '340px',
+      width: '400px',
       background: 'var(--cream)',
       borderLeft: '1px solid var(--stone)',
       display: 'flex',
@@ -196,7 +196,7 @@ export default function GarvisPanel({ onClose, fornecedores = [], kpis = null, o
               border: 'none',
               borderBottom: activeTab === tab.id ? '2px solid var(--brown)' : '2px solid transparent',
               cursor: 'pointer',
-              fontSize: '12px',
+              fontSize: '13px',
               fontWeight: activeTab === tab.id ? 600 : 400,
               color: activeTab === tab.id ? 'var(--brown)' : 'var(--brown-light)',
               transition: 'all 0.2s',
@@ -233,10 +233,10 @@ export default function GarvisPanel({ onClose, fornecedores = [], kpis = null, o
                 <Loader2 size={20} className="spin" style={{ color: 'var(--brown-light)' }} />
               </div>
             ) : alertas.length === 0 ? (
-              <div style={{ padding: '24px 12px', textAlign: 'center', color: 'var(--brown-light)', fontSize: '12px' }}>
-                <Bell size={20} style={{ opacity: 0.3, margin: '0 auto 8px', display: 'block' }} />
+              <div style={{ padding: '24px 12px', textAlign: 'center', color: 'var(--brown-light)', fontSize: '13px' }}>
+                <Bell size={24} style={{ opacity: 0.3, margin: '0 auto 8px', display: 'block' }} />
                 Sem alertas ativos
-                <div style={{ fontSize: '11px', marginTop: '4px', opacity: 0.7 }}>
+                <div style={{ fontSize: '12px', marginTop: '4px', opacity: 0.7 }}>
                   Os alertas serão gerados automaticamente com base nas certificações e orçamentos.
                 </div>
               </div>
@@ -312,18 +312,18 @@ export default function GarvisPanel({ onClose, fornecedores = [], kpis = null, o
         {activeTab === 'historico' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {chatMessages.length === 0 ? (
-              <div style={{ padding: '24px 12px', textAlign: 'center', color: 'var(--brown-light)', fontSize: '12px' }}>
-                <History size={20} style={{ opacity: 0.3, margin: '0 auto 8px', display: 'block' }} />
+              <div style={{ padding: '24px 12px', textAlign: 'center', color: 'var(--brown-light)', fontSize: '13px' }}>
+                <History size={24} style={{ opacity: 0.3, margin: '0 auto 8px', display: 'block' }} />
                 Sem histórico de conversas.
-                <div style={{ fontSize: '11px', marginTop: '4px', opacity: 0.7 }}>
+                <div style={{ fontSize: '12px', marginTop: '4px', opacity: 0.7 }}>
                   As interações com o G.A.R.V.I.S. aparecerão aqui.
                 </div>
               </div>
             ) : (
               chatMessages.map((msg, i) => (
                 <div key={i} style={{
-                  fontSize: '11px',
-                  padding: '8px 10px',
+                  fontSize: '13px',
+                  padding: '10px 12px',
                   borderRadius: '8px',
                   background: msg.role === 'user' ? 'var(--brown)' : msg.error ? 'rgba(220, 38, 38, 0.06)' : 'var(--white)',
                   color: msg.role === 'user' ? 'white' : msg.error ? 'var(--error)' : 'var(--brown)',
@@ -333,7 +333,7 @@ export default function GarvisPanel({ onClose, fornecedores = [], kpis = null, o
                 }}>
                   {msg.content}
                   {msg.tempo && (
-                    <div style={{ fontSize: '9px', opacity: 0.5, marginTop: '4px' }}>
+                    <div style={{ fontSize: '10px', opacity: 0.5, marginTop: '4px' }}>
                       {(msg.tempo / 1000).toFixed(1)}s
                     </div>
                   )}
@@ -350,7 +350,7 @@ export default function GarvisPanel({ onClose, fornecedores = [], kpis = null, o
         padding: '12px'
       }}>
         <div style={{
-          fontSize: '10px',
+          fontSize: '11px',
           fontWeight: 700,
           letterSpacing: '1px',
           color: 'var(--brown-light)',
@@ -364,7 +364,7 @@ export default function GarvisPanel({ onClose, fornecedores = [], kpis = null, o
             <Loader2 size={14} className="spin" style={{ color: 'var(--brown-light)' }} />
           </div>
         ) : activeDealRooms.length === 0 ? (
-          <div style={{ fontSize: '12px', color: 'var(--brown-light)', padding: '4px 0' }}>
+          <div style={{ fontSize: '13px', color: 'var(--brown-light)', padding: '4px 0' }}>
             Sem deal rooms ativos
           </div>
         ) : (
@@ -381,7 +381,7 @@ export default function GarvisPanel({ onClose, fornecedores = [], kpis = null, o
         background: 'rgba(255,255,255,0.5)'
       }}>
         <div style={{
-          fontSize: '10px',
+          fontSize: '11px',
           fontWeight: 700,
           letterSpacing: '1px',
           color: 'var(--brown-light)',
@@ -391,34 +391,34 @@ export default function GarvisPanel({ onClose, fornecedores = [], kpis = null, o
           alignItems: 'center',
           gap: '4px'
         }}>
-          <MessageSquare size={12} />
+          <MessageSquare size={13} />
           PERGUNTE AO G.A.R.V.I.S.
         </div>
 
         {/* Recent chat messages (last 4) */}
         {chatMessages.length > 0 && (
-          <div style={{ maxHeight: '120px', overflowY: 'auto', marginBottom: '8px' }}>
+          <div style={{ maxHeight: '160px', overflowY: 'auto', marginBottom: '8px' }}>
             {chatMessages.slice(-4).map((msg, i) => (
               <div key={i} style={{
-                fontSize: '11px',
-                padding: '6px 8px',
+                fontSize: '13px',
+                padding: '8px 10px',
                 marginBottom: '4px',
                 borderRadius: '6px',
                 background: msg.role === 'user' ? 'var(--brown)' : msg.error ? 'rgba(220, 38, 38, 0.06)' : 'var(--white)',
                 color: msg.role === 'user' ? 'white' : msg.error ? 'var(--error)' : 'var(--brown)',
                 textAlign: msg.role === 'user' ? 'right' : 'left',
-                lineHeight: 1.4
+                lineHeight: 1.5
               }}>
                 {msg.content}
               </div>
             ))}
             {chatLoading && (
               <div style={{
-                fontSize: '11px', padding: '6px 8px', borderRadius: '6px',
+                fontSize: '13px', padding: '8px 10px', borderRadius: '6px',
                 background: 'var(--white)', color: 'var(--brown-light)',
                 display: 'flex', alignItems: 'center', gap: '6px'
               }}>
-                <Loader2 size={12} className="spin" /> A pensar...
+                <Loader2 size={14} className="spin" /> A pensar...
               </div>
             )}
             <div ref={chatEndRef} />
@@ -436,10 +436,10 @@ export default function GarvisPanel({ onClose, fornecedores = [], kpis = null, o
             disabled={chatLoading}
             style={{
               flex: 1,
-              padding: '8px 10px',
+              padding: '10px 12px',
               border: '1px solid var(--stone)',
               borderRadius: '8px',
-              fontSize: '11px',
+              fontSize: '13px',
               background: 'var(--white)',
               color: 'var(--brown)',
               outline: 'none',
@@ -450,7 +450,7 @@ export default function GarvisPanel({ onClose, fornecedores = [], kpis = null, o
             onClick={handleSendChat}
             disabled={chatLoading || !chatInput.trim()}
             style={{
-              width: '32px', height: '32px',
+              width: '36px', height: '36px',
               borderRadius: '50%',
               background: chatLoading ? 'var(--brown-light)' : 'var(--brown)',
               color: 'white',
@@ -474,8 +474,8 @@ export default function GarvisPanel({ onClose, fornecedores = [], kpis = null, o
                 key={i}
                 onClick={() => setChatInput(sug)}
                 style={{
-                  padding: '4px 10px',
-                  fontSize: '10px',
+                  padding: '5px 12px',
+                  fontSize: '12px',
                   border: '1px solid var(--stone)',
                   borderRadius: '12px',
                   background: 'var(--white)',
@@ -522,10 +522,10 @@ function AlertCard({ alerta, onMarkRead, onArchive, timeAgo }) {
           flexShrink: 0
         }} />
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--brown)', marginBottom: '4px' }}>
+          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--brown)', marginBottom: '4px' }}>
             {alerta.titulo}
           </div>
-          <div style={{ fontSize: '11px', color: 'var(--brown-light)', lineHeight: 1.4 }}>
+          <div style={{ fontSize: '12px', color: 'var(--brown-light)', lineHeight: 1.5 }}>
             {alerta.mensagem}
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '6px', alignItems: 'center' }}>
@@ -596,8 +596,8 @@ function DealRoomCard({ deal, onClick }) {
       transition: 'all 0.15s'
     }}>
       <div>
-        <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--brown)' }}>{deal.titulo}</div>
-        <div style={{ fontSize: '10px', color: 'var(--brown-light)' }}>
+        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--brown)' }}>{deal.titulo}</div>
+        <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
           {deal.codigo} · {deal.detalhe || 'Em curso'}
         </div>
       </div>
@@ -629,10 +629,10 @@ function SuggestionCard({ icon, title, text, action, actionLabel }) {
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
         <span style={{ fontSize: '16px' }}>{icon}</span>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--brown)', marginBottom: '4px' }}>
+          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--brown)', marginBottom: '4px' }}>
             {title}
           </div>
-          <div style={{ fontSize: '11px', color: 'var(--brown-light)', lineHeight: 1.4 }}>
+          <div style={{ fontSize: '12px', color: 'var(--brown-light)', lineHeight: 1.5 }}>
             {text}
           </div>
           {actionLabel && action && (
