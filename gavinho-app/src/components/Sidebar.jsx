@@ -27,54 +27,89 @@ import {
   MessageSquare,
   Eye,
   EyeOff,
-  Check
+  Check,
+  Handshake,
+  ClipboardList,
+  FileCheck,
+  Layers,
+  TrendingUp,
+  CreditCard,
+  FileText,
+  Building2,
+  MessagesSquare
 } from 'lucide-react'
 import { useState } from 'react'
 
+// Calendário global - visível para todos, fora dos módulos
+const globalItems = [
+  { name: 'Calendário', href: '/calendario', icon: Calendar }
+]
+
 const navigation = [
   {
-    section: 'Módulo Projetos',
+    section: 'Projetos',
     items: [
       { name: 'Dashboard Projetos', href: '/dashboard-projetos', icon: LayoutDashboard },
       { name: 'Projetos', href: '/projetos', icon: FolderKanban },
-      { name: 'Team Chat', href: '/chat', icon: MessageSquare },
-      { name: 'Calendário', href: '/calendario', icon: Calendar },
+      { name: 'Teams', href: '/chat', icon: MessagesSquare },
       { name: 'Biblioteca', href: '/biblioteca', icon: Library },
     ]
   },
   {
-    section: 'Módulo Obras',
-    adminOnly: true, // Restrito a administradores
+    section: 'Obras',
     items: [
       { name: 'Dashboard Obras', href: '/obras', icon: HardHat },
-      { name: 'Gestão Obras', href: '/gestao-obras', icon: UsersRound },
+      { name: 'Obras', href: '/obras-lista', icon: Building2 },
+      { name: 'Chat', href: '/obras-chat', icon: MessageSquare },
+      { name: 'Equipa & SubEmpreiteiros', href: '/gestao-obras', icon: UsersRound },
     ]
   },
   {
-    section: 'Gestão Projetos',
-    adminOnly: true, // Restrito a administradores
+    section: 'Gestão Projeto',
+    adminOnly: true,
     items: [
-      { name: 'Gestão de Projeto', href: '/gestao-projeto', icon: LayoutDashboard, highlight: true },
-      { name: 'Emails', href: '/emails', icon: Mail },
       { name: 'Clientes', href: '/clientes', icon: Users },
       { name: 'Viabilidade', href: '/viabilidade', icon: FileSearch },
+      { name: 'Leads', href: '/leads', icon: TrendingUp },
       {
-        name: 'Gestão Financeira',
-        href: '/financeiro',
-        icon: Wallet,
+        name: 'Projetos em Curso',
+        href: '/gestao-projeto/em-curso',
+        icon: FolderKanban,
         subItems: [
-          { name: 'Orçamentos', href: '/financeiro?tab=orcamentos', icon: Receipt },
-          { name: 'Compras', href: '/financeiro?tab=compras', icon: ShoppingCart },
-          { name: 'Controlo Executado', href: '/financeiro?tab=controlo', icon: PieChart }
+          { name: 'Procurement', href: '/gestao-projeto/em-curso/procurement', icon: Handshake },
+          { name: 'Compras', href: '/gestao-projeto/em-curso/compras', icon: ShoppingCart },
+          { name: 'Controlo Executado', href: '/gestao-projeto/em-curso/controlo', icon: PieChart },
+          { name: 'Autos Projeto', href: '/gestao-projeto/em-curso/autos', icon: FileCheck },
         ]
       },
-      { name: 'Fornecedores', href: '/fornecedores', icon: Truck },
+      {
+        name: 'Projetos Concluídos',
+        href: '/gestao-projeto/concluidos',
+        icon: ClipboardList,
+        subItems: [
+          { name: 'Procurement', href: '/gestao-projeto/concluidos/procurement', icon: Handshake },
+          { name: 'Compras', href: '/gestao-projeto/concluidos/compras', icon: ShoppingCart },
+          { name: 'Controlo Executado', href: '/gestao-projeto/concluidos/controlo', icon: PieChart },
+          { name: 'Autos Obra', href: '/gestao-projeto/concluidos/autos', icon: FileCheck },
+        ]
+      },
+      { name: 'Gestão Integrada', href: '/gestao-projeto/integrada', icon: Layers },
     ]
   },
   {
-    section: 'Administração',
-    adminOnly: true, // Restrito a administradores
+    section: 'Financeiro',
+    adminOnly: true,
     items: [
+      { name: 'Custos Fixos', href: '/financeiro/custos-fixos', icon: CreditCard },
+      { name: 'Faturação', href: '/financeiro/faturacao', icon: FileText },
+      { name: 'Compras', href: '/financeiro/compras', icon: ShoppingCart },
+    ]
+  },
+  {
+    section: 'Administrativo',
+    adminOnly: true,
+    items: [
+      { name: 'Emails', href: '/emails', icon: Mail },
       { name: 'Recursos Humanos', href: '/equipa', icon: UsersRound },
       { name: 'Seed de Dados', href: '/admin/seed', icon: Database },
       { name: 'Configurações', href: '/configuracoes', icon: Settings },
@@ -258,12 +293,17 @@ export default function Sidebar({ isOpen, onClose, isMobile, collapsed, onToggle
 
       {/* Navigation */}
       <nav className="sidebar-nav">
+        {/* Calendário global - sempre visível */}
+        <div className="nav-section">
+          {globalItems.map((item) => renderNavItem(item))}
+        </div>
+
         {navigation
           .filter(group => !group.adminOnly || shouldShowAsAdmin())
           .map((group, index) => (
           <div key={group.section} className="nav-section">
             {!collapsed && <div className="nav-section-title">{group.section}</div>}
-            {collapsed && index > 0 && <div className="nav-section-divider" />}
+            {collapsed && <div className="nav-section-divider" />}
             {group.items.map((item) => renderNavItem(item))}
           </div>
         ))}
