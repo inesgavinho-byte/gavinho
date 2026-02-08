@@ -7,6 +7,7 @@ import {
   ChevronDown, ChevronRight, Send, Save, Clock, Loader2,
   CheckCircle, AlertCircle, FileEdit, Image as ImageIcon
 } from 'lucide-react'
+import PortalToggle from './PortalToggle'
 
 const TIPOS_RELATORIO = [
   { id: 'semanal', label: 'Semanal' },
@@ -150,7 +151,9 @@ export default function ObraRelatorios({ obra }) {
       observacoes: relatorio.observacoes || '',
       progresso_global: relatorio.progresso_global || 0,
       progresso_por_especialidade: relatorio.progresso_por_especialidade || {},
-      fotos_selecionadas: []
+      fotos_selecionadas: [],
+      publicar_no_portal: relatorio.publicar_no_portal || false,
+      resumo_portal: relatorio.resumo_portal || ''
     })
     setShowEditorModal(true)
   }
@@ -168,7 +171,9 @@ export default function ObraRelatorios({ obra }) {
         decisoes_pendentes: editorData.decisoes_pendentes || null,
         observacoes: editorData.observacoes || null,
         progresso_global: editorData.progresso_global,
-        progresso_por_especialidade: editorData.progresso_por_especialidade
+        progresso_por_especialidade: editorData.progresso_por_especialidade,
+        publicar_no_portal: editorData.publicar_no_portal,
+        resumo_portal: editorData.resumo_portal || null
       }
 
       if (publish) {
@@ -659,6 +664,26 @@ export default function ObraRelatorios({ obra }) {
                   rows={2}
                   style={{ width: '100%', resize: 'vertical' }}
                 />
+              </div>
+
+              {/* Portal Cliente */}
+              <div style={{ borderTop: '1px solid #E8E6DF', paddingTop: '12px' }}>
+                <PortalToggle
+                  checked={editorData.publicar_no_portal}
+                  onChange={v => setEditorData({ ...editorData, publicar_no_portal: v })}
+                />
+                {editorData.publicar_no_portal && (
+                  <div style={{ marginTop: '8px' }}>
+                    <label style={{ fontSize: '11px', color: '#8B8670', display: 'block', marginBottom: '2px' }}>Resumo para o Portal (visível ao cliente)</label>
+                    <textarea
+                      value={editorData.resumo_portal}
+                      onChange={e => setEditorData({ ...editorData, resumo_portal: e.target.value })}
+                      placeholder="Resumo simplificado para o cliente ver no portal..."
+                      rows={3}
+                      style={{ width: '100%', resize: 'vertical', padding: '8px', border: '1px solid #E8E6DF', borderRadius: '6px', fontSize: '13px' }}
+                    />
+                  </div>
+                )}
               </div>
             </div>
 

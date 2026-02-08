@@ -7,6 +7,7 @@ import {
   Grid, List, ChevronDown, ChevronRight, Image as ImageIcon,
   Trash2, Edit2, Download, Maximize2, Loader2
 } from 'lucide-react'
+import PortalToggle from './PortalToggle'
 
 export default function ObraFotografias({ obra }) {
   const toast = useToast()
@@ -33,7 +34,10 @@ export default function ObraFotografias({ obra }) {
     data_fotografia: new Date().toISOString().split('T')[0],
     zona_id: '',
     especialidade_id: '',
-    tags: []
+    tags: [],
+    publicar_no_portal: false,
+    legenda_portal: '',
+    portal_tipo: 'normal'
   })
   const [selectedFiles, setSelectedFiles] = useState([])
   const [previews, setPreviews] = useState([])
@@ -136,7 +140,10 @@ export default function ObraFotografias({ obra }) {
             data_fotografia: formData.data_fotografia,
             zona_id: formData.zona_id || null,
             especialidade_id: formData.especialidade_id || null,
-            tags: formData.tags.length > 0 ? formData.tags : null
+            tags: formData.tags.length > 0 ? formData.tags : null,
+            publicar_no_portal: formData.publicar_no_portal,
+            legenda_portal: formData.legenda_portal || null,
+            portal_tipo: formData.portal_tipo || 'normal'
           })
 
         if (dbError) throw dbError
@@ -199,7 +206,10 @@ export default function ObraFotografias({ obra }) {
       data_fotografia: foto.data_fotografia || '',
       zona_id: foto.zona_id || '',
       especialidade_id: foto.especialidade_id || '',
-      tags: foto.tags || []
+      tags: foto.tags || [],
+      publicar_no_portal: foto.publicar_no_portal || false,
+      legenda_portal: foto.legenda_portal || '',
+      portal_tipo: foto.portal_tipo || 'normal'
     })
     setShowModal(true)
   }
@@ -216,7 +226,10 @@ export default function ObraFotografias({ obra }) {
           data_fotografia: formData.data_fotografia,
           zona_id: formData.zona_id || null,
           especialidade_id: formData.especialidade_id || null,
-          tags: formData.tags.length > 0 ? formData.tags : null
+          tags: formData.tags.length > 0 ? formData.tags : null,
+          publicar_no_portal: formData.publicar_no_portal,
+          legenda_portal: formData.legenda_portal || null,
+          portal_tipo: formData.portal_tipo || 'normal'
         })
         .eq('id', editingFoto.id)
 
@@ -692,6 +705,40 @@ export default function ObraFotografias({ obra }) {
                   rows={3}
                   style={{ width: '100%', resize: 'vertical' }}
                 />
+              </div>
+
+              {/* Portal Cliente */}
+              <div style={{ borderTop: '1px solid #E8E6DF', paddingTop: '12px' }}>
+                <PortalToggle
+                  checked={formData.publicar_no_portal}
+                  onChange={v => setFormData({ ...formData, publicar_no_portal: v })}
+                />
+                {formData.publicar_no_portal && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '8px' }}>
+                    <div>
+                      <label style={{ fontSize: '11px', color: '#8B8670', display: 'block', marginBottom: '2px' }}>Legenda Portal</label>
+                      <input
+                        value={formData.legenda_portal}
+                        onChange={e => setFormData({ ...formData, legenda_portal: e.target.value })}
+                        placeholder="Legenda visível ao cliente..."
+                        style={{ width: '100%', padding: '6px 8px', border: '1px solid #E8E6DF', borderRadius: '6px', fontSize: '12px' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '11px', color: '#8B8670', display: 'block', marginBottom: '2px' }}>Tipo</label>
+                      <select
+                        value={formData.portal_tipo}
+                        onChange={e => setFormData({ ...formData, portal_tipo: e.target.value })}
+                        style={{ width: '100%', padding: '6px 8px', border: '1px solid #E8E6DF', borderRadius: '6px', fontSize: '12px' }}
+                      >
+                        <option value="normal">Normal</option>
+                        <option value="destaque">Destaque</option>
+                        <option value="antes">Antes</option>
+                        <option value="depois">Depois</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

@@ -68,6 +68,17 @@ const Faturacao = lazy(() => import('./pages/Faturacao'))
 const ComprasFinanceiro = lazy(() => import('./pages/ComprasFinanceiro'))
 const ProcurementDashboard = lazy(() => import('./pages/ProcurementDashboard'))
 
+// Portal Cliente - separate chunk
+const PortalLayout = lazy(() => import('./portal/PortalLayout'))
+const PortalLogin = lazy(() => import('./portal/PortalLogin'))
+const PortalHome = lazy(() => import('./portal/PortalHome'))
+const PortalGaleria = lazy(() => import('./portal/PortalGaleria'))
+const PortalDecisoes = lazy(() => import('./portal/PortalDecisoes'))
+const PortalTimeline = lazy(() => import('./portal/PortalTimeline'))
+const PortalRelatorios = lazy(() => import('./portal/PortalRelatorios'))
+const PortalDocumentos = lazy(() => import('./portal/PortalDocumentos'))
+const PortalMensagens = lazy(() => import('./portal/PortalMensagens'))
+
 // PWA App - separate chunk
 const ObraApp = lazy(() => import('./pages/ObraApp'))
 
@@ -213,6 +224,54 @@ function App() {
                     <ObraApp />
                   </Suspense>
                 } />
+
+                {/* Portal Cliente - Separate auth (magic link) */}
+                <Route path="/portal/login" element={
+                  <Suspense fallback={<PageLoader />}>
+                    <PortalLogin />
+                  </Suspense>
+                } />
+                <Route path="/portal" element={
+                  <Suspense fallback={<PageLoader />}>
+                    <PortalLayout />
+                  </Suspense>
+                }>
+                  <Route index element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PortalHome />
+                    </Suspense>
+                  } />
+                  <Route path="galeria" element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PortalGaleria />
+                    </Suspense>
+                  } />
+                  <Route path="decisoes" element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PortalDecisoes />
+                    </Suspense>
+                  } />
+                  <Route path="timeline" element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PortalTimeline />
+                    </Suspense>
+                  } />
+                  <Route path="relatorios" element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PortalRelatorios />
+                    </Suspense>
+                  } />
+                  <Route path="documentos" element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PortalDocumentos />
+                    </Suspense>
+                  } />
+                  <Route path="mensagens" element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PortalMensagens />
+                    </Suspense>
+                  } />
+                </Route>
 
                 {/* Protected Routes */}
                 <Route path="/" element={
