@@ -34,7 +34,7 @@ const Finance = lazy(() => import('./pages/Finance'))
 // Lazy loaded - Medium pages
 const DashboardAdmin = lazy(() => import('./pages/DashboardAdmin'))
 const DashboardProjetos = lazy(() => import('./pages/DashboardProjetos'))
-const GestaoProjetoPage = lazy(() => import('./pages/GestaoProjetoPage'))
+// GestaoProjetoPage replaced by ProjetosGestaoPage (loaded below)
 const Projetos = lazy(() => import('./pages/Projetos'))
 const Clientes = lazy(() => import('./pages/Clientes'))
 const Obras = lazy(() => import('./pages/Obras'))
@@ -57,6 +57,15 @@ const DecisoesPagina = lazy(() => import('./pages/DecisoesPagina'))
 const MQT = lazy(() => import('./pages/MQT'))
 const GestaoObras = lazy(() => import('./pages/GestaoObras'))
 const AdminSeed = lazy(() => import('./pages/AdminSeed'))
+
+// New module pages
+const ObrasLista = lazy(() => import('./pages/ObrasLista'))
+const Leads = lazy(() => import('./pages/Leads'))
+const ProjetosGestaoPage = lazy(() => import('./pages/ProjetosGestaoPage'))
+const GestaoIntegrada = lazy(() => import('./pages/GestaoIntegrada'))
+const CustosFixos = lazy(() => import('./pages/CustosFixos'))
+const Faturacao = lazy(() => import('./pages/Faturacao'))
+const ComprasFinanceiro = lazy(() => import('./pages/ComprasFinanceiro'))
 
 // PWA App - separate chunk
 const ObraApp = lazy(() => import('./pages/ObraApp'))
@@ -219,9 +228,32 @@ function App() {
                       <DashboardProjetos />
                     </Suspense>
                   } />
-                  <Route path="gestao-projeto" element={
+                  {/* Gestão Projeto - Projetos em Curso */}
+                  <Route path="gestao-projeto/em-curso" element={
                     <Suspense fallback={<PageLoader />}>
-                      <GestaoProjetoPage />
+                      <ProjetosGestaoPage mode="em-curso" />
+                    </Suspense>
+                  } />
+                  <Route path="gestao-projeto/em-curso/:tab" element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ProjetosGestaoPage mode="em-curso" />
+                    </Suspense>
+                  } />
+                  {/* Gestão Projeto - Projetos Concluídos */}
+                  <Route path="gestao-projeto/concluidos" element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ProjetosGestaoPage mode="concluidos" />
+                    </Suspense>
+                  } />
+                  <Route path="gestao-projeto/concluidos/:tab" element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ProjetosGestaoPage mode="concluidos" />
+                    </Suspense>
+                  } />
+                  {/* Gestão Integrada */}
+                  <Route path="gestao-projeto/integrada" element={
+                    <Suspense fallback={<PageLoader />}>
+                      <GestaoIntegrada />
                     </Suspense>
                   } />
                   <Route path="gestao" element={
@@ -402,6 +434,42 @@ function App() {
                   <Route path="admin/seed" element={
                     <Suspense fallback={<PageLoader />}>
                       <AdminSeed />
+                    </Suspense>
+                  } />
+
+                  {/* Obras module - new routes */}
+                  <Route path="obras-lista" element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ObrasLista />
+                    </Suspense>
+                  } />
+                  <Route path="obras-chat" element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ChatObras />
+                    </Suspense>
+                  } />
+
+                  {/* Gestão Projeto - Leads */}
+                  <Route path="leads" element={
+                    <Suspense fallback={<PageLoader />}>
+                      <Leads />
+                    </Suspense>
+                  } />
+
+                  {/* Financeiro module */}
+                  <Route path="financeiro/custos-fixos" element={
+                    <Suspense fallback={<PageLoader />}>
+                      <CustosFixos />
+                    </Suspense>
+                  } />
+                  <Route path="financeiro/faturacao" element={
+                    <Suspense fallback={<PageLoader />}>
+                      <Faturacao />
+                    </Suspense>
+                  } />
+                  <Route path="financeiro/compras" element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ComprasFinanceiro />
                     </Suspense>
                   } />
                 </Route>
