@@ -337,9 +337,9 @@ export default function ObraFotografias({ obra }) {
                 <div onClick={() => toggleDateCollapse(dia)} style={S.dateHeader}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <ChevronDown size={16} style={{ color: '#ADAA96', transition: 'transform 0.2s', transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0)' }} />
-                    <span style={{ fontSize: '13px', fontWeight: 500, color: '#3D3D3D', textTransform: 'capitalize' }}>{dia}</span>
+                    <span style={{ fontSize: '14px', fontWeight: 600, color: '#3D3D3D', textTransform: 'capitalize', letterSpacing: '0.01em' }}>{dia}</span>
                   </div>
-                  <span style={{ fontSize: '11px', color: '#ADAA96' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 500, color: '#8B8670', background: '#F5F3EB', padding: '2px 10px', borderRadius: '12px' }}>
                     {fotos.length} foto{fotos.length !== 1 ? 's' : ''}
                   </span>
                 </div>
@@ -646,8 +646,8 @@ const S = {
   },
   dateHeader: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    padding: '8px 4px', marginBottom: '8px', borderBottom: '1px solid #E5E2D9',
-    cursor: 'pointer', userSelect: 'none',
+    padding: '10px 14px', marginBottom: '10px', borderRadius: '10px',
+    background: '#EDE9DF', cursor: 'pointer', userSelect: 'none',
   },
   masonry: {
     columns: '4 220px', columnGap: '14px', marginBottom: '8px',
