@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../contexts/AuthContext'
 import PortalToggle from '../PortalToggle'
 
 const TIPO_OPTIONS = [
@@ -29,6 +30,7 @@ const INITIAL_FORM = {
 }
 
 export default function DecisaoForm({ projetoId, decisao, onClose, onSave }) {
+  const { profile } = useAuth()
   const [form, setForm] = useState(INITIAL_FORM)
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState({})
@@ -91,9 +93,8 @@ export default function DecisaoForm({ projetoId, decisao, onClose, onSave }) {
       if (isEditing) {
         await supabase.from('decisoes').update(dataToSave).eq('id', decisao.id)
       } else {
-        const user = (await supabase.auth.getUser()).data.user
-        dataToSave.created_by = user?.id
-        dataToSave.aprovado_por = user?.id
+        dataToSave.created_by = profile?.id
+        dataToSave.aprovado_por = profile?.id
         await supabase.from('decisoes').insert(dataToSave)
       }
       onSave?.()

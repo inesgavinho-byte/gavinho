@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../contexts/AuthContext'
 
 export default function ValidacaoDecisoes({ projetoId, onClose, onUpdate }) {
+  const { profile } = useAuth()
   const [sugestoes, setSugestoes] = useState([])
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState(null)
@@ -25,8 +27,7 @@ export default function ValidacaoDecisoes({ projetoId, onClose, onUpdate }) {
 
   const aprovar = async (id) => {
     setProcessing(p => ({ ...p, [id]: true }))
-    const user = (await supabase.auth.getUser()).data.user
-    await supabase.from('decisoes').update({ estado: 'validada', aprovado_por: user?.id }).eq('id', id)
+    await supabase.from('decisoes').update({ estado: 'validada', aprovado_por: profile?.id }).eq('id', id)
     setSugestoes(s => s.filter(x => x.id !== id))
     setProcessing(p => ({ ...p, [id]: false }))
     onUpdate?.()
@@ -52,12 +53,11 @@ export default function ValidacaoDecisoes({ projetoId, onClose, onUpdate }) {
 
   const saveEdit = async (id) => {
     setProcessing(p => ({ ...p, [id]: true }))
-    const user = (await supabase.auth.getUser()).data.user
     await supabase.from('decisoes').update({
       ...editForm,
       impacto_orcamento: editForm.impacto_orcamento ? parseFloat(editForm.impacto_orcamento) : null,
       impacto_prazo_dias: editForm.impacto_prazo_dias ? parseInt(editForm.impacto_prazo_dias) : null,
-      estado: 'validada', aprovado_por: user?.id
+      estado: 'validada', aprovado_por: profile?.id
     }).eq('id', id)
     setSugestoes(s => s.filter(x => x.id !== id))
     setEditingId(null)
@@ -66,9 +66,8 @@ export default function ValidacaoDecisoes({ projetoId, onClose, onUpdate }) {
   }
 
   const aprovarTodas = async () => {
-    const user = (await supabase.auth.getUser()).data.user
     for (const sug of sugestoes) {
-      await supabase.from('decisoes').update({ estado: 'validada', aprovado_por: user?.id }).eq('id', sug.id)
+      await supabase.from('decisoes').update({ estado: 'validada', aprovado_por: profile?.id }).eq('id', sug.id)
     }
     setSugestoes([])
     onUpdate?.()

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useToast } from '../ui/Toast'
+import { useAuth } from '../../contexts/AuthContext'
 import {
   Search, Plus, Filter, AlertCircle, Mail, Mic, MessageSquare, Edit3,
   ChevronRight, ArrowRight, ArrowLeft, Check, XCircle, X, ExternalLink,
@@ -34,6 +35,7 @@ const FONTE_CONFIG = {
 
 export default function ProjetoDecisoes({ projetoId }) {
   const toast = useToast()
+  const { profile } = useAuth()
 
   // Estados principais
   const [decisoes, setDecisoes] = useState([])
@@ -153,13 +155,13 @@ export default function ProjetoDecisoes({ projetoId }) {
 
   const handleAprovar = async (id) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const utilizadorId = profile?.id
 
       const { error } = await supabase
         .from('decisoes')
         .update({
           estado: 'validada',
-          aprovado_por: user?.id
+          aprovado_por: utilizadorId
         })
         .eq('id', id)
 
@@ -171,7 +173,7 @@ export default function ProjetoDecisoes({ projetoId }) {
         campo_alterado: 'estado',
         valor_anterior: 'sugerida',
         valor_novo: 'validada',
-        alterado_por: user?.id,
+        alterado_por: utilizadorId,
         motivo: 'Aprovada manualmente'
       })
 
@@ -185,7 +187,7 @@ export default function ProjetoDecisoes({ projetoId }) {
 
   const handleRejeitar = async (id) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const utilizadorId = profile?.id
 
       const { error } = await supabase
         .from('decisoes')
@@ -199,7 +201,7 @@ export default function ProjetoDecisoes({ projetoId }) {
         campo_alterado: 'estado',
         valor_anterior: 'sugerida',
         valor_novo: 'rejeitada',
-        alterado_por: user?.id,
+        alterado_por: utilizadorId,
         motivo: 'Não é uma decisão válida'
       })
 
@@ -219,7 +221,7 @@ export default function ProjetoDecisoes({ projetoId }) {
 
     setSaving(true)
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const utilizadorId = profile?.id
 
       const { error } = await supabase
         .from('decisoes')
@@ -238,8 +240,8 @@ export default function ProjetoDecisoes({ projetoId }) {
           justificacao: formData.justificacao || null,
           fonte: 'manual',
           estado: 'validada',
-          aprovado_por: user?.id,
-          created_by: user?.id
+          aprovado_por: utilizadorId,
+          created_by: utilizadorId
         })
 
       if (error) throw error
