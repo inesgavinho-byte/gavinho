@@ -81,6 +81,7 @@ export default function Projetos() {
             projeto_entregaveis(status),
             projeto_pagamentos(valor, estado)
           `)
+          .eq('arquivado', false)
           .order('codigo', { ascending: true }),
         supabase.from('clientes').select('id, nome').order('nome'),
         supabase.from('projeto_equipa').select('projeto_id, funcao, utilizadores(id, nome, avatar_url)').catch(() => ({ data: [] }))
@@ -148,7 +149,7 @@ export default function Projetos() {
       setProjects(projetosComMetricas)
       setClientes(cliRes.data || [])
     } catch (err) {
-      // Silent fail - will show empty state
+      console.error('Erro ao carregar projetos:', err)
     } finally {
       setLoading(false)
     }
