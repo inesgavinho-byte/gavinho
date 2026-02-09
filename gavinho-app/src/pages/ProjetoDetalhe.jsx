@@ -3074,65 +3074,78 @@ export default function ProjetoDetalhe() {
           </div>
 
           {imagensFinais.length > 0 ? (
-            <div className="grid grid-3" style={{ gap: '16px' }}>
+            <>
+            <div style={{ columns: '4 220px', columnGap: '14px' }}>
               {imagensFinais.map((render) => (
                 <div
                   key={render.id}
-                  style={{
-                    position: 'relative',
-                    aspectRatio: '16/10',
-                    background: render.imagem_url ? `url(${render.imagem_url}) center/cover` : 'var(--cream)',
-                    borderRadius: '12px',
-                    overflow: 'hidden',
-                    border: '3px solid var(--success)',
-                    cursor: render.imagem_url ? 'pointer' : 'default'
-                  }}
-                  onClick={() => render.imagem_url && openLightbox(render, imagensFinais)}
+                  className="pin-card-finais"
+                  style={{ breakInside: 'avoid', marginBottom: '14px' }}
                 >
-                  {!render.imagem_url && (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                      <Image size={32} style={{ color: 'var(--brown-light)', opacity: 0.4 }} />
-                    </div>
-                  )}
+                  <div
+                    style={{
+                      position: 'relative',
+                      borderRadius: '12px',
+                      overflow: 'hidden',
+                      cursor: render.imagem_url ? 'pointer' : 'default'
+                    }}
+                    onClick={() => render.imagem_url && openLightbox(render, imagensFinais)}
+                  >
+                    {render.imagem_url ? (
+                      <img
+                        src={render.imagem_url}
+                        alt={render.compartimento || 'Render'}
+                        style={{ width: '100%', display: 'block', background: '#F0EBE5' }}
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '160px', background: 'var(--cream)' }}>
+                        <Image size={32} style={{ color: 'var(--brown-light)', opacity: 0.4 }} />
+                      </div>
+                    )}
 
-                  <div style={{
-                    position: 'absolute',
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    padding: '12px',
-                    background: 'linear-gradient(transparent, rgba(0,0,0,0.8))',
-                    color: 'white'
-                  }}>
-                    <div style={{ fontSize: '13px', fontWeight: 600 }}>{render.compartimento}</div>
-                    <div style={{ fontSize: '11px', opacity: 0.8 }}>Versão {render.versao}</div>
+                    {/* Hover overlay */}
+                    <div className="pin-overlay-finais" style={{
+                      position: 'absolute', inset: 0,
+                      background: 'linear-gradient(180deg, rgba(0,0,0,0.3) 0%, transparent 40%, transparent 60%, rgba(0,0,0,0.4) 100%)',
+                      borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+                      padding: '10px', opacity: 0, transition: 'opacity 0.2s', pointerEvents: 'none'
+                    }}>
+                      <span style={{ padding: '3px 10px', background: 'rgba(255,255,255,0.9)', borderRadius: '12px', fontSize: '10px', fontWeight: 500, color: '#3D3D3D' }}>
+                        v{render.versao}
+                      </span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); toggleFinalImage(render) }}
+                        style={{
+                          width: '32px', height: '32px', borderRadius: '50%',
+                          background: 'rgba(220,38,38,0.85)', color: 'white', border: 'none',
+                          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          pointerEvents: 'auto'
+                        }}
+                        title="Remover das imagens finais"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
                   </div>
 
-                  <button
-                    onClick={(e) => { e.stopPropagation(); toggleFinalImage(render) }}
-                    style={{
-                      position: 'absolute',
-                      top: '8px',
-                      right: '8px',
-                      padding: '6px',
-                      background: 'var(--error)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '6px',
-                      fontSize: '11px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                    title="Remover das imagens finais"
-                    aria-label="Remover das imagens finais"
-                  >
-                    <X size={14} />
-                  </button>
+                  {/* Caption */}
+                  <div style={{ padding: '8px 4px 4px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 500, color: '#3D3D3D', lineHeight: 1.3 }}>
+                      {render.compartimento}
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#ADAA96', marginTop: '2px' }}>
+                      Versão {render.versao}
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
+            <style>{`
+              .pin-overlay-finais { opacity: 0 !important; transition: opacity 0.2s !important; }
+              .pin-card-finais:hover .pin-overlay-finais { opacity: 1 !important; }
+            `}</style>
+            </>
           ) : (
             <div style={{
               padding: '48px',
