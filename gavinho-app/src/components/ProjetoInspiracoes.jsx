@@ -5,7 +5,7 @@ import { ConfirmModal } from './ui/ConfirmModal'
 import {
   Plus, Upload, Trash2, X, Loader2, Search,
   ExternalLink, Tag, Image as ImageIcon, Maximize2,
-  Pencil, Check, MoreHorizontal
+  Pencil, Check, MoreHorizontal, Link2
 } from 'lucide-react'
 
 const CATEGORIAS = [
@@ -386,9 +386,16 @@ export default function ProjetoInspiracoes({ projeto, userId, userName }) {
                   </button>
                   {menuOpenId === insp.id && (
                     <div style={S.menuDropdown} onClick={e => e.stopPropagation()}>
+                      <button onClick={() => { navigator.clipboard.writeText(insp.imagem_url); toast.success('Link copiado'); setMenuOpenId(null) }} style={S.menuItem}>
+                        <Link2 size={12} /> Copiar Link
+                      </button>
+                      <button onClick={() => { window.open(insp.imagem_url, '_blank'); setMenuOpenId(null) }} style={S.menuItem}>
+                        <ExternalLink size={12} /> Abrir em nova aba
+                      </button>
                       <button onClick={() => startEdit(insp)} style={S.menuItem}>
                         <Pencil size={12} /> Editar
                       </button>
+                      <div style={{ height: '1px', background: '#E5E2D9', margin: '2px 0' }} />
                       <button onClick={() => handleDelete(insp)} style={{ ...S.menuItem, color: '#DC2626' }}>
                         <Trash2 size={12} /> Eliminar
                       </button>
