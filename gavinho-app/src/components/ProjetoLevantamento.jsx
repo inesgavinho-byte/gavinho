@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useToast } from './ui/Toast'
 import ConfirmModal from './ui/ConfirmModal'
 import {
-  Plus, Upload, Image, X, ChevronLeft, ChevronRight,
+  Plus, Upload, Image, X, ChevronLeft, ChevronRight, ChevronDown,
   Star, Trash2, Edit, Loader2, FolderPlus, Camera,
   AlertCircle, RefreshCw, Eye, MoreVertical
 } from 'lucide-react'
@@ -136,6 +136,7 @@ export default function ProjetoLevantamento({ projeto, userId, userName }) {
 
   // Expanded sections
   const [expandedSections, setExpandedSections] = useState({})
+  const [collapsedDates, setCollapsedDates] = useState({})
   const ITEMS_PER_SECTION = 8
 
   // Refs
@@ -493,6 +494,29 @@ export default function ProjetoLevantamento({ projeto, userId, userName }) {
     }))
   }
 
+  // Toggle date collapse
+  const toggleDateCollapse = (key) => {
+    setCollapsedDates(prev => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  // Group photos by date
+  const groupByDate = (fotosList) => {
+    const groups = {}
+    fotosList.forEach(foto => {
+      const dateKey = foto.created_at
+        ? new Date(foto.created_at).toLocaleDateString('pt-PT', { year: 'numeric', month: 'long', day: 'numeric' })
+        : 'Sem data'
+      if (!groups[dateKey]) groups[dateKey] = []
+      groups[dateKey].push(foto)
+    })
+    // Sort dates newest first
+    return Object.entries(groups).sort((a, b) => {
+      const dateA = a[1][0]?.created_at ? new Date(a[1][0].created_at) : new Date(0)
+      const dateB = b[1][0]?.created_at ? new Date(b[1][0].created_at) : new Date(0)
+      return dateB - dateA
+    })
+  }
+
   // Count total fotos
   const totalFotos = Object.values(fotos).reduce((sum, arr) => sum + arr.length, 0)
 
@@ -595,7 +619,7 @@ export default function ProjetoLevantamento({ projeto, userId, userName }) {
                   </div>
                 </div>
 
-                {/* Photos Grid */}
+                {/* Photos by Date */}
                 {compartimentoFotos.length === 0 ? (
                   <div className="levantamento-section-empty">
                     <Image size={24} />
@@ -610,68 +634,85 @@ export default function ProjetoLevantamento({ projeto, userId, userName }) {
                   </div>
                 ) : (
                   <>
-                    <div className="levantamento-grid">
-                      {visibleFotos.map((foto, index) => (
-                        <div key={foto.id} className="levantamento-card">
-                          <LazyImage
-                            src={foto.url}
-                            alt={foto.titulo || 'Foto'}
-                            className="levantamento-card-image"
-                            onClick={() => openLightbox(compartimento.id, foto, index)}
-                          />
-
-                          {foto.is_destaque && (
-                            <span className="levantamento-destaque-badge">
-                              <Star size={12} /> Destaque
+                    {groupByDate(compartimentoFotos).map(([dateLabel, dateFotos]) => {
+                      const dateKey = `${compartimento.id}_${dateLabel}`
+                      const isDateCollapsed = collapsedDates[dateKey]
+                      return (
+                        <div key={dateLabel} className="levantamento-date-group">
+                          <div
+                            className="levantamento-date-header"
+                            onClick={() => toggleDateCollapse(dateKey)}
+                          >
+                            <span className="levantamento-date-label">
+                              <ChevronDown
+                                size={16}
+                                className={`levantamento-date-chevron${isDateCollapsed ? ' collapsed' : ''}`}
+                              />
+                              {dateLabel}
+                              <span className="levantamento-date-count">
+                                ({dateFotos.length} foto{dateFotos.length !== 1 ? 's' : ''})
+                              </span>
                             </span>
-                          )}
-
-                          <div className="levantamento-card-overlay">
-                            <button
-                              className="levantamento-action-btn"
-                              title="Ver"
-                              onClick={() => openLightbox(compartimento.id, foto, index)}
-                            >
-                              <Eye size={18} />
-                            </button>
                           </div>
+                          {!isDateCollapsed && (
+                            <div className="levantamento-grid">
+                              {dateFotos.map((foto, index) => {
+                                const globalIndex = compartimentoFotos.indexOf(foto)
+                                return (
+                                  <div key={foto.id} className="levantamento-card">
+                                    <LazyImage
+                                      src={foto.url}
+                                      alt={foto.titulo || 'Foto'}
+                                      className="levantamento-card-image"
+                                      onClick={() => openLightbox(compartimento.id, foto, globalIndex)}
+                                    />
 
-                          <div className="levantamento-card-actions">
-                            <button
-                              className={`btn-icon ${foto.is_destaque ? 'active' : ''}`}
-                              onClick={() => handleToggleDestaque(compartimento.id, foto)}
-                              title={foto.is_destaque ? 'Remover destaque' : 'Marcar como destaque'}
-                            >
-                              <Star size={14} />
-                            </button>
-                            <button
-                              className="btn-icon btn-danger"
-                              onClick={() => handleDeleteFoto(compartimento.id, foto)}
-                              title="Eliminar"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
+                                    {foto.is_destaque && (
+                                      <span className="levantamento-destaque-badge">
+                                        <Star size={12} /> Destaque
+                                      </span>
+                                    )}
 
-                          {foto.titulo && (
-                            <div className="levantamento-card-title">
-                              {foto.titulo}
+                                    <div className="levantamento-card-overlay">
+                                      <button
+                                        className="levantamento-action-btn"
+                                        title="Ver"
+                                        onClick={() => openLightbox(compartimento.id, foto, globalIndex)}
+                                      >
+                                        <Eye size={18} />
+                                      </button>
+                                    </div>
+
+                                    <div className="levantamento-card-actions">
+                                      <button
+                                        className={`btn-icon ${foto.is_destaque ? 'active' : ''}`}
+                                        onClick={() => handleToggleDestaque(compartimento.id, foto)}
+                                        title={foto.is_destaque ? 'Remover destaque' : 'Marcar como destaque'}
+                                      >
+                                        <Star size={14} />
+                                      </button>
+                                      <button
+                                        className="btn-icon btn-danger"
+                                        onClick={() => handleDeleteFoto(compartimento.id, foto)}
+                                        title="Eliminar"
+                                      >
+                                        <Trash2 size={14} />
+                                      </button>
+                                    </div>
+
+                                    {foto.titulo && (
+                                      <div className="levantamento-card-title">
+                                        {foto.titulo}
+                                      </div>
+                                    )}
+                                  </div>
+                                )
+                              })}
                             </div>
                           )}
                         </div>
-                      ))}
-                    </div>
-
-                    {hasMore && (
-                      <button
-                        className="levantamento-show-more"
-                        onClick={() => toggleSection(compartimento.id)}
-                      >
-                        {isExpanded
-                          ? 'Mostrar menos'
-                          : `Ver mais ${compartimentoFotos.length - ITEMS_PER_SECTION} fotos`}
-                      </button>
-                    )}
+                      )
+                    })}
                   </>
                 )}
               </div>
