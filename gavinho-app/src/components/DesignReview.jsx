@@ -523,16 +523,34 @@ export default function DesignReview({ projeto, initialReviewId }) {
 
       const data = drawing.data
 
-      switch (drawing.tipo) {
-        case 'pencil':
-          if (data.points && data.points.length > 1) {
+      // Helper: draw pencil path with optional pressure-based thickness
+      const drawPencilPath = (points, baseWidth, color) => {
+        if (!points || points.length < 2) return
+        const hasPressure = points.some(pt => pt.p !== undefined && pt.p !== 0.5)
+        if (hasPressure) {
+          // Pressure-sensitive: draw segments with varying width
+          for (let i = 1; i < points.length; i++) {
+            const p = points[i].p ?? 0.5
+            ctx.lineWidth = baseWidth * (0.4 + p * 1.2)
+            ctx.strokeStyle = color
             ctx.beginPath()
-            ctx.moveTo(data.points[0].x * scaledWidth / 100, data.points[0].y * scaledHeight / 100)
-            for (let i = 1; i < data.points.length; i++) {
-              ctx.lineTo(data.points[i].x * scaledWidth / 100, data.points[i].y * scaledHeight / 100)
-            }
+            ctx.moveTo(points[i - 1].x * scaledWidth / 100, points[i - 1].y * scaledHeight / 100)
+            ctx.lineTo(points[i].x * scaledWidth / 100, points[i].y * scaledHeight / 100)
             ctx.stroke()
           }
+        } else {
+          ctx.beginPath()
+          ctx.moveTo(points[0].x * scaledWidth / 100, points[0].y * scaledHeight / 100)
+          for (let i = 1; i < points.length; i++) {
+            ctx.lineTo(points[i].x * scaledWidth / 100, points[i].y * scaledHeight / 100)
+          }
+          ctx.stroke()
+        }
+      }
+
+      switch (drawing.tipo) {
+        case 'pencil':
+          drawPencilPath(data.points, drawing.espessura * scale, drawing.cor)
           break
 
         case 'rectangle':
@@ -599,13 +617,28 @@ export default function DesignReview({ projeto, initialReviewId }) {
 
       switch (currentDrawing.tipo) {
         case 'pencil':
+          // Helper function defined above in saved drawings loop is not in scope here
+          // so draw inline with pressure support
           if (data.points && data.points.length > 1) {
-            ctx.beginPath()
-            ctx.moveTo(data.points[0].x * scaledWidth / 100, data.points[0].y * scaledHeight / 100)
-            for (let i = 1; i < data.points.length; i++) {
-              ctx.lineTo(data.points[i].x * scaledWidth / 100, data.points[i].y * scaledHeight / 100)
+            const hasPressure = data.points.some(pt => pt.p !== undefined && pt.p !== 0.5)
+            if (hasPressure) {
+              for (let i = 1; i < data.points.length; i++) {
+                const p = data.points[i].p ?? 0.5
+                ctx.lineWidth = drawingThickness * scale * (0.4 + p * 1.2)
+                ctx.strokeStyle = drawingColor
+                ctx.beginPath()
+                ctx.moveTo(data.points[i - 1].x * scaledWidth / 100, data.points[i - 1].y * scaledHeight / 100)
+                ctx.lineTo(data.points[i].x * scaledWidth / 100, data.points[i].y * scaledHeight / 100)
+                ctx.stroke()
+              }
+            } else {
+              ctx.beginPath()
+              ctx.moveTo(data.points[0].x * scaledWidth / 100, data.points[0].y * scaledHeight / 100)
+              for (let i = 1; i < data.points.length; i++) {
+                ctx.lineTo(data.points[i].x * scaledWidth / 100, data.points[i].y * scaledHeight / 100)
+              }
+              ctx.stroke()
             }
-            ctx.stroke()
           }
           break
 
@@ -662,26 +695,43 @@ export default function DesignReview({ projeto, initialReviewId }) {
     }
   }, [drawings, currentDrawing, scale, pdfDimensions, drawingColor, drawingThickness])
 
-  // Canvas mouse event handlers
+  // Canvas pointer event handlers (supports mouse, touch & Apple Pencil/stylus)
   const getCanvasCoords = (e) => {
     const canvas = canvasRef.current
     if (!canvas) return { x: 0, y: 0 }
     const rect = canvas.getBoundingClientRect()
-    const x = ((e.clientX - rect.left) / rect.width) * 100
-    const y = ((e.clientY - rect.top) / rect.height) * 100
+    // Support both mouse events (clientX) and touch events (touches[0])
+    const clientX = e.clientX ?? e.touches?.[0]?.clientX ?? 0
+    const clientY = e.clientY ?? e.touches?.[0]?.clientY ?? 0
+    const x = ((clientX - rect.left) / rect.width) * 100
+    const y = ((clientY - rect.top) / rect.height) * 100
     return { x, y }
   }
 
-  const handleCanvasMouseDown = (e) => {
+  // Get pressure from pointer/touch event (Apple Pencil support)
+  const getPointerPressure = (e) => {
+    if (e.pressure !== undefined && e.pressure > 0) return e.pressure
+    if (e.force !== undefined && e.force > 0) return e.force / 3
+    return 0.5
+  }
+
+  const handleCanvasPointerDown = (e) => {
     if (!['pencil', 'rectangle', 'arrow', 'circle', 'line'].includes(activeTool)) return
     e.preventDefault()
+    e.stopPropagation()
+
+    // Capture pointer for reliable move/up tracking on touch devices
+    if (e.pointerId !== undefined && canvasRef.current?.setPointerCapture) {
+      canvasRef.current.setPointerCapture(e.pointerId)
+    }
 
     const { x, y } = getCanvasCoords(e)
+    const pressure = getPointerPressure(e)
     setIsDrawing(true)
 
     switch (activeTool) {
       case 'pencil':
-        setCurrentDrawing({ tipo: 'pencil', data: { points: [{ x, y }] } })
+        setCurrentDrawing({ tipo: 'pencil', data: { points: [{ x, y, p: pressure }] } })
         break
       case 'rectangle':
         setCurrentDrawing({ tipo: 'rectangle', data: { x, y, width: 0, height: 0, startX: x, startY: y } })
@@ -698,16 +748,18 @@ export default function DesignReview({ projeto, initialReviewId }) {
     }
   }
 
-  const handleCanvasMouseMove = (e) => {
+  const handleCanvasPointerMove = (e) => {
     if (!isDrawing || !currentDrawing) return
+    e.preventDefault()
 
     const { x, y } = getCanvasCoords(e)
+    const pressure = getPointerPressure(e)
 
     switch (currentDrawing.tipo) {
       case 'pencil':
         setCurrentDrawing(prev => ({
           ...prev,
-          data: { points: [...prev.data.points, { x, y }] }
+          data: { points: [...prev.data.points, { x, y, p: pressure }] }
         }))
         break
       case 'rectangle':
@@ -745,8 +797,13 @@ export default function DesignReview({ projeto, initialReviewId }) {
     redrawCanvas()
   }
 
-  const handleCanvasMouseUp = () => {
+  const handleCanvasPointerUp = (e) => {
     if (!isDrawing || !currentDrawing) return
+
+    // Release pointer capture
+    if (e?.pointerId !== undefined && canvasRef.current?.releasePointerCapture) {
+      try { canvasRef.current.releasePointerCapture(e.pointerId) } catch (_) {}
+    }
 
     setIsDrawing(false)
 
@@ -1802,16 +1859,19 @@ export default function DesignReview({ projeto, initialReviewId }) {
               {pdfDimensions.width > 0 && (
                 <canvas
                   ref={canvasRef}
-                  onMouseDown={(e) => {
+                  onPointerDown={(e) => {
                     if (activeTool === 'eraser') {
                       handleEraserClick(e)
                     } else {
-                      handleCanvasMouseDown(e)
+                      handleCanvasPointerDown(e)
                     }
                   }}
-                  onMouseMove={handleCanvasMouseMove}
-                  onMouseUp={handleCanvasMouseUp}
-                  onMouseLeave={handleCanvasMouseUp}
+                  onPointerMove={handleCanvasPointerMove}
+                  onPointerUp={handleCanvasPointerUp}
+                  onPointerLeave={handleCanvasPointerUp}
+                  onPointerCancel={handleCanvasPointerUp}
+                  onTouchStart={(e) => e.preventDefault()}
+                  onTouchMove={(e) => e.preventDefault()}
                   style={{
                     position: 'absolute',
                     top: 0,
@@ -1820,6 +1880,7 @@ export default function DesignReview({ projeto, initialReviewId }) {
                     height: pdfDimensions.height * scale,
                     pointerEvents: ['pencil', 'rectangle', 'arrow', 'circle', 'line', 'eraser'].includes(activeTool) ? 'auto' : 'none',
                     cursor: activeTool === 'eraser' ? 'crosshair' : 'crosshair',
+                    touchAction: 'none',
                     zIndex: 5
                   }}
                 />

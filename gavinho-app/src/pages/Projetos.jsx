@@ -73,7 +73,7 @@ export default function Projetos() {
   // Otimizado: usa JOINs do Supabase em vez de queries separadas
   const loadData = async () => {
     try {
-      const [projRes, cliRes] = await Promise.all([
+      const [projRes, cliRes, equipaRes] = await Promise.all([
         supabase
           .from('projetos')
           .select(`
@@ -82,13 +82,28 @@ export default function Projetos() {
             projeto_pagamentos(valor, estado)
           `)
           .order('codigo', { ascending: true }),
-        supabase.from('clientes').select('id, nome').order('nome')
+        supabase.from('clientes').select('id, nome').order('nome'),
+        supabase.from('projeto_equipa').select('projeto_id, funcao, utilizadores(id, nome, avatar_url)').catch(() => ({ data: [] }))
       ])
 
       const projetos = projRes.data || []
 
       // Calcular progresso e financeiro para cada projeto
       // Dados ja vem relacionados - sem necessidade de filtrar
+      const clientesMap = (cliRes.data || []).reduce((map, c) => { map[c.id] = c.nome; return map }, {})
+
+      // Build team map: projeto_id -> [{ nome, avatar_url, funcao }]
+      const equipaMap = {}
+      ;(equipaRes?.data || []).forEach(eq => {
+        if (!eq.projeto_id || !eq.utilizadores) return
+        if (!equipaMap[eq.projeto_id]) equipaMap[eq.projeto_id] = []
+        equipaMap[eq.projeto_id].push({
+          nome: eq.utilizadores.nome,
+          avatar_url: eq.utilizadores.avatar_url,
+          funcao: eq.funcao
+        })
+      })
+
       const projetosComMetricas = projetos.map(p => {
         const entregaveis = p.projeto_entregaveis || []
         const pagamentos = p.projeto_pagamentos || []
@@ -110,10 +125,15 @@ export default function Projetos() {
         // Calcular status automatico
         const statusCalculado = calcularStatusAutomatico({ ...p, progresso: progressoCalculado })
 
+        // Enriquecer cliente_nome a partir da tabela clientes (caso denormalizado esteja vazio)
+        const clienteNomeResolvido = p.cliente_nome || (p.cliente_id ? clientesMap[p.cliente_id] : null)
+
         return {
           ...p,
           projeto_entregaveis: undefined, // Remover dados aninhados
           projeto_pagamentos: undefined,
+          cliente_nome: clienteNomeResolvido,
+          equipa: equipaMap[p.id] || [],
           progresso: progressoCalculado,
           progresso_manual: p.progresso,
           status_calculado: statusCalculado,
@@ -586,6 +606,37 @@ export default function Projetos() {
                   </span>
                 </div>
 
+                {/* Team Avatars */}
+                {p.equipa && p.equipa.length > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                    {p.equipa.slice(0, 4).map((m, idx) => (
+                      <div key={idx} title={`${m.nome}${m.funcao ? ' — ' + m.funcao : ''}`} style={{
+                        width: '24px', height: '24px', borderRadius: '50%',
+                        background: 'linear-gradient(135deg, var(--blush), var(--blush-dark))',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: '9px', fontWeight: 600, color: 'var(--brown-dark)',
+                        border: '2px solid var(--white)', marginLeft: idx > 0 ? '-6px' : 0,
+                        overflow: 'hidden', flexShrink: 0
+                      }}>
+                        {m.avatar_url
+                          ? <img src={m.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          : m.nome?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+                        }
+                      </div>
+                    ))}
+                    {p.equipa.length > 4 && (
+                      <div style={{
+                        width: '24px', height: '24px', borderRadius: '50%',
+                        background: 'var(--stone)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: '9px', fontWeight: 600, color: 'var(--brown-light)',
+                        border: '2px solid var(--white)', marginLeft: '-6px', flexShrink: 0
+                      }}>
+                        +{p.equipa.length - 4}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Progress Bar com percentagem */}
                 <div style={{ marginTop: '8px' }}>
                   <div style={{
@@ -657,7 +708,7 @@ export default function Projetos() {
           <div className="table-container">
             <table>
               <thead>
-                <tr><th>Código</th><th>ID Interno</th><th>Nome</th><th>Fase</th><th>Status</th><th>Progresso</th><th></th></tr>
+                <tr><th>Código</th><th>ID Interno</th><th>Nome</th><th>Cliente</th><th>Fase</th><th>Status</th><th>Progresso</th><th></th></tr>
               </thead>
               <tbody>
                 {filteredProjects.map((p) => (
@@ -665,6 +716,7 @@ export default function Projetos() {
                     <td><span style={{ fontWeight: 600, color: 'var(--warning)', fontFamily: 'monospace' }}>{p.codigo}</span></td>
                     <td><span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--info)', fontFamily: 'monospace' }}>{p.codigo_interno || '—'}</span></td>
                     <td style={{ fontWeight: 500 }}>{p.nome}</td>
+                    <td style={{ fontSize: '13px', color: p.cliente_nome ? 'var(--brown)' : 'var(--brown-light)' }}>{p.cliente_nome || '—'}</td>
                     <td><span style={{ padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 600, background: `${getFaseColor(p.fase)}20`, color: getFaseColor(p.fase) }}>{p.fase}</span></td>
                     <td><span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ width: '8px', height: '8px', borderRadius: '50%', background: getStatusColor(p.status_calculado || p.status) }} />{getStatusLabel(p.status_calculado || p.status)}</span></td>
                     <td>

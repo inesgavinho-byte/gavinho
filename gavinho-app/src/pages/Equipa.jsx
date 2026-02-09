@@ -34,6 +34,7 @@ export default function Equipa() {
   const [utilizadores, setUtilizadores] = useState([]);
   const [pendingUsers, setPendingUsers] = useState([]);
   const [projetos, setProjetos] = useState([]);
+  const [userProjectMap, setUserProjectMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState(null);
   const [activeTab, setActiveTab] = useState('perfil');
@@ -153,12 +154,20 @@ export default function Equipa() {
         .order('created_at', { ascending: false });
       setPendingUsers(pendingData || []);
 
-      const { data: projetosData } = await supabase
-        .from('projetos')
-        .select('id, codigo, nome')
-        .eq('arquivado', false)
-        .order('codigo');
-      setProjetos(projetosData || []);
+      const [projetosRes, equipaRes] = await Promise.all([
+        supabase.from('projetos').select('id, codigo, nome').eq('arquivado', false).order('codigo'),
+        supabase.from('projeto_equipa').select('utilizador_id, funcao, projetos:projeto_id(codigo, nome)').catch(() => ({ data: [] }))
+      ]);
+      setProjetos(projetosRes.data || []);
+
+      // Build user -> projects map
+      const upm = {};
+      (equipaRes?.data || []).forEach(eq => {
+        if (!eq.utilizador_id || !eq.projetos) return;
+        if (!upm[eq.utilizador_id]) upm[eq.utilizador_id] = [];
+        upm[eq.utilizador_id].push({ codigo: eq.projetos.codigo, nome: eq.projetos.nome, funcao: eq.funcao });
+      });
+      setUserProjectMap(upm);
 
       // Carregar dados de gestão RH (admin)
       await loadRHData();
@@ -1418,6 +1427,14 @@ export default function Equipa() {
                       <span style={{ ...styles.badge, background: '#fef3c7', color: '#b45309' }}>Admin</span>
                     )}
                   </div>
+                  {userProjectMap[user.id] && userProjectMap[user.id].length > 0 && (
+                    <div style={{ fontSize: '11px', color: '#7A8B6E', marginTop: '2px' }}>
+                      {userProjectMap[user.id].length} projeto{userProjectMap[user.id].length !== 1 ? 's' : ''}
+                      {' — '}
+                      {userProjectMap[user.id].slice(0, 2).map(p => p.codigo).join(', ')}
+                      {userProjectMap[user.id].length > 2 && ` +${userProjectMap[user.id].length - 2}`}
+                    </div>
+                  )}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#a8a29e' }}>
                   {getRegimeIcon(user.regime)}

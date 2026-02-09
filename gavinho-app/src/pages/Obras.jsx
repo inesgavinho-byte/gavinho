@@ -73,13 +73,26 @@ export default function Obras() {
 
   const fetchObras = async () => {
     try {
-      const { data, error } = await supabase
-        .from('obras')
-        .select(`*, projetos (codigo, nome, cliente_nome)`)
-        .order('codigo', { ascending: true })
+      const [obrasRes, clientesRes] = await Promise.all([
+        supabase.from('obras').select(`*, projetos (codigo, nome, cliente_nome, cliente_id)`).order('codigo', { ascending: true }),
+        supabase.from('clientes').select('id, nome')
+      ])
 
-      if (error) throw error
-      setObras(data || [])
+      if (obrasRes.error) throw obrasRes.error
+
+      // Build clients map to resolve missing cliente_nome
+      const clientesMap = {}
+      ;(clientesRes.data || []).forEach(c => { clientesMap[c.id] = c.nome })
+
+      // Enrich obras with resolved client name
+      const enriched = (obrasRes.data || []).map(obra => {
+        if (obra.projetos && !obra.projetos.cliente_nome && obra.projetos.cliente_id) {
+          obra.projetos = { ...obra.projetos, cliente_nome: clientesMap[obra.projetos.cliente_id] || null }
+        }
+        return obra
+      })
+
+      setObras(enriched)
     } catch (error) {
       console.error('Erro ao carregar obras:', error)
     } finally {
@@ -422,8 +435,13 @@ export default function Obras() {
                       color: 'var(--brown-light)',
                       margin: 0
                     }}>
-                      {obra.projetos?.cliente_nome || obra.encarregado || 'Encarregado não definido'}
+                      {obra.projetos?.cliente_nome || obra.encarregado || 'Sem cliente/encarregado'}
                     </p>
+                    {obra.projetos?.codigo && (
+                      <p style={{ fontSize: '11px', color: 'var(--accent-olive)', margin: '2px 0 0', fontWeight: 500 }}>
+                        {obra.projetos.codigo} — {obra.projetos.nome}
+                      </p>
+                    )}
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
