@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useToast } from './ui/Toast'
 import { ConfirmModal } from './ui/ConfirmModal'
 import {
   Camera, Plus, Upload, X, Calendar, MapPin, Tag, Search, Filter,
-  Grid, List, ChevronDown, ChevronRight, Image as ImageIcon,
+  Grid, List, ChevronDown, ChevronLeft, ChevronRight, Image as ImageIcon,
   Trash2, Edit2, Download, Maximize2, Loader2
 } from 'lucide-react'
 import PortalToggle from './PortalToggle'
@@ -19,13 +19,14 @@ export default function ObraFotografias({ obra }) {
   const [uploading, setUploading] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [showLightbox, setShowLightbox] = useState(null)
+  const [lightboxIndex, setLightboxIndex] = useState(0)
   const [editingFoto, setEditingFoto] = useState(null)
+  const [collapsedDates, setCollapsedDates] = useState({})
 
   // Filtros
   const [filtroZona, setFiltroZona] = useState('')
   const [filtroEspecialidade, setFiltroEspecialidade] = useState('')
   const [filtroBusca, setFiltroBusca] = useState('')
-  const [viewMode, setViewMode] = useState('grid') // 'grid' ou 'list'
 
   // Form
   const [formData, setFormData] = useState({
@@ -43,9 +44,7 @@ export default function ObraFotografias({ obra }) {
   const [previews, setPreviews] = useState([])
 
   useEffect(() => {
-    if (obra?.id) {
-      loadData()
-    }
+    if (obra?.id) loadData()
   }, [obra?.id])
 
   const loadData = async () => {
@@ -82,27 +81,17 @@ export default function ObraFotografias({ obra }) {
   const handleFileSelect = (e) => {
     const files = Array.from(e.target.files || [])
     if (files.length === 0) return
-
-    setSelectedFiles(files)
-
-    // Generate previews
+    setSelectedFiles(prev => [...prev, ...files])
     const newPreviews = files.map(file => ({
-      file,
-      url: URL.createObjectURL(file),
-      name: file.name
+      file, url: URL.createObjectURL(file), name: file.name
     }))
-    setPreviews(newPreviews)
+    setPreviews(prev => [...prev, ...newPreviews])
   }
 
   const removePreview = (index) => {
-    const newFiles = selectedFiles.filter((_, i) => i !== index)
-    const newPreviews = previews.filter((_, i) => i !== index)
-
-    // Revoke URL to prevent memory leaks
     URL.revokeObjectURL(previews[index].url)
-
-    setSelectedFiles(newFiles)
-    setPreviews(newPreviews)
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index))
+    setPreviews(prev => prev.filter((_, i) => i !== index))
   }
 
   const handleUpload = async () => {
@@ -110,24 +99,15 @@ export default function ObraFotografias({ obra }) {
       toast.warning('Atenção', 'Selecione pelo menos uma fotografia')
       return
     }
-
     setUploading(true)
     try {
       for (const file of selectedFiles) {
-        // Upload to storage
         const fileName = `${obra.codigo}/fotografias/${Date.now()}_${file.name}`
-        const { error: uploadError } = await supabase.storage
-          .from('obras')
-          .upload(fileName, file)
-
+        const { error: uploadError } = await supabase.storage.from('obras').upload(fileName, file)
         if (uploadError) throw uploadError
 
-        // Get public URL
-        const { data: { publicUrl } } = supabase.storage
-          .from('obras')
-          .getPublicUrl(fileName)
+        const { data: { publicUrl } } = supabase.storage.from('obras').getPublicUrl(fileName)
 
-        // Create database record
         const { error: dbError } = await supabase
           .from('obra_fotografias')
           .insert({
@@ -145,24 +125,15 @@ export default function ObraFotografias({ obra }) {
             legenda_portal: formData.legenda_portal || null,
             portal_tipo: formData.portal_tipo || 'normal'
           })
-
         if (dbError) throw dbError
       }
-
-      // Clean up
       previews.forEach(p => URL.revokeObjectURL(p.url))
       setPreviews([])
       setSelectedFiles([])
-      setFormData({
-        titulo: '',
-        descricao: '',
-        data_fotografia: new Date().toISOString().split('T')[0],
-        zona_id: '',
-        especialidade_id: '',
-        tags: []
-      })
+      resetForm()
       setShowModal(false)
       loadData()
+      toast.success(`${selectedFiles.length} fotografia(s) adicionada(s)`)
     } catch (err) {
       console.error('Erro ao fazer upload:', err)
       toast.error('Erro', 'Erro ao fazer upload: ' + err.message)
@@ -171,26 +142,24 @@ export default function ObraFotografias({ obra }) {
     }
   }
 
+  const resetForm = () => {
+    setFormData({
+      titulo: '', descricao: '', data_fotografia: new Date().toISOString().split('T')[0],
+      zona_id: '', especialidade_id: '', tags: [],
+      publicar_no_portal: false, legenda_portal: '', portal_tipo: 'normal'
+    })
+  }
+
   const handleDelete = (foto) => {
     setConfirmModal({
-      isOpen: true,
-      title: 'Apagar Fotografia',
-      message: 'Tem certeza que deseja apagar esta fotografia?',
-      type: 'danger',
+      isOpen: true, title: 'Apagar Fotografia',
+      message: 'Tem certeza que deseja apagar esta fotografia?', type: 'danger',
       onConfirm: async () => {
         try {
-          // Delete from database
-          const { error } = await supabase
-            .from('obra_fotografias')
-            .delete()
-            .eq('id', foto.id)
-
+          const { error } = await supabase.from('obra_fotografias').delete().eq('id', foto.id)
           if (error) throw error
-
-          // Note: Could also delete from storage, but keeping for now
           loadData()
         } catch (err) {
-          console.error('Erro ao apagar:', err)
           toast.error('Erro', 'Erro ao apagar fotografia')
         }
         setConfirmModal(prev => ({ ...prev, isOpen: false }))
@@ -201,58 +170,41 @@ export default function ObraFotografias({ obra }) {
   const handleEdit = (foto) => {
     setEditingFoto(foto)
     setFormData({
-      titulo: foto.titulo || '',
-      descricao: foto.descricao || '',
-      data_fotografia: foto.data_fotografia || '',
-      zona_id: foto.zona_id || '',
-      especialidade_id: foto.especialidade_id || '',
-      tags: foto.tags || [],
+      titulo: foto.titulo || '', descricao: foto.descricao || '',
+      data_fotografia: foto.data_fotografia || '', zona_id: foto.zona_id || '',
+      especialidade_id: foto.especialidade_id || '', tags: foto.tags || [],
       publicar_no_portal: foto.publicar_no_portal || false,
-      legenda_portal: foto.legenda_portal || '',
-      portal_tipo: foto.portal_tipo || 'normal'
+      legenda_portal: foto.legenda_portal || '', portal_tipo: foto.portal_tipo || 'normal'
     })
     setShowModal(true)
   }
 
   const handleUpdate = async () => {
     if (!editingFoto) return
-
     try {
       const { error } = await supabase
         .from('obra_fotografias')
         .update({
-          titulo: formData.titulo,
-          descricao: formData.descricao,
+          titulo: formData.titulo, descricao: formData.descricao,
           data_fotografia: formData.data_fotografia,
-          zona_id: formData.zona_id || null,
-          especialidade_id: formData.especialidade_id || null,
+          zona_id: formData.zona_id || null, especialidade_id: formData.especialidade_id || null,
           tags: formData.tags.length > 0 ? formData.tags : null,
           publicar_no_portal: formData.publicar_no_portal,
           legenda_portal: formData.legenda_portal || null,
           portal_tipo: formData.portal_tipo || 'normal'
         })
         .eq('id', editingFoto.id)
-
       if (error) throw error
-
       setShowModal(false)
       setEditingFoto(null)
-      setFormData({
-        titulo: '',
-        descricao: '',
-        data_fotografia: new Date().toISOString().split('T')[0],
-        zona_id: '',
-        especialidade_id: '',
-        tags: []
-      })
+      resetForm()
       loadData()
     } catch (err) {
-      console.error('Erro ao atualizar:', err)
       toast.error('Erro', 'Erro ao atualizar fotografia')
     }
   }
 
-  // Filtrar fotografias
+  // Filtrar
   const fotografiasFiltradas = fotografias.filter(foto => {
     if (filtroZona && foto.zona_id !== filtroZona) return false
     if (filtroEspecialidade && foto.especialidade_id !== filtroEspecialidade) return false
@@ -265,368 +217,251 @@ export default function ObraFotografias({ obra }) {
     return true
   })
 
-  // Agrupar por mês
+  // Group by DAY
   const fotografiasAgrupadas = fotografiasFiltradas.reduce((acc, foto) => {
     const data = foto.data_fotografia
-    const mes = data ? new Date(data).toLocaleDateString('pt-PT', { month: 'long', year: 'numeric' }) : 'Sem data'
-    if (!acc[mes]) acc[mes] = []
-    acc[mes].push(foto)
+    const dia = data
+      ? new Date(data).toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+      : 'Sem data'
+    if (!acc[dia]) acc[dia] = []
+    acc[dia].push(foto)
     return acc
   }, {})
 
-  const formatDate = (dateStr) => {
-    if (!dateStr) return ''
-    return new Date(dateStr).toLocaleDateString('pt-PT', { day: 'numeric', month: 'short' })
+  // Lightbox navigation
+  const openLightbox = useCallback((foto) => {
+    const idx = fotografiasFiltradas.findIndex(f => f.id === foto.id)
+    setLightboxIndex(idx >= 0 ? idx : 0)
+    setShowLightbox(foto)
+  }, [fotografiasFiltradas])
+
+  const navigateLightbox = useCallback((dir) => {
+    const newIdx = lightboxIndex + dir
+    if (newIdx >= 0 && newIdx < fotografiasFiltradas.length) {
+      setLightboxIndex(newIdx)
+      setShowLightbox(fotografiasFiltradas[newIdx])
+    }
+  }, [lightboxIndex, fotografiasFiltradas])
+
+  useEffect(() => {
+    if (!showLightbox) return
+    const handler = (e) => {
+      if (e.key === 'Escape') setShowLightbox(null)
+      if (e.key === 'ArrowLeft') navigateLightbox(-1)
+      if (e.key === 'ArrowRight') navigateLightbox(1)
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [showLightbox, navigateLightbox])
+
+  const toggleDateCollapse = (key) => {
+    setCollapsedDates(prev => ({ ...prev, [key]: !prev[key] }))
   }
+
+  const collapseAll = () => {
+    const all = {}
+    Object.keys(fotografiasAgrupadas).forEach(k => { all[k] = true })
+    setCollapsedDates(all)
+  }
+  const expandAll = () => setCollapsedDates({})
 
   if (loading) {
     return (
-      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--brown-light)' }}>
+      <div style={{ padding: '40px', textAlign: 'center', color: '#ADAA96' }}>
         <Loader2 className="spin" size={24} style={{ marginBottom: '8px' }} />
         <p>A carregar fotografias...</p>
       </div>
     )
   }
 
+  const dateGroupCount = Object.keys(fotografiasAgrupadas).length
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--brown)' }}>
-            Fotografias
-          </h3>
-          <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--brown-light)' }}>
+          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#3D3D3D' }}>Fotografias</h3>
+          <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#ADAA96' }}>
             {fotografias.length} {fotografias.length === 1 ? 'fotografia' : 'fotografias'}
           </p>
         </div>
-        <button
-          onClick={() => { setEditingFoto(null); setShowModal(true) }}
-          className="btn btn-primary"
-        >
-          <Plus size={16} /> Adicionar
+        <button onClick={() => { setEditingFoto(null); resetForm(); setPreviews([]); setSelectedFiles([]); setShowModal(true) }} style={S.addBtn}>
+          <Plus size={14} /> Adicionar
         </button>
       </div>
 
-      {/* Filtros */}
-      <div className="card" style={{ padding: '12px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-        <div style={{ position: 'relative', flex: '1', minWidth: '200px' }}>
-          <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--brown-light)' }} />
-          <input
-            type="text"
-            placeholder="Pesquisar..."
-            value={filtroBusca}
-            onChange={e => setFiltroBusca(e.target.value)}
-            style={{ width: '100%', paddingLeft: '32px', fontSize: '13px' }}
-          />
+      {/* Filters */}
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ position: 'relative', flex: '1', minWidth: '180px' }}>
+          <Search size={13} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#ADAA96' }} />
+          <input type="text" placeholder="Pesquisar..." value={filtroBusca}
+            onChange={e => setFiltroBusca(e.target.value)} style={S.searchInput} />
         </div>
-
-        <select
-          value={filtroZona}
-          onChange={e => setFiltroZona(e.target.value)}
-          style={{ fontSize: '13px', minWidth: '140px' }}
-        >
+        <select value={filtroZona} onChange={e => setFiltroZona(e.target.value)} style={S.selectInput}>
           <option value="">Todas as zonas</option>
-          {zonas.map(zona => (
-            <option key={zona.id} value={zona.id}>{zona.nome}</option>
-          ))}
+          {zonas.map(zona => <option key={zona.id} value={zona.id}>{zona.nome}</option>)}
         </select>
-
-        <select
-          value={filtroEspecialidade}
-          onChange={e => setFiltroEspecialidade(e.target.value)}
-          style={{ fontSize: '13px', minWidth: '140px' }}
-        >
+        <select value={filtroEspecialidade} onChange={e => setFiltroEspecialidade(e.target.value)} style={S.selectInput}>
           <option value="">Todas especialidades</option>
-          {especialidades.map(esp => (
-            <option key={esp.id} value={esp.id}>{esp.nome}</option>
-          ))}
+          {especialidades.map(esp => <option key={esp.id} value={esp.id}>{esp.nome}</option>)}
         </select>
-
-        <div style={{ display: 'flex', gap: '4px', borderLeft: '1px solid var(--border)', paddingLeft: '12px' }}>
-          <button
-            onClick={() => setViewMode('grid')}
-            className={`btn btn-ghost btn-icon ${viewMode === 'grid' ? 'active' : ''}`}
-            style={{ background: viewMode === 'grid' ? 'var(--stone)' : 'transparent' }}
-          >
-            <Grid size={16} />
-          </button>
-          <button
-            onClick={() => setViewMode('list')}
-            className={`btn btn-ghost btn-icon ${viewMode === 'list' ? 'active' : ''}`}
-            style={{ background: viewMode === 'list' ? 'var(--stone)' : 'transparent' }}
-          >
-            <List size={16} />
-          </button>
-        </div>
-
+        {dateGroupCount > 1 && (
+          <div style={{ display: 'flex', gap: '4px', borderLeft: '1px solid #E5E2D9', paddingLeft: '8px' }}>
+            <button onClick={collapseAll} style={S.collapseBtn}>Colapsar</button>
+            <button onClick={expandAll} style={S.collapseBtn}>Expandir</button>
+          </div>
+        )}
         {(filtroZona || filtroEspecialidade || filtroBusca) && (
-          <button
-            onClick={() => { setFiltroZona(''); setFiltroEspecialidade(''); setFiltroBusca('') }}
-            style={{ fontSize: '12px', color: 'var(--brown-light)', background: 'none', border: 'none', cursor: 'pointer' }}
-          >
-            Limpar filtros
+          <button onClick={() => { setFiltroZona(''); setFiltroEspecialidade(''); setFiltroBusca('') }}
+            style={{ fontSize: '11px', color: '#ADAA96', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+            Limpar
           </button>
         )}
       </div>
 
-      {/* Galeria */}
+      {/* Gallery */}
       {fotografiasFiltradas.length === 0 ? (
-        <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
-          <Camera size={48} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '16px' }} />
-          <p style={{ color: 'var(--brown-light)', marginBottom: '8px' }}>Sem fotografias</p>
-          <p style={{ fontSize: '13px', color: 'var(--brown-light)' }}>Adicione a primeira fotografia para começar</p>
+        <div style={{ padding: '60px 20px', textAlign: 'center', background: '#FAFAF8', borderRadius: '12px', border: '1px solid #E5E2D9' }}>
+          <Camera size={48} style={{ color: '#ADAA96', opacity: 0.4, marginBottom: '16px' }} />
+          <h3 style={{ margin: '0 0 8px', color: '#3D3D3D', fontSize: '15px' }}>Sem fotografias</h3>
+          <p style={{ color: '#8B8670', margin: '0 0 20px', fontSize: '13px' }}>Adicione a primeira fotografia para começar</p>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          {Object.entries(fotografiasAgrupadas).map(([mes, fotos]) => (
-            <div key={mes}>
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '12px',
-                padding: '8px 12px',
-                background: 'var(--cream)',
-                borderRadius: '8px'
-              }}>
-                <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--brown)', textTransform: 'capitalize' }}>
-                  {mes}
-                </span>
-                <span style={{ fontSize: '12px', color: 'var(--brown-light)' }}>
-                  {fotos.length} {fotos.length === 1 ? 'foto' : 'fotos'}
-                </span>
-              </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {Object.entries(fotografiasAgrupadas).map(([dia, fotos]) => {
+            const isCollapsed = collapsedDates[dia]
+            return (
+              <div key={dia}>
+                {/* Day header */}
+                <div onClick={() => toggleDateCollapse(dia)} style={S.dateHeader}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <ChevronDown size={16} style={{ color: '#ADAA96', transition: 'transform 0.2s', transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0)' }} />
+                    <span style={{ fontSize: '13px', fontWeight: 500, color: '#3D3D3D', textTransform: 'capitalize' }}>{dia}</span>
+                  </div>
+                  <span style={{ fontSize: '11px', color: '#ADAA96' }}>
+                    {fotos.length} foto{fotos.length !== 1 ? 's' : ''}
+                  </span>
+                </div>
 
-              {viewMode === 'grid' ? (
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-                  gap: '12px'
-                }}>
-                  {fotos.map(foto => (
-                    <div
-                      key={foto.id}
-                      style={{
-                        position: 'relative',
-                        paddingTop: '100%',
-                        borderRadius: '8px',
-                        overflow: 'hidden',
-                        background: 'var(--stone)',
-                        cursor: 'pointer'
-                      }}
-                      onClick={() => setShowLightbox(foto)}
-                    >
-                      <img
-                        src={foto.url}
-                        alt={foto.titulo || foto.filename}
-                        style={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'cover'
-                        }}
-                      />
-                      {/* Overlay com info */}
-                      <div style={{
-                        position: 'absolute',
-                        inset: 0,
-                        background: 'linear-gradient(transparent 60%, rgba(0,0,0,0.7))',
-                        opacity: 0,
-                        transition: 'opacity 0.2s'
-                      }} className="foto-overlay">
-                        <div style={{ position: 'absolute', bottom: '8px', left: '8px', right: '8px' }}>
-                          {foto.titulo && (
-                            <div style={{ color: '#FFF', fontSize: '12px', fontWeight: 500, marginBottom: '2px' }}>
-                              {foto.titulo}
+                {/* Masonry grid */}
+                {!isCollapsed && (
+                  <div style={S.masonry}>
+                    {fotos.map(foto => (
+                      <div key={foto.id} className="obra-foto-pin" style={S.pin}>
+                        <div style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', cursor: 'pointer' }}
+                          onClick={() => openLightbox(foto)}>
+                          <img src={foto.url} alt={foto.titulo || foto.filename}
+                            style={{ width: '100%', display: 'block', background: '#F0EBE5' }} loading="lazy" />
+
+                          {/* Hover overlay */}
+                          <div className="obra-foto-overlay" style={S.pinOverlay}>
+                            {/* Top badges */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                              <div style={{ display: 'flex', gap: '4px' }}>
+                                {foto.zona && (
+                                  <span style={S.badge}>{foto.zona.codigo || foto.zona.nome}</span>
+                                )}
+                                {foto.especialidade && (
+                                  <span style={{ ...S.badge, background: foto.especialidade.cor || '#8B8670' }}>
+                                    {foto.especialidade.nome}
+                                  </span>
+                                )}
+                              </div>
+                              <div style={{ display: 'flex', gap: '4px', pointerEvents: 'auto' }}>
+                                <button onClick={(e) => { e.stopPropagation(); handleEdit(foto) }} style={S.overlayBtn} title="Editar">
+                                  <Edit2 size={12} />
+                                </button>
+                                <button onClick={(e) => { e.stopPropagation(); handleDelete(foto) }}
+                                  style={{ ...S.overlayBtn, background: 'rgba(220,38,38,0.85)', color: '#FFF' }} title="Eliminar">
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
                             </div>
-                          )}
-                          <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px' }}>
-                            {formatDate(foto.data_fotografia)}
                           </div>
                         </div>
+
+                        {/* Caption */}
+                        {(foto.titulo || foto.filename) && (
+                          <div style={{ padding: '6px 4px 2px' }}>
+                            <div style={{ fontSize: '12px', fontWeight: 500, color: '#3D3D3D', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {foto.titulo || foto.filename}
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      {/* Badge de zona */}
-                      {foto.zona && (
-                        <span style={{
-                          position: 'absolute',
-                          top: '8px',
-                          left: '8px',
-                          padding: '2px 6px',
-                          background: 'rgba(0,0,0,0.6)',
-                          color: '#FFF',
-                          fontSize: '10px',
-                          borderRadius: '4px'
-                        }}>
-                          {foto.zona.codigo || foto.zona.nome}
-                        </span>
-                      )}
-                      {/* Badge de especialidade */}
-                      {foto.especialidade && (
-                        <span style={{
-                          position: 'absolute',
-                          top: '8px',
-                          right: '8px',
-                          padding: '2px 6px',
-                          background: foto.especialidade.cor || 'var(--warning)',
-                          color: '#FFF',
-                          fontSize: '10px',
-                          borderRadius: '4px'
-                        }}>
-                          {foto.especialidade.nome}
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {fotos.map(foto => (
-                    <div
-                      key={foto.id}
-                      className="card"
-                      style={{
-                        padding: '12px',
-                        display: 'flex',
-                        gap: '12px',
-                        alignItems: 'center',
-                        cursor: 'pointer'
-                      }}
-                      onClick={() => setShowLightbox(foto)}
-                    >
-                      <div style={{
-                        width: '60px',
-                        height: '60px',
-                        borderRadius: '6px',
-                        overflow: 'hidden',
-                        background: 'var(--stone)',
-                        flexShrink: 0
-                      }}>
-                        <img
-                          src={foto.url}
-                          alt={foto.titulo || foto.filename}
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '4px' }}>
-                          {foto.titulo || foto.filename}
-                        </div>
-                        <div style={{ display: 'flex', gap: '12px', fontSize: '12px', color: 'var(--brown-light)' }}>
-                          <span>{formatDate(foto.data_fotografia)}</span>
-                          {foto.zona && <span>{foto.zona.nome}</span>}
-                          {foto.especialidade && (
-                            <span style={{ color: foto.especialidade.cor }}>{foto.especialidade.nome}</span>
-                          )}
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', gap: '4px' }} onClick={e => e.stopPropagation()}>
-                        <button
-                          className="btn btn-ghost btn-icon"
-                          onClick={() => handleEdit(foto)}
-                        >
-                          <Edit2 size={14} />
-                        </button>
-                        <button
-                          className="btn btn-ghost btn-icon"
-                          onClick={() => handleDelete(foto)}
-                          style={{ color: 'var(--error)' }}
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
 
-      {/* Modal de Upload/Edição */}
+      {/* Upload/Edit Modal */}
       {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px' }}>
-            <div className="modal-header">
-              <h3>{editingFoto ? 'Editar Fotografia' : 'Adicionar Fotografias'}</h3>
-              <button onClick={() => setShowModal(false)} className="modal-close">
+        <div style={S.modalBackdrop} onClick={() => setShowModal(false)}>
+          <div style={S.modalCard} onClick={e => e.stopPropagation()}>
+            {/* Modal Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 20px', borderBottom: '1px solid #E5E2D9' }}>
+              <h3 style={{ margin: 0, fontSize: '16px', color: '#3D3D3D', fontFamily: 'Cormorant Garamond, serif', fontWeight: 600 }}>
+                {editingFoto ? 'Editar Fotografia' : 'Adicionar Fotografias'}
+              </h3>
+              <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ADAA96', padding: '4px' }}>
                 <X size={18} />
               </button>
             </div>
 
-            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {/* Modal Body */}
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '65vh', overflowY: 'auto' }}>
+              {/* File Upload Area */}
               {!editingFoto && (
                 <div>
-                  <label style={{ fontSize: '12px', fontWeight: 500, marginBottom: '8px', display: 'block' }}>
-                    Fotografias *
-                  </label>
                   <div
-                    style={{
-                      border: '2px dashed var(--border)',
-                      borderRadius: '8px',
-                      padding: '24px',
-                      textAlign: 'center',
-                      cursor: 'pointer',
-                      background: 'var(--cream)'
-                    }}
+                    style={S.uploadZone}
                     onClick={() => document.getElementById('foto-input')?.click()}
+                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = '#7A8B6E' }}
+                    onDragLeave={(e) => { e.currentTarget.style.borderColor = '#E5E2D9' }}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      e.currentTarget.style.borderColor = '#E5E2D9'
+                      const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'))
+                      if (files.length) {
+                        setSelectedFiles(prev => [...prev, ...files])
+                        setPreviews(prev => [...prev, ...files.map(f => ({ file: f, url: URL.createObjectURL(f), name: f.name }))])
+                      }
+                    }}
                   >
                     {uploading ? (
-                      <Loader2 className="spin" size={32} style={{ color: 'var(--brown-light)' }} />
+                      <Loader2 className="spin" size={28} style={{ color: '#ADAA96' }} />
                     ) : (
                       <>
-                        <Upload size={32} style={{ color: 'var(--brown-light)', marginBottom: '8px' }} />
-                        <p style={{ margin: 0, fontSize: '13px', color: 'var(--brown-light)' }}>
-                          Clique ou arraste para adicionar fotos
-                        </p>
+                        <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#F5F3EB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Camera size={22} style={{ color: '#7A8B6E' }} />
+                        </div>
+                        <div style={{ textAlign: 'center' }}>
+                          <p style={{ margin: 0, fontSize: '13px', color: '#3D3D3D', fontWeight: 500 }}>
+                            Clique ou arraste fotografias
+                          </p>
+                          <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#ADAA96' }}>
+                            JPG, PNG, WEBP (max. 20MB)
+                          </p>
+                        </div>
                       </>
                     )}
-                    <input
-                      id="foto-input"
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      onChange={handleFileSelect}
-                      style={{ display: 'none' }}
-                    />
+                    <input id="foto-input" type="file" accept="image/*" multiple onChange={handleFileSelect} style={{ display: 'none' }} />
                   </div>
 
-                  {/* Previews */}
+                  {/* Previews masonry */}
                   {previews.length > 0 && (
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(4, 1fr)',
-                      gap: '8px',
-                      marginTop: '12px'
-                    }}>
+                    <div style={{ columns: '4 80px', columnGap: '6px', marginTop: '12px' }}>
                       {previews.map((preview, idx) => (
-                        <div key={idx} style={{ position: 'relative', paddingTop: '100%', borderRadius: '6px', overflow: 'hidden', background: 'var(--stone)' }}>
-                          <img
-                            src={preview.url}
-                            alt={preview.name}
-                            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }}
-                          />
-                          <button
-                            onClick={() => removePreview(idx)}
-                            style={{
-                              position: 'absolute',
-                              top: '4px',
-                              right: '4px',
-                              background: 'rgba(0,0,0,0.5)',
-                              border: 'none',
-                              borderRadius: '50%',
-                              width: '24px',
-                              height: '24px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            <X size={14} style={{ color: 'white' }} />
+                        <div key={idx} style={{ position: 'relative', breakInside: 'avoid', marginBottom: '6px', borderRadius: '8px', overflow: 'hidden' }}>
+                          <img src={preview.url} alt={preview.name}
+                            style={{ width: '100%', display: 'block', borderRadius: '8px' }} />
+                          <button onClick={() => removePreview(idx)} style={S.previewRemoveBtn}>
+                            <X size={12} />
                           </button>
                         </div>
                       ))}
@@ -635,102 +470,64 @@ export default function ObraFotografias({ obra }) {
                 </div>
               )}
 
+              {/* Form fields */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
-                  <label style={{ fontSize: '12px', fontWeight: 500, marginBottom: '4px', display: 'block' }}>
-                    Título
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.titulo}
+                  <label style={S.label}>Título</label>
+                  <input type="text" value={formData.titulo}
                     onChange={e => setFormData({ ...formData, titulo: e.target.value })}
-                    placeholder="Descrição breve..."
-                    style={{ width: '100%' }}
-                  />
+                    placeholder="Descrição breve..." style={S.input} />
                 </div>
                 <div>
-                  <label style={{ fontSize: '12px', fontWeight: 500, marginBottom: '4px', display: 'block' }}>
-                    Data
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.data_fotografia}
-                    onChange={e => setFormData({ ...formData, data_fotografia: e.target.value })}
-                    style={{ width: '100%' }}
-                  />
+                  <label style={S.label}>Data</label>
+                  <input type="date" value={formData.data_fotografia}
+                    onChange={e => setFormData({ ...formData, data_fotografia: e.target.value })} style={S.input} />
                 </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
-                  <label style={{ fontSize: '12px', fontWeight: 500, marginBottom: '4px', display: 'block' }}>
-                    Zona
-                  </label>
-                  <select
-                    value={formData.zona_id}
-                    onChange={e => setFormData({ ...formData, zona_id: e.target.value })}
-                    style={{ width: '100%' }}
-                  >
+                  <label style={S.label}>Zona</label>
+                  <select value={formData.zona_id}
+                    onChange={e => setFormData({ ...formData, zona_id: e.target.value })} style={S.input}>
                     <option value="">Selecionar zona...</option>
-                    {zonas.map(zona => (
-                      <option key={zona.id} value={zona.id}>{zona.nome}</option>
-                    ))}
+                    {zonas.map(zona => <option key={zona.id} value={zona.id}>{zona.nome}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label style={{ fontSize: '12px', fontWeight: 500, marginBottom: '4px', display: 'block' }}>
-                    Especialidade
-                  </label>
-                  <select
-                    value={formData.especialidade_id}
-                    onChange={e => setFormData({ ...formData, especialidade_id: e.target.value })}
-                    style={{ width: '100%' }}
-                  >
+                  <label style={S.label}>Especialidade</label>
+                  <select value={formData.especialidade_id}
+                    onChange={e => setFormData({ ...formData, especialidade_id: e.target.value })} style={S.input}>
                     <option value="">Selecionar especialidade...</option>
-                    {especialidades.map(esp => (
-                      <option key={esp.id} value={esp.id}>{esp.nome}</option>
-                    ))}
+                    {especialidades.map(esp => <option key={esp.id} value={esp.id}>{esp.nome}</option>)}
                   </select>
                 </div>
               </div>
 
               <div>
-                <label style={{ fontSize: '12px', fontWeight: 500, marginBottom: '4px', display: 'block' }}>
-                  Descrição
-                </label>
-                <textarea
-                  value={formData.descricao}
+                <label style={S.label}>Descrição</label>
+                <textarea value={formData.descricao}
                   onChange={e => setFormData({ ...formData, descricao: e.target.value })}
-                  placeholder="Notas adicionais..."
-                  rows={3}
-                  style={{ width: '100%', resize: 'vertical' }}
-                />
+                  placeholder="Notas adicionais..." rows={2}
+                  style={{ ...S.input, resize: 'vertical' }} />
               </div>
 
               {/* Portal Cliente */}
-              <div style={{ borderTop: '1px solid #E8E6DF', paddingTop: '12px' }}>
-                <PortalToggle
-                  checked={formData.publicar_no_portal}
-                  onChange={v => setFormData({ ...formData, publicar_no_portal: v })}
-                />
+              <div style={{ borderTop: '1px solid #E5E2D9', paddingTop: '12px' }}>
+                <PortalToggle checked={formData.publicar_no_portal}
+                  onChange={v => setFormData({ ...formData, publicar_no_portal: v })} />
                 {formData.publicar_no_portal && (
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '8px' }}>
                     <div>
-                      <label style={{ fontSize: '11px', color: '#8B8670', display: 'block', marginBottom: '2px' }}>Legenda Portal</label>
-                      <input
-                        value={formData.legenda_portal}
+                      <label style={{ ...S.label, fontSize: '11px' }}>Legenda Portal</label>
+                      <input value={formData.legenda_portal}
                         onChange={e => setFormData({ ...formData, legenda_portal: e.target.value })}
-                        placeholder="Legenda visível ao cliente..."
-                        style={{ width: '100%', padding: '6px 8px', border: '1px solid #E8E6DF', borderRadius: '6px', fontSize: '12px' }}
-                      />
+                        placeholder="Legenda visível ao cliente..." style={S.input} />
                     </div>
                     <div>
-                      <label style={{ fontSize: '11px', color: '#8B8670', display: 'block', marginBottom: '2px' }}>Tipo</label>
-                      <select
-                        value={formData.portal_tipo}
-                        onChange={e => setFormData({ ...formData, portal_tipo: e.target.value })}
-                        style={{ width: '100%', padding: '6px 8px', border: '1px solid #E8E6DF', borderRadius: '6px', fontSize: '12px' }}
-                      >
+                      <label style={{ ...S.label, fontSize: '11px' }}>Tipo</label>
+                      <select value={formData.portal_tipo}
+                        onChange={e => setFormData({ ...formData, portal_tipo: e.target.value })} style={S.input}>
                         <option value="normal">Normal</option>
                         <option value="destaque">Destaque</option>
                         <option value="antes">Antes</option>
@@ -742,138 +539,194 @@ export default function ObraFotografias({ obra }) {
               </div>
             </div>
 
-            <div className="modal-footer">
-              <button onClick={() => setShowModal(false)} className="btn btn-outline">
-                Cancelar
-              </button>
-              <button
-                onClick={editingFoto ? handleUpdate : handleUpload}
-                className="btn btn-primary"
-                disabled={uploading || (!editingFoto && selectedFiles.length === 0)}
-              >
-                {uploading ? (
-                  <>
-                    <Loader2 className="spin" size={14} />
-                    A enviar...
-                  </>
-                ) : editingFoto ? 'Guardar' : 'Enviar Fotografias'}
+            {/* Modal Footer */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', padding: '14px 20px', borderTop: '1px solid #E5E2D9' }}>
+              <button onClick={() => setShowModal(false)} style={S.cancelBtn}>Cancelar</button>
+              <button onClick={editingFoto ? handleUpdate : handleUpload}
+                disabled={uploading || (!editingFoto && selectedFiles.length === 0)} style={S.submitBtn}>
+                {uploading ? <><Loader2 className="spin" size={14} /> A enviar...</>
+                  : editingFoto ? 'Guardar' : `Enviar ${selectedFiles.length || ''} Fotografia${selectedFiles.length !== 1 ? 's' : ''}`}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Lightbox */}
+      {/* Lightbox with Navigation */}
       {showLightbox && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.95)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1100,
-            padding: '20px'
-          }}
-          onClick={() => setShowLightbox(null)}
-        >
-          <button
-            onClick={() => setShowLightbox(null)}
-            style={{
-              position: 'absolute',
-              top: '20px',
-              right: '20px',
-              background: 'rgba(255,255,255,0.1)',
-              border: 'none',
-              borderRadius: '50%',
-              width: '44px',
-              height: '44px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              color: 'white'
-            }}
-          >
-            <X size={24} />
-          </button>
+        <div style={S.lightbox} onClick={() => setShowLightbox(null)}>
+          <button onClick={() => setShowLightbox(null)} style={S.lightboxClose}><X size={20} /></button>
 
-          <div style={{ maxWidth: '90vw', maxHeight: '80vh', position: 'relative' }} onClick={e => e.stopPropagation()}>
-            <img
-              src={showLightbox.url}
-              alt={showLightbox.titulo || showLightbox.filename}
-              style={{ maxWidth: '100%', maxHeight: '80vh', borderRadius: '8px' }}
-            />
+          {/* Counter */}
+          <div style={{ position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)', color: 'white', fontSize: '13px', opacity: 0.7 }}>
+            {lightboxIndex + 1} / {fotografiasFiltradas.length}
+          </div>
 
-            {/* Info panel */}
-            <div style={{
-              position: 'absolute',
-              bottom: '-60px',
-              left: 0,
-              right: 0,
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              padding: '12px',
-              background: 'rgba(255,255,255,0.1)',
-              borderRadius: '8px',
-              backdropFilter: 'blur(8px)'
-            }}>
-              <div>
-                <div style={{ color: 'white', fontSize: '14px', fontWeight: 500 }}>
-                  {showLightbox.titulo || showLightbox.filename}
-                </div>
-                <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px', marginTop: '2px' }}>
-                  {formatDate(showLightbox.data_fotografia)}
-                  {showLightbox.zona && ` • ${showLightbox.zona.nome}`}
-                  {showLightbox.especialidade && ` • ${showLightbox.especialidade.nome}`}
-                </div>
+          {/* Prev */}
+          {lightboxIndex > 0 && (
+            <button onClick={(e) => { e.stopPropagation(); navigateLightbox(-1) }}
+              style={{ ...S.lightboxNav, left: '20px' }}>
+              <ChevronLeft size={28} />
+            </button>
+          )}
+          {/* Next */}
+          {lightboxIndex < fotografiasFiltradas.length - 1 && (
+            <button onClick={(e) => { e.stopPropagation(); navigateLightbox(1) }}
+              style={{ ...S.lightboxNav, right: '20px' }}>
+              <ChevronRight size={28} />
+            </button>
+          )}
+
+          <div onClick={e => e.stopPropagation()} style={{ maxWidth: '90vw', maxHeight: '80vh' }}>
+            <img src={showLightbox.url} alt={showLightbox.titulo || showLightbox.filename}
+              style={{ maxWidth: '90vw', maxHeight: '80vh', objectFit: 'contain', borderRadius: '8px' }} />
+          </div>
+
+          {/* Info bar */}
+          <div style={S.lightboxInfo} onClick={e => e.stopPropagation()}>
+            <div>
+              <div style={{ color: 'white', fontSize: '14px', fontWeight: 500 }}>
+                {showLightbox.titulo || showLightbox.filename}
               </div>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleEdit(showLightbox); setShowLightbox(null) }}
-                  className="btn btn-ghost btn-icon"
-                  style={{ color: 'white' }}
-                >
-                  <Edit2 size={16} />
-                </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleDelete(showLightbox); setShowLightbox(null) }}
-                  className="btn btn-ghost btn-icon"
-                  style={{ color: '#EF4444' }}
-                >
-                  <Trash2 size={16} />
-                </button>
-                <a
-                  href={showLightbox.url}
-                  download={showLightbox.filename}
-                  onClick={e => e.stopPropagation()}
-                  className="btn btn-ghost btn-icon"
-                  style={{ color: 'white' }}
-                >
-                  <Download size={16} />
-                </a>
+              <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px', marginTop: '2px' }}>
+                {showLightbox.data_fotografia && new Date(showLightbox.data_fotografia).toLocaleDateString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric' })}
+                {showLightbox.zona && ` · ${showLightbox.zona.nome}`}
+                {showLightbox.especialidade && ` · ${showLightbox.especialidade.nome}`}
               </div>
+            </div>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <button onClick={() => { handleEdit(showLightbox); setShowLightbox(null) }}
+                style={{ ...S.overlayBtn, background: 'rgba(255,255,255,0.15)', color: 'white' }}>
+                <Edit2 size={14} />
+              </button>
+              <a href={showLightbox.url} download={showLightbox.filename}
+                style={{ ...S.overlayBtn, background: 'rgba(255,255,255,0.15)', color: 'white', textDecoration: 'none' }}>
+                <Download size={14} />
+              </a>
+              <button onClick={() => { handleDelete(showLightbox); setShowLightbox(null) }}
+                style={{ ...S.overlayBtn, background: 'rgba(220,38,38,0.6)', color: 'white' }}>
+                <Trash2 size={14} />
+              </button>
             </div>
           </div>
         </div>
       )}
 
       <style>{`
-        .foto-overlay:hover {
-          opacity: 1 !important;
-        }
+        .obra-foto-overlay { opacity: 0 !important; transition: opacity 0.2s !important; }
+        .obra-foto-pin:hover .obra-foto-overlay { opacity: 1 !important; }
       `}</style>
 
-      <ConfirmModal
-        isOpen={confirmModal.isOpen}
+      <ConfirmModal isOpen={confirmModal.isOpen}
         onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
-        onConfirm={confirmModal.onConfirm}
-        title={confirmModal.title}
-        message={confirmModal.message}
-        type={confirmModal.type}
-      />
+        onConfirm={confirmModal.onConfirm} title={confirmModal.title}
+        message={confirmModal.message} type={confirmModal.type} />
     </div>
   )
+}
+
+// ─── Styles ────────────────────────────────────
+const S = {
+  addBtn: {
+    padding: '8px 16px', background: '#3D3D3D', color: 'white', border: 'none',
+    borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: 500,
+    display: 'flex', alignItems: 'center', gap: '6px',
+  },
+  searchInput: {
+    width: '100%', padding: '7px 10px 7px 30px', border: '1px solid #E5E2D9',
+    borderRadius: '20px', fontSize: '12px', background: '#FAFAF8', color: '#3D3D3D', outline: 'none',
+  },
+  selectInput: {
+    padding: '7px 10px', border: '1px solid #E5E2D9', borderRadius: '20px',
+    fontSize: '12px', background: '#FAFAF8', color: '#3D3D3D', outline: 'none', minWidth: '130px',
+  },
+  collapseBtn: {
+    padding: '5px 10px', background: 'transparent', border: '1px solid #E5E2D9',
+    borderRadius: '14px', fontSize: '11px', color: '#8B8670', cursor: 'pointer',
+  },
+  dateHeader: {
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    padding: '8px 4px', marginBottom: '8px', borderBottom: '1px solid #E5E2D9',
+    cursor: 'pointer', userSelect: 'none',
+  },
+  masonry: {
+    columns: '4 220px', columnGap: '14px', marginBottom: '8px',
+  },
+  pin: {
+    breakInside: 'avoid', marginBottom: '14px',
+  },
+  pinOverlay: {
+    position: 'absolute', inset: 0,
+    background: 'linear-gradient(180deg, rgba(0,0,0,0.35) 0%, transparent 40%, transparent 100%)',
+    borderRadius: '12px', display: 'flex', alignItems: 'flex-start', padding: '8px',
+    opacity: 0, transition: 'opacity 0.2s', pointerEvents: 'none',
+  },
+  badge: {
+    padding: '2px 8px', background: 'rgba(0,0,0,0.6)', color: '#FFF',
+    fontSize: '10px', borderRadius: '10px', fontWeight: 500,
+  },
+  overlayBtn: {
+    width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(255,255,255,0.9)',
+    color: '#3D3D3D', border: 'none', cursor: 'pointer', display: 'flex',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  modalBackdrop: {
+    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+  },
+  modalCard: {
+    width: '520px', maxWidth: '95vw', background: '#FFF', borderRadius: '16px',
+    boxShadow: '0 20px 60px rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column',
+    maxHeight: '90vh',
+  },
+  uploadZone: {
+    border: '2px dashed #E5E2D9', borderRadius: '12px', padding: '32px',
+    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px',
+    cursor: 'pointer', transition: 'border-color 0.2s, background 0.2s',
+    background: '#FAFAF8',
+  },
+  previewRemoveBtn: {
+    position: 'absolute', top: '4px', right: '4px', width: '20px', height: '20px',
+    background: 'rgba(0,0,0,0.6)', color: 'white', border: 'none', borderRadius: '50%',
+    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+  },
+  label: {
+    display: 'block', fontSize: '12px', fontWeight: 500, color: '#8B8670', marginBottom: '4px',
+  },
+  input: {
+    width: '100%', padding: '8px 10px', border: '1px solid #E5E2D9', borderRadius: '8px',
+    fontSize: '12px', background: '#FAFAF8', color: '#3D3D3D', fontFamily: 'inherit',
+  },
+  cancelBtn: {
+    padding: '8px 16px', background: 'transparent', border: '1px solid #E5E2D9',
+    borderRadius: '8px', fontSize: '12px', color: '#8B8670', cursor: 'pointer',
+  },
+  submitBtn: {
+    padding: '8px 20px', background: '#7A8B6E', color: 'white', border: 'none',
+    borderRadius: '8px', fontSize: '12px', fontWeight: 500, cursor: 'pointer',
+    display: 'flex', alignItems: 'center', gap: '6px',
+  },
+  lightbox: {
+    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100,
+  },
+  lightboxClose: {
+    position: 'absolute', top: '20px', right: '20px',
+    background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%',
+    width: '40px', height: '40px', cursor: 'pointer', color: 'white',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+  },
+  lightboxNav: {
+    position: 'absolute', top: '50%', transform: 'translateY(-50%)',
+    background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%',
+    width: '44px', height: '44px', cursor: 'pointer', color: 'white',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10,
+  },
+  lightboxInfo: {
+    position: 'absolute', bottom: '24px', left: '50%', transform: 'translateX(-50%)',
+    background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
+    padding: '12px 20px', borderRadius: '12px', display: 'flex',
+    justifyContent: 'space-between', alignItems: 'center', gap: '24px',
+    minWidth: '400px', maxWidth: '90vw',
+  },
 }
