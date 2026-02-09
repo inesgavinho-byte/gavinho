@@ -96,6 +96,7 @@ export default function ChatProjetos() {
   const [loading, setLoading] = useState(true)
   const [membrosEquipa, setMembrosEquipa] = useState([])
   const [unreadCounts, setUnreadCounts] = useState({}) // {topicoId: count}
+  const [topicoLeituras, setTopicoLeituras] = useState([]) // [{utilizador_id, ultima_leitura_at}]
   const [typingUsers, setTypingUsers] = useState([]) // Quem está a escrever
   const [presencaMap, setPresencaMap] = useState({}) // {utilizadorId: 'online'|'away'|'offline'}
   const typingTimeoutRef = useRef(null)
@@ -168,13 +169,16 @@ export default function ChatProjetos() {
   useEffect(() => {
     if (topicoAtivo) {
       loadMensagens(topicoAtivo.id)
+      loadTopicoLeituras(topicoAtivo.id)
       markAsRead(topicoAtivo.id)
       loadTypingUsers(topicoAtivo.id)
       const unsubMessages = subscribeToMessages(topicoAtivo.id)
       const unsubTyping = subscribeToTyping(topicoAtivo.id)
+      const unsubLeituras = subscribeToLeituras(topicoAtivo.id)
       return () => {
         unsubMessages?.()
         unsubTyping?.()
+        unsubLeituras?.()
         stopTyping()
       }
     }
@@ -197,6 +201,22 @@ export default function ChatProjetos() {
         if (payload.eventType === 'INSERT' && payload.new.autor_id !== profile?.id) {
           playNotificationSound()
         }
+      })
+      .subscribe()
+
+    return () => supabase.removeChannel(channel)
+  }
+
+  const subscribeToLeituras = (topicoId) => {
+    const channel = supabase
+      .channel(`chat_leituras_${topicoId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'chat_leituras',
+        filter: `topico_id=eq.${topicoId}`
+      }, () => {
+        loadTopicoLeituras(topicoId)
       })
       .subscribe()
 
@@ -385,6 +405,32 @@ export default function ChatProjetos() {
     } catch (err) {
       console.error('Erro ao marcar como lido:', err)
     }
+  }
+
+  // Carregar leituras do tópico (quem leu e quando)
+  const loadTopicoLeituras = async (topicoId) => {
+    if (!topicoId) return
+    try {
+      const { data } = await supabase
+        .from('chat_leituras')
+        .select('utilizador_id, ultima_leitura_at')
+        .eq('topico_id', topicoId)
+      setTopicoLeituras(data || [])
+    } catch (err) {
+      // Silenciar erros de leituras
+    }
+  }
+
+  // Verificar se mensagem foi lida por todos os membros
+  const isReadByAll = (msg) => {
+    if (!msg || !profile?.id) return false
+    if (msg.autor_id !== profile.id) return false
+    const otherMembers = membrosEquipa.filter(m => m.id !== profile.id && !m.is_bot)
+    if (otherMembers.length === 0) return false
+    return otherMembers.every(member => {
+      const leitura = topicoLeituras.find(l => l.utilizador_id === member.id)
+      return leitura && new Date(leitura.ultima_leitura_at) >= new Date(msg.created_at)
+    })
   }
 
   // Enviar typing indicator
@@ -1543,8 +1589,8 @@ export default function ChatProjetos() {
                             ))}
                           </div>
                         )}
-                        {showAuthor && msg.lido_por_todos !== false && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px', marginLeft: '48px' }}>
+                        {isOwn && !arr.slice(idx + 1).some(m => m.autor_id === profile?.id) && isReadByAll(msg) && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
                             <Check size={12} style={{ color: '#22c55e' }} />
                             <span style={{ fontSize: '10px', color: 'var(--brown-light)' }}>Lido por todos</span>
                           </div>
