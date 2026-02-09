@@ -84,7 +84,7 @@ export default function Projetos() {
           .eq('arquivado', false)
           .order('codigo', { ascending: true }),
         supabase.from('clientes').select('id, nome').order('nome'),
-        supabase.from('projeto_equipa').select('projeto_id, funcao, utilizadores(id, nome, avatar_url)').catch(() => ({ data: [] }))
+        supabase.from('projeto_equipa').select('projeto_id, funcao, utilizadores(id, nome, avatar_url)').then(res => res, () => ({ data: [] }))
       ])
 
       const projetos = projRes.data || []
