@@ -226,10 +226,11 @@ FROM projeto_marcos m
 WHERE m.publicar_no_portal = true
 ORDER BY m.ordem, m.data_prevista;
 
+-- CORRIGIDO: purchase_orders não tem coluna 'codigo' — o PK 'id' É o código (ex: PO-2025-0001)
 CREATE OR REPLACE VIEW v_portal_entregas AS
 SELECT
-  po.id, po.codigo, po.projeto_id, po.obra_id,
-  COALESCE(po.descricao_portal, po.codigo) as descricao,
+  po.id, po.id as codigo, po.projeto_id, po.obra_id,
+  COALESCE(po.descricao_portal, po.id) as descricao,
   po.data_entrega_prevista, po.data_entrega_real, po.estado
 FROM purchase_orders po
 WHERE po.publicar_no_portal = true

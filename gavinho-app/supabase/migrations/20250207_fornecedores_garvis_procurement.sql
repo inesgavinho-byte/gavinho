@@ -2,6 +2,8 @@
 -- MIGRAÇÃO: Fornecedores + G.A.R.V.I.S. Procurement
 -- Gavinho Platform - Fevereiro 2025
 -- Tabelas base + inteligência + procurement
+-- CORRIGIDO: Removido precos_referencia (usa versão de procurement_pipeline)
+--            Renomeado orcamento_linhas → orcamento_recebido_linhas (conflito com obras_module_v2)
 -- =====================================================
 
 -- ============================================
@@ -169,7 +171,7 @@ CREATE TABLE IF NOT EXISTS deal_room_fornecedores (
 );
 
 -- ============================================
--- FASE 3: Orçamentos recebidos
+-- FASE 3: Orçamentos recebidos (de fornecedores)
 -- ============================================
 
 CREATE TABLE IF NOT EXISTS orcamentos_recebidos (
@@ -196,7 +198,9 @@ CREATE TABLE IF NOT EXISTS orcamentos_recebidos (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS orcamento_linhas (
+-- RENOMEADO: orcamento_linhas → orcamento_recebido_linhas
+-- (evita conflito com orcamento_linhas de obras_module_v2 que referencia orcamentos_internos)
+CREATE TABLE IF NOT EXISTS orcamento_recebido_linhas (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   orcamento_id UUID NOT NULL REFERENCES orcamentos_recebidos(id) ON DELETE CASCADE,
   linha_numero INTEGER,
@@ -213,26 +217,10 @@ CREATE TABLE IF NOT EXISTS orcamento_linhas (
 );
 
 -- ============================================
--- FASE 3: Preços de referência
+-- NOTA: precos_referencia REMOVIDO daqui
+-- Usar a versão mais avançada em 20250208_procurement_pipeline.sql
+-- (tem trend tracking, UNIQUE constraint, precisão DECIMAL(12,4))
 -- ============================================
-
-CREATE TABLE IF NOT EXISTS precos_referencia (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  descricao TEXT NOT NULL,
-  categoria TEXT,
-  subcategoria TEXT,
-  unidade TEXT NOT NULL,
-  preco_minimo DECIMAL(12,2),
-  preco_medio DECIMAL(12,2),
-  preco_maximo DECIMAL(12,2),
-  n_amostras INTEGER DEFAULT 0,
-  data_atualizacao DATE DEFAULT CURRENT_DATE,
-  fonte TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_preco_ref_categoria ON precos_referencia(categoria, subcategoria);
 
 -- ============================================
 -- FASE 4: Alertas inteligentes
@@ -288,8 +276,7 @@ ALTER TABLE fornecedor_perfil ENABLE ROW LEVEL SECURITY;
 ALTER TABLE deal_rooms ENABLE ROW LEVEL SECURITY;
 ALTER TABLE deal_room_fornecedores ENABLE ROW LEVEL SECURITY;
 ALTER TABLE orcamentos_recebidos ENABLE ROW LEVEL SECURITY;
-ALTER TABLE orcamento_linhas ENABLE ROW LEVEL SECURITY;
-ALTER TABLE precos_referencia ENABLE ROW LEVEL SECURITY;
+ALTER TABLE orcamento_recebido_linhas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE alertas_garvis ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fornecedor_projeto_scores ENABLE ROW LEVEL SECURITY;
 
@@ -312,10 +299,8 @@ DROP POLICY IF EXISTS "all_deal_room_fornecedores" ON deal_room_fornecedores;
 CREATE POLICY "all_deal_room_fornecedores" ON deal_room_fornecedores FOR ALL USING (true) WITH CHECK (true);
 DROP POLICY IF EXISTS "all_orcamentos_recebidos" ON orcamentos_recebidos;
 CREATE POLICY "all_orcamentos_recebidos" ON orcamentos_recebidos FOR ALL USING (true) WITH CHECK (true);
-DROP POLICY IF EXISTS "all_orcamento_linhas" ON orcamento_linhas;
-CREATE POLICY "all_orcamento_linhas" ON orcamento_linhas FOR ALL USING (true) WITH CHECK (true);
-DROP POLICY IF EXISTS "all_precos_referencia" ON precos_referencia;
-CREATE POLICY "all_precos_referencia" ON precos_referencia FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "all_orcamento_recebido_linhas" ON orcamento_recebido_linhas;
+CREATE POLICY "all_orcamento_recebido_linhas" ON orcamento_recebido_linhas FOR ALL USING (true) WITH CHECK (true);
 DROP POLICY IF EXISTS "all_alertas_garvis" ON alertas_garvis;
 CREATE POLICY "all_alertas_garvis" ON alertas_garvis FOR ALL USING (true) WITH CHECK (true);
 DROP POLICY IF EXISTS "all_fornecedor_projeto_scores" ON fornecedor_projeto_scores;

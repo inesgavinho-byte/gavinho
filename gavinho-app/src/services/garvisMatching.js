@@ -165,7 +165,7 @@ async function enrichSupplierData(fornecedor) {
 
     // Get quote deviation average
     const { data: quoteLinesData } = await supabase
-      .from('orcamento_linhas')
+      .from('orcamento_recebido_linhas')
       .select('desvio_percentual, orcamentos_recebidos!inner(fornecedor_id)')
       .eq('orcamentos_recebidos.fornecedor_id', fornecedor.id)
       .not('desvio_percentual', 'is', null)

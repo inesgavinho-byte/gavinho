@@ -18,7 +18,7 @@ export async function analyzeQuote(orcamentoId) {
       .select(`
         *,
         fornecedores(nome, especialidade),
-        orcamento_linhas(*)
+        orcamento_recebido_linhas(*)
       `)
       .eq('id', orcamentoId)
       .single()
@@ -26,7 +26,7 @@ export async function analyzeQuote(orcamentoId) {
     if (error) throw error
     if (!orcamento) return { error: 'Orçamento não encontrado' }
 
-    const linhas = orcamento.orcamento_linhas || []
+    const linhas = orcamento.orcamento_recebido_linhas || []
     const analysis = {
       orcamento_id: orcamentoId,
       fornecedor: orcamento.fornecedores?.nome,
@@ -48,7 +48,7 @@ export async function analyzeQuote(orcamentoId) {
     const refMap = new Map()
     if (referencias) {
       for (const ref of referencias) {
-        refMap.set(ref.descricao.toLowerCase(), ref)
+        refMap.set((ref.descricao_normalizada || '').toLowerCase(), ref)
         if (ref.categoria) {
           refMap.set(`${ref.categoria}:${ref.subcategoria || ''}`.toLowerCase(), ref)
         }
@@ -95,7 +95,7 @@ export async function analyzeQuote(orcamentoId) {
 
         // Update the line in DB with deviation
         await supabase
-          .from('orcamento_linhas')
+          .from('orcamento_recebido_linhas')
           .update({
             preco_referencia: refPreco,
             desvio_percentual: Math.round(desvio * 10) / 10
@@ -168,7 +168,7 @@ export async function compareDealRoomQuotes(dealRoomId) {
       .select(`
         *,
         fornecedores(id, nome, especialidade, rating),
-        orcamento_linhas(*)
+        orcamento_recebido_linhas(*)
       `)
       .eq('deal_room_id', dealRoomId)
       .order('valor_total')
@@ -204,7 +204,7 @@ export async function compareDealRoomQuotes(dealRoomId) {
         rank: idx + 1,
         vs_budget: budget ? ((q.valor_total - budget) / budget * 100).toFixed(1) : null,
         within_budget: budget ? q.valor_total <= budget : null,
-        linhas_count: q.orcamento_linhas?.length || 0,
+        linhas_count: q.orcamento_recebido_linhas?.length || 0,
         referencia: q.referencia_fornecedor
       })),
       recomendacao: null
@@ -254,7 +254,7 @@ export async function registerQuoteLines(orcamentoId, lines) {
     }))
 
     const { data, error } = await supabase
-      .from('orcamento_linhas')
+      .from('orcamento_recebido_linhas')
       .insert(toInsert)
       .select()
 
@@ -276,7 +276,7 @@ export async function registerQuoteLines(orcamentoId, lines) {
 export async function updateReferencePrices(orcamentoId) {
   try {
     const { data: linhas } = await supabase
-      .from('orcamento_linhas')
+      .from('orcamento_recebido_linhas')
       .select('descricao, unidade, preco_unitario')
       .eq('orcamento_id', orcamentoId)
       .not('preco_unitario', 'is', null)
@@ -284,29 +284,28 @@ export async function updateReferencePrices(orcamentoId) {
     if (!linhas || linhas.length === 0) return
 
     for (const linha of linhas) {
-      // Check if reference exists
+      // Check if reference exists (usa descricao_normalizada do schema procurement_pipeline)
       const { data: existing } = await supabase
         .from('precos_referencia')
         .select('*')
-        .ilike('descricao', linha.descricao)
+        .ilike('descricao_normalizada', linha.descricao)
         .limit(1)
 
       if (existing && existing.length > 0) {
         const ref = existing[0]
         const newMin = Math.min(ref.preco_minimo || Infinity, linha.preco_unitario)
         const newMax = Math.max(ref.preco_maximo || 0, linha.preco_unitario)
-        const newCount = (ref.n_amostras || 0) + 1
-        const newMedio = ((ref.preco_medio || 0) * (ref.n_amostras || 0) + linha.preco_unitario) / newCount
+        const newCount = (ref.num_cotacoes || 0) + 1
+        const newMedio = ((ref.preco_medio || 0) * (ref.num_cotacoes || 0) + linha.preco_unitario) / newCount
 
         await supabase
           .from('precos_referencia')
           .update({
             preco_minimo: newMin,
             preco_maximo: newMax,
-            preco_medio: Math.round(newMedio * 100) / 100,
-            n_amostras: newCount,
-            data_atualizacao: new Date().toISOString().split('T')[0],
-            fonte: 'garvis_auto'
+            preco_medio: Math.round(newMedio * 10000) / 10000,
+            num_cotacoes: newCount,
+            ultima_cotacao: new Date().toISOString()
           })
           .eq('id', ref.id)
       } else {
@@ -314,13 +313,14 @@ export async function updateReferencePrices(orcamentoId) {
         await supabase
           .from('precos_referencia')
           .insert({
-            descricao: linha.descricao,
+            descricao_normalizada: linha.descricao,
+            categoria: 'geral',
             unidade: linha.unidade || 'un',
             preco_minimo: linha.preco_unitario,
             preco_medio: linha.preco_unitario,
             preco_maximo: linha.preco_unitario,
-            n_amostras: 1,
-            fonte: 'garvis_auto'
+            num_cotacoes: 1,
+            ultima_cotacao: new Date().toISOString()
           })
       }
     }

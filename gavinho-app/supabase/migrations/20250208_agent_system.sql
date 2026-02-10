@@ -275,9 +275,15 @@ ALTER TABLE agent_notifications ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "an_all" ON agent_notifications;
 CREATE POLICY "an_all" ON agent_notifications FOR ALL USING (true) WITH CHECK (true);
 
--- Ativar Realtime
-ALTER PUBLICATION supabase_realtime ADD TABLE agent_notifications;
-ALTER PUBLICATION supabase_realtime ADD TABLE agent_actions;
+-- Ativar Realtime (com segurança para re-run)
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE agent_notifications;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE agent_actions;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- ══════════════════════════════════════════════════
 -- 6. CONFIGURAÇÃO DE SUBSCRIÇÕES GRAPH API

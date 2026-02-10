@@ -150,7 +150,7 @@ export function useGarvisAlerts(options = {}) {
 
       // 2. Check quote deviations (if price references exist)
       const { data: recentQuotes } = await supabase
-        .from('orcamento_linhas')
+        .from('orcamento_recebido_linhas')
         .select('*, orcamentos_recebidos!inner(fornecedor_id, fornecedores!inner(nome))')
         .gt('desvio_percentual', 15)
         .order('created_at', { ascending: false })
