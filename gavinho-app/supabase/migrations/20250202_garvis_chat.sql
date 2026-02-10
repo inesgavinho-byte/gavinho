@@ -109,9 +109,5 @@ BEGIN
   END IF;
 END $$;
 
--- =====================================================
--- Comments for documentation
--- =====================================================
-COMMENT ON TABLE garvis_chat_logs IS 'Logs de todas as interações do GARVIS no chat';
-COMMENT ON TABLE garvis_config_projeto IS 'Configurações do GARVIS por projeto';
-COMMENT ON COLUMN garvis_chat_logs.contexto_projeto IS 'Dados do projeto usados para contextualizar a resposta';
+-- Documentation: garvis_chat_logs = GARVIS chat interaction logs
+-- Documentation: garvis_config_projeto = GARVIS config per project
