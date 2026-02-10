@@ -44,6 +44,7 @@ CREATE INDEX IF NOT EXISTS idx_portal_config_projeto ON portal_config(projeto_id
 CREATE INDEX IF NOT EXISTS idx_portal_config_email ON portal_config(cliente_email);
 
 ALTER TABLE portal_config ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "portal_config_all" ON portal_config;
 CREATE POLICY "portal_config_all" ON portal_config FOR ALL USING (true) WITH CHECK (true);
 
 -- ══════════════════════════════════════════════════
@@ -99,6 +100,7 @@ CREATE TABLE IF NOT EXISTS portal_documentos (
 CREATE INDEX IF NOT EXISTS idx_portal_docs_projeto ON portal_documentos(projeto_id);
 
 ALTER TABLE portal_documentos ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "portal_docs_all" ON portal_documentos;
 CREATE POLICY "portal_docs_all" ON portal_documentos FOR ALL USING (true) WITH CHECK (true);
 
 -- ══════════════════════════════════════════════════
@@ -127,6 +129,7 @@ CREATE TABLE IF NOT EXISTS portal_mensagens (
 CREATE INDEX IF NOT EXISTS idx_portal_msgs_projeto ON portal_mensagens(projeto_id, created_at DESC);
 
 ALTER TABLE portal_mensagens ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "portal_msgs_all" ON portal_mensagens;
 CREATE POLICY "portal_msgs_all" ON portal_mensagens FOR ALL USING (true) WITH CHECK (true);
 
 -- ══════════════════════════════════════════════════
@@ -149,6 +152,7 @@ CREATE TABLE IF NOT EXISTS portal_acessos (
 CREATE INDEX IF NOT EXISTS idx_portal_acessos_projeto ON portal_acessos(projeto_id, created_at DESC);
 
 ALTER TABLE portal_acessos ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "portal_acessos_all" ON portal_acessos;
 CREATE POLICY "portal_acessos_all" ON portal_acessos FOR ALL USING (true) WITH CHECK (true);
 
 -- ══════════════════════════════════════════════════
@@ -183,6 +187,7 @@ CREATE TABLE IF NOT EXISTS projeto_marcos (
 CREATE INDEX IF NOT EXISTS idx_portal_marcos ON projeto_marcos(projeto_id, ordem);
 
 ALTER TABLE projeto_marcos ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "marcos_all" ON projeto_marcos;
 CREATE POLICY "marcos_all" ON projeto_marcos FOR ALL USING (true) WITH CHECK (true);
 
 -- ══════════════════════════════════════════════════
@@ -238,12 +243,4 @@ DROP TRIGGER IF EXISTS trg_portal_config_updated ON portal_config;
 CREATE TRIGGER trg_portal_config_updated BEFORE UPDATE ON portal_config
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- ══════════════════════════════════════════════════
--- COMMENTS
--- ══════════════════════════════════════════════════
-
-COMMENT ON TABLE portal_config IS 'Configuração do portal cliente por projecto — magic link, idioma, secções visíveis';
-COMMENT ON TABLE portal_documentos IS 'Documentos partilhados com o cliente no portal';
-COMMENT ON TABLE portal_mensagens IS 'Canal de mensagens entre cliente e equipa GAVINHO';
-COMMENT ON TABLE portal_acessos IS 'Log de acessos do cliente ao portal para analytics';
-COMMENT ON TABLE projeto_marcos IS 'Marcos do projecto para timeline no portal cliente';
+-- Docs: portal_config, portal_documentos, portal_mensagens, portal_acessos, projeto_marcos

@@ -128,6 +128,7 @@ CREATE INDEX IF NOT EXISTS idx_epq_graph_msg ON email_processing_queue(graph_mes
 
 -- RLS
 ALTER TABLE email_processing_queue ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "epq_all" ON email_processing_queue;
 CREATE POLICY "epq_all" ON email_processing_queue FOR ALL USING (true) WITH CHECK (true);
 
 -- ══════════════════════════════════════════════════
@@ -194,6 +195,7 @@ CREATE INDEX IF NOT EXISTS idx_aa_assigned ON agent_actions(assigned_to, status)
 
 -- RLS
 ALTER TABLE agent_actions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "aa_all" ON agent_actions;
 CREATE POLICY "aa_all" ON agent_actions FOR ALL USING (true) WITH CHECK (true);
 
 -- ══════════════════════════════════════════════════
@@ -241,6 +243,7 @@ CREATE INDEX IF NOT EXISTS idx_aal_email ON ai_audit_log(email_queue_id);
 
 -- RLS
 ALTER TABLE ai_audit_log ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "aal_all" ON ai_audit_log;
 CREATE POLICY "aal_all" ON ai_audit_log FOR ALL USING (true) WITH CHECK (true);
 
 -- ══════════════════════════════════════════════════
@@ -269,6 +272,7 @@ CREATE INDEX IF NOT EXISTS idx_an_created ON agent_notifications(created_at DESC
 
 -- RLS
 ALTER TABLE agent_notifications ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "an_all" ON agent_notifications;
 CREATE POLICY "an_all" ON agent_notifications FOR ALL USING (true) WITH CHECK (true);
 
 -- Ativar Realtime
@@ -294,6 +298,7 @@ CREATE TABLE IF NOT EXISTS graph_subscriptions (
 
 -- RLS
 ALTER TABLE graph_subscriptions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "gs_all" ON graph_subscriptions;
 CREATE POLICY "gs_all" ON graph_subscriptions FOR ALL USING (true) WITH CHECK (true);
 
 -- ══════════════════════════════════════════════════
@@ -425,7 +430,7 @@ ORDER BY
 -- 11. RENOVAÇÃO AUTOMÁTICA DA SUBSCRIÇÃO (pg_cron)
 -- ══════════════════════════════════════════════════
 
-DO $$
+DO $do$
 BEGIN
   PERFORM cron.schedule(
     'renew-graph-subscription',
@@ -441,17 +446,9 @@ BEGIN
       );
     $$
   );
-  RAISE NOTICE 'pg_cron job para renovação da subscrição Graph criado';
+  RAISE NOTICE 'pg_cron job criado';
 EXCEPTION WHEN OTHERS THEN
-  RAISE NOTICE 'pg_cron não disponível: %. Renovação manual necessária.', SQLERRM;
-END $$;
+  RAISE NOTICE 'pg_cron não disponível: %', SQLERRM;
+END $do$;
 
--- ══════════════════════════════════════════════════
--- COMENTÁRIOS
--- ══════════════════════════════════════════════════
-
-COMMENT ON TABLE email_processing_queue IS 'Fila de processamento de emails via Microsoft Graph webhooks';
-COMMENT ON TABLE agent_actions IS 'Ações propostas/executadas pelos agentes IA';
-COMMENT ON TABLE ai_audit_log IS 'Log imutável de todas as decisões e ações da IA';
-COMMENT ON TABLE agent_notifications IS 'Notificações em tempo real dos agentes para utilizadores';
-COMMENT ON TABLE graph_subscriptions IS 'Registo de subscrições ativas do Microsoft Graph API';
+-- Docs: email_processing_queue, agent_actions, ai_audit_log, agent_notifications, graph_subscriptions

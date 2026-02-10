@@ -39,9 +39,13 @@ CREATE INDEX IF NOT EXISTS idx_leads_responsavel ON leads(responsavel_id);
 
 -- RLS
 ALTER TABLE leads ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "leads_select" ON leads;
 CREATE POLICY "leads_select" ON leads FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "leads_insert" ON leads;
 CREATE POLICY "leads_insert" ON leads FOR INSERT TO authenticated WITH CHECK (true);
+DROP POLICY IF EXISTS "leads_update" ON leads;
 CREATE POLICY "leads_update" ON leads FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "leads_delete" ON leads;
 CREATE POLICY "leads_delete" ON leads FOR DELETE TO authenticated USING (true);
 
 -- Updated_at trigger
@@ -81,9 +85,13 @@ CREATE INDEX IF NOT EXISTS idx_custos_fixos_ativo ON custos_fixos(ativo);
 
 -- RLS
 ALTER TABLE custos_fixos ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "custos_fixos_select" ON custos_fixos;
 CREATE POLICY "custos_fixos_select" ON custos_fixos FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "custos_fixos_insert" ON custos_fixos;
 CREATE POLICY "custos_fixos_insert" ON custos_fixos FOR INSERT TO authenticated WITH CHECK (true);
+DROP POLICY IF EXISTS "custos_fixos_update" ON custos_fixos;
 CREATE POLICY "custos_fixos_update" ON custos_fixos FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "custos_fixos_delete" ON custos_fixos;
 CREATE POLICY "custos_fixos_delete" ON custos_fixos FOR DELETE TO authenticated USING (true);
 
 -- Updated_at trigger
@@ -131,9 +139,13 @@ CREATE INDEX IF NOT EXISTS idx_compras_data_encomenda ON compras(data_encomenda 
 
 -- RLS
 ALTER TABLE compras ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "compras_select" ON compras;
 CREATE POLICY "compras_select" ON compras FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "compras_insert" ON compras;
 CREATE POLICY "compras_insert" ON compras FOR INSERT TO authenticated WITH CHECK (true);
+DROP POLICY IF EXISTS "compras_update" ON compras;
 CREATE POLICY "compras_update" ON compras FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "compras_delete" ON compras;
 CREATE POLICY "compras_delete" ON compras FOR DELETE TO authenticated USING (true);
 
 -- Updated_at trigger

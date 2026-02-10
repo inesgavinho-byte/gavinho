@@ -56,6 +56,7 @@ CREATE INDEX IF NOT EXISTS idx_req_obra ON requisicoes(obra_id, estado);
 CREATE INDEX IF NOT EXISTS idx_req_estado ON requisicoes(estado);
 
 ALTER TABLE requisicoes ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "req_all" ON requisicoes;
 CREATE POLICY "req_all" ON requisicoes FOR ALL USING (true) WITH CHECK (true);
 
 -- ══════════════════════════════════════════════════
@@ -107,6 +108,7 @@ CREATE INDEX IF NOT EXISTS idx_cot_requisicao ON cotacoes(requisicao_id);
 CREATE INDEX IF NOT EXISTS idx_cot_fornecedor ON cotacoes(fornecedor_id);
 
 ALTER TABLE cotacoes ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "cot_all" ON cotacoes;
 CREATE POLICY "cot_all" ON cotacoes FOR ALL USING (true) WITH CHECK (true);
 
 -- ══════════════════════════════════════════════════
@@ -142,6 +144,7 @@ CREATE TABLE IF NOT EXISTS cotacao_linhas (
 CREATE INDEX IF NOT EXISTS idx_cl_cotacao ON cotacao_linhas(cotacao_id);
 
 ALTER TABLE cotacao_linhas ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "cl_all" ON cotacao_linhas;
 CREATE POLICY "cl_all" ON cotacao_linhas FOR ALL USING (true) WITH CHECK (true);
 
 -- ══════════════════════════════════════════════════
@@ -201,6 +204,7 @@ CREATE INDEX IF NOT EXISTS idx_po_fornecedor ON purchase_orders(fornecedor_id);
 CREATE INDEX IF NOT EXISTS idx_po_estado ON purchase_orders(estado);
 
 ALTER TABLE purchase_orders ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "po_all" ON purchase_orders;
 CREATE POLICY "po_all" ON purchase_orders FOR ALL USING (true) WITH CHECK (true);
 
 -- Trigger: proteger PO aprovada contra alteração de valores
@@ -245,6 +249,7 @@ CREATE TABLE IF NOT EXISTS po_linhas (
 CREATE INDEX IF NOT EXISTS idx_pol_po ON po_linhas(po_id);
 
 ALTER TABLE po_linhas ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "pol_all" ON po_linhas;
 CREATE POLICY "pol_all" ON po_linhas FOR ALL USING (true) WITH CHECK (true);
 
 -- ══════════════════════════════════════════════════
@@ -288,6 +293,7 @@ CREATE INDEX IF NOT EXISTS idx_pfat_po ON procurement_facturas(po_id);
 CREATE INDEX IF NOT EXISTS idx_pfat_fornecedor ON procurement_facturas(fornecedor_id);
 
 ALTER TABLE procurement_facturas ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "pfat_all" ON procurement_facturas;
 CREATE POLICY "pfat_all" ON procurement_facturas FOR ALL USING (true) WITH CHECK (true);
 
 -- ══════════════════════════════════════════════════
@@ -319,6 +325,7 @@ CREATE TABLE IF NOT EXISTS precos_referencia (
 CREATE INDEX IF NOT EXISTS idx_preco_categoria ON precos_referencia(categoria, subcategoria);
 
 ALTER TABLE precos_referencia ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "pr_all" ON precos_referencia;
 CREATE POLICY "pr_all" ON precos_referencia FOR ALL USING (true) WITH CHECK (true);
 
 -- ══════════════════════════════════════════════════
@@ -351,6 +358,7 @@ CREATE TABLE IF NOT EXISTS fornecedor_score_historico (
 CREATE INDEX IF NOT EXISTS idx_fsh_fornecedor ON fornecedor_score_historico(fornecedor_id);
 
 ALTER TABLE fornecedor_score_historico ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "fsh_all" ON fornecedor_score_historico;
 CREATE POLICY "fsh_all" ON fornecedor_score_historico FOR ALL USING (true) WITH CHECK (true);
 
 -- ══════════════════════════════════════════════════
@@ -409,15 +417,5 @@ LEFT JOIN fornecedor_score_historico fsh ON fsh.fornecedor_id = f.id
 LEFT JOIN purchase_orders po ON po.fornecedor_id = f.id
 GROUP BY f.id, f.nome;
 
--- ══════════════════════════════════════════════════
--- COMENTÁRIOS
--- ══════════════════════════════════════════════════
-
-COMMENT ON TABLE requisicoes IS 'Requisições de material/serviço — início do ciclo de procurement';
-COMMENT ON TABLE cotacoes IS 'Cotações recebidas de fornecedores, com extracção IA';
-COMMENT ON TABLE cotacao_linhas IS 'Linhas individuais de cada cotação com preços unitários';
-COMMENT ON TABLE purchase_orders IS 'Notas de encomenda geradas a partir de cotações aprovadas';
-COMMENT ON TABLE po_linhas IS 'Linhas da purchase order com rastreio de entrega';
-COMMENT ON TABLE procurement_facturas IS 'Facturas associadas a purchase orders';
-COMMENT ON TABLE precos_referencia IS 'Base de preços de referência construída automaticamente';
-COMMENT ON TABLE fornecedor_score_historico IS 'Score automático de fornecedores por projecto';
+-- Docs: requisicoes, cotacoes, cotacao_linhas, purchase_orders, po_linhas,
+-- procurement_facturas, precos_referencia, fornecedor_score_historico
