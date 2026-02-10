@@ -1080,7 +1080,7 @@ COMMENT ON TABLE email_config IS 'Configuração do servidor de email - usa Rese
 -- Replace app.settings with system_config table lookup
 -- =====================================================
 
--- system_config already exists (2 rows) - ensure it's set up correctly
+-- system_config may already exist without all columns - ensure schema is complete
 CREATE TABLE IF NOT EXISTS system_config (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL,
@@ -1089,7 +1089,21 @@ CREATE TABLE IF NOT EXISTS system_config (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Add columns that may be missing if table pre-existed
+ALTER TABLE system_config ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE system_config ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE system_config ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+
 CREATE INDEX IF NOT EXISTS idx_system_config_key ON system_config(key);
+
+ALTER TABLE system_config ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'system_config' AND policyname = 'Service role pode gerir configurações') THEN
+    CREATE POLICY "Service role pode gerir configurações" ON system_config
+      FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
 
 INSERT INTO system_config (key, value, description) VALUES
   ('supabase_url', '', 'URL do projeto Supabase (ex: https://xxx.supabase.co)'),
