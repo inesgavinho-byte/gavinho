@@ -24,5 +24,6 @@ CREATE INDEX IF NOT EXISTS idx_projeto_inspiracoes_categoria ON projeto_inspirac
 
 ALTER TABLE projeto_inspiracoes ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "projeto_inspiracoes_all" ON projeto_inspiracoes;
 CREATE POLICY "projeto_inspiracoes_all" ON projeto_inspiracoes
   FOR ALL USING (true);
