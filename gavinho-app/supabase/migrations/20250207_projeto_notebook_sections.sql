@@ -42,7 +42,6 @@ CREATE TRIGGER trigger_notebook_sections_updated_at
 
 ALTER TABLE projeto_notebook_sections ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "notebook_sections_all" ON projeto_notebook_sections;
 CREATE POLICY "notebook_sections_all" ON projeto_notebook_sections
   FOR ALL USING (true) WITH CHECK (true);
-
-COMMENT ON TABLE projeto_notebook_sections IS 'Secções do Notebook do projeto - estrutura hierárquica estilo Google Docs';

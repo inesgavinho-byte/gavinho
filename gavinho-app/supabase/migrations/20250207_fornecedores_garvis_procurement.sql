@@ -293,22 +293,30 @@ ALTER TABLE precos_referencia ENABLE ROW LEVEL SECURITY;
 ALTER TABLE alertas_garvis ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fornecedor_projeto_scores ENABLE ROW LEVEL SECURITY;
 
--- Policies permissivas para authenticated
+-- Policies permissivas para authenticated (drop first to allow re-run)
+DROP POLICY IF EXISTS "all_fornecedor_contactos" ON fornecedor_contactos;
 CREATE POLICY "all_fornecedor_contactos" ON fornecedor_contactos FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "all_fornecedor_certificacoes" ON fornecedor_certificacoes;
 CREATE POLICY "all_fornecedor_certificacoes" ON fornecedor_certificacoes FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "all_fornecedor_avaliacoes" ON fornecedor_avaliacoes;
 CREATE POLICY "all_fornecedor_avaliacoes" ON fornecedor_avaliacoes FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "all_fornecedor_fornecimentos" ON fornecedor_fornecimentos;
 CREATE POLICY "all_fornecedor_fornecimentos" ON fornecedor_fornecimentos FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "all_projeto_perfil" ON projeto_perfil;
 CREATE POLICY "all_projeto_perfil" ON projeto_perfil FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "all_fornecedor_perfil" ON fornecedor_perfil;
 CREATE POLICY "all_fornecedor_perfil" ON fornecedor_perfil FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "all_deal_rooms" ON deal_rooms;
 CREATE POLICY "all_deal_rooms" ON deal_rooms FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "all_deal_room_fornecedores" ON deal_room_fornecedores;
 CREATE POLICY "all_deal_room_fornecedores" ON deal_room_fornecedores FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "all_orcamentos_recebidos" ON orcamentos_recebidos;
 CREATE POLICY "all_orcamentos_recebidos" ON orcamentos_recebidos FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "all_orcamento_linhas" ON orcamento_linhas;
 CREATE POLICY "all_orcamento_linhas" ON orcamento_linhas FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "all_precos_referencia" ON precos_referencia;
 CREATE POLICY "all_precos_referencia" ON precos_referencia FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "all_alertas_garvis" ON alertas_garvis;
 CREATE POLICY "all_alertas_garvis" ON alertas_garvis FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "all_fornecedor_projeto_scores" ON fornecedor_projeto_scores;
 CREATE POLICY "all_fornecedor_projeto_scores" ON fornecedor_projeto_scores FOR ALL USING (true) WITH CHECK (true);
-
-COMMENT ON TABLE deal_rooms IS 'Espaços de negociação por especialidade/projeto';
-COMMENT ON TABLE alertas_garvis IS 'Alertas proativos do G.A.R.V.I.S.';
-COMMENT ON TABLE orcamentos_recebidos IS 'Orçamentos recebidos de fornecedores';
-COMMENT ON TABLE fornecedor_projeto_scores IS 'Cache de matching scores fornecedor-projeto';

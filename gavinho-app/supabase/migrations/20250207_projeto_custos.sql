@@ -43,6 +43,7 @@ GROUP BY projeto_id, capitulo;
 -- RLS
 ALTER TABLE projeto_custos ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "projeto_custos_all" ON projeto_custos;
 CREATE POLICY "projeto_custos_all" ON projeto_custos
   FOR ALL USING (true);
 
