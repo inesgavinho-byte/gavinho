@@ -28,6 +28,7 @@ CREATE INDEX IF NOT EXISTS idx_projeto_custos_capitulo ON projeto_custos(capitul
 CREATE INDEX IF NOT EXISTS idx_projeto_custos_estado ON projeto_custos(estado);
 
 -- View agregada de custos por capítulo (usada em Finance.jsx)
+DROP VIEW IF EXISTS v_custos_por_capitulo;
 CREATE OR REPLACE VIEW v_custos_por_capitulo AS
 SELECT
   projeto_id,
