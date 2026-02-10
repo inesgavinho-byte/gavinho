@@ -177,8 +177,12 @@ export default function Workspace() {
     toggleMuteChannel, isChannelMuted, toggleSound, playNotificationSound,
     togglePinMessage, isMessagePinned, getChannelPinnedMessages, toggleDnd,
     updateDndSchedule, isDndActive, addReminder, removeReminder,
-    markReminderComplete, getActiveReminders, openReminderModal
-  } = useNotifications()
+    markReminderComplete, getActiveReminders, openReminderModal,
+    // Mention notifications
+    mentionNotifications, unreadMentionsCount,
+    parseMentions, findMentionedUserIds, createMentionNotifications,
+    markMentionAsRead, markAllMentionsAsRead
+  } = useNotifications(profile)
 
   // Toast & Confirm Hooks (replacing alert/confirm)
   const { toasts, success: toastSuccess, error: toastError, info: toastInfo, dismissToast } = useToast()
@@ -336,6 +340,8 @@ export default function Workspace() {
         table: 'chat_mensagens',
         filter: `canal_id=eq.${canalId}`
       }, (payload) => {
+        const isOwnMessage = payload.new.autor_id === profile?.id
+
         if (!payload.new.parent_id) {
           // Avoid duplicates - check if message already exists locally
           setPosts(prev => {
@@ -347,6 +353,27 @@ export default function Workspace() {
             ...prev,
             [payload.new.parent_id]: [...(prev[payload.new.parent_id] || []), payload.new]
           }))
+        }
+
+        // Notify user of new messages from others (if channel not muted)
+        if (!isOwnMessage && !isChannelMuted(canalId)) {
+          // Check if user was mentioned
+          const mentions = parseMentions(payload.new.conteudo || '')
+          const isMentioned = mentions.some(name => {
+            const profileName = profile?.nome?.toLowerCase() || ''
+            const mentionName = name.toLowerCase()
+            return profileName === mentionName ||
+                   profileName.startsWith(mentionName + ' ') ||
+                   profileName.split(' ')[0] === mentionName
+          })
+
+          if (isMentioned) {
+            playNotificationSound()
+            toastInfo('Menção', `Foste mencionado(a) numa mensagem`)
+          } else if (document.hidden) {
+            // Only show toast for non-mention messages when tab is not focused
+            playNotificationSound()
+          }
         }
       })
       .subscribe()
@@ -420,6 +447,15 @@ export default function Workspace() {
           tipo: att.type
         }))
         await supabase.from('chat_anexos').insert(extraAttachments)
+      }
+
+      // Process @mentions and create notifications
+      const mentionedNames = parseMentions(messageInput)
+      if (mentionedNames.length > 0) {
+        const mentionedUserIds = findMentionedUserIds(mentionedNames, membros)
+        if (mentionedUserIds.length > 0) {
+          createMentionNotifications(insertedMessage, mentionedUserIds, canalAtivo)
+        }
       }
 
       // Adicionar attachments ao post para exibição local

@@ -210,24 +210,38 @@ export default function useNotifications(profile) {
     if (!mentionedUserIds.length || !profile?.id) return
 
     try {
-      // Insert notifications for each mentioned user (except self)
+      // Insert notifications into chat_notificacoes for each mentioned user (except self)
       const notificationsToInsert = mentionedUserIds
         .filter(userId => userId !== profile.id)
         .map(userId => ({
           utilizador_id: userId,
-          tipo: 'mention',
+          tipo: 'mencao',
           mensagem_id: message.id,
-          canal_id: message.canal_id,
-          remetente_id: profile.id,
-          conteudo: `${profile.nome || 'Alguém'} mencionou-te em ${canalInfo?.nome || 'uma conversa'}`,
+          canal_id: message.canal_id || canalInfo?.id,
+          titulo: `${profile.nome || 'Alguém'} mencionou-te`,
+          corpo: `${profile.nome || 'Alguém'} mencionou-te em ${canalInfo?.nome || 'uma conversa'}`,
+          originado_por: profile.id,
           lido: false
         }))
 
       if (notificationsToInsert.length > 0) {
-        await supabase.from('notificacoes').insert(notificationsToInsert)
+        await supabase.from('chat_notificacoes').insert(notificationsToInsert)
+      }
+
+      // Also insert into chat_mencoes for mention tracking
+      const mencoesToInsert = mentionedUserIds
+        .filter(userId => userId !== profile.id)
+        .map(userId => ({
+          mensagem_id: message.id,
+          utilizador_id: userId,
+          lida: false
+        }))
+
+      if (mencoesToInsert.length > 0) {
+        await supabase.from('chat_mencoes').insert(mencoesToInsert)
       }
     } catch (err) {
-      // Silent fail - notifications table might not exist
+      // Silent fail - tables might not exist yet
       console.warn('Could not create mention notifications:', err.message)
     }
   }, [profile])
@@ -238,14 +252,14 @@ export default function useNotifications(profile) {
 
     try {
       const { data, error } = await supabase
-        .from('notificacoes')
+        .from('chat_notificacoes')
         .select(`
           *,
-          remetente:remetente_id(id, nome, avatar_url),
+          remetente:originado_por(id, nome, avatar_url),
           mensagem:mensagem_id(id, conteudo)
         `)
         .eq('utilizador_id', profile.id)
-        .eq('tipo', 'mention')
+        .eq('tipo', 'mencao')
         .order('created_at', { ascending: false })
         .limit(50)
 
@@ -254,7 +268,7 @@ export default function useNotifications(profile) {
         setUnreadMentionsCount(data.filter(n => !n.lido).length)
       }
     } catch (err) {
-      // Silent fail
+      // Silent fail - table might not exist yet
     }
   }, [profile?.id])
 
@@ -264,8 +278,8 @@ export default function useNotifications(profile) {
 
     try {
       await supabase
-        .from('notificacoes')
-        .update({ lido: true })
+        .from('chat_notificacoes')
+        .update({ lido: true, lido_at: new Date().toISOString() })
         .eq('id', notificationId)
 
       setMentionNotifications(prev =>
@@ -283,10 +297,10 @@ export default function useNotifications(profile) {
 
     try {
       await supabase
-        .from('notificacoes')
-        .update({ lido: true })
+        .from('chat_notificacoes')
+        .update({ lido: true, lido_at: new Date().toISOString() })
         .eq('utilizador_id', profile.id)
-        .eq('tipo', 'mention')
+        .eq('tipo', 'mencao')
         .eq('lido', false)
 
       setMentionNotifications(prev => prev.map(n => ({ ...n, lido: true })))
@@ -308,10 +322,10 @@ export default function useNotifications(profile) {
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
-        table: 'notificacoes',
+        table: 'chat_notificacoes',
         filter: `utilizador_id=eq.${profile.id}`
       }, (payload) => {
-        if (payload.new.tipo === 'mention') {
+        if (payload.new.tipo === 'mencao') {
           setMentionNotifications(prev => [payload.new, ...prev])
           setUnreadMentionsCount(prev => prev + 1)
           playNotificationSound()
