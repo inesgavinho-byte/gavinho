@@ -7,7 +7,8 @@ import {
   Edit, Trash2, X, Check, Loader2, Plus, ChevronDown, ChevronUp,
   Clock, Calendar, Download, LogIn, LogOut as LogOutIcon,
   CalendarDays, TrendingUp, Package, Filter, CheckCheck, Truck,
-  AlertTriangle, User
+  AlertTriangle, User, MapPin, Navigation, Shield, ShieldCheck,
+  ShieldAlert, RefreshCw
 } from 'lucide-react'
 
 // Tab configuration
@@ -626,15 +627,28 @@ function TrabalhadoresTab() {
 }
 
 // =============================================
-// PRESENÇAS TAB
+// PRESENÇAS TAB — Check-in / Check-out with GPS
 // =============================================
 function PresencasTab() {
+  const { profile } = useAuth()
   const [presencas, setPresencas] = useState([])
   const [trabalhadores, setTrabalhadores] = useState([])
   const [obras, setObras] = useState([])
   const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState({ total: 0, horasTotal: 0, mediaHoras: 0 })
+  const [actionLoading, setActionLoading] = useState(null)
+  const [stats, setStats] = useState({ total: 0, horasTotal: 0, mediaHoras: 0, emTrabalho: 0 })
+  const [expandedRow, setExpandedRow] = useState(null)
 
+  // Check-in modal
+  const [showCheckinModal, setShowCheckinModal] = useState(false)
+  const [checkinType, setCheckinType] = useState('in') // 'in' or 'out'
+  const [checkinTarget, setCheckinTarget] = useState(null) // presenca record for checkout
+  const [checkinForm, setCheckinForm] = useState({ trabalhador_id: '', obra_id: '', notas: '' })
+  const [gpsStatus, setGpsStatus] = useState('idle') // idle, loading, success, error, denied
+  const [gpsData, setGpsData] = useState(null)
+  const [gpsError, setGpsError] = useState('')
+
+  // Filters
   const [filtroObra, setFiltroObra] = useState('')
   const [filtroTrabalhador, setFiltroTrabalhador] = useState('')
   const [dataInicio, setDataInicio] = useState(() => {
@@ -657,10 +671,9 @@ function PresencasTab() {
   const loadData = async () => {
     try {
       const [trabRes, obrasRes] = await Promise.all([
-        supabase.from('trabalhadores').select('id, nome, cargo').order('nome'),
-        supabase.from('obras').select('id, codigo, nome').order('codigo', { ascending: false })
+        supabase.from('trabalhadores').select('id, nome, cargo').eq('ativo', true).order('nome'),
+        supabase.from('obras').select('id, codigo, nome, latitude, longitude, raio_geofence').order('codigo', { ascending: false })
       ])
-
       setTrabalhadores(trabRes.data || [])
       setObras(obrasRes.data || [])
     } catch (err) {
@@ -676,41 +689,38 @@ function PresencasTab() {
         .select(`
           *,
           trabalhadores(id, nome, cargo),
-          obras(id, codigo, nome)
+          obras(id, codigo, nome, latitude, longitude, raio_geofence)
         `)
         .gte('data', dataInicio)
         .lte('data', dataFim)
         .order('data', { ascending: false })
         .order('hora_entrada', { ascending: false })
 
-      if (filtroObra) {
-        query = query.eq('obra_id', filtroObra)
-      }
-
-      if (filtroTrabalhador) {
-        query = query.eq('trabalhador_id', filtroTrabalhador)
-      }
+      if (filtroObra) query = query.eq('obra_id', filtroObra)
+      if (filtroTrabalhador) query = query.eq('trabalhador_id', filtroTrabalhador)
 
       const { data, error } = await query
-
       if (error) throw error
 
       setPresencas(data || [])
 
       const total = data?.length || 0
       let horasTotal = 0
+      let emTrabalho = 0
 
       data?.forEach(p => {
         if (p.hora_entrada && p.hora_saida) {
           const diff = new Date(p.hora_saida) - new Date(p.hora_entrada)
           horasTotal += diff / (1000 * 60 * 60)
         }
+        if (p.hora_entrada && !p.hora_saida) emTrabalho++
       })
 
       setStats({
         total,
         horasTotal: horasTotal.toFixed(1),
-        mediaHoras: total > 0 ? (horasTotal / total).toFixed(1) : 0
+        mediaHoras: total > 0 ? (horasTotal / total).toFixed(1) : 0,
+        emTrabalho
       })
     } catch (err) {
       console.error('Erro ao carregar presenças:', err)
@@ -719,6 +729,145 @@ function PresencasTab() {
     }
   }
 
+  // --- GPS Location ---
+  const requestGPS = () => {
+    setGpsStatus('loading')
+    setGpsError('')
+    setGpsData(null)
+
+    if (!navigator.geolocation) {
+      setGpsStatus('error')
+      setGpsError('Geolocalização não suportada neste browser')
+      return
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setGpsData({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy
+        })
+        setGpsStatus('success')
+      },
+      (err) => {
+        if (err.code === 1) {
+          setGpsStatus('denied')
+          setGpsError('Permissão de localização negada. Ativa nas definições do browser.')
+        } else if (err.code === 2) {
+          setGpsStatus('error')
+          setGpsError('Localização indisponível. Verifica o GPS do dispositivo.')
+        } else {
+          setGpsStatus('error')
+          setGpsError('Timeout ao obter localização. Tenta novamente.')
+        }
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    )
+  }
+
+  // Calculate distance between two GPS points (Haversine)
+  const calcDistancia = (lat1, lon1, lat2, lon2) => {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return null
+    const R = 6371000
+    const dLat = (lat2 - lat1) * Math.PI / 180
+    const dLon = (lon2 - lon1) * Math.PI / 180
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2)
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  }
+
+  const getDistanceInfo = () => {
+    if (!gpsData) return null
+    const obraId = checkinType === 'out' ? checkinTarget?.obra_id : checkinForm.obra_id
+    const obra = obras.find(o => o.id === obraId)
+    if (!obra?.latitude || !obra?.longitude) return { distance: null, withinFence: null, noCoords: true }
+
+    const dist = calcDistancia(gpsData.latitude, gpsData.longitude, obra.latitude, obra.longitude)
+    const raio = obra.raio_geofence || 200
+    return { distance: Math.round(dist), withinFence: dist <= raio, raio, noCoords: false }
+  }
+
+  // --- Check-in ---
+  const openCheckin = () => {
+    setCheckinType('in')
+    setCheckinTarget(null)
+    setCheckinForm({ trabalhador_id: '', obra_id: '', notas: '' })
+    setGpsStatus('idle')
+    setGpsData(null)
+    setGpsError('')
+    setShowCheckinModal(true)
+  }
+
+  // --- Check-out ---
+  const openCheckout = (presenca) => {
+    setCheckinType('out')
+    setCheckinTarget(presenca)
+    setCheckinForm({ trabalhador_id: presenca.trabalhador_id, obra_id: presenca.obra_id, notas: '' })
+    setGpsStatus('idle')
+    setGpsData(null)
+    setGpsError('')
+    setShowCheckinModal(true)
+  }
+
+  const handleCheckin = async () => {
+    const trabId = checkinType === 'out' ? checkinTarget.trabalhador_id : checkinForm.trabalhador_id
+    const obraId = checkinType === 'out' ? checkinTarget.obra_id : checkinForm.obra_id
+    if (!trabId || !obraId) return
+
+    setActionLoading('checkin')
+    try {
+      const now = new Date().toISOString()
+
+      if (checkinType === 'in') {
+        const insertData = {
+          trabalhador_id: trabId,
+          obra_id: obraId,
+          data: new Date().toISOString().split('T')[0],
+          hora_entrada: now,
+          notas: checkinForm.notas || null,
+          metodo: 'manual'
+        }
+
+        if (gpsData) {
+          insertData.latitude_entrada = gpsData.latitude
+          insertData.longitude_entrada = gpsData.longitude
+          insertData.precisao_entrada = gpsData.accuracy
+        }
+
+        const { error } = await supabase.from('presencas').insert(insertData)
+        if (error) throw error
+      } else {
+        // Check-out
+        const updateData = {
+          hora_saida: now,
+          notas: checkinTarget.notas
+            ? checkinTarget.notas + (checkinForm.notas ? '\nSaída: ' + checkinForm.notas : '')
+            : (checkinForm.notas ? 'Saída: ' + checkinForm.notas : null)
+        }
+
+        if (gpsData) {
+          updateData.latitude_saida = gpsData.latitude
+          updateData.longitude_saida = gpsData.longitude
+          updateData.precisao_saida = gpsData.accuracy
+        }
+
+        const { error } = await supabase.from('presencas').update(updateData).eq('id', checkinTarget.id)
+        if (error) throw error
+      }
+
+      setShowCheckinModal(false)
+      loadPresencas()
+    } catch (err) {
+      console.error('Erro no check-in/out:', err)
+      alert('Erro ao registar: ' + err.message)
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  // --- Helpers ---
   const formatTime = (timestamp) => {
     if (!timestamp) return '--:--'
     return new Date(timestamp).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
@@ -736,17 +885,25 @@ function PresencasTab() {
   }
 
   const getStatusBadge = (presenca) => {
-    if (!presenca.hora_entrada) {
-      return { text: 'Sem entrada', color: '#F44336', bg: '#FFEBEE' }
-    }
-    if (!presenca.hora_saida) {
-      return { text: 'Em trabalho', color: '#4CAF50', bg: '#E8F5E9' }
-    }
+    if (!presenca.hora_entrada) return { text: 'Sem entrada', color: '#F44336', bg: '#FFEBEE' }
+    if (!presenca.hora_saida) return { text: 'Em trabalho', color: '#4CAF50', bg: '#E8F5E9' }
     return { text: 'Completo', color: '#2196F3', bg: '#E3F2FD' }
   }
 
+  const getGeofenceBadge = (dentroGeofence, distancia) => {
+    if (dentroGeofence === null || dentroGeofence === undefined) return null
+    if (dentroGeofence) return { text: 'No local', color: '#4CAF50', bg: '#E8F5E9', icon: ShieldCheck }
+    return { text: `${distancia ? Math.round(distancia) + 'm' : 'Fora'} do local`, color: '#FF9800', bg: '#FFF3E0', icon: ShieldAlert }
+  }
+
+  const formatDistancia = (metros) => {
+    if (!metros && metros !== 0) return '-'
+    if (metros < 1000) return Math.round(metros) + 'm'
+    return (metros / 1000).toFixed(1) + 'km'
+  }
+
   const exportCSV = () => {
-    const headers = ['Data', 'Trabalhador', 'Cargo', 'Obra', 'Entrada', 'Saída', 'Horas', 'Notas']
+    const headers = ['Data', 'Trabalhador', 'Cargo', 'Obra', 'Entrada', 'Saída', 'Horas', 'No Local (Entrada)', 'Distância (m)', 'Notas']
     const rows = presencas.map(p => [
       p.data,
       p.trabalhadores?.nome || '',
@@ -755,11 +912,13 @@ function PresencasTab() {
       formatTime(p.hora_entrada),
       formatTime(p.hora_saida),
       calcularHoras(p.hora_entrada, p.hora_saida) || '',
-      p.notas || ''
+      p.dentro_geofence_entrada ? 'Sim' : (p.dentro_geofence_entrada === false ? 'Não' : '-'),
+      p.distancia_entrada ? Math.round(p.distancia_entrada) : '-',
+      (p.notas || '').replace(/,/g, ';')
     ])
 
     const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n')
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
@@ -773,19 +932,27 @@ function PresencasTab() {
     return acc
   }, {})
 
+  const distInfo = getDistanceInfo()
+
   return (
     <div>
-      {/* Header with button */}
+      {/* Header */}
       <div style={tabStyles.tabHeader}>
         <div />
-        <button onClick={exportCSV} style={tabStyles.addButton}>
-          <Download size={18} />
-          Exportar CSV
-        </button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={exportCSV} style={{ ...tabStyles.addButton, background: 'var(--brown-light)' }}>
+            <Download size={18} />
+            CSV
+          </button>
+          <button onClick={openCheckin} style={tabStyles.addButton}>
+            <LogIn size={18} />
+            Registar Entrada
+          </button>
+        </div>
       </div>
 
-      {/* Stats Cards */}
-      <div style={tabStyles.statsGrid}>
+      {/* Stats */}
+      <div style={{ ...tabStyles.statsGrid, gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))' }}>
         <div style={tabStyles.statCard}>
           <div style={tabStyles.statIcon}>
             <CalendarDays size={24} style={{ color: 'var(--brown)' }} />
@@ -797,7 +964,16 @@ function PresencasTab() {
         </div>
         <div style={tabStyles.statCard}>
           <div style={{ ...tabStyles.statIcon, background: '#E8F5E9' }}>
-            <Clock size={24} style={{ color: '#2e7d32' }} />
+            <Users size={24} style={{ color: '#2e7d32' }} />
+          </div>
+          <div>
+            <div style={tabStyles.statValue}>{stats.emTrabalho}</div>
+            <div style={tabStyles.statLabel}>Em trabalho agora</div>
+          </div>
+        </div>
+        <div style={tabStyles.statCard}>
+          <div style={{ ...tabStyles.statIcon, background: '#E3F2FD' }}>
+            <Clock size={24} style={{ color: '#1976d2' }} />
           </div>
           <div>
             <div style={tabStyles.statValue}>{stats.horasTotal}h</div>
@@ -805,67 +981,45 @@ function PresencasTab() {
           </div>
         </div>
         <div style={tabStyles.statCard}>
-          <div style={{ ...tabStyles.statIcon, background: '#E3F2FD' }}>
-            <TrendingUp size={24} style={{ color: '#1976d2' }} />
+          <div style={{ ...tabStyles.statIcon, background: '#F3E5F5' }}>
+            <TrendingUp size={24} style={{ color: '#7B1FA2' }} />
           </div>
           <div>
             <div style={tabStyles.statValue}>{stats.mediaHoras}h</div>
-            <div style={tabStyles.statLabel}>Média por dia</div>
+            <div style={tabStyles.statLabel}>Média por registo</div>
           </div>
         </div>
       </div>
 
-      {/* Filtros */}
+      {/* Filters */}
       <div style={tabStyles.filtersCard}>
         <div style={tabStyles.filtersGrid}>
           <div style={tabStyles.filterGroup}>
             <label style={tabStyles.filterLabel}>Data Início</label>
-            <input
-              type="date"
-              value={dataInicio}
-              onChange={(e) => setDataInicio(e.target.value)}
-              style={tabStyles.filterInput}
-            />
+            <input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} style={tabStyles.filterInput} />
           </div>
           <div style={tabStyles.filterGroup}>
             <label style={tabStyles.filterLabel}>Data Fim</label>
-            <input
-              type="date"
-              value={dataFim}
-              onChange={(e) => setDataFim(e.target.value)}
-              style={tabStyles.filterInput}
-            />
+            <input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)} style={tabStyles.filterInput} />
           </div>
           <div style={tabStyles.filterGroup}>
             <label style={tabStyles.filterLabel}>Obra</label>
-            <select
-              value={filtroObra}
-              onChange={(e) => setFiltroObra(e.target.value)}
-              style={tabStyles.filterInput}
-            >
+            <select value={filtroObra} onChange={(e) => setFiltroObra(e.target.value)} style={tabStyles.filterInput}>
               <option value="">Todas as obras</option>
-              {obras.map(o => (
-                <option key={o.id} value={o.id}>{o.codigo} - {o.nome}</option>
-              ))}
+              {obras.map(o => <option key={o.id} value={o.id}>{o.codigo} - {o.nome}</option>)}
             </select>
           </div>
           <div style={tabStyles.filterGroup}>
             <label style={tabStyles.filterLabel}>Trabalhador</label>
-            <select
-              value={filtroTrabalhador}
-              onChange={(e) => setFiltroTrabalhador(e.target.value)}
-              style={tabStyles.filterInput}
-            >
+            <select value={filtroTrabalhador} onChange={(e) => setFiltroTrabalhador(e.target.value)} style={tabStyles.filterInput}>
               <option value="">Todos</option>
-              {trabalhadores.map(t => (
-                <option key={t.id} value={t.id}>{t.nome}</option>
-              ))}
+              {trabalhadores.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
             </select>
           </div>
         </div>
       </div>
 
-      {/* Lista de Presenças */}
+      {/* Attendance List */}
       <div style={tabStyles.listCard}>
         {loading ? (
           <div style={tabStyles.loadingState}>
@@ -875,7 +1029,7 @@ function PresencasTab() {
           <div style={tabStyles.emptyState}>
             <Clock size={48} style={{ color: 'var(--stone)', marginBottom: 12 }} />
             <p style={{ color: 'var(--brown-light)', margin: 0 }}>Nenhum registo encontrado</p>
-            <p style={{ color: 'var(--brown-light)', fontSize: 13, marginTop: 4 }}>Ajusta os filtros ou aguarda novos registos</p>
+            <p style={{ color: 'var(--brown-light)', fontSize: 13, marginTop: 4 }}>Usa "Registar Entrada" para criar o primeiro check-in</p>
           </div>
         ) : (
           Object.entries(presencasPorData).map(([data, registos]) => (
@@ -887,44 +1041,157 @@ function PresencasTab() {
               </div>
               {registos.map(p => {
                 const status = getStatusBadge(p)
+                const geoIn = getGeofenceBadge(p.dentro_geofence_entrada, p.distancia_entrada)
+                const isExpanded = expandedRow === p.id
                 return (
-                  <div key={p.id} style={tabStyles.presencaRow}>
-                    <div style={tabStyles.presencaAvatar}>
-                      {p.trabalhadores?.nome?.charAt(0).toUpperCase() || '?'}
-                    </div>
-                    <div style={tabStyles.presencaInfo}>
-                      <div style={tabStyles.presencaNome}>{p.trabalhadores?.nome}</div>
-                      <div style={tabStyles.presencaMeta}>
-                        <span style={tabStyles.metaItem}>
-                          <Building2 size={12} />
-                          {p.obras?.codigo}
-                        </span>
-                        {p.trabalhadores?.cargo && (
-                          <span style={tabStyles.metaItem}>{p.trabalhadores.cargo}</span>
+                  <div key={p.id}>
+                    <div
+                      style={{ ...tabStyles.presencaRow, cursor: 'pointer' }}
+                      onClick={() => setExpandedRow(isExpanded ? null : p.id)}
+                    >
+                      <div style={tabStyles.presencaAvatar}>
+                        {p.trabalhadores?.nome?.charAt(0).toUpperCase() || '?'}
+                      </div>
+                      <div style={tabStyles.presencaInfo}>
+                        <div style={tabStyles.presencaNome}>
+                          {p.trabalhadores?.nome}
+                          {geoIn && (
+                            <span style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 3,
+                              fontSize: 11, padding: '2px 8px', borderRadius: 10, marginLeft: 8,
+                              color: geoIn.color, background: geoIn.bg, fontWeight: 500
+                            }}>
+                              <geoIn.icon size={12} />
+                              {geoIn.text}
+                            </span>
+                          )}
+                        </div>
+                        <div style={tabStyles.presencaMeta}>
+                          <span style={tabStyles.metaItem}>
+                            <Building2 size={12} />
+                            {p.obras?.codigo}
+                          </span>
+                          {p.trabalhadores?.cargo && (
+                            <span style={tabStyles.metaItem}>{p.trabalhadores.cargo}</span>
+                          )}
+                        </div>
+                      </div>
+                      <div style={tabStyles.presencaTimes}>
+                        <div style={tabStyles.timeBlock}>
+                          <LogIn size={14} style={{ color: '#4CAF50' }} />
+                          <span>{formatTime(p.hora_entrada)}</span>
+                        </div>
+                        <div style={tabStyles.timeBlock}>
+                          <LogOutIcon size={14} style={{ color: p.hora_saida ? '#F44336' : '#ccc' }} />
+                          <span style={{ color: p.hora_saida ? 'inherit' : '#ccc' }}>
+                            {formatTime(p.hora_saida)}
+                          </span>
+                        </div>
+                      </div>
+                      <div style={tabStyles.presencaHoras}>
+                        {p.hora_saida ? (
+                          <span style={tabStyles.horasValue}>{calcularHoras(p.hora_entrada, p.hora_saida)}h</span>
+                        ) : (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); openCheckout(p) }}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: 6,
+                              padding: '6px 14px', background: '#F44336', color: 'white',
+                              border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer'
+                            }}
+                          >
+                            <LogOutIcon size={14} />
+                            Saída
+                          </button>
                         )}
                       </div>
                     </div>
-                    <div style={tabStyles.presencaTimes}>
-                      <div style={tabStyles.timeBlock}>
-                        <LogIn size={14} style={{ color: '#4CAF50' }} />
-                        <span>{formatTime(p.hora_entrada)}</span>
+
+                    {/* Expanded detail row */}
+                    {isExpanded && (
+                      <div style={{
+                        padding: '12px 20px 16px 74px', background: 'var(--cream)',
+                        borderBottom: '1px solid var(--stone)', fontSize: 13
+                      }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                          <div>
+                            <div style={{ fontWeight: 600, color: 'var(--brown)', marginBottom: 6 }}>
+                              <LogIn size={14} style={{ verticalAlign: -2, marginRight: 4 }} />
+                              Entrada
+                            </div>
+                            <div style={{ color: 'var(--brown-light)' }}>
+                              Hora: <strong>{formatTime(p.hora_entrada)}</strong>
+                            </div>
+                            {p.latitude_entrada && (
+                              <>
+                                <div style={{ color: 'var(--brown-light)', marginTop: 4 }}>
+                                  <MapPin size={12} style={{ verticalAlign: -2 }} />
+                                  {' '}{p.latitude_entrada.toFixed(6)}, {p.longitude_entrada.toFixed(6)}
+                                </div>
+                                {p.precisao_entrada && (
+                                  <div style={{ color: 'var(--brown-light)' }}>
+                                    Precisão: ~{Math.round(p.precisao_entrada)}m
+                                  </div>
+                                )}
+                                <div style={{ marginTop: 2 }}>
+                                  Distância da obra: <strong>{formatDistancia(p.distancia_entrada)}</strong>
+                                  {p.dentro_geofence_entrada !== null && (
+                                    <span style={{
+                                      marginLeft: 8, padding: '2px 8px', borderRadius: 8, fontSize: 11,
+                                      background: p.dentro_geofence_entrada ? '#E8F5E9' : '#FFF3E0',
+                                      color: p.dentro_geofence_entrada ? '#4CAF50' : '#FF9800'
+                                    }}>
+                                      {p.dentro_geofence_entrada ? 'Dentro do raio' : 'Fora do raio'}
+                                    </span>
+                                  )}
+                                </div>
+                              </>
+                            )}
+                            {!p.latitude_entrada && (
+                              <div style={{ color: '#999', fontStyle: 'italic', marginTop: 4 }}>
+                                Sem dados GPS
+                              </div>
+                            )}
+                          </div>
+
+                          <div>
+                            <div style={{ fontWeight: 600, color: 'var(--brown)', marginBottom: 6 }}>
+                              <LogOutIcon size={14} style={{ verticalAlign: -2, marginRight: 4 }} />
+                              Saída
+                            </div>
+                            {p.hora_saida ? (
+                              <>
+                                <div style={{ color: 'var(--brown-light)' }}>
+                                  Hora: <strong>{formatTime(p.hora_saida)}</strong>
+                                </div>
+                                {p.latitude_saida && (
+                                  <>
+                                    <div style={{ color: 'var(--brown-light)', marginTop: 4 }}>
+                                      <MapPin size={12} style={{ verticalAlign: -2 }} />
+                                      {' '}{p.latitude_saida.toFixed(6)}, {p.longitude_saida.toFixed(6)}
+                                    </div>
+                                    <div style={{ marginTop: 2 }}>
+                                      Distância: <strong>{formatDistancia(p.distancia_saida)}</strong>
+                                    </div>
+                                  </>
+                                )}
+                                {!p.latitude_saida && (
+                                  <div style={{ color: '#999', fontStyle: 'italic', marginTop: 4 }}>Sem dados GPS</div>
+                                )}
+                              </>
+                            ) : (
+                              <div style={{ color: '#999', fontStyle: 'italic' }}>Ainda em trabalho</div>
+                            )}
+                          </div>
+                        </div>
+
+                        {p.notas && (
+                          <div style={{ marginTop: 12, padding: '8px 12px', background: 'white', borderRadius: 8, color: 'var(--brown-light)' }}>
+                            {p.notas}
+                          </div>
+                        )}
                       </div>
-                      <div style={tabStyles.timeBlock}>
-                        <LogOutIcon size={14} style={{ color: p.hora_saida ? '#F44336' : '#ccc' }} />
-                        <span style={{ color: p.hora_saida ? 'inherit' : '#ccc' }}>
-                          {formatTime(p.hora_saida)}
-                        </span>
-                      </div>
-                    </div>
-                    <div style={tabStyles.presencaHoras}>
-                      {p.hora_saida ? (
-                        <span style={tabStyles.horasValue}>{calcularHoras(p.hora_entrada, p.hora_saida)}h</span>
-                      ) : (
-                        <span style={{ ...tabStyles.statusBadgeSmall, color: status.color, background: status.bg }}>
-                          {status.text}
-                        </span>
-                      )}
-                    </div>
+                    )}
                   </div>
                 )
               })}
@@ -932,6 +1199,205 @@ function PresencasTab() {
           ))
         )}
       </div>
+
+      {/* Check-in / Check-out Modal */}
+      {showCheckinModal && (
+        <div style={tabStyles.modalOverlay}>
+          <div style={{ ...tabStyles.modal, maxWidth: 520 }}>
+            <div style={tabStyles.modalHeader}>
+              <h2 style={tabStyles.modalTitle}>
+                {checkinType === 'in' ? (
+                  <><LogIn size={20} style={{ color: '#4CAF50', verticalAlign: -4 }} /> Registar Entrada</>
+                ) : (
+                  <><LogOutIcon size={20} style={{ color: '#F44336', verticalAlign: -4 }} /> Registar Saída</>
+                )}
+              </h2>
+              <button onClick={() => setShowCheckinModal(false)} style={tabStyles.closeButton}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ padding: 20 }}>
+              {/* Worker + Obra selection (only for check-in) */}
+              {checkinType === 'in' ? (
+                <>
+                  <div style={tabStyles.field}>
+                    <label style={tabStyles.label}>Trabalhador *</label>
+                    <select
+                      value={checkinForm.trabalhador_id}
+                      onChange={(e) => setCheckinForm({ ...checkinForm, trabalhador_id: e.target.value })}
+                      style={tabStyles.input}
+                    >
+                      <option value="">Selecionar...</option>
+                      {trabalhadores.map(t => <option key={t.id} value={t.id}>{t.nome} {t.cargo ? `(${t.cargo})` : ''}</option>)}
+                    </select>
+                  </div>
+                  <div style={tabStyles.field}>
+                    <label style={tabStyles.label}>Obra *</label>
+                    <select
+                      value={checkinForm.obra_id}
+                      onChange={(e) => setCheckinForm({ ...checkinForm, obra_id: e.target.value })}
+                      style={tabStyles.input}
+                    >
+                      <option value="">Selecionar...</option>
+                      {obras.map(o => (
+                        <option key={o.id} value={o.id}>
+                          {o.codigo} - {o.nome} {o.latitude ? '' : '(sem GPS)'}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              ) : (
+                <div style={{
+                  padding: 16, background: 'var(--cream)', borderRadius: 10, marginBottom: 16
+                }}>
+                  <div style={{ fontWeight: 600, color: 'var(--brown)', marginBottom: 4 }}>
+                    {checkinTarget?.trabalhadores?.nome}
+                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--brown-light)' }}>
+                    <Building2 size={14} style={{ verticalAlign: -2 }} /> {checkinTarget?.obras?.codigo} - {checkinTarget?.obras?.nome}
+                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--brown-light)', marginTop: 4 }}>
+                    Entrada: <strong>{formatTime(checkinTarget?.hora_entrada)}</strong>
+                  </div>
+                </div>
+              )}
+
+              {/* GPS Location Section */}
+              <div style={{
+                padding: 16, border: '2px solid var(--stone)', borderRadius: 10, marginBottom: 16
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <div style={{ fontWeight: 600, color: 'var(--brown)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Navigation size={16} />
+                    Localização GPS
+                  </div>
+                  <button
+                    onClick={requestGPS}
+                    disabled={gpsStatus === 'loading'}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      padding: '8px 14px', background: gpsStatus === 'success' ? '#E8F5E9' : 'var(--brown)',
+                      color: gpsStatus === 'success' ? '#2e7d32' : 'white',
+                      border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer'
+                    }}
+                  >
+                    {gpsStatus === 'loading' ? (
+                      <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> A obter...</>
+                    ) : gpsStatus === 'success' ? (
+                      <><RefreshCw size={14} /> Atualizar</>
+                    ) : (
+                      <><MapPin size={14} /> Obter Localização</>
+                    )}
+                  </button>
+                </div>
+
+                {gpsStatus === 'idle' && (
+                  <p style={{ margin: 0, fontSize: 13, color: 'var(--brown-light)' }}>
+                    Clica "Obter Localização" para registar a posição GPS do trabalhador.
+                  </p>
+                )}
+
+                {gpsStatus === 'success' && gpsData && (
+                  <div>
+                    <div style={{ fontSize: 13, color: 'var(--brown-light)', marginBottom: 4 }}>
+                      <MapPin size={12} style={{ verticalAlign: -2 }} />
+                      {' '}{gpsData.latitude.toFixed(6)}, {gpsData.longitude.toFixed(6)}
+                      <span style={{ marginLeft: 8, opacity: 0.7 }}>
+                        (precisão: ~{Math.round(gpsData.accuracy)}m)
+                      </span>
+                    </div>
+
+                    {distInfo && !distInfo.noCoords && (
+                      <div style={{
+                        marginTop: 8, padding: '10px 14px', borderRadius: 8,
+                        background: distInfo.withinFence ? '#E8F5E9' : '#FFF3E0',
+                        display: 'flex', alignItems: 'center', gap: 8
+                      }}>
+                        {distInfo.withinFence ? (
+                          <ShieldCheck size={18} style={{ color: '#4CAF50' }} />
+                        ) : (
+                          <ShieldAlert size={18} style={{ color: '#FF9800' }} />
+                        )}
+                        <div>
+                          <div style={{
+                            fontWeight: 600, fontSize: 14,
+                            color: distInfo.withinFence ? '#2e7d32' : '#E65100'
+                          }}>
+                            {distInfo.withinFence ? 'Dentro do raio da obra' : 'Fora do raio da obra'}
+                          </div>
+                          <div style={{ fontSize: 12, color: distInfo.withinFence ? '#4CAF50' : '#FF9800' }}>
+                            Distância: {formatDistancia(distInfo.distance)} (raio: {distInfo.raio}m)
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {distInfo && distInfo.noCoords && (
+                      <div style={{
+                        marginTop: 8, padding: '10px 14px', borderRadius: 8,
+                        background: '#FFF9C4', fontSize: 13, color: '#F57F17',
+                        display: 'flex', alignItems: 'center', gap: 8
+                      }}>
+                        <AlertTriangle size={16} />
+                        Obra sem coordenadas GPS configuradas. Configura nas definições da obra.
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {(gpsStatus === 'error' || gpsStatus === 'denied') && (
+                  <div style={{
+                    padding: '10px 14px', borderRadius: 8, background: '#FFEBEE',
+                    fontSize: 13, color: '#C62828', display: 'flex', alignItems: 'center', gap: 8
+                  }}>
+                    <AlertTriangle size={16} />
+                    {gpsError}
+                  </div>
+                )}
+              </div>
+
+              {/* Notes */}
+              <div style={tabStyles.field}>
+                <label style={tabStyles.label}>Notas (opcional)</label>
+                <textarea
+                  value={checkinForm.notas}
+                  onChange={(e) => setCheckinForm({ ...checkinForm, notas: e.target.value })}
+                  style={tabStyles.textarea}
+                  rows={2}
+                  placeholder={checkinType === 'in' ? 'Ex: Chegou mais cedo para preparar materiais...' : 'Ex: Saiu mais cedo por motivo pessoal...'}
+                />
+              </div>
+            </div>
+
+            <div style={tabStyles.modalActionsRow}>
+              <button onClick={() => setShowCheckinModal(false)} style={tabStyles.cancelButton}>
+                Cancelar
+              </button>
+              <button
+                onClick={handleCheckin}
+                disabled={
+                  actionLoading === 'checkin' ||
+                  (checkinType === 'in' && (!checkinForm.trabalhador_id || !checkinForm.obra_id))
+                }
+                style={{
+                  ...tabStyles.confirmButton,
+                  background: checkinType === 'in' ? '#4CAF50' : '#F44336'
+                }}
+              >
+                {actionLoading === 'checkin' ? (
+                  <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                ) : checkinType === 'in' ? (
+                  <><LogIn size={16} /> Registar Entrada</>
+                ) : (
+                  <><LogOutIcon size={16} /> Registar Saída</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
