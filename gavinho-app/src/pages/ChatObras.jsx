@@ -729,7 +729,9 @@ export default function ChatObras() {
                                   src={msg.anexos[0].url}
                                   alt="Foto"
                                   style={{
-                                    maxWidth: '100%',
+                                    maxWidth: '280px',
+                                    maxHeight: '220px',
+                                    objectFit: 'cover',
                                     borderRadius: '8px',
                                     cursor: 'pointer',
                                     marginBottom: msg.conteudo && msg.conteudo !== '📷 Foto' ? '6px' : 0
