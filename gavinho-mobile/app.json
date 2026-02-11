@@ -1,0 +1,56 @@
+{
+  "expo": {
+    "name": "Gavinho Obras",
+    "slug": "gavinho-obras",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "scheme": "gavinho-obras",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#3d4349"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.gavinho.obras",
+      "infoPlist": {
+        "NSCameraUsageDescription": "A app precisa de acesso à câmara para fotografar na obra.",
+        "NSPhotoLibraryUsageDescription": "A app precisa de acesso à galeria para selecionar fotos da obra.",
+        "NSLocationWhenInUseUsageDescription": "A app precisa da localização para registo de presenças.",
+        "NSLocationAlwaysUsageDescription": "A app precisa da localização para registo de presenças."
+      }
+    },
+    "android": {
+      "package": "com.gavinho.obras",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#3d4349"
+      },
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE"
+      ]
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-image-picker",
+      "expo-location",
+      "expo-notifications",
+      "expo-camera"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": ""
+      }
+    }
+  }
+}

@@ -2,7 +2,7 @@
 <html lang="pt">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 
     <!-- Primary Meta Tags -->
     <title>GAVINHO | Plataforma de Gestão</title>
@@ -31,7 +31,8 @@
 
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
 
     <!-- PWA - Manifest loaded dynamically based on path -->
     <link rel="manifest" id="app-manifest" href="/manifest-platform.json" />
@@ -40,7 +41,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" id="apple-app-title" content="Gavinho" />
 
-    <!-- Dynamic manifest and service worker based on path -->
+    <!-- Dynamic manifest based on path -->
     <script>
       (function() {
         var isObraApp = window.location.pathname.startsWith('/obra-app');
@@ -50,13 +51,6 @@
         if (isObraApp) {
           manifestLink.href = '/manifest-obras.json';
           appleTitle.content = 'Gavinho Obras';
-
-          // Register service worker only for obra-app
-          if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js')
-              .then(function(reg) { console.log('SW registered for Obra App'); })
-              .catch(function(err) { console.log('SW registration failed:', err); });
-          }
         }
       })();
     </script>
