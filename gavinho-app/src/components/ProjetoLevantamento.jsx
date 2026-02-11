@@ -12,12 +12,14 @@ import './ProjetoLevantamento.css'
 // Image cache for prefetching
 const imageCache = new Map()
 
-// Generate optimized thumbnail URL
+// Generate optimized thumbnail URL using Supabase Image Transforms
 const getThumbnailUrl = (url, width = 400) => {
   if (!url) return ''
-  if (url.includes('supabase.co/storage')) {
-    const separator = url.includes('?') ? '&' : '?'
-    return `${url}${separator}width=${width}&quality=75`
+  if (url.includes('supabase.co/storage/v1/object/')) {
+    // Replace /object/ with /render/image/ to enable Supabase image transforms
+    const transformUrl = url.replace('/storage/v1/object/', '/storage/v1/render/image/')
+    const separator = transformUrl.includes('?') ? '&' : '?'
+    return `${transformUrl}${separator}width=${width}&quality=75`
   }
   return url
 }
