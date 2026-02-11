@@ -2,11 +2,12 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import {
-  ArrowLeft, Plus, Trash2, Lock, Copy,
+  ArrowLeft, Plus, Trash2, Lock, Copy, X,
   FileText, Calculator, Receipt, ShoppingCart,
   TrendingUp, ClipboardList, MapPin, Users,
-  AlertTriangle, Camera, BookOpen,
-  Shield, Truck, Grid3X3, BarChart3, MessageSquare, Loader2
+  AlertTriangle, Camera, BookOpen, Upload,
+  Shield, Truck, Grid3X3, BarChart3, MessageSquare, Loader2,
+  ChevronDown, Edit, Send, FileCheck, CheckSquare
 } from 'lucide-react'
 import ObraChat from '../components/ObraChat'
 import ObraChecklist from '../components/ObraChecklist'
