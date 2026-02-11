@@ -23,7 +23,7 @@ const localStyles = {
     borderRadius: 16,
     overflow: 'hidden',
     boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-    marginBottom: 24
+    marginBottom: 16
   },
   statusHeader: {
     display: 'flex',
@@ -35,7 +35,7 @@ const localStyles = {
     fontSize: 14
   },
   statusBody: {
-    padding: 24,
+    padding: '20px 16px',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center'

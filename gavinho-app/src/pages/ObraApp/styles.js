@@ -52,6 +52,7 @@ export const styles = {
     background: colors.primary,
     color: 'white',
     padding: '12px 16px',
+    paddingTop: 'max(12px, env(safe-area-inset-top))',
     display: 'flex',
     alignItems: 'center',
     gap: 12,
@@ -155,7 +156,8 @@ export const styles = {
     display: 'flex',
     background: 'white',
     borderTop: `1px solid ${colors.border}`,
-    padding: '8px 0'
+    padding: '8px 0',
+    paddingBottom: 'max(8px, env(safe-area-inset-bottom))'
   },
   navButton: {
     flex: 1,
@@ -425,8 +427,9 @@ export const styles = {
   // Forms
   formContainer: {
     flex: 1,
-    padding: 20,
-    overflowY: 'auto'
+    padding: '16px 12px',
+    overflowY: 'auto',
+    WebkitOverflowScrolling: 'touch'
   },
   formTitle: {
     display: 'flex',
