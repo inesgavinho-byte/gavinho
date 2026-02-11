@@ -5,7 +5,7 @@ import { ConfirmModal } from './ui/ConfirmModal'
 import {
   FileText, Plus, X, Calendar, Edit2, Trash2, Eye, Download,
   ChevronDown, ChevronRight, Send, Save, Clock, Loader2,
-  CheckCircle, AlertCircle, FileEdit, Image as ImageIcon, FileDown,
+  CheckCircle, AlertCircle, FilePenLine, Image as ImageIcon, FileDown,
   Camera, Upload, ListOrdered, MessageSquare, AlertTriangle, ClipboardList
 } from 'lucide-react'
 import PortalToggle from './PortalToggle'
@@ -22,7 +22,7 @@ const TIPOS_RELATORIO = [
 ]
 
 const ESTADOS_RELATORIO = {
-  rascunho: { label: 'Rascunho', cor: '#6B7280', icon: FileEdit },
+  rascunho: { label: 'Rascunho', cor: '#6B7280', icon: FilePenLine },
   em_revisao: { label: 'Em Revisão', cor: '#F59E0B', icon: Clock },
   publicado: { label: 'Publicado', cor: '#10B981', icon: CheckCircle }
 }
