@@ -1458,18 +1458,6 @@ export default function ObraDetalhe() {
   }
 
   // ============================================
-  // RENDER PRINCIPAL
-  // ============================================
-
-  if (loading) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
-        <div className="spinner" />
-      </div>
-    )
-  }
-
-  // ============================================
   // ACOMPANHAMENTO: FOTOGRAFIAS
   // ============================================
   const [fotos, setFotos] = useState([])
@@ -3110,6 +3098,18 @@ export default function ObraDetalhe() {
             ))}
           </div>
         </div>
+      </div>
+    )
+  }
+
+  // ============================================
+  // RENDER PRINCIPAL
+  // ============================================
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
+        <div className="spinner" />
       </div>
     )
   }
