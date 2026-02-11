@@ -5,7 +5,7 @@ import {
   Search, Plus, Filter, Grid, List, X, Upload, Tag, Edit, Trash2,
   Image, Box, Sparkles, Mountain, Trees, Layers, Shirt, Square,
   Sofa, Lamp, Bath, ChefHat, TreePalm, Building, Bed, Monitor, ZoomIn,
-  ExternalLink, Heart, MoreVertical, Check, ChevronDown, Eye
+  ExternalLink, Heart, MoreVertical, Check, ChevronDown, Eye, Download
 } from 'lucide-react'
 
 // ============================================
@@ -17,7 +17,7 @@ const TABS = [
   { id: 'inspiracao', label: 'Inspiração', icon: Sparkles }
 ]
 
-const FORMATOS_3D = ['.obj', '.fbx', '.skp', '.3ds', '.blend', '.glb', '.gltf']
+const FORMATOS_3D = ['.obj', '.fbx', '.skp', '.3ds', '.blend', '.glb', '.gltf', '.zip', '.rar']
 
 const ICON_MAP = {
   'mountain': Mountain,
@@ -1424,7 +1424,7 @@ export default function Biblioteca() {
                         }}>
                           <input
                             type="file"
-                            accept=".obj,.fbx,.skp,.3ds,.blend,.glb,.gltf"
+                            accept=".obj,.fbx,.skp,.3ds,.blend,.glb,.gltf,.zip,.rar"
                             onChange={e => handleFileUpload(e)}
                             style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }}
                             disabled={uploadingFile}
@@ -1456,7 +1456,7 @@ export default function Biblioteca() {
                                 {uploadingFile ? 'A carregar...' : 'Upload ficheiro 3D'}
                               </div>
                               <div style={{ fontSize: '10px', color: 'var(--stone-dark)' }}>
-                                .obj, .fbx, .skp, .blend, .glb
+                                .obj, .fbx, .skp, .blend, .glb, .zip, .rar
                               </div>
                             </>
                           )}
@@ -2213,10 +2213,35 @@ export default function Biblioteca() {
 // ============================================
 function ItemCard({ item, type, tags, categorias, onEdit, onDelete, onPreview, onToggleFavorite }) {
   const [menuOpen, setMenuOpen] = useState(false)
-  
+
   const imageUrl = type === 'materiais' ? item.textura_url :
                    type === 'modelos3d' ? item.miniatura_url : item.imagem_url
-  
+
+  // URL do ficheiro para download
+  const downloadUrl = type === 'materiais' ? (item.ficha_tecnica_url || item.textura_url) :
+                      type === 'modelos3d' ? (item.ficheiro_url || item.miniatura_url) : item.imagem_url
+
+  const handleDownload = async (e) => {
+    e.stopPropagation()
+    if (!downloadUrl) return
+    try {
+      const response = await fetch(downloadUrl)
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const ext = downloadUrl.split('.').pop()?.split('?')[0] || 'file'
+      a.download = `${item.nome || 'download'}.${ext}`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('Download error:', err)
+      window.open(downloadUrl, '_blank')
+    }
+  }
+
   const categoria = categorias.find(c => c.id === item.categoria_id)
   const itemTags = tags.filter(t => item.tags?.includes(t.id))
 
@@ -2257,6 +2282,14 @@ function ItemCard({ item, type, tags, categorias, onEdit, onDelete, onPreview, o
           <button style={{ background: 'white', border: 'none', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Eye size={18} style={{ color: 'var(--brown)' }} />
           </button>
+          {downloadUrl && (
+            <button
+              onClick={(e) => { e.stopPropagation(); handleDownload(e) }}
+              style={{ background: 'white', border: 'none', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Download size={18} style={{ color: 'var(--brown)' }} />
+            </button>
+          )}
         </div>
 
         {/* Favorito (só inspiração) */}
@@ -2320,34 +2353,54 @@ function ItemCard({ item, type, tags, categorias, onEdit, onDelete, onPreview, o
             )}
           </div>
           
-          {/* Menu */}
-          <div style={{ position: 'relative' }}>
-            <button 
-              onClick={() => setMenuOpen(!menuOpen)} 
-              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
-            >
-              <MoreVertical size={16} style={{ color: 'var(--brown-light)' }} />
-            </button>
-            {menuOpen && (
-              <div style={{
-                position: 'absolute',
-                right: 0,
-                top: '100%',
-                background: 'white',
-                border: '1px solid var(--stone)',
-                borderRadius: '8px',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                zIndex: 10,
-                minWidth: '120px'
-              }}>
-                <button onClick={() => { onEdit(); setMenuOpen(false) }} style={{ width: '100%', padding: '8px 12px', background: 'none', border: 'none', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
-                  <Edit size={14} /> Editar
-                </button>
-                <button onClick={() => { onDelete(); setMenuOpen(false) }} style={{ width: '100%', padding: '8px 12px', background: 'none', border: 'none', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: 'var(--error)' }}>
-                  <Trash2 size={14} /> Eliminar
-                </button>
-              </div>
+          {/* Actions */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+            {/* Download direto */}
+            {downloadUrl && (
+              <button
+                onClick={handleDownload}
+                title="Download"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', borderRadius: '4px', transition: 'background 0.2s' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--stone)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'none'}
+              >
+                <Download size={15} style={{ color: 'var(--brown-light)' }} />
+              </button>
             )}
+            {/* Menu */}
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setMenuOpen(!menuOpen)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
+              >
+                <MoreVertical size={16} style={{ color: 'var(--brown-light)' }} />
+              </button>
+              {menuOpen && (
+                <div style={{
+                  position: 'absolute',
+                  right: 0,
+                  top: '100%',
+                  background: 'white',
+                  border: '1px solid var(--stone)',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                  zIndex: 10,
+                  minWidth: '140px'
+                }}>
+                  {downloadUrl && (
+                    <button onClick={(e) => { handleDownload(e); setMenuOpen(false) }} style={{ width: '100%', padding: '8px 12px', background: 'none', border: 'none', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
+                      <Download size={14} /> Download
+                    </button>
+                  )}
+                  <button onClick={() => { onEdit(); setMenuOpen(false) }} style={{ width: '100%', padding: '8px 12px', background: 'none', border: 'none', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
+                    <Edit size={14} /> Editar
+                  </button>
+                  <button onClick={() => { onDelete(); setMenuOpen(false) }} style={{ width: '100%', padding: '8px 12px', background: 'none', border: 'none', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: 'var(--error)' }}>
+                    <Trash2 size={14} /> Eliminar
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
