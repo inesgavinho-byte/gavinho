@@ -210,12 +210,18 @@ export default function ProjetoInspiracoes({ projeto, userId, userName, comparti
         .from('projeto_inspiracoes')
         .select('*')
         .eq('projeto_id', projeto.id)
-        .order('compartimento')
+        .order('categoria')
         .order('created_at', { ascending: false })
 
       if (error) throw error
 
-      setInspiracoes(data || [])
+      // Map DB column names to component field names
+      const mapped = (data || []).map(row => ({
+        ...row,
+        url: row.imagem_url || row.url,
+        compartimento: row.categoria || row.compartimento || 'Geral'
+      }))
+      setInspiracoes(mapped)
     } catch (err) {
       // Table may not exist yet - show empty state
     } finally {
@@ -300,10 +306,10 @@ export default function ProjetoInspiracoes({ projeto, userId, userName, comparti
           .from('projeto_inspiracoes')
           .insert({
             projeto_id: projeto.id,
-            compartimento: uploadForm.compartimento || 'Geral',
+            categoria: uploadForm.compartimento || 'Geral',
             titulo: uploadForm.titulo || file.name.replace(/\.[^.]+$/, ''),
             descricao: uploadForm.descricao || null,
-            url: urlData.publicUrl,
+            imagem_url: urlData.publicUrl,
             fonte: uploadForm.fonte || null,
             tags: tagsArray,
             created_by: userId,
@@ -369,7 +375,7 @@ export default function ProjetoInspiracoes({ projeto, userId, userName, comparti
       const { error } = await supabase
         .from('projeto_inspiracoes')
         .update({
-          compartimento: editForm.compartimento,
+          categoria: editForm.compartimento,
           titulo: editForm.titulo || null,
           descricao: editForm.descricao || null,
           fonte: editForm.fonte || null,
@@ -532,9 +538,9 @@ export default function ProjetoInspiracoes({ projeto, userId, userName, comparti
       // Move inspiracoes to "Geral"
       const { error: updateError } = await supabase
         .from('projeto_inspiracoes')
-        .update({ compartimento: 'Geral' })
+        .update({ categoria: 'Geral' })
         .eq('projeto_id', projeto.id)
-        .eq('compartimento', compartimento)
+        .eq('categoria', compartimento)
 
       if (updateError) {
         alert('Erro ao mover inspiracoes: ' + updateError.message)

@@ -326,6 +326,7 @@ export default function ChatObras() {
     setMessages(prev => [...prev, tempMessage])
 
     const photoToUpload = selectedPhoto
+    const photoFileName = selectedPhoto?.name || null
     cancelPhoto()
 
     try {
@@ -348,6 +349,28 @@ export default function ChatObras() {
         .select()
         .single()
       if (error) throw error
+
+      // Auto-register photo in obra_fotografias (Acompanhamento de Obra)
+      if (photoUrl) {
+        const now = new Date()
+        await supabase
+          .from('obra_fotografias')
+          .insert({
+            obra_id: selectedObra.id,
+            url: photoUrl,
+            filename: photoFileName || `chat_${now.getTime()}.jpg`,
+            titulo: `Chat - ${now.toLocaleDateString('pt-PT')} ${now.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}`,
+            descricao: `Enviada via Chat por ${currentUser.nome}`,
+            data_fotografia: now.toISOString(),
+            autor_id: currentUser.id,
+            autor_nome: currentUser.nome,
+            tags: ['chat']
+          })
+          .then(({ error: fotoErr }) => {
+            if (fotoErr) console.warn('Aviso: foto não registada no acompanhamento:', fotoErr.message)
+          })
+      }
+
       setMessages(prev => prev.map(m =>
         m.id === tempId ? { ...data, pending: false } : m
       ))
