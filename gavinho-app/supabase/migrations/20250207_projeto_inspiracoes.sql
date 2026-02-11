@@ -82,7 +82,12 @@ COMMENT ON COLUMN projeto_inspiracoes.fonte IS 'Source of inspiration (Pinterest
 COMMENT ON COLUMN projeto_inspiracoes.tags IS 'Array of tags for categorization and filtering';
 COMMENT ON COLUMN projeto_inspiracoes.url IS 'Public URL to the image in storage';
 
--- Log migration execution
-INSERT INTO seeds_executados (nome, executed_at)
-VALUES ('20250207_projeto_inspiracoes', NOW())
-ON CONFLICT (nome) DO UPDATE SET executed_at = NOW();
+-- Log migration execution (only if seeds_executados exists)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'seeds_executados') THEN
+    INSERT INTO seeds_executados (nome, executed_at)
+    VALUES ('20250207_projeto_inspiracoes', NOW())
+    ON CONFLICT (nome) DO UPDATE SET executed_at = NOW();
+  END IF;
+END $$;
