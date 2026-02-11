@@ -5,7 +5,8 @@ import { useToast } from '../components/ui/Toast'
 import {
   Plus, Search, HardHat, MapPin, Calendar, Users,
   MoreVertical, Eye, X, Edit, Trash2, Play, Pause, CheckCircle,
-  Loader2, AlertTriangle, ChevronDown
+  Loader2, AlertTriangle, ChevronDown, Building2, UserCheck, TrendingUp,
+  Clock, Briefcase
 } from 'lucide-react'
 
 const statusOptions = ['Todos', 'Planeamento', 'Em Curso', 'Pausada', 'Concluída', 'Cancelada']
@@ -386,200 +387,322 @@ export default function Obras() {
         </div>
       </div>
 
+      {/* Summary Stats */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+        gap: '12px',
+        marginBottom: '28px'
+      }}>
+        {[
+          { label: 'Total Obras', value: obras.length, icon: HardHat, color: 'var(--brown)' },
+          { label: 'Em Curso', value: obras.filter(o => o.status === 'em_curso').length, icon: Play, color: 'var(--success)' },
+          { label: 'Planeamento', value: obras.filter(o => o.status === 'planeamento').length, icon: Clock, color: 'var(--info)' },
+          { label: 'Concluídas', value: obras.filter(o => o.status === 'concluida').length, icon: CheckCircle, color: 'var(--accent-olive)' },
+        ].map((stat, i) => (
+          <div key={i} style={{
+            background: 'var(--white)',
+            borderRadius: '12px',
+            padding: '16px 20px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '14px',
+            boxShadow: 'var(--shadow-sm)',
+            border: '1px solid var(--stone)'
+          }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '10px',
+              background: `${stat.color}15`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}>
+              <stat.icon size={18} style={{ color: stat.color }} />
+            </div>
+            <div>
+              <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--brown)', lineHeight: 1.1 }}>{stat.value}</div>
+              <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginTop: '2px' }}>{stat.label}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
       {/* Grid de Cards de Obras */}
       {filteredObras.length === 0 ? (
-        <div className="card" style={{ padding: '48px', textAlign: 'center', color: 'var(--brown-light)' }}>
-          <HardHat size={48} style={{ opacity: 0.3, marginBottom: '16px' }} />
-          <p>Nenhuma obra encontrada</p>
-          <button className="btn btn-primary" style={{ marginTop: '16px' }} onClick={handleNewObra}>Criar Primeira Obra</button>
+        <div style={{
+          padding: '64px 24px',
+          textAlign: 'center',
+          color: 'var(--brown-light)',
+          background: 'var(--white)',
+          borderRadius: '16px',
+          border: '2px dashed var(--stone)'
+        }}>
+          <div style={{
+            width: '72px',
+            height: '72px',
+            borderRadius: '50%',
+            background: 'var(--cream)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 20px'
+          }}>
+            <HardHat size={32} style={{ color: 'var(--brown-light)', opacity: 0.5 }} />
+          </div>
+          <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)', marginBottom: '8px' }}>Nenhuma obra encontrada</h3>
+          <p style={{ fontSize: '14px', color: 'var(--brown-light)', marginBottom: '20px' }}>Comece por criar a sua primeira obra</p>
+          <button className="btn btn-primary" onClick={handleNewObra}>
+            <Plus size={16} /> Criar Primeira Obra
+          </button>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '20px' }}>
           {filteredObras.map((obra) => {
             const prioridade = getPrioridadeFromOrcamento(obra.orcamento)
             const prioridadeStyle = getPrioridadeStyle(prioridade)
+            const progresso = obra.progresso || 0
             return (
               <div
                 key={obra.id}
-                className="card"
+                className="obra-card-enhanced"
                 style={{
                   cursor: 'pointer',
                   position: 'relative',
-                  padding: '20px 20px 16px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '12px',
-                  transition: 'box-shadow 0.2s ease'
+                  background: 'var(--white)',
+                  borderRadius: '16px',
+                  overflow: 'hidden',
+                  boxShadow: 'var(--shadow-sm)',
+                  border: '1px solid var(--stone)',
+                  transition: 'transform 0.2s ease, box-shadow 0.25s ease'
                 }}
                 onClick={() => navigate(`/obras/${obra.codigo}`)}
-                onMouseEnter={(e) => e.currentTarget.style.boxShadow = 'var(--shadow-lg)'}
-                onMouseLeave={(e) => e.currentTarget.style.boxShadow = 'var(--shadow-sm)'}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-3px)'
+                  e.currentTarget.style.boxShadow = 'var(--shadow-lg)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'none'
+                  e.currentTarget.style.boxShadow = 'var(--shadow-sm)'
+                }}
               >
-                {/* Header: Título + Badge + Menu */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <h3 style={{
-                      fontSize: '14px',
-                      fontWeight: 600,
-                      color: 'var(--brown)',
-                      marginBottom: '4px',
-                      lineHeight: 1.4,
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis'
-                    }}>
-                      {obra.codigo}_{(obra.nome || '').toUpperCase()}
-                    </h3>
-                    <p style={{
-                      fontSize: '13px',
-                      color: 'var(--brown-light)',
-                      margin: 0
-                    }}>
-                      {obra.projetos?.cliente_nome || obra.encarregado || 'Sem cliente/encarregado'}
-                    </p>
-                    {obra.projetos?.codigo && (
-                      <p style={{ fontSize: '11px', color: 'var(--accent-olive)', margin: '2px 0 0', fontWeight: 500 }}>
-                        {obra.projetos.codigo} — {obra.projetos.nome}
-                      </p>
-                    )}
-                  </div>
+                {/* Status accent bar */}
+                <div style={{
+                  height: '4px',
+                  background: getStatusColor(obra.status),
+                  width: '100%'
+                }} />
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                    {/* Priority Badge */}
+                <div style={{ padding: '20px 22px 18px' }}>
+                  {/* Row 1: Code + Status + Menu */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                     <span style={{
-                      padding: '4px 10px',
-                      fontSize: '9px',
+                      fontSize: '11px',
                       fontWeight: 700,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px',
-                      borderRadius: '4px',
-                      background: prioridadeStyle.bg,
-                      color: 'white'
+                      color: 'var(--accent-olive)',
+                      letterSpacing: '1px',
+                      fontFamily: 'monospace'
                     }}>
-                      {prioridadeStyle.label}
+                      {obra.codigo}
                     </span>
-
-                    {/* Menu */}
-                    <div style={{ position: 'relative' }}>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setActiveMenu(activeMenu === obra.id ? null : obra.id) }}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          padding: '4px',
-                          color: 'var(--brown-light)',
-                          borderRadius: '4px'
-                        }}
-                      >
-                        <MoreVertical size={16} />
-                      </button>
-                      {activeMenu === obra.id && (
-                        <div style={{
-                          position: 'absolute',
-                          right: 0,
-                          top: '100%',
-                          background: 'var(--white)',
-                          borderRadius: '10px',
-                          boxShadow: 'var(--shadow-lg)',
-                          minWidth: '150px',
-                          zIndex: 100,
-                          overflow: 'hidden'
-                        }}>
-                          <button onClick={(e) => { e.stopPropagation(); navigate(`/obras/${obra.codigo}`) }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--brown)' }}><Eye size={14} />Ver Detalhe</button>
-                          <button onClick={(e) => { e.stopPropagation(); handleEditObra(obra) }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--brown)' }}><Edit size={14} />Editar</button>
-                          <button onClick={(e) => { e.stopPropagation(); setShowDeleteModal(obra); setActiveMenu(null) }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--error)' }}><Trash2 size={14} />Eliminar</button>
-                        </div>
-                      )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{
+                        padding: '4px 12px',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        borderRadius: '20px',
+                        background: `${getStatusColor(obra.status)}18`,
+                        color: getStatusColor(obra.status),
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '5px'
+                      }}>
+                        <span style={{
+                          width: '6px',
+                          height: '6px',
+                          borderRadius: '50%',
+                          background: getStatusColor(obra.status)
+                        }} />
+                        {getStatusLabel(obra.status)}
+                      </span>
+                      <div style={{ position: 'relative' }}>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setActiveMenu(activeMenu === obra.id ? null : obra.id) }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '6px',
+                            color: 'var(--brown-light)',
+                            borderRadius: '8px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = 'var(--cream)'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                        >
+                          <MoreVertical size={16} />
+                        </button>
+                        {activeMenu === obra.id && (
+                          <div style={{
+                            position: 'absolute',
+                            right: 0,
+                            top: '100%',
+                            background: 'var(--white)',
+                            borderRadius: '12px',
+                            boxShadow: 'var(--shadow-lg)',
+                            border: '1px solid var(--stone)',
+                            minWidth: '160px',
+                            zIndex: 100,
+                            overflow: 'hidden'
+                          }}>
+                            <button onClick={(e) => { e.stopPropagation(); navigate(`/obras/${obra.codigo}`) }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--brown)', transition: 'background 0.15s' }} onMouseEnter={e => e.currentTarget.style.background = 'var(--cream)'} onMouseLeave={e => e.currentTarget.style.background = 'none'}><Eye size={14} />Ver Detalhe</button>
+                            <button onClick={(e) => { e.stopPropagation(); handleEditObra(obra) }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--brown)', transition: 'background 0.15s' }} onMouseEnter={e => e.currentTarget.style.background = 'var(--cream)'} onMouseLeave={e => e.currentTarget.style.background = 'none'}><Edit size={14} />Editar</button>
+                            <button onClick={(e) => { e.stopPropagation(); setShowDeleteModal(obra); setActiveMenu(null) }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: 'var(--error)', transition: 'background 0.15s' }} onMouseEnter={e => e.currentTarget.style.background = 'var(--error-bg)'} onMouseLeave={e => e.currentTarget.style.background = 'none'}><Trash2 size={14} />Eliminar</button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Meta Info: Localização + Datas */}
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '16px',
-                  fontSize: '12px',
-                  color: 'var(--brown-light)'
-                }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <MapPin size={13} />
-                    {obra.localizacao || '—'}
-                  </span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <Calendar size={13} />
-                    {formatDateRange(obra.data_inicio, obra.data_prevista_conclusao)}
-                  </span>
-                </div>
+                  {/* Row 2: Name + Client */}
+                  <h3 style={{
+                    fontSize: '16px',
+                    fontWeight: 700,
+                    color: 'var(--brown)',
+                    margin: '0 0 4px',
+                    lineHeight: 1.35,
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden'
+                  }}>
+                    {obra.nome || 'Sem nome'}
+                  </h3>
+                  <p style={{
+                    fontSize: '13px',
+                    color: 'var(--brown-light)',
+                    margin: '0 0 14px'
+                  }}>
+                    {obra.projetos?.cliente_nome || obra.encarregado || '—'}
+                  </p>
 
-                {/* Tipo Badge - pequeno */}
-                {obra.tipo && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{
-                      padding: '3px 8px',
-                      fontSize: '10px',
-                      fontWeight: 500,
-                      borderRadius: '4px',
-                      background: 'var(--stone)',
-                      color: 'var(--brown)'
-                    }}>
-                      {obra.tipo}
-                    </span>
-                    {obra.projetos?.codigo && (
-                      <span style={{
-                        padding: '3px 8px',
-                        fontSize: '10px',
-                        fontWeight: 500,
-                        borderRadius: '4px',
-                        background: 'var(--blush)',
-                        color: 'var(--brown)'
-                      }}>
-                        {obra.projetos.codigo}
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                {/* Progress Bar */}
-                <div style={{
-                  width: '100%',
-                  height: '3px',
-                  background: 'var(--stone)',
-                  borderRadius: '2px',
-                  overflow: 'hidden',
-                  marginTop: '4px'
-                }}>
+                  {/* Row 3: Meta info grid */}
                   <div style={{
-                    width: `${obra.progresso || 0}%`,
-                    height: '100%',
-                    background: getStatusColor(obra.status),
-                    borderRadius: '2px',
-                    transition: 'width 0.3s ease'
-                  }} />
-                </div>
-
-                {/* Footer: Status */}
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  marginTop: '4px'
-                }}>
-                  <span style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: '8px 16px',
+                    marginBottom: '16px',
                     fontSize: '12px',
                     color: 'var(--brown-light)'
                   }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <MapPin size={13} style={{ color: 'var(--accent-olive)', flexShrink: 0 }} />
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {obra.localizacao || '—'}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Calendar size={13} style={{ color: 'var(--accent-olive)', flexShrink: 0 }} />
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {formatDateRange(obra.data_inicio, obra.data_prevista_conclusao)}
+                      </span>
+                    </div>
+                    {obra.tipo && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Building2 size={13} style={{ color: 'var(--accent-olive)', flexShrink: 0 }} />
+                        <span>{obra.tipo}</span>
+                      </div>
+                    )}
+                    {obra.encarregado && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <UserCheck size={13} style={{ color: 'var(--accent-olive)', flexShrink: 0 }} />
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {obra.encarregado}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Tags row */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px', flexWrap: 'wrap' }}>
+                    {obra.projetos?.codigo && (
+                      <span style={{
+                        padding: '3px 10px',
+                        fontSize: '10px',
+                        fontWeight: 600,
+                        borderRadius: '20px',
+                        background: 'var(--accent-olive)15',
+                        color: 'var(--accent-olive)',
+                        border: '1px solid var(--accent-olive)30'
+                      }}>
+                        {obra.projetos.codigo} — {obra.projetos.nome}
+                      </span>
+                    )}
                     <span style={{
-                      width: '6px',
+                      padding: '3px 10px',
+                      fontSize: '10px',
+                      fontWeight: 600,
+                      borderRadius: '20px',
+                      background: prioridadeStyle.bg + '20',
+                      color: prioridadeStyle.bg
+                    }}>
+                      {prioridadeStyle.label}
+                    </span>
+                  </div>
+
+                  {/* Progress section */}
+                  <div style={{
+                    background: 'var(--cream)',
+                    borderRadius: '10px',
+                    padding: '12px 14px'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--brown-light)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        Progresso
+                      </span>
+                      <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--brown)' }}>
+                        {progresso}%
+                      </span>
+                    </div>
+                    <div style={{
+                      width: '100%',
                       height: '6px',
-                      borderRadius: '50%',
-                      background: getStatusColor(obra.status)
-                    }} />
-                    {getStatusLabel(obra.status)}
-                  </span>
+                      background: 'var(--stone)',
+                      borderRadius: '3px',
+                      overflow: 'hidden'
+                    }}>
+                      <div style={{
+                        width: `${progresso}%`,
+                        height: '100%',
+                        background: progresso >= 80 ? 'var(--success)' : progresso >= 40 ? 'var(--warning)' : getStatusColor(obra.status),
+                        borderRadius: '3px',
+                        transition: 'width 0.4s ease'
+                      }} />
+                    </div>
+                  </div>
+
+                  {/* Budget row (if available) */}
+                  {obra.orcamento && (
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginTop: '12px',
+                      paddingTop: '12px',
+                      borderTop: '1px solid var(--stone)'
+                    }}>
+                      <span style={{ fontSize: '11px', color: 'var(--brown-light)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <Briefcase size={12} /> Orçamento
+                      </span>
+                      <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--brown)' }}>
+                        {new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(obra.orcamento)}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             )

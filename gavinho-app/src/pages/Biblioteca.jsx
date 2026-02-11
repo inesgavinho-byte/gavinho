@@ -700,15 +700,14 @@ export default function Biblioteca() {
           </button>
         </div>
       ) : viewMode === 'grid' ? (
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: activeTab === 'inspiracao' ? 'repeat(auto-fill, minmax(250px, 1fr))' : 'repeat(auto-fill, minmax(280px, 1fr))',
-          gap: '16px'
-        }}>
+        <div style={{
+          columnCount: 4,
+          columnGap: '16px',
+        }} className="biblioteca-masonry">
           {filteredItems.map(item => (
-            <ItemCard 
-              key={item.id} 
-              item={item} 
+            <ItemCard
+              key={item.id}
+              item={item}
               type={activeTab}
               tags={tags}
               categorias={categorias}
@@ -2204,6 +2203,159 @@ export default function Biblioteca() {
           </div>
         </div>
       )}
+
+      {/* Pinterest / Masonry styles */}
+      <style>{`
+        .biblioteca-masonry {
+          column-count: 4;
+          column-gap: 16px;
+        }
+        @media (max-width: 1400px) {
+          .biblioteca-masonry { column-count: 3; }
+        }
+        @media (max-width: 1000px) {
+          .biblioteca-masonry { column-count: 2; }
+        }
+        @media (max-width: 600px) {
+          .biblioteca-masonry { column-count: 1; }
+        }
+
+        .bib-pin-card {
+          break-inside: avoid;
+          margin-bottom: 16px;
+          border-radius: 12px;
+          overflow: hidden;
+          background: white;
+          border: 1px solid var(--stone);
+          transition: transform 0.2s ease, box-shadow 0.2s ease;
+          cursor: default;
+        }
+        .bib-pin-card:hover {
+          transform: translateY(-3px);
+          box-shadow: 0 8px 24px rgba(0,0,0,0.10);
+        }
+
+        .bib-pin-image-wrap {
+          position: relative;
+          overflow: hidden;
+          cursor: pointer;
+          line-height: 0;
+          background: var(--cream);
+        }
+
+        .bib-pin-overlay {
+          position: absolute;
+          inset: 0;
+          background: rgba(0,0,0,0.35);
+          opacity: 0;
+          transition: opacity 0.2s ease;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+        }
+        .bib-pin-card:hover .bib-pin-overlay {
+          opacity: 1;
+        }
+
+        .bib-pin-overlay-btn {
+          background: white;
+          border: none;
+          border-radius: 50%;
+          width: 36px;
+          height: 36px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: transform 0.15s ease;
+        }
+        .bib-pin-overlay-btn:hover {
+          transform: scale(1.1);
+        }
+
+        .bib-pin-fav-btn {
+          position: absolute;
+          top: 8px;
+          right: 8px;
+          background: none;
+          border: none;
+          cursor: pointer;
+          padding: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          filter: drop-shadow(0 1px 3px rgba(0,0,0,0.3));
+          transition: transform 0.15s ease;
+          z-index: 2;
+        }
+        .bib-pin-fav-btn:hover {
+          transform: scale(1.15);
+        }
+
+        .bib-pin-ext-link {
+          position: absolute;
+          top: 8px;
+          left: 8px;
+          background: rgba(255,255,255,0.85);
+          border: none;
+          border-radius: 50%;
+          width: 28px;
+          height: 28px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: background 0.2s;
+          z-index: 2;
+        }
+        .bib-pin-ext-link:hover {
+          background: white;
+        }
+
+        .bib-pin-action-btn {
+          background: none;
+          border: none;
+          cursor: pointer;
+          padding: 4px;
+          border-radius: 4px;
+          transition: background 0.15s;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .bib-pin-action-btn:hover {
+          background: var(--stone);
+        }
+
+        .bib-pin-menu {
+          position: absolute;
+          right: 0;
+          top: 100%;
+          background: white;
+          border: 1px solid var(--stone);
+          border-radius: 10px;
+          box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+          z-index: 10;
+          min-width: 140px;
+          overflow: hidden;
+        }
+
+        .bib-pin-menu-item {
+          width: 100%;
+          padding: 9px 14px;
+          background: none;
+          border: none;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          cursor: pointer;
+          font-size: 13px;
+          transition: background 0.15s;
+        }
+        .bib-pin-menu-item:hover {
+          background: var(--cream);
+        }
+      `}</style>
     </div>
   )
 }
@@ -2213,6 +2365,7 @@ export default function Biblioteca() {
 // ============================================
 function ItemCard({ item, type, tags, categorias, onEdit, onDelete, onPreview, onToggleFavorite }) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [imgLoaded, setImgLoaded] = useState(false)
 
   const imageUrl = type === 'materiais' ? item.textura_url :
                    type === 'modelos3d' ? item.miniatura_url : item.imagem_url
@@ -2246,46 +2399,63 @@ function ItemCard({ item, type, tags, categorias, onEdit, onDelete, onPreview, o
   const itemTags = tags.filter(t => item.tags?.includes(t.id))
 
   return (
-    <div className="card" style={{ padding: 0, overflow: 'hidden', position: 'relative' }}>
+    <div className="bib-pin-card">
       {/* Image */}
-      <div 
+      <div
         onClick={onPreview}
-        style={{ 
-          height: type === 'inspiracao' ? '200px' : '160px',
-          background: imageUrl ? `url(${imageUrl}) center/cover` : 'linear-gradient(135deg, var(--cream) 0%, var(--stone) 100%)',
-          cursor: 'pointer',
-          position: 'relative',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}
+        className="bib-pin-image-wrap"
       >
-        {!imageUrl && (
-          <div style={{ color: 'var(--brown-light)', textAlign: 'center' }}>
-            {type === 'materiais' ? <Layers size={32} /> : type === 'modelos3d' ? <Box size={32} /> : <Image size={32} />}
-            <div style={{ fontSize: '11px', marginTop: '4px' }}>Sem imagem</div>
+        {imageUrl ? (
+          <img
+            src={imageUrl}
+            alt={item.nome || ''}
+            onLoad={() => setImgLoaded(true)}
+            style={{
+              width: '100%',
+              height: 'auto',
+              display: 'block',
+              opacity: imgLoaded ? 1 : 0,
+              transition: 'opacity 0.3s ease',
+            }}
+          />
+        ) : (
+          <div style={{
+            height: '140px',
+            background: 'linear-gradient(135deg, var(--cream) 0%, var(--stone) 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            <div style={{ color: 'var(--brown-light)', textAlign: 'center' }}>
+              {type === 'materiais' ? <Layers size={32} /> : type === 'modelos3d' ? <Box size={32} /> : <Image size={32} />}
+              <div style={{ fontSize: '11px', marginTop: '4px' }}>Sem imagem</div>
+            </div>
           </div>
         )}
-        
+
+        {/* Placeholder bg while loading */}
+        {imageUrl && !imgLoaded && (
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'var(--cream)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            <Layers size={24} style={{ color: 'var(--stone)', opacity: 0.5 }} />
+          </div>
+        )}
+
         {/* Overlay on hover */}
-        <div style={{
-          position: 'absolute',
-          inset: 0,
-          background: 'rgba(0,0,0,0.4)',
-          opacity: 0,
-          transition: 'opacity 0.2s',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '8px'
-        }} className="card-overlay">
-          <button style={{ background: 'white', border: 'none', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="bib-pin-overlay">
+          <button className="bib-pin-overlay-btn" onClick={(e) => { e.stopPropagation() }}>
             <Eye size={18} style={{ color: 'var(--brown)' }} />
           </button>
           {downloadUrl && (
             <button
+              className="bib-pin-overlay-btn"
               onClick={(e) => { e.stopPropagation(); handleDownload(e) }}
-              style={{ background: 'white', border: 'none', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             >
               <Download size={18} style={{ color: 'var(--brown)' }} />
             </button>
@@ -2296,22 +2466,13 @@ function ItemCard({ item, type, tags, categorias, onEdit, onDelete, onPreview, o
         {type === 'inspiracao' && (
           <button
             onClick={(e) => { e.stopPropagation(); onToggleFavorite?.() }}
-            style={{
-              position: 'absolute',
-              top: '8px',
-              right: '8px',
-              background: item.favorito ? 'var(--error)' : 'rgba(255,255,255,0.9)',
-              border: 'none',
-              borderRadius: '50%',
-              width: '32px',
-              height: '32px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
+            className="bib-pin-fav-btn"
           >
-            <Heart size={16} fill={item.favorito ? 'white' : 'none'} style={{ color: item.favorito ? 'white' : 'var(--brown-light)' }} />
+            <Heart
+              size={20}
+              fill={item.favorito ? '#e25555' : 'rgba(255,255,255,0.6)'}
+              style={{ color: item.favorito ? '#e25555' : 'white' }}
+            />
           </button>
         )}
 
@@ -2322,80 +2483,54 @@ function ItemCard({ item, type, tags, categorias, onEdit, onDelete, onPreview, o
             target="_blank"
             rel="noopener noreferrer"
             onClick={e => e.stopPropagation()}
-            style={{
-              position: 'absolute',
-              top: '8px',
-              left: '8px',
-              background: 'rgba(255,255,255,0.9)',
-              border: 'none',
-              borderRadius: '50%',
-              width: '32px',
-              height: '32px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
+            className="bib-pin-ext-link"
           >
-            <ExternalLink size={14} style={{ color: 'var(--brown)' }} />
+            <ExternalLink size={13} style={{ color: 'var(--brown)' }} />
           </a>
         )}
       </div>
 
       {/* Content */}
-      <div style={{ padding: '12px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-          <div>
-            <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--brown)', marginBottom: '2px' }}>
+      <div style={{ padding: '10px 12px 12px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '4px' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--brown)', marginBottom: '1px', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
               {item.nome || '(sem nome)'}
             </div>
             {categoria && (
               <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>{categoria.nome}</div>
             )}
           </div>
-          
+
           {/* Actions */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-            {/* Download direto */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0px', flexShrink: 0 }}>
             {downloadUrl && (
               <button
                 onClick={handleDownload}
                 title="Download"
-                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', borderRadius: '4px', transition: 'background 0.2s' }}
-                onMouseEnter={e => e.currentTarget.style.background = 'var(--stone)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                className="bib-pin-action-btn"
               >
-                <Download size={15} style={{ color: 'var(--brown-light)' }} />
+                <Download size={14} style={{ color: 'var(--brown-light)' }} />
               </button>
             )}
-            {/* Menu */}
             <div style={{ position: 'relative' }}>
               <button
                 onClick={() => setMenuOpen(!menuOpen)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
+                className="bib-pin-action-btn"
               >
-                <MoreVertical size={16} style={{ color: 'var(--brown-light)' }} />
+                <MoreVertical size={15} style={{ color: 'var(--brown-light)' }} />
               </button>
               {menuOpen && (
-                <div style={{
-                  position: 'absolute',
-                  right: 0,
-                  top: '100%',
-                  background: 'white',
-                  border: '1px solid var(--stone)',
-                  borderRadius: '8px',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                  zIndex: 10,
-                  minWidth: '140px'
-                }}>
+                <div className="bib-pin-menu">
                   {downloadUrl && (
-                    <button onClick={(e) => { handleDownload(e); setMenuOpen(false) }} style={{ width: '100%', padding: '8px 12px', background: 'none', border: 'none', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
+                    <button onClick={(e) => { handleDownload(e); setMenuOpen(false) }} className="bib-pin-menu-item">
                       <Download size={14} /> Download
                     </button>
                   )}
-                  <button onClick={() => { onEdit(); setMenuOpen(false) }} style={{ width: '100%', padding: '8px 12px', background: 'none', border: 'none', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
+                  <button onClick={() => { onEdit(); setMenuOpen(false) }} className="bib-pin-menu-item">
                     <Edit size={14} /> Editar
                   </button>
-                  <button onClick={() => { onDelete(); setMenuOpen(false) }} style={{ width: '100%', padding: '8px 12px', background: 'none', border: 'none', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: 'var(--error)' }}>
+                  <button onClick={() => { onDelete(); setMenuOpen(false) }} className="bib-pin-menu-item" style={{ color: 'var(--error)' }}>
                     <Trash2 size={14} /> Eliminar
                   </button>
                 </div>
@@ -2405,39 +2540,40 @@ function ItemCard({ item, type, tags, categorias, onEdit, onDelete, onPreview, o
         </div>
 
         {/* Metadados específicos */}
-        {type === 'materiais' && (
-          <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginBottom: '8px' }}>
+        {type === 'materiais' && (item.fornecedor || item.preco_m2) && (
+          <div style={{ fontSize: '11px', color: 'var(--brown-light)', marginTop: '4px' }}>
             {item.fornecedor && <span>{item.fornecedor}</span>}
-            {item.fornecedor && item.preco_m2 && <span>  –  </span>}
+            {item.fornecedor && item.preco_m2 && <span> · </span>}
             {item.preco_m2 && <span style={{ color: 'var(--brown)', fontWeight: 500 }}>€{item.preco_m2}/m²</span>}
           </div>
         )}
 
-        {type === 'modelos3d' && (
-          <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginBottom: '8px' }}>
-            {item.formato && <span style={{ background: 'var(--stone)', padding: '2px 6px', borderRadius: '4px', marginRight: '6px' }}>{item.formato}</span>}
+        {type === 'modelos3d' && (item.formato || (item.largura_cm && item.altura_cm)) && (
+          <div style={{ fontSize: '11px', color: 'var(--brown-light)', marginTop: '4px' }}>
+            {item.formato && <span style={{ background: 'var(--stone)', padding: '1px 5px', borderRadius: '4px', marginRight: '5px', fontSize: '10px' }}>{item.formato}</span>}
             {item.largura_cm && item.altura_cm && item.profundidade_cm && (
-              <span>{item.largura_cm}×{item.altura_cm}×{item.profundidade_cm} cm</span>
+              <span>{item.largura_cm}×{item.altura_cm}×{item.profundidade_cm}cm</span>
             )}
           </div>
         )}
 
         {type === 'inspiracao' && item.fonte && (
-          <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginBottom: '8px' }}>
-            Fonte: {item.fonte}
+          <div style={{ fontSize: '11px', color: 'var(--brown-light)', marginTop: '4px' }}>
+            {item.fonte}
           </div>
         )}
 
         {/* Tags */}
         {itemTags.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '6px' }}>
             {itemTags.slice(0, 3).map(tag => (
               <span key={tag.id} style={{
-                padding: '2px 6px',
+                padding: '1px 6px',
                 borderRadius: '8px',
                 fontSize: '10px',
-                background: tag.cor + '25',
-                color: 'var(--brown)'
+                background: tag.cor + '20',
+                color: tag.cor || 'var(--brown)',
+                fontWeight: 500,
               }}>
                 {tag.nome}
               </span>
@@ -2448,12 +2584,6 @@ function ItemCard({ item, type, tags, categorias, onEdit, onDelete, onPreview, o
           </div>
         )}
       </div>
-
-      <style>{`
-        .card:hover .card-overlay {
-          opacity: 1 !important;
-        }
-      `}</style>
     </div>
   )
 }
