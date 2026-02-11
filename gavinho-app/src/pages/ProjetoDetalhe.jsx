@@ -3422,7 +3422,7 @@ export default function ProjetoDetalhe() {
                       disabled={savingCliente}
                       style={{
                         padding: '8px 16px',
-                        background: 'var(--verde)',
+                        background: 'var(--accent-olive)',
                         color: 'white',
                         border: 'none',
                         borderRadius: '8px',
