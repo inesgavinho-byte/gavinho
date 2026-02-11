@@ -190,6 +190,11 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
   // Floating toolbar state
   const [showFloatingToolbar, setShowFloatingToolbar] = useState(true)
 
+  // Crop state
+  const [isCropping, setIsCropping] = useState(false)
+  const [cropRect, setCropRect] = useState(null) // { x, y, width, height } relative to image
+  const [cropStart, setCropStart] = useState(null)
+
   // Clipboard state
   const [clipboard, setClipboard] = useState(null)
 
@@ -870,10 +875,10 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
       return
     }
 
-    // Eraser mode
+    // Eraser mode - only erase strokes and shapes, NOT images
     if (activeTool === TOOLS.ERASER) {
       const hitElement = findElementAtPoint(x, y)
-      if (hitElement) {
+      if (hitElement && hitElement.type !== 'image') {
         const newElements = currentPage.elements.filter(el => el.id !== hitElement.id)
         updatePageElements(newElements)
         if (selectedElement?.id === hitElement.id) setSelectedElement(null)
