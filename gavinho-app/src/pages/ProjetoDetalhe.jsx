@@ -174,13 +174,18 @@ export default function ProjetoDetalhe() {
   const [activeFaseSection, setActiveFaseSection] = useState(urlSubtab || 'entregaveis')
 
   // Sub-tabs para Archviz
-  const [activeArchvizSection, setActiveArchvizSection] = useState(urlSubtab || 'inspiracoes')
+  const [activeArchvizSection, setActiveArchvizSection] = useState(urlSubtab || 'processo')
 
   // Sub-tabs para Gestão de Projeto
   const [activeGestaoSection, setActiveGestaoSection] = useState(urlSubtab || 'decisoes')
 
+  // Ficha de Cliente inline editing
+  const [editingCliente, setEditingCliente] = useState(false)
+  const [clienteForm, setClienteForm] = useState({})
+  const [savingCliente, setSavingCliente] = useState(false)
+
   // Sub-tabs para Briefing & Conceito
-  const [activeBriefingSection, setActiveBriefingSection] = useState(urlSubtab || 'moodboards')
+  const [activeBriefingSection, setActiveBriefingSection] = useState(urlSubtab || 'inspiracoes')
 
   // Gestão de Renders/Archviz
   const [renders, setRenders] = useState([])
@@ -768,6 +773,51 @@ export default function ProjetoDetalhe() {
     }
   }
 
+  // Guardar ficha de cliente inline
+  const handleSaveCliente = async () => {
+    if (!project.cliente_id) return
+    setSavingCliente(true)
+    try {
+      const { error } = await supabase
+        .from('clientes')
+        .update({
+          nome: clienteForm.nome,
+          tipo: clienteForm.tipo,
+          empresa: clienteForm.empresa,
+          email: clienteForm.email,
+          telefone: clienteForm.telefone,
+          nif: clienteForm.nif,
+          morada: clienteForm.morada,
+          codigo_postal: clienteForm.codigo_postal,
+          cidade: clienteForm.cidade,
+          notas: clienteForm.notas,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', project.cliente_id)
+      if (error) throw error
+      // Update local project state
+      setProject(prev => ({
+        ...prev,
+        cliente_nome: clienteForm.nome,
+        cliente: {
+          ...prev.cliente,
+          nome: clienteForm.nome,
+          tipo: clienteForm.tipo,
+          email: clienteForm.email,
+          telefone: clienteForm.telefone,
+          documento: clienteForm.nif ? `NIF: ${clienteForm.nif}` : '',
+          morada: `${clienteForm.morada || ''}, ${clienteForm.codigo_postal || ''} ${clienteForm.cidade || ''}`.replace(/^, |, $/g, '')
+        }
+      }))
+      setEditingCliente(false)
+    } catch (err) {
+      console.error('Erro ao guardar cliente:', err)
+      alert('Erro ao guardar dados do cliente')
+    } finally {
+      setSavingCliente(false)
+    }
+  }
+
   // Duplicar projeto
   const handleDuplicate = async () => {
     if (!project) return
@@ -1153,14 +1203,21 @@ export default function ProjetoDetalhe() {
           
           // Cliente
           cliente: clienteData ? {
+            id: clienteData.id,
             codigo: clienteData.codigo,
             nome: clienteData.nome,
             titulo: '',
             tipo: clienteData.tipo || 'Particular',
+            empresa: clienteData.empresa || '',
             documento: clienteData.nif ? `NIF: ${clienteData.nif}` : '',
+            nif: clienteData.nif || '',
             email: clienteData.email,
             telefone: clienteData.telefone,
             morada: `${clienteData.morada || ''}, ${clienteData.codigo_postal || ''} ${clienteData.cidade || ''}`,
+            morada_raw: clienteData.morada || '',
+            codigo_postal: clienteData.codigo_postal || '',
+            cidade: clienteData.cidade || '',
+            notas: clienteData.notas || '',
             segmento: clienteData.segmento || 'Nacional',
             idioma: clienteData.idioma || 'Português'
           } : {
@@ -1717,6 +1774,7 @@ export default function ProjetoDetalhe() {
     { id: 'dashboard', label: 'Dashboard', icon: Layers },
     { id: 'briefing', label: 'Briefing & Conceito', icon: Lightbulb, hasSubtabs: true },
     { id: 'fases', label: 'Fases & Entregas', icon: Target, hasSubtabs: true },
+    { id: 'notebook', label: 'Notebook', icon: BookOpen },
     { id: 'chat-ia', label: 'Chat IA', icon: MessageSquare },
     { id: 'archviz', label: 'Archviz', icon: Image, hasSubtabs: true },
     { id: 'biblioteca', label: 'Biblioteca', icon: Library },
@@ -1725,6 +1783,7 @@ export default function ProjetoDetalhe() {
 
   // Secções dentro de Briefing & Conceito
   const briefingSections = [
+    { id: 'inspiracoes', label: 'Inspirações & Referências', icon: Palette },
     { id: 'moodboards', label: 'Moodboards', icon: Lightbulb },
     { id: 'levantamento', label: 'Levantamento Fotografico', icon: Camera }
   ]
@@ -1735,13 +1794,11 @@ export default function ProjetoDetalhe() {
     { id: 'entregaveis', label: 'Entregáveis', icon: ListChecks },
     { id: 'recebidos', label: 'Recebidos', icon: Inbox },
     { id: 'entregas', label: 'Central Entregas', icon: Package },
-    { id: 'design-review', label: 'Design Review', icon: Eye },
-    { id: 'atas', label: 'Atas', icon: FileText }
+    { id: 'design-review', label: 'Design Review', icon: Eye }
   ]
 
   // Secções dentro de Archviz
   const archvizSections = [
-    { id: 'inspiracoes', label: 'Inspirações & Referências', icon: Palette },
     { id: 'processo', label: 'Imagens Processo', icon: ImagePlus },
     { id: 'finais', label: 'Imagens Finais', icon: CheckCircle },
     { id: 'moleskine', label: 'Moleskine', icon: Pencil }
@@ -2623,12 +2680,13 @@ export default function ProjetoDetalhe() {
               <DesignReview projeto={project} />
             )}
 
-            {/* Atas */}
-            {activeFaseSection === 'atas' && (
-              <ProjetoAtas projeto={project} />
-            )}
           </div>
         </div>
+      )}
+
+      {/* Tab Notebook (Atas) */}
+      {activeTab === 'notebook' && (
+        <ProjetoAtas projeto={project} />
       )}
 
       {/* Tab Briefing & Conceito com subtabs */}
@@ -2666,6 +2724,18 @@ export default function ProjetoDetalhe() {
               </button>
             ))}
           </div>
+
+          {/* Inspirações & Referências */}
+          {activeBriefingSection === 'inspiracoes' && (
+            <div className="card">
+              <ProjetoInspiracoes
+                projeto={project}
+                userId={user?.id}
+                userName={user?.nome || user?.email}
+                compartimentosProjeto={projetoCompartimentos}
+              />
+            </div>
+          )}
 
           {/* Moodboards */}
           {activeBriefingSection === 'moodboards' && (
@@ -2722,18 +2792,6 @@ export default function ProjetoDetalhe() {
               </button>
             ))}
           </div>
-
-          {/* Inspirações & Referências */}
-          {activeArchvizSection === 'inspiracoes' && (
-            <div className="card">
-              <ProjetoInspiracoes
-                projeto={project}
-                userId={user?.id}
-                userName={user?.nome || user?.email}
-                compartimentosProjeto={projetoCompartimentos}
-              />
-            </div>
-          )}
 
           {/* Imagens Processo */}
           {activeArchvizSection === 'processo' && (
@@ -3128,7 +3186,7 @@ export default function ProjetoDetalhe() {
             <MoleskineDigital
               projectId={project?.id}
               projectName={project?.nome}
-              onClose={() => setActiveArchvizSection('inspiracoes')}
+              onClose={() => setActiveArchvizSection('processo')}
             />
           )}
         </div>
@@ -3287,33 +3345,234 @@ export default function ProjetoDetalhe() {
           {/* Ficha de Cliente */}
           {activeGestaoSection === 'ficha-cliente' && (
             <div className="card">
-              <div className="flex items-center gap-md" style={{ marginBottom: '24px' }}>
-                <div style={{
-                  width: '48px',
-                  height: '48px',
-                  borderRadius: '12px',
-                  background: 'var(--cream)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  <UserCircle size={24} style={{ color: 'var(--brown)' }} />
+              <div className="flex items-center justify-between" style={{ marginBottom: '24px' }}>
+                <div className="flex items-center gap-md">
+                  <div style={{
+                    width: '48px',
+                    height: '48px',
+                    borderRadius: '12px',
+                    background: 'var(--cream)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <UserCircle size={24} style={{ color: 'var(--brown)' }} />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)', margin: 0 }}>
+                      {project.cliente?.nome || project.cliente_nome || 'Cliente'}
+                    </h3>
+                    <p style={{ fontSize: '13px', color: 'var(--brown-light)', margin: 0 }}>
+                      {project.cliente?.codigo || ''} {project.cliente?.tipo ? `• ${project.cliente.tipo}` : ''}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)', margin: 0 }}>
-                    {project.cliente_nome || 'Cliente'}
-                  </h3>
-                  <p style={{ fontSize: '13px', color: 'var(--brown-light)', margin: 0 }}>
-                    Dados e histórico do cliente
-                  </p>
-                </div>
+                {!editingCliente ? (
+                  <button
+                    onClick={() => {
+                      const c = project.cliente || {}
+                      setClienteForm({
+                        nome: c.nome || project.cliente_nome || '',
+                        tipo: c.tipo || 'Particular',
+                        empresa: c.empresa || '',
+                        email: c.email || '',
+                        telefone: c.telefone || '',
+                        nif: c.nif || (c.documento || '').replace('NIF: ', ''),
+                        morada: c.morada_raw || '',
+                        codigo_postal: c.codigo_postal || '',
+                        cidade: c.cidade || '',
+                        notas: c.notas || ''
+                      })
+                      setEditingCliente(true)
+                    }}
+                    style={{
+                      padding: '8px 16px',
+                      background: 'var(--brown)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    <Edit size={14} />
+                    Editar
+                  </button>
+                ) : (
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      onClick={() => setEditingCliente(false)}
+                      style={{
+                        padding: '8px 16px',
+                        background: 'transparent',
+                        color: 'var(--brown-light)',
+                        border: '1px solid var(--stone)',
+                        borderRadius: '8px',
+                        fontSize: '13px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={handleSaveCliente}
+                      disabled={savingCliente}
+                      style={{
+                        padding: '8px 16px',
+                        background: 'var(--verde)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontSize: '13px',
+                        cursor: savingCliente ? 'wait' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        opacity: savingCliente ? 0.7 : 1
+                      }}
+                    >
+                      {savingCliente ? <Loader2 size={14} className="spin" /> : <CheckCircle size={14} />}
+                      Guardar
+                    </button>
+                  </div>
+                )}
               </div>
-              <button
-                onClick={() => navigate(`/clientes/${project.cliente?.id}`)}
-                className="btn btn-primary"
-              >
-                Ver Ficha Completa
-              </button>
+
+              {!editingCliente ? (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div style={{ padding: '16px', background: 'var(--cream)', borderRadius: '8px' }}>
+                    <p style={{ fontSize: '11px', color: 'var(--brown-light)', margin: '0 0 4px', textTransform: 'uppercase', fontWeight: 600 }}>Nome</p>
+                    <p style={{ fontSize: '14px', color: 'var(--brown)', margin: 0 }}>{project.cliente?.nome || project.cliente_nome || '-'}</p>
+                  </div>
+                  <div style={{ padding: '16px', background: 'var(--cream)', borderRadius: '8px' }}>
+                    <p style={{ fontSize: '11px', color: 'var(--brown-light)', margin: '0 0 4px', textTransform: 'uppercase', fontWeight: 600 }}>Tipo</p>
+                    <p style={{ fontSize: '14px', color: 'var(--brown)', margin: 0 }}>{project.cliente?.tipo || 'Particular'}</p>
+                  </div>
+                  <div style={{ padding: '16px', background: 'var(--cream)', borderRadius: '8px' }}>
+                    <p style={{ fontSize: '11px', color: 'var(--brown-light)', margin: '0 0 4px', textTransform: 'uppercase', fontWeight: 600 }}>Email</p>
+                    <p style={{ fontSize: '14px', color: 'var(--brown)', margin: 0 }}>{project.cliente?.email || '-'}</p>
+                  </div>
+                  <div style={{ padding: '16px', background: 'var(--cream)', borderRadius: '8px' }}>
+                    <p style={{ fontSize: '11px', color: 'var(--brown-light)', margin: '0 0 4px', textTransform: 'uppercase', fontWeight: 600 }}>Telefone</p>
+                    <p style={{ fontSize: '14px', color: 'var(--brown)', margin: 0 }}>{project.cliente?.telefone || '-'}</p>
+                  </div>
+                  <div style={{ padding: '16px', background: 'var(--cream)', borderRadius: '8px' }}>
+                    <p style={{ fontSize: '11px', color: 'var(--brown-light)', margin: '0 0 4px', textTransform: 'uppercase', fontWeight: 600 }}>NIF</p>
+                    <p style={{ fontSize: '14px', color: 'var(--brown)', margin: 0 }}>{project.cliente?.documento || '-'}</p>
+                  </div>
+                  <div style={{ padding: '16px', background: 'var(--cream)', borderRadius: '8px' }}>
+                    <p style={{ fontSize: '11px', color: 'var(--brown-light)', margin: '0 0 4px', textTransform: 'uppercase', fontWeight: 600 }}>Morada</p>
+                    <p style={{ fontSize: '14px', color: 'var(--brown)', margin: 0 }}>{project.cliente?.morada || '-'}</p>
+                  </div>
+                  {project.cliente?.notas && (
+                    <div style={{ padding: '16px', background: 'var(--cream)', borderRadius: '8px', gridColumn: '1 / -1' }}>
+                      <p style={{ fontSize: '11px', color: 'var(--brown-light)', margin: '0 0 4px', textTransform: 'uppercase', fontWeight: 600 }}>Notas</p>
+                      <p style={{ fontSize: '14px', color: 'var(--brown)', margin: 0, whiteSpace: 'pre-wrap' }}>{project.cliente.notas}</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div>
+                    <label style={{ fontSize: '12px', color: 'var(--brown-light)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Nome *</label>
+                    <input
+                      type="text"
+                      value={clienteForm.nome}
+                      onChange={e => setClienteForm(f => ({ ...f, nome: e.target.value }))}
+                      style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '14px', background: 'white', color: 'var(--brown)' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '12px', color: 'var(--brown-light)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Tipo</label>
+                    <select
+                      value={clienteForm.tipo}
+                      onChange={e => setClienteForm(f => ({ ...f, tipo: e.target.value }))}
+                      style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '14px', background: 'white', color: 'var(--brown)' }}
+                    >
+                      <option value="Particular">Particular</option>
+                      <option value="Empresa">Empresa</option>
+                      <option value="Investidor">Investidor</option>
+                    </select>
+                  </div>
+                  {clienteForm.tipo !== 'Particular' && (
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <label style={{ fontSize: '12px', color: 'var(--brown-light)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Empresa</label>
+                      <input
+                        type="text"
+                        value={clienteForm.empresa}
+                        onChange={e => setClienteForm(f => ({ ...f, empresa: e.target.value }))}
+                        style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '14px', background: 'white', color: 'var(--brown)' }}
+                      />
+                    </div>
+                  )}
+                  <div>
+                    <label style={{ fontSize: '12px', color: 'var(--brown-light)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Email</label>
+                    <input
+                      type="email"
+                      value={clienteForm.email}
+                      onChange={e => setClienteForm(f => ({ ...f, email: e.target.value }))}
+                      style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '14px', background: 'white', color: 'var(--brown)' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '12px', color: 'var(--brown-light)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Telefone</label>
+                    <input
+                      type="tel"
+                      value={clienteForm.telefone}
+                      onChange={e => setClienteForm(f => ({ ...f, telefone: e.target.value }))}
+                      style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '14px', background: 'white', color: 'var(--brown)' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '12px', color: 'var(--brown-light)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>NIF</label>
+                    <input
+                      type="text"
+                      value={clienteForm.nif}
+                      onChange={e => setClienteForm(f => ({ ...f, nif: e.target.value }))}
+                      style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '14px', background: 'white', color: 'var(--brown)' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '12px', color: 'var(--brown-light)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Morada</label>
+                    <input
+                      type="text"
+                      value={clienteForm.morada}
+                      onChange={e => setClienteForm(f => ({ ...f, morada: e.target.value }))}
+                      style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '14px', background: 'white', color: 'var(--brown)' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '12px', color: 'var(--brown-light)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Código Postal</label>
+                    <input
+                      type="text"
+                      value={clienteForm.codigo_postal}
+                      onChange={e => setClienteForm(f => ({ ...f, codigo_postal: e.target.value }))}
+                      style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '14px', background: 'white', color: 'var(--brown)' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '12px', color: 'var(--brown-light)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Cidade</label>
+                    <input
+                      type="text"
+                      value={clienteForm.cidade}
+                      onChange={e => setClienteForm(f => ({ ...f, cidade: e.target.value }))}
+                      style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '14px', background: 'white', color: 'var(--brown)' }}
+                    />
+                  </div>
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <label style={{ fontSize: '12px', color: 'var(--brown-light)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Notas</label>
+                    <textarea
+                      value={clienteForm.notas}
+                      onChange={e => setClienteForm(f => ({ ...f, notas: e.target.value }))}
+                      rows={3}
+                      style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '14px', background: 'white', color: 'var(--brown)', resize: 'vertical' }}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
