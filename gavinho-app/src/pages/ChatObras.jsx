@@ -480,7 +480,7 @@ export default function ChatObras() {
                     width: '40px',
                     height: '40px',
                     borderRadius: '10px',
-                    background: selectedObra?.id === obra.id ? 'var(--verde)' : 'var(--cream)',
+                    background: selectedObra?.id === obra.id ? 'var(--accent-olive)' : 'var(--cream)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -568,7 +568,7 @@ export default function ChatObras() {
                   width: '36px',
                   height: '36px',
                   borderRadius: '8px',
-                  background: 'var(--verde)',
+                  background: 'var(--accent-olive)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center'
@@ -695,7 +695,7 @@ export default function ChatObras() {
                                 maxWidth: '65%',
                                 padding: '10px 14px',
                                 borderRadius: isOwn ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
-                                background: isOwn ? 'var(--verde)' : 'white',
+                                background: isOwn ? 'var(--accent-olive)' : 'white',
                                 color: isOwn ? 'white' : 'var(--brown)',
                                 boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
                                 position: 'relative',
@@ -970,7 +970,7 @@ export default function ChatObras() {
                   onClick={handleSendMessage}
                   disabled={(!newMessage.trim() && !selectedPhoto) || sending || uploadingPhoto}
                   style={{
-                    background: 'var(--verde)',
+                    background: 'var(--accent-olive)',
                     border: 'none',
                     borderRadius: '50%',
                     width: '40px',
