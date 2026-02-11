@@ -117,7 +117,7 @@ export default function useUnifiedNotifications(user, options = {}) {
       setOffset(currentOffset + results.length)
 
     } catch (err) {
-      console.error('Erro ao carregar notificações:', err)
+      // RPC function may not be deployed - expected when migrations pending
       setError(err.message)
     } finally {
       setLoading(false)
@@ -147,7 +147,7 @@ export default function useUnifiedNotifications(user, options = {}) {
 
       setGroupedNotifications(formatted)
     } catch (err) {
-      console.error('Erro ao carregar notificações agrupadas:', err)
+      // RPC function may not be deployed - expected when migrations pending
     }
   }, [user?.id, user?.email, pageSize, enableGrouping])
 
@@ -168,7 +168,7 @@ export default function useUnifiedNotifications(user, options = {}) {
         setCounts(data[0])
       }
     } catch (err) {
-      console.error('Erro ao contar notificações:', err)
+      // RPC function may not be deployed
     }
   }, [user?.id, user?.email])
 

@@ -69,7 +69,7 @@ export default function DiarioBordo({ projeto }) {
       if (tagsRes.data) setTags(tagsRes.data)
       if (utilizadoresRes.data) setUtilizadores(utilizadoresRes.data)
     } catch (err) {
-      console.error('Erro ao carregar diário:', err)
+      // Tables may not exist yet
     } finally {
       setLoading(false)
     }

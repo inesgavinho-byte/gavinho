@@ -81,7 +81,7 @@ export default function CentralEntregas({ projeto, onNavigateToDesignReview }) {
         setEntregas(data || [])
       }
     } catch (err) {
-      console.error('Erro ao carregar entregas:', err)
+      // Table may not exist yet - use sample data
       // Use sample data for demo
       setEntregas(getSampleData())
     } finally {

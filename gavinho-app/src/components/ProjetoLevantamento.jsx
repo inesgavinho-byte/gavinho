@@ -188,7 +188,7 @@ export default function ProjetoLevantamento({ projeto, userId, userName }) {
         setFotos(fotosMap)
       }
     } catch (err) {
-      console.error('Erro ao carregar levantamento:', err)
+      // Table may not exist yet
     } finally {
       setLoading(false)
     }

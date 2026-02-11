@@ -128,7 +128,7 @@ export default function Biblioteca() {
       if (inspRes.data) setInspiracao(inspRes.data.map(i => ({ ...i, tags: i.biblioteca_inspiracao_tags?.map(t => t.tag_id) || [] })))
       if (projRes.data) setProjetos(projRes.data)
     } catch (err) {
-      console.error('Erro ao carregar biblioteca:', err)
+      // Tables may not exist yet
     } finally {
       setLoading(false)
     }

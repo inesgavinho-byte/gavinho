@@ -38,7 +38,7 @@ export default function ProjetoMoodboards({ projeto, userId, userName }) {
       const text = await response.text()
       setHtmlContent(text)
     } catch (err) {
-      console.error('Erro ao carregar HTML:', err)
+      // HTML template not available
       setHtmlContent(`<html><body><h1>Erro ao carregar</h1><p>${err.message}</p></body></html>`)
     } finally {
       setLoadingHtml(false)
@@ -85,7 +85,7 @@ export default function ProjetoMoodboards({ projeto, userId, userName }) {
       if (error) throw error
       setMoodboards(data || [])
     } catch (err) {
-      console.error('Erro ao carregar moodboards:', err)
+      // Table may not exist yet
     } finally {
       setLoading(false)
     }

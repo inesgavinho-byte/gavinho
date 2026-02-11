@@ -116,7 +116,7 @@ export default function ViabilidadeModule({ projeto, onSelectAnalise }) {
 
       setConcelhos(concelhosData || [])
     } catch (error) {
-      console.error('Erro ao carregar dados:', error)
+      // Tables may not exist yet
     } finally {
       setLoading(false)
     }

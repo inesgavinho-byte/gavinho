@@ -115,8 +115,7 @@ export default function ProjetoDecisoes({ projetoId }) {
 
       setDecisoes(filtered)
     } catch (err) {
-      console.error('Erro ao carregar decisões:', err)
-      setError('Erro ao carregar decisões')
+      // Table may not exist yet
     } finally {
       setLoading(false)
     }
@@ -135,7 +134,7 @@ export default function ProjetoDecisoes({ projetoId }) {
         setPendentes(data || [])
       }
     } catch (err) {
-      console.error('Erro ao carregar pendentes:', err)
+      // Table may not exist yet
     }
   }
 

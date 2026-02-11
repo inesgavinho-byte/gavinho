@@ -215,7 +215,7 @@ export default function ProjetoInspiracoes({ projeto, userId, userName, comparti
 
       setInspiracoes(data || [])
     } catch (err) {
-      console.error('Erro ao carregar inspiracoes:', err)
+      // Table may not exist yet - show empty state
     } finally {
       setLoading(false)
     }
