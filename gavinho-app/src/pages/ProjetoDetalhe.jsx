@@ -4,32 +4,49 @@ import {
   ArrowLeft,
   MapPin,
   Calendar,
+  User,
   Building2,
   FileText,
   Euro,
   CheckCircle,
+  Clock,
+  AlertCircle,
+  ChevronRight,
   Download,
+  ExternalLink,
+  Phone,
+  Mail,
+  Globe,
   Layers,
   Target,
+  TrendingUp,
+  Receipt,
+  CreditCard,
   MoreVertical,
   Edit,
   Trash2,
   Copy,
   Share,
+  Upload,
   X,
   Plus,
   File,
   ListChecks,
+  FileCheck,
+  Lock,
   Image,
   Library,
   Settings,
   Eye,
   BookOpen,
   Package,
+  Send,
+  Users,
   ClipboardList,
   Lightbulb,
   Palette,
   ImagePlus,
+  FolderOpen,
   UserCircle,
   Inbox,
   FileSearch,
@@ -43,13 +60,12 @@ import {
   ChevronUp,
   Pencil,
   MessageSquare,
-  Camera,
-  ShoppingCart
+  Link2,
+  Type,
+  Camera
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { useToast } from '../components/ui/Toast'
-import { ConfirmModal } from '../components/ui/ConfirmModal'
 import { jsPDF } from 'jspdf'
 import ProjetoEntregaveis from '../components/ProjetoEntregaveis'
 import ProjetoDocumentos from '../components/ProjetoDocumentos'
@@ -64,11 +80,19 @@ import Moleskine from '../components/Moleskine'
 import MoleskineDigital from '../components/MoleskineDigital'
 import ProjetoChatIA from '../components/projeto/ProjetoChatIA'
 import ProjetoAtas from '../components/ProjetoAtas'
-import ProjetoNotebook from '../components/ProjetoNotebook'
 import ProjetoMoodboards from '../components/ProjetoMoodboards'
 import ProjetoLevantamento from '../components/ProjetoLevantamento'
 import ProjetoInspiracoes from '../components/ProjetoInspiracoes'
-import { useProcurement } from '../hooks/useProcurement'
+
+// Importar constantes de ficheiros separados
+import {
+  COMPARTIMENTOS,
+  TIPOLOGIAS,
+  SUBTIPOS,
+  FASES,
+  STATUS_OPTIONS,
+  TIPOS_INTERVENIENTES
+} from '../constants/projectConstants'
 
 // Importar componentes de modais
 import {
@@ -88,8 +112,6 @@ export default function ProjetoDetalhe() {
   const { id, tab: urlTab, subtab: urlSubtab } = useParams()
   const navigate = useNavigate()
   const { isAdmin, user } = useAuth()
-  const toast = useToast()
-  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null })
   const [activeTab, setActiveTab] = useState(urlTab || 'dashboard')
   const [showActions, setShowActions] = useState(false)
   const [showUploadModal, setShowUploadModal] = useState(false)
@@ -152,13 +174,13 @@ export default function ProjetoDetalhe() {
   const [activeFaseSection, setActiveFaseSection] = useState(urlSubtab || 'entregaveis')
 
   // Sub-tabs para Archviz
-  const [activeArchvizSection, setActiveArchvizSection] = useState(urlSubtab || 'processo')
+  const [activeArchvizSection, setActiveArchvizSection] = useState(urlSubtab || 'inspiracoes')
 
   // Sub-tabs para Gestão de Projeto
   const [activeGestaoSection, setActiveGestaoSection] = useState(urlSubtab || 'decisoes')
 
   // Sub-tabs para Briefing & Conceito
-  const [activeBriefingSection, setActiveBriefingSection] = useState(urlSubtab || 'inspiracoes')
+  const [activeBriefingSection, setActiveBriefingSection] = useState(urlSubtab || 'moodboards')
 
   // Gestão de Renders/Archviz
   const [renders, setRenders] = useState([])
@@ -181,6 +203,10 @@ export default function ProjetoDetalhe() {
     imagem_url: '',
     data_upload: new Date().toISOString().split('T')[0]
   })
+
+  // Imagens finais do projeto com suporte para drag-and-drop reordering
+  const [finalImageOrder, setFinalImageOrder] = useState([])
+  const [draggedImage, setDraggedImage] = useState(null)
 
   // CONSTANTES agora importadas de ../constants/projectConstants.js:
   // COMPARTIMENTOS, TIPOLOGIAS, SUBTIPOS, FASES, STATUS_OPTIONS
@@ -278,10 +304,10 @@ export default function ProjetoDetalhe() {
       }))
 
       setShowEditModal(false)
-      toast.success('Sucesso', 'Projeto atualizado com sucesso!')
+      alert('Projeto atualizado com sucesso!')
     } catch (err) {
       console.error('Erro ao guardar:', err)
-      toast.error('Erro', `Erro ao guardar: ${err.message || JSON.stringify(err)}`)
+      alert(`Erro ao guardar: ${err.message || JSON.stringify(err)}`)
     }
     
     setSaving(false)
@@ -300,6 +326,8 @@ export default function ProjetoDetalhe() {
         setActiveArchvizSection(urlSubtab)
       } else if (urlTab === 'gestao') {
         setActiveGestaoSection(urlSubtab)
+      } else if (urlTab === 'briefing') {
+        setActiveBriefingSection(urlSubtab)
       }
     }
   }, [urlTab, urlSubtab])
@@ -349,31 +377,23 @@ export default function ProjetoDetalhe() {
       fetchEquipaProjeto(project.id)
     } catch (err) {
       console.error('Erro ao adicionar membro:', err)
-      toast.error('Erro', err.message)
+      alert(`Erro: ${err.message}`)
     }
   }
 
   // Remover membro da equipa
-  const handleRemoveMembro = (membroId) => {
-    setConfirmModal({
-      isOpen: true,
-      title: 'Remover Membro',
-      message: 'Remover este membro da equipa?',
-      type: 'danger',
-      onConfirm: async () => {
-        try {
-          const { error } = await supabase
-            .from('projeto_equipa')
-            .delete()
-            .eq('id', membroId)
-          if (error) throw error
-          fetchEquipaProjeto(project.id)
-        } catch (err) {
-          console.error('Erro ao remover:', err)
-        }
-        setConfirmModal(prev => ({ ...prev, isOpen: false }))
-      }
-    })
+  const handleRemoveMembro = async (membroId) => {
+    if (!confirm('Remover este membro da equipa?')) return
+    try {
+      const { error } = await supabase
+        .from('projeto_equipa')
+        .delete()
+        .eq('id', membroId)
+      if (error) throw error
+      fetchEquipaProjeto(project.id)
+    } catch (err) {
+      console.error('Erro ao remover:', err)
+    }
   }
 
   // TIPOS_INTERVENIENTES agora importado de ../constants/projectConstants
@@ -395,7 +415,6 @@ export default function ProjetoDetalhe() {
   // Adicionar/Editar interveniente
   const handleSaveInterveniente = async () => {
     if (!project?.id || !intervenienteForm.tipo) return
-    setSaving(true)
     try {
       if (editingInterveniente) {
         const { error } = await supabase
@@ -440,9 +459,7 @@ export default function ProjetoDetalhe() {
       })
     } catch (err) {
       console.error('Erro ao salvar interveniente:', err)
-      toast.error('Erro', err.message)
-    } finally {
-      setSaving(false)
+      alert(`Erro: ${err.message}`)
     }
   }
 
@@ -462,26 +479,18 @@ export default function ProjetoDetalhe() {
   }
 
   // Remover interveniente
-  const handleRemoveInterveniente = (id) => {
-    setConfirmModal({
-      isOpen: true,
-      title: 'Remover Interveniente',
-      message: 'Remover este interveniente?',
-      type: 'danger',
-      onConfirm: async () => {
-        try {
-          const { error } = await supabase
-            .from('projeto_intervenientes')
-            .delete()
-            .eq('id', id)
-          if (error) throw error
-          fetchIntervenientes(project.id)
-        } catch (err) {
-          console.error('Erro ao remover interveniente:', err)
-        }
-        setConfirmModal(prev => ({ ...prev, isOpen: false }))
-      }
-    })
+  const handleRemoveInterveniente = async (id) => {
+    if (!confirm('Remover este interveniente?')) return
+    try {
+      const { error } = await supabase
+        .from('projeto_intervenientes')
+        .delete()
+        .eq('id', id)
+      if (error) throw error
+      fetchIntervenientes(project.id)
+    } catch (err) {
+      console.error('Erro ao remover interveniente:', err)
+    }
   }
 
   // Carregar fases contratuais
@@ -501,7 +510,6 @@ export default function ProjetoDetalhe() {
   // Salvar fase contratual
   const handleSaveFase = async () => {
     if (!project?.id || !faseForm.nome) return
-    setSaving(true)
     try {
       const faseData = {
         projeto_id: project.id,
@@ -543,7 +551,7 @@ export default function ProjetoDetalhe() {
       })
     } catch (err) {
       console.error('Erro ao salvar fase:', err)
-      toast.error('Erro', err.message)
+      alert(`Erro: ${err.message}`)
     }
   }
 
@@ -592,26 +600,18 @@ export default function ProjetoDetalhe() {
   }
 
   // Remover fase
-  const handleRemoveFase = (id) => {
-    setConfirmModal({
-      isOpen: true,
-      title: 'Remover Fase',
-      message: 'Remover esta fase?',
-      type: 'danger',
-      onConfirm: async () => {
-        try {
-          const { error } = await supabase
-            .from('projeto_fases_contratuais')
-            .delete()
-            .eq('id', id)
-          if (error) throw error
-          fetchFasesContratuais(project.id)
-        } catch (err) {
-          console.error('Erro ao remover fase:', err)
-        }
-        setConfirmModal(prev => ({ ...prev, isOpen: false }))
-      }
-    })
+  const handleRemoveFase = async (id) => {
+    if (!confirm('Remover esta fase?')) return
+    try {
+      const { error } = await supabase
+        .from('projeto_fases_contratuais')
+        .delete()
+        .eq('id', id)
+      if (error) throw error
+      fetchFasesContratuais(project.id)
+    } catch (err) {
+      console.error('Erro ao remover fase:', err)
+    }
   }
 
   // Guardar escopo de trabalho
@@ -630,7 +630,7 @@ export default function ProjetoDetalhe() {
       setEditingEscopo(false)
     } catch (err) {
       console.error('Erro ao guardar escopo:', err)
-      toast.error('Erro', 'Erro ao guardar escopo: ' + err.message)
+      alert('Erro ao guardar escopo: ' + err.message)
     } finally {
       setSavingEscopo(false)
     }
@@ -671,7 +671,7 @@ export default function ProjetoDetalhe() {
       }
     } catch (err) {
       console.error('Erro ao analisar escopo:', err)
-      toast.error('Erro', 'Erro ao analisar escopo: ' + err.message)
+      alert('Erro ao analisar escopo: ' + err.message)
     } finally {
       setAnalisandoEscopo(false)
     }
@@ -697,7 +697,7 @@ export default function ProjetoDetalhe() {
       }))
     } catch (err) {
       console.error('Erro ao adicionar fase:', err)
-      toast.error('Erro', 'Erro ao adicionar fase: ' + err.message)
+      alert('Erro ao adicionar fase: ' + err.message)
     }
   }
 
@@ -769,59 +769,52 @@ export default function ProjetoDetalhe() {
   }
 
   // Duplicar projeto
-  const handleDuplicate = () => {
+  const handleDuplicate = async () => {
     if (!project) return
-    setConfirmModal({
-      isOpen: true,
-      title: 'Duplicar Projeto',
-      message: 'Deseja duplicar este projeto?',
-      type: 'danger',
-      onConfirm: async () => {
-        try {
-          // Gerar novo código
-          const { data: lastProject } = await supabase
-            .from('projetos')
-            .select('codigo')
-            .order('codigo', { ascending: false })
-            .limit(1)
+    if (!confirm('Deseja duplicar este projeto?')) return
 
-          let nextNum = 1
-          if (lastProject && lastProject.length > 0) {
-            const match = lastProject[0].codigo.match(/GA(\d+)/)
-            if (match) nextNum = parseInt(match[1]) + 1
-          }
-          const newCode = `GA${String(nextNum).padStart(5, '0')}`
+    try {
+      // Gerar novo código
+      const { data: lastProject } = await supabase
+        .from('projetos')
+        .select('codigo')
+        .order('codigo', { ascending: false })
+        .limit(1)
 
-          // Criar cópia do projeto
-          const { error } = await supabase
-            .from('projetos')
-            .insert({
-              codigo: newCode,
-              nome: `${project.nome} (cópia)`,
-              tipologia: project.tipologia,
-              subtipo: project.subtipo,
-              fase: 'Conceito',
-              status: 'on_track',
-              progresso: 0,
-              cliente_id: project.cliente_id,
-              morada: project.morada,
-              cidade: project.cidade,
-              pais: project.pais || 'Portugal',
-              data_inicio: new Date().toISOString().split('T')[0]
-            })
-
-          if (error) throw error
-
-          toast.success('Sucesso', `Projeto duplicado com sucesso! Novo código: ${newCode}`)
-          navigate(`/projetos/${newCode}`)
-        } catch (err) {
-          console.error('Erro ao duplicar:', err)
-          toast.error('Erro', `Erro ao duplicar: ${err.message}`)
-        }
-        setShowActions(false)
-        setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      let nextNum = 1
+      if (lastProject && lastProject.length > 0) {
+        const match = lastProject[0].codigo.match(/GA(\d+)/)
+        if (match) nextNum = parseInt(match[1]) + 1
       }
-    })
+      const newCode = `GA${String(nextNum).padStart(5, '0')}`
+
+      // Criar cópia do projeto
+      const { error } = await supabase
+        .from('projetos')
+        .insert({
+          codigo: newCode,
+          nome: `${project.nome} (cópia)`,
+          tipologia: project.tipologia,
+          subtipo: project.subtipo,
+          fase: 'Conceito',
+          status: 'on_track',
+          progresso: 0,
+          cliente_id: project.cliente_id,
+          morada: project.morada,
+          cidade: project.cidade,
+          pais: project.pais || 'Portugal',
+          data_inicio: new Date().toISOString().split('T')[0]
+        })
+
+      if (error) throw error
+
+      alert(`Projeto duplicado com sucesso! Novo código: ${newCode}`)
+      navigate(`/projetos/${newCode}`)
+    } catch (err) {
+      console.error('Erro ao duplicar:', err)
+      alert(`Erro ao duplicar: ${err.message}`)
+    }
+    setShowActions(false)
   }
 
   // Partilhar projeto
@@ -834,7 +827,7 @@ export default function ProjetoDetalhe() {
       })
     } else {
       navigator.clipboard.writeText(url)
-      toast.success('Sucesso', 'Link copiado para a área de transferência!')
+      alert('Link copiado para a área de transferência!')
     }
     setShowActions(false)
   }
@@ -969,7 +962,7 @@ export default function ProjetoDetalhe() {
 
     } catch (err) {
       console.error('Erro ao gerar PDF:', err)
-      toast.error('Erro', 'Erro ao gerar PDF: ' + err.message)
+      alert('Erro ao gerar PDF: ' + err.message)
     }
     setShowActions(false)
   }
@@ -991,11 +984,11 @@ export default function ProjetoDetalhe() {
 
       if (error) throw error
 
-      toast.success('Sucesso', 'Projeto eliminado com sucesso!')
+      alert('Projeto eliminado com sucesso!')
       navigate('/projetos')
     } catch (err) {
       console.error('Erro ao eliminar:', err)
-      toast.error('Erro', `Erro ao eliminar: ${err.message}. Verifique se não existem dados associados.`)
+      alert(`Erro ao eliminar: ${err.message}. Verifique se não existem dados associados.`)
     }
     setShowDeleteConfirm(false)
   }
@@ -1266,6 +1259,20 @@ export default function ProjetoDetalhe() {
     }
   }, [id])
 
+  // Load final image order from localStorage
+  useEffect(() => {
+    if (project?.id) {
+      const stored = localStorage.getItem(`gavinho_final_images_order_${project.id}`)
+      if (stored) {
+        try {
+          setFinalImageOrder(JSON.parse(stored))
+        } catch {
+          setFinalImageOrder([])
+        }
+      }
+    }
+  }, [project?.id])
+
   // Loading state
   if (loading) {
     return (
@@ -1355,7 +1362,7 @@ export default function ProjetoDetalhe() {
   // Função para processar upload de ficheiro
   const handleFileUpload = (file) => {
     if (!file || file.type !== 'application/pdf') {
-      toast.warning('Aviso', 'Por favor selecione um ficheiro PDF.')
+      alert('Por favor selecione um ficheiro PDF.')
       return
     }
 
@@ -1460,7 +1467,7 @@ export default function ProjetoDetalhe() {
 
   const handleSaveRender = async () => {
     if (!renderForm.compartimento) {
-      toast.warning('Aviso', 'Por favor selecione um compartimento')
+      alert('Por favor selecione um compartimento')
       return
     }
 
@@ -1515,7 +1522,7 @@ export default function ProjetoDetalhe() {
           .single()
 
         if (error) {
-          toast.error('Erro', 'Erro ao guardar render: ' + error.message)
+          alert('Erro ao guardar render: ' + error.message)
           return
         }
         setRenders(prev => [...prev, data])
@@ -1524,31 +1531,24 @@ export default function ProjetoDetalhe() {
       setShowRenderModal(false)
       setEditingRender(null)
     } catch (err) {
-      toast.error('Erro', 'Erro ao guardar render: ' + err.message)
+      alert('Erro ao guardar render: ' + err.message)
     }
   }
 
-  const handleDeleteRender = (render) => {
-    setConfirmModal({
-      isOpen: true,
-      title: 'Eliminar Render',
-      message: 'Tem certeza que deseja eliminar este render?',
-      type: 'danger',
-      onConfirm: async () => {
-        try {
-          const { error } = await supabase
-            .from('projeto_renders')
-            .delete()
-            .eq('id', render.id)
+  const handleDeleteRender = async (render) => {
+    if (!confirm('Tem certeza que deseja eliminar este render?')) return
 
-          if (error) throw error
-          setRenders(prev => prev.filter(r => r.id !== render.id))
-        } catch (err) {
-          toast.error('Erro', 'Erro ao eliminar: ' + err.message)
-        }
-        setConfirmModal(prev => ({ ...prev, isOpen: false }))
-      }
-    })
+    try {
+      const { error } = await supabase
+        .from('projeto_renders')
+        .delete()
+        .eq('id', render.id)
+
+      if (error) throw error
+      setRenders(prev => prev.filter(r => r.id !== render.id))
+    } catch (err) {
+      alert('Erro ao eliminar: ' + err.message)
+    }
   }
 
   const toggleFinalImage = async (render) => {
@@ -1565,7 +1565,7 @@ export default function ProjetoDetalhe() {
         r.id === render.id ? { ...r, is_final: newIsFinal } : r
       ))
     } catch (err) {
-      toast.error('Erro', 'Erro ao atualizar: ' + err.message)
+      alert('Erro ao atualizar: ' + err.message)
     }
   }
 
@@ -1577,7 +1577,7 @@ export default function ProjetoDetalhe() {
 
   const processImageFile = (file) => {
     if (!file.type.startsWith('image/')) {
-      toast.warning('Aviso', 'Por favor selecione um ficheiro de imagem válido')
+      alert('Por favor selecione um ficheiro de imagem válido')
       return
     }
     // Simular upload - em produção, fazer upload para Supabase Storage
@@ -1658,8 +1658,59 @@ export default function ProjetoDetalhe() {
     setCollapsedCompartimentos(newState)
   }
 
-  // Imagens finais do projeto
-  const imagensFinais = renders.filter(r => r.is_final)
+  // Get final images sorted by custom order
+  const imagensFinais = (() => {
+    const finals = renders.filter(r => r.is_final)
+    if (finalImageOrder.length === 0) return finals
+
+    // Sort by custom order, new images go to the end
+    return finals.sort((a, b) => {
+      const indexA = finalImageOrder.indexOf(a.id)
+      const indexB = finalImageOrder.indexOf(b.id)
+      if (indexA === -1 && indexB === -1) return 0
+      if (indexA === -1) return 1
+      if (indexB === -1) return -1
+      return indexA - indexB
+    })
+  })()
+
+  // Handle drag start for final images
+  const handleFinalImageDragStart = (e, render) => {
+    setDraggedImage(render)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  // Handle drag over for final images
+  const handleFinalImageDragOver = (e) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+  }
+
+  // Handle drop for final images
+  const handleFinalImageDrop = (e, targetRender) => {
+    e.preventDefault()
+    if (!draggedImage || draggedImage.id === targetRender.id) {
+      setDraggedImage(null)
+      return
+    }
+
+    const currentOrder = imagensFinais.map(r => r.id)
+    const draggedIndex = currentOrder.indexOf(draggedImage.id)
+    const targetIndex = currentOrder.indexOf(targetRender.id)
+
+    // Remove dragged item and insert at new position
+    currentOrder.splice(draggedIndex, 1)
+    currentOrder.splice(targetIndex, 0, draggedImage.id)
+
+    setFinalImageOrder(currentOrder)
+    localStorage.setItem(`gavinho_final_images_order_${project.id}`, JSON.stringify(currentOrder))
+    setDraggedImage(null)
+  }
+
+  // Handle drag end
+  const handleFinalImageDragEnd = () => {
+    setDraggedImage(null)
+  }
 
   // Tabs principais
   const allTabs = [
@@ -1668,15 +1719,12 @@ export default function ProjetoDetalhe() {
     { id: 'fases', label: 'Fases & Entregas', icon: Target, hasSubtabs: true },
     { id: 'chat-ia', label: 'Chat IA', icon: MessageSquare },
     { id: 'archviz', label: 'Archviz', icon: Image, hasSubtabs: true },
-    { id: 'notebook', label: 'Notebook', icon: BookOpen },
     { id: 'biblioteca', label: 'Biblioteca', icon: Library },
-    { id: 'gestao', label: 'Gestão de Projeto', icon: Settings, hasSubtabs: true },
-    { id: 'procurement', label: 'Procurement', icon: ShoppingCart }
+    { id: 'gestao', label: 'Gestão de Projeto', icon: Settings, hasSubtabs: true }
   ]
 
   // Secções dentro de Briefing & Conceito
   const briefingSections = [
-    { id: 'inspiracoes', label: 'Inspirações & Referências', icon: Palette },
     { id: 'moodboards', label: 'Moodboards', icon: Lightbulb },
     { id: 'levantamento', label: 'Levantamento Fotografico', icon: Camera }
   ]
@@ -1687,11 +1735,13 @@ export default function ProjetoDetalhe() {
     { id: 'entregaveis', label: 'Entregáveis', icon: ListChecks },
     { id: 'recebidos', label: 'Recebidos', icon: Inbox },
     { id: 'entregas', label: 'Central Entregas', icon: Package },
-    { id: 'design-review', label: 'Design Review', icon: Eye }
+    { id: 'design-review', label: 'Design Review', icon: Eye },
+    { id: 'atas', label: 'Atas', icon: FileText }
   ]
 
   // Secções dentro de Archviz
   const archvizSections = [
+    { id: 'inspiracoes', label: 'Inspirações & Referências', icon: Palette },
     { id: 'processo', label: 'Imagens Processo', icon: ImagePlus },
     { id: 'finais', label: 'Imagens Finais', icon: CheckCircle },
     { id: 'moleskine', label: 'Moleskine', icon: Pencil }
@@ -1711,86 +1761,108 @@ export default function ProjetoDetalhe() {
 
   return (
     <div className="fade-in">
-      {/* Header */}
-      <div style={{ marginBottom: '24px' }}>
-        <button
-          onClick={() => navigate(-1)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            background: 'none',
-            border: 'none',
-            color: 'var(--brown-light)',
-            fontSize: '13px',
-            cursor: 'pointer',
-            marginBottom: '16px',
-            padding: 0
-          }}
-        >
-          <ArrowLeft size={16} />
-          Voltar
-        </button>
-
+      {/* Header - Single line layout */}
+      <div style={{ marginBottom: '16px' }}>
         <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-md mb-sm">
-              <span style={{
+          <div className="flex items-center gap-md" style={{ flexWrap: 'wrap' }}>
+            {/* Back button */}
+            <button
+              onClick={() => navigate(-1)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                background: 'none',
+                border: 'none',
+                color: 'var(--brown-light)',
                 fontSize: '13px',
-                fontWeight: 700,
-                color: 'var(--blush-dark)',
-                letterSpacing: '0.5px'
+                cursor: 'pointer',
+                padding: 0
+              }}
+            >
+              <ArrowLeft size={16} />
+            </button>
+
+            {/* Separator */}
+            <div style={{ width: '1px', height: '20px', background: 'var(--stone)' }} />
+
+            {/* Project Name */}
+            <h1 style={{
+              fontSize: '18px',
+              fontWeight: 700,
+              color: 'var(--brown)',
+              margin: 0
+            }}>
+              {project.nome}
+            </h1>
+
+            {/* Separator */}
+            <div style={{ width: '1px', height: '20px', background: 'var(--stone)' }} />
+
+            {/* Project Codes */}
+            <span style={{
+              fontSize: '12px',
+              fontWeight: 600,
+              color: 'var(--blush-dark)',
+              letterSpacing: '0.5px'
+            }}>
+              {project.codigo}
+            </span>
+            {project.codigo_interno && (
+              <span style={{
+                fontSize: '11px',
+                fontWeight: 600,
+                color: 'var(--info)',
+                background: 'rgba(59, 130, 246, 0.1)',
+                padding: '2px 6px',
+                borderRadius: '4px',
+                fontFamily: 'monospace'
               }}>
-                {project.codigo}
+                {project.codigo_interno}
               </span>
-              {project.codigo_interno && (
-                <span style={{
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  color: 'var(--info)',
-                  background: 'rgba(59, 130, 246, 0.1)',
-                  padding: '3px 8px',
-                  borderRadius: '4px',
-                  fontFamily: 'monospace'
-                }}>
-                  {project.codigo_interno}
-                </span>
-              )}
-              <span className="badge badge-gold">{project.fase}</span>
-              <div 
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '4px 10px',
-                  borderRadius: '20px',
-                  background: `${getStatusColor(project.status)}15`,
-                  color: getStatusColor(project.status),
-                  fontSize: '12px',
-                  fontWeight: 600
-                }}
-              >
-                <div style={{
-                  width: '6px',
-                  height: '6px',
-                  borderRadius: '50%',
-                  background: getStatusColor(project.status)
-                }} />
-                {getStatusLabel(project.status)}
-              </div>
+            )}
+
+            {/* Phase Badge */}
+            <span className="badge badge-gold" style={{ fontSize: '11px', padding: '3px 8px' }}>{project.fase}</span>
+
+            {/* Status Badge */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '3px 8px',
+                borderRadius: '12px',
+                background: `${getStatusColor(project.status)}15`,
+                color: getStatusColor(project.status),
+                fontSize: '11px',
+                fontWeight: 600
+              }}
+            >
+              <div style={{
+                width: '5px',
+                height: '5px',
+                borderRadius: '50%',
+                background: getStatusColor(project.status)
+              }} />
+              {getStatusLabel(project.status)}
             </div>
-            <h1 className="page-title" style={{ marginBottom: '8px' }}>{project.nome}</h1>
-            <div className="flex items-center gap-lg text-muted" style={{ fontSize: '13px' }}>
+
+            {/* Separator */}
+            <div style={{ width: '1px', height: '20px', background: 'var(--stone)' }} />
+
+            {/* Project Info */}
+            <div className="flex items-center gap-md text-muted" style={{ fontSize: '12px' }}>
               <span className="flex items-center gap-xs">
-                <Building2 size={14} />
-                {project.tipologia} • {project.subtipo} {project.tipo_apartamento}
+                <Building2 size={13} />
+                {project.tipologia} • {project.subtipo}
               </span>
               <span className="flex items-center gap-xs">
-                <MapPin size={14} />
+                <MapPin size={13} />
                 {project.localizacao.cidade}, {project.localizacao.pais}
               </span>
               <span className="flex items-center gap-xs">
-                <Layers size={14} />
+                <Layers size={13} />
                 {project.area_bruta} {project.unidade_area}
               </span>
             </div>
@@ -1802,10 +1874,9 @@ export default function ProjetoDetalhe() {
               Editar
             </button>
             <div style={{ position: 'relative' }}>
-              <button
+              <button 
                 className="btn btn-secondary"
                 onClick={() => setShowActions(!showActions)}
-                aria-label="Mais ações"
                 style={{ padding: '10px' }}
               >
                 <MoreVertical size={18} />
@@ -1862,12 +1933,10 @@ export default function ProjetoDetalhe() {
 
       {/* Tabs */}
       <div
-        role="tablist"
-        aria-label="Separadores do projeto"
         style={{
           display: 'flex',
           gap: '4px',
-          marginBottom: '24px',
+          marginBottom: '16px',
           background: 'var(--cream)',
           padding: '4px',
           borderRadius: '12px',
@@ -1877,8 +1946,6 @@ export default function ProjetoDetalhe() {
         {tabs.map(tab => (
           <button
             key={tab.id}
-            role="tab"
-            aria-selected={activeTab === tab.id}
             onClick={() => handleTabChange(tab.id)}
             style={{
               display: 'flex',
@@ -1950,22 +2017,16 @@ export default function ProjetoDetalhe() {
       {activeTab === 'fases' && (
         <div>
           {/* Section navigation */}
-          <div
-            role="tablist"
-            aria-label="Sub-separadores fases e entregas"
-            style={{
-              display: 'flex',
-              gap: '8px',
-              marginBottom: '20px',
-              borderBottom: '1px solid var(--stone)',
-              paddingBottom: '12px'
-            }}
-          >
+          <div style={{
+            display: 'flex',
+            gap: '8px',
+            marginBottom: '20px',
+            borderBottom: '1px solid var(--stone)',
+            paddingBottom: '12px'
+          }}>
             {faseSections.map(section => (
               <button
                 key={section.id}
-                role="tab"
-                aria-selected={activeFaseSection === section.id}
                 onClick={() => handleSubtabChange(section.id)}
                 style={{
                   padding: '8px 16px',
@@ -2102,7 +2163,6 @@ export default function ProjetoDetalhe() {
                             </td>
                             <td style={{ padding: '12px 10px', textAlign: 'center' }}>
                               <select
-                                aria-label="Estado da fase"
                                 value={fase.estado}
                                 onChange={(e) => handleUpdateFaseEstado(fase.id, e.target.value)}
                                 style={{
@@ -2125,7 +2185,6 @@ export default function ProjetoDetalhe() {
                             </td>
                             <td style={{ padding: '12px 10px', textAlign: 'center' }}>
                               <select
-                                aria-label="Avaliação da fase"
                                 value={fase.avaliacao || ''}
                                 onChange={(e) => handleUpdateFaseAvaliacao(fase.id, e.target.value)}
                                 style={{
@@ -2150,14 +2209,12 @@ export default function ProjetoDetalhe() {
                               <div style={{ display: 'flex', gap: '4px' }}>
                                 <button
                                   onClick={() => handleEditFase(fase)}
-                                  aria-label="Editar fase"
                                   style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--brown-light)' }}
                                 >
                                   <Edit size={14} />
                                 </button>
                                 <button
                                   onClick={() => handleRemoveFase(fase.id)}
-                                  aria-label="Eliminar fase"
                                   style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--danger)' }}
                                 >
                                   <Trash2 size={14} />
@@ -2222,7 +2279,6 @@ export default function ProjetoDetalhe() {
                           type="button"
                           onClick={() => formatEscopo('bold')}
                           title="Negrito (Ctrl+B)"
-                          aria-label="Negrito"
                           style={{
                             width: '32px',
                             height: '32px',
@@ -2242,7 +2298,6 @@ export default function ProjetoDetalhe() {
                           type="button"
                           onClick={() => formatEscopo('italic')}
                           title="Itálico (Ctrl+I)"
-                          aria-label="Itálico"
                           style={{
                             width: '32px',
                             height: '32px',
@@ -2262,7 +2317,6 @@ export default function ProjetoDetalhe() {
                           type="button"
                           onClick={() => formatEscopo('underline')}
                           title="Sublinhado (Ctrl+U)"
-                          aria-label="Sublinhado"
                           style={{
                             width: '32px',
                             height: '32px',
@@ -2283,7 +2337,6 @@ export default function ProjetoDetalhe() {
                           type="button"
                           onClick={() => formatEscopo('insertUnorderedList')}
                           title="Lista com marcadores"
-                          aria-label="Lista com marcadores"
                           style={{
                             width: '32px',
                             height: '32px',
@@ -2303,7 +2356,6 @@ export default function ProjetoDetalhe() {
                           type="button"
                           onClick={() => formatEscopo('insertOrderedList')}
                           title="Lista numerada"
-                          aria-label="Lista numerada"
                           style={{
                             width: '32px',
                             height: '32px',
@@ -2571,6 +2623,10 @@ export default function ProjetoDetalhe() {
               <DesignReview projeto={project} />
             )}
 
+            {/* Atas */}
+            {activeFaseSection === 'atas' && (
+              <ProjetoAtas projeto={project} />
+            )}
           </div>
         </div>
       )}
@@ -2579,22 +2635,16 @@ export default function ProjetoDetalhe() {
       {activeTab === 'briefing' && (
         <div>
           {/* Section navigation */}
-          <div
-            role="tablist"
-            aria-label="Sub-separadores briefing e conceito"
-            style={{
-              display: 'flex',
-              gap: '8px',
-              marginBottom: '20px',
-              borderBottom: '1px solid var(--stone)',
-              paddingBottom: '12px'
-            }}
-          >
+          <div style={{
+            display: 'flex',
+            gap: '8px',
+            marginBottom: '20px',
+            borderBottom: '1px solid var(--stone)',
+            paddingBottom: '12px'
+          }}>
             {briefingSections.map(section => (
               <button
                 key={section.id}
-                role="tab"
-                aria-selected={activeBriefingSection === section.id}
                 onClick={() => handleSubtabChange(section.id, 'briefing')}
                 style={{
                   padding: '8px 16px',
@@ -2616,15 +2666,6 @@ export default function ProjetoDetalhe() {
               </button>
             ))}
           </div>
-
-          {/* Inspirações & Referências */}
-          {activeBriefingSection === 'inspiracoes' && (
-            <ProjetoInspiracoes
-              projeto={project}
-              userId={user?.id}
-              userName={user?.email?.split('@')[0] || 'Utilizador'}
-            />
-          )}
 
           {/* Moodboards */}
           {activeBriefingSection === 'moodboards' && (
@@ -2650,22 +2691,16 @@ export default function ProjetoDetalhe() {
       {activeTab === 'archviz' && (
         <div>
           {/* Section navigation */}
-          <div
-            role="tablist"
-            aria-label="Sub-separadores archviz"
-            style={{
-              display: 'flex',
-              gap: '8px',
-              marginBottom: '20px',
-              borderBottom: '1px solid var(--stone)',
-              paddingBottom: '12px'
-            }}
-          >
+          <div style={{
+            display: 'flex',
+            gap: '8px',
+            marginBottom: '20px',
+            borderBottom: '1px solid var(--stone)',
+            paddingBottom: '12px'
+          }}>
             {archvizSections.map(section => (
               <button
                 key={section.id}
-                role="tab"
-                aria-selected={activeArchvizSection === section.id}
                 onClick={() => handleSubtabChange(section.id, 'archviz')}
                 style={{
                   padding: '8px 16px',
@@ -2687,6 +2722,18 @@ export default function ProjetoDetalhe() {
               </button>
             ))}
           </div>
+
+          {/* Inspirações & Referências */}
+          {activeArchvizSection === 'inspiracoes' && (
+            <div className="card">
+              <ProjetoInspiracoes
+                projeto={project}
+                userId={user?.id}
+                userName={user?.nome || user?.email}
+                compartimentosProjeto={projetoCompartimentos}
+              />
+            </div>
+          )}
 
           {/* Imagens Processo */}
           {activeArchvizSection === 'processo' && (
@@ -2800,7 +2847,6 @@ export default function ProjetoDetalhe() {
                             transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)'
                           }}
                           title={isCollapsed ? 'Expandir' : 'Colapsar'}
-                          aria-label={isCollapsed ? `Expandir ${compartimento}` : `Colapsar ${compartimento}`}
                         >
                           <ChevronDown size={18} />
                         </button>
@@ -2875,101 +2921,86 @@ export default function ProjetoDetalhe() {
                             </button>
                           </div>
 
-                          {/* Masonry Grid de Renders da Vista */}
-                          <div style={{ columns: '3 200px', columnGap: '12px' }}>
+                          {/* Grid de Renders da Vista - Masonry Pinterest Style */}
+                          <div className="masonry-grid">
                             {vistaRenders
                               .sort((a, b) => (b.versao || 0) - (a.versao || 0))
                               .map((render) => (
                               <div
                                 key={render.id}
-                                className="pin-card-processo"
-                                style={{ breakInside: 'avoid', marginBottom: '12px' }}
+                                className={`masonry-card ${render.is_final ? 'is-final' : ''}`}
+                                style={{ cursor: render.imagem_url ? 'pointer' : 'default' }}
+                                onClick={() => openLightbox(render, compartimentoRenders)}
                               >
-                                <div
-                                  style={{
-                                    position: 'relative',
-                                    borderRadius: '10px',
-                                    overflow: 'hidden',
-                                    border: render.is_final ? '2px solid var(--success)' : '1px solid #E5E2D9',
-                                    cursor: render.imagem_url ? 'pointer' : 'default'
-                                  }}
-                                  onClick={() => openLightbox(render, compartimentoRenders)}
-                                >
-                                  {render.imagem_url ? (
-                                    <img
-                                      src={render.imagem_url}
-                                      alt={render.compartimento || 'Render'}
-                                      style={{ width: '100%', display: 'block', background: '#F0EBE5' }}
-                                      loading="lazy"
-                                    />
-                                  ) : (
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '140px', background: 'var(--white)' }}>
-                                      <Image size={24} style={{ color: 'var(--brown-light)', opacity: 0.4 }} />
-                                    </div>
-                                  )}
+                                {render.imagem_url ? (
+                                  <img
+                                    src={render.imagem_url}
+                                    alt={`${render.compartimento} - v${render.versao}`}
+                                    className="masonry-card-image"
+                                  />
+                                ) : (
+                                  <div className="masonry-placeholder">
+                                    <Image size={24} />
+                                  </div>
+                                )}
 
-                                  {/* Hover overlay */}
-                                  <div className="pin-overlay-processo" style={{
-                                    position: 'absolute', inset: 0,
-                                    background: 'linear-gradient(180deg, rgba(0,0,0,0.25) 0%, transparent 35%, transparent 55%, rgba(0,0,0,0.6) 100%)',
-                                    display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
-                                    padding: '8px', opacity: 0, transition: 'opacity 0.2s', pointerEvents: 'none'
-                                  }}>
-                                    {/* Top row: version + final badge */}
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                      <span style={{ padding: '3px 8px', background: 'rgba(255,255,255,0.9)', borderRadius: '10px', fontSize: '10px', fontWeight: 600, color: '#3D3D3D' }}>
-                                        v{render.versao}
-                                      </span>
-                                      {render.is_final && (
-                                        <span style={{ padding: '3px 8px', background: 'var(--success)', borderRadius: '10px', fontSize: '9px', fontWeight: 600, color: 'white', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                          <CheckCircle size={9} /> FINAL
-                                        </span>
-                                      )}
-                                    </div>
-                                    {/* Bottom row: actions */}
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pointerEvents: 'auto' }}>
-                                      <button
-                                        onClick={(e) => { e.stopPropagation(); toggleFinalImage(render) }}
-                                        style={{
-                                          padding: '4px 10px', background: render.is_final ? 'rgba(220,38,38,0.85)' : 'rgba(34,197,94,0.85)',
-                                          color: 'white', border: 'none', borderRadius: '14px', fontSize: '10px', fontWeight: 500, cursor: 'pointer'
-                                        }}
-                                      >
-                                        {render.is_final ? 'Remover Final' : 'Marcar Final'}
-                                      </button>
-                                      <div style={{ display: 'flex', gap: '4px' }}>
-                                        <button
-                                          onClick={(e) => { e.stopPropagation(); setMoleskineRender(render) }}
-                                          style={{
-                                            width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(255,255,255,0.85)',
-                                            color: '#3D3D3D', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
-                                          }}
-                                          title="Moleskine"
-                                        >
-                                          <Pencil size={12} />
-                                        </button>
-                                        <button
-                                          onClick={(e) => { e.stopPropagation(); openEditRenderModal(render) }}
-                                          style={{
-                                            width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(255,255,255,0.85)',
-                                            color: '#3D3D3D', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
-                                          }}
-                                          title="Editar"
-                                        >
-                                          <Edit size={12} />
-                                        </button>
-                                        <button
-                                          onClick={(e) => { e.stopPropagation(); handleDeleteRender(render) }}
-                                          style={{
-                                            width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(220,38,38,0.85)',
-                                            color: 'white', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
-                                          }}
-                                          title="Eliminar"
-                                        >
-                                          <Trash2 size={12} />
-                                        </button>
-                                      </div>
-                                    </div>
+                                {/* Versão Badge */}
+                                <div className="masonry-badge dark">
+                                  v{render.versao}
+                                </div>
+
+                                {/* Final Badge */}
+                                {render.is_final && (
+                                  <div className="masonry-badge success" style={{ left: 'auto', right: '50px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <CheckCircle size={10} />
+                                    FINAL
+                                  </div>
+                                )}
+
+                                {/* Actions */}
+                                <div className="masonry-card-actions">
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setMoleskineRender(render) }}
+                                    className="masonry-action-btn"
+                                    title="Moleskine"
+                                  >
+                                    <Pencil size={14} />
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); openEditRenderModal(render) }}
+                                    className="masonry-action-btn"
+                                    title="Editar"
+                                  >
+                                    <Edit size={14} />
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleDeleteRender(render) }}
+                                    className="masonry-action-btn danger"
+                                    title="Eliminar"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
+
+                                {/* Info Footer */}
+                                <div className="masonry-card-info">
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span className="masonry-card-info-subtitle">{render.vista || 'Vista Principal'}</span>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); toggleFinalImage(render) }}
+                                      className={`masonry-action-btn ${render.is_final ? '' : 'success'}`}
+                                      style={{
+                                        padding: '4px 10px',
+                                        borderRadius: '12px',
+                                        fontSize: '10px',
+                                        fontWeight: 500,
+                                        background: render.is_final ? 'var(--error)' : 'var(--success)',
+                                        color: 'white'
+                                      }}
+                                      title={render.is_final ? 'Remover Final' : 'Marcar Final'}
+                                    >
+                                      {render.is_final ? 'Remover' : 'Final'}
+                                    </button>
                                   </div>
                                 </div>
                               </div>
@@ -3024,85 +3055,57 @@ export default function ProjetoDetalhe() {
               fontSize: '13px',
               fontWeight: 600
             }}>
-              {imagensFinais.length} imagem{imagensFinais.length !== 1 ? 'ns' : ''}
+              {imagensFinais.length} {imagensFinais.length !== 1 ? 'imagens' : 'imagem'}
             </span>
           </div>
 
           {imagensFinais.length > 0 ? (
-            <>
-            <div style={{ columns: '4 220px', columnGap: '14px' }}>
+            <div className="masonry-grid">
               {imagensFinais.map((render) => (
                 <div
                   key={render.id}
-                  className="pin-card-finais"
-                  style={{ breakInside: 'avoid', marginBottom: '14px' }}
+                  className={`masonry-card ${draggedImage?.id === render.id ? 'dragging' : ''}`}
+                  draggable
+                  onDragStart={(e) => handleFinalImageDragStart(e, render)}
+                  onDragOver={handleFinalImageDragOver}
+                  onDrop={(e) => handleFinalImageDrop(e, render)}
+                  onDragEnd={handleFinalImageDragEnd}
+                  style={{
+                    cursor: 'grab',
+                    opacity: draggedImage?.id === render.id ? 0.5 : 1,
+                    transition: 'opacity 0.2s'
+                  }}
+                  onClick={() => render.imagem_url && openLightbox(render, imagensFinais)}
                 >
-                  <div
-                    style={{
-                      position: 'relative',
-                      borderRadius: '12px',
-                      overflow: 'hidden',
-                      cursor: render.imagem_url ? 'pointer' : 'default'
-                    }}
-                    onClick={() => render.imagem_url && openLightbox(render, imagensFinais)}
-                  >
-                    {render.imagem_url ? (
-                      <img
-                        src={render.imagem_url}
-                        alt={render.compartimento || 'Render'}
-                        style={{ width: '100%', display: 'block', background: '#F0EBE5' }}
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '160px', background: 'var(--cream)' }}>
-                        <Image size={32} style={{ color: 'var(--brown-light)', opacity: 0.4 }} />
-                      </div>
-                    )}
-
-                    {/* Hover overlay */}
-                    <div className="pin-overlay-finais" style={{
-                      position: 'absolute', inset: 0,
-                      background: 'linear-gradient(180deg, rgba(0,0,0,0.3) 0%, transparent 40%, transparent 60%, rgba(0,0,0,0.4) 100%)',
-                      borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
-                      padding: '10px', opacity: 0, transition: 'opacity 0.2s', pointerEvents: 'none'
+                  {render.imagem_url ? (
+                    <img
+                      src={render.imagem_url}
+                      alt={render.compartimento}
+                      style={{
+                        width: '100%',
+                        height: 'auto',
+                        display: 'block'
+                      }}
+                    />
+                  ) : (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      height: '200px',
+                      background: 'var(--cream)'
                     }}>
-                      <span style={{ padding: '3px 10px', background: 'rgba(255,255,255,0.9)', borderRadius: '12px', fontSize: '10px', fontWeight: 500, color: '#3D3D3D' }}>
-                        v{render.versao}
-                      </span>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); toggleFinalImage(render) }}
-                        style={{
-                          width: '32px', height: '32px', borderRadius: '50%',
-                          background: 'rgba(220,38,38,0.85)', color: 'white', border: 'none',
-                          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          pointerEvents: 'auto'
-                        }}
-                        title="Remover das imagens finais"
-                      >
-                        <X size={14} />
-                      </button>
+                      <Image size={32} style={{ color: 'var(--brown-light)', opacity: 0.4 }} />
                     </div>
-                  </div>
+                  )}
 
-                  {/* Caption */}
-                  <div style={{ padding: '8px 4px 4px' }}>
-                    <div style={{ fontSize: '13px', fontWeight: 500, color: '#3D3D3D', lineHeight: 1.3 }}>
-                      {render.compartimento}
-                    </div>
-                    <div style={{ fontSize: '11px', color: '#ADAA96', marginTop: '2px' }}>
-                      Versão {render.versao}
-                    </div>
+                  <div className="masonry-card-info">
+                    <div style={{ fontSize: '13px', fontWeight: 600 }}>{render.compartimento}</div>
+                    <div style={{ fontSize: '11px', opacity: 0.8 }}>Versão {render.versao}</div>
                   </div>
                 </div>
               ))}
             </div>
-            <style>{`
-              .pin-overlay-finais { opacity: 0 !important; transition: opacity 0.2s !important; }
-              .pin-card-finais:hover .pin-overlay-finais { opacity: 1 !important; }
-              .pin-overlay-processo { opacity: 0 !important; transition: opacity 0.2s !important; }
-              .pin-card-processo:hover .pin-overlay-processo { opacity: 1 !important; }
-            `}</style>
-            </>
           ) : (
             <div style={{
               padding: '48px',
@@ -3125,41 +3128,29 @@ export default function ProjetoDetalhe() {
             <MoleskineDigital
               projectId={project?.id}
               projectName={project?.nome}
-              onClose={() => setActiveArchvizSection('processo')}
+              onClose={() => setActiveArchvizSection('inspiracoes')}
             />
           )}
         </div>
-      )}
-
-      {/* Tab Notebook (Documento do Projeto) */}
-      {activeTab === 'notebook' && (
-        <ProjetoNotebook
-          projeto={project}
-          userId={user?.id}
-          userName={user?.email?.split('@')[0] || 'Utilizador'}
-        />
       )}
 
       {/* Tab Biblioteca do Projeto */}
       {activeTab === 'biblioteca' && (
         <div>
           <div className="grid grid-3" style={{ gap: '16px', marginBottom: '24px' }}>
-            {/* KPI Cards */}
+            {/* KPI Cards - showing project-specific counts (0 when empty) */}
             {[
-              { label: 'Materiais', count: 12, icon: '🎨' },
-              { label: 'Objetos 3D', count: 8, icon: '📦' },
-              { label: 'Texturas', count: 24, icon: '🖼️' }
+              { label: 'Materiais', count: 0 },
+              { label: 'Objetos 3D', count: 0 },
+              { label: 'Texturas', count: 0 }
             ].map((item, idx) => (
               <div key={idx} className="card" style={{ padding: '20px' }}>
-                <div className="flex items-center gap-md">
-                  <span style={{ fontSize: '32px' }}>{item.icon}</span>
-                  <div>
-                    <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--brown)' }}>
-                      {item.count}
-                    </div>
-                    <div style={{ fontSize: '13px', color: 'var(--brown-light)' }}>
-                      {item.label}
-                    </div>
+                <div>
+                  <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--brown)' }}>
+                    {item.count}
+                  </div>
+                  <div style={{ fontSize: '13px', color: 'var(--brown-light)' }}>
+                    {item.label}
                   </div>
                 </div>
               </div>
@@ -3226,22 +3217,16 @@ export default function ProjetoDetalhe() {
       {activeTab === 'gestao' && (
         <div>
           {/* Section navigation */}
-          <div
-            role="tablist"
-            aria-label="Sub-separadores gestão de projeto"
-            style={{
-              display: 'flex',
-              gap: '8px',
-              marginBottom: '20px',
-              borderBottom: '1px solid var(--stone)',
-              paddingBottom: '12px'
-            }}
-          >
+          <div style={{
+            display: 'flex',
+            gap: '8px',
+            marginBottom: '20px',
+            borderBottom: '1px solid var(--stone)',
+            paddingBottom: '12px'
+          }}>
             {gestaoSections.map(section => (
               <button
                 key={section.id}
-                role="tab"
-                aria-selected={activeGestaoSection === section.id}
                 onClick={() => handleSubtabChange(section.id, 'gestao')}
                 style={{
                   padding: '8px 16px',
@@ -3334,10 +3319,6 @@ export default function ProjetoDetalhe() {
         </div>
       )}
 
-      {/* Tab Procurement */}
-      {activeTab === 'procurement' && (
-        <ProjetoProcurement projectId={project?.id} obraId={null} />
-      )}
 
       {/* Modal de Upload */}
       {showUploadModal && (
@@ -3374,12 +3355,11 @@ export default function ProjetoDetalhe() {
               <h3 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--brown)' }}>
                 {uploadingDoc ? 'Anexar Proposta Assinada' : 'Adicionar Documento'}
               </h3>
-              <button
+              <button 
                 onClick={() => {
                   setShowUploadModal(false)
                   setUploadingDoc(null)
                 }}
-                aria-label="Fechar"
                 style={{
                   background: 'none',
                   border: 'none',
@@ -3427,7 +3407,6 @@ export default function ProjetoDetalhe() {
                 type="file"
                 accept=".pdf,application/pdf"
                 onChange={handleFileSelect}
-                aria-label="Selecionar ficheiro PDF"
                 style={{
                   position: 'absolute',
                   top: 0,
@@ -3563,144 +3542,6 @@ export default function ProjetoDetalhe() {
         />
       )}
 
-      <ConfirmModal
-        isOpen={confirmModal.isOpen}
-        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
-        onConfirm={confirmModal.onConfirm}
-        title={confirmModal.title}
-        message={confirmModal.message}
-        type={confirmModal.type || 'danger'}
-        confirmText="Confirmar"
-      />
-
-    </div>
-  )
-}
-
-// ═══════════════════════════════════════
-// PROCUREMENT TAB (inline component)
-// ═══════════════════════════════════════
-
-function ProjetoProcurement({ projectId, obraId }) {
-  const { requisicoes, cotacoes, purchaseOrders, facturas, stats, loading } = useProcurement(projectId, obraId)
-
-  const formatCurrency = (val) => {
-    if (!val && val !== 0) return '—'
-    return new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(val)
-  }
-
-  const formatDate = (d) => {
-    if (!d) return '—'
-    return new Date(d).toLocaleDateString('pt-PT')
-  }
-
-  if (loading) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '48px' }}>
-        <Loader2 size={24} style={{ animation: 'spin 1s linear infinite', color: 'var(--accent-olive)' }} />
-      </div>
-    )
-  }
-
-  const activeReqs = requisicoes.filter(r => !['fechada', 'cancelada'].includes(r.estado))
-  const activePOs = purchaseOrders.filter(p => !['concluida', 'cancelada'].includes(p.estado))
-
-  const isEmpty = requisicoes.length === 0 && cotacoes.length === 0 && purchaseOrders.length === 0 && facturas.length === 0
-
-  if (isEmpty) {
-    return (
-      <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
-        <ShoppingCart size={48} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '16px' }} />
-        <h3 style={{ margin: '0 0 8px', color: 'var(--brown)' }}>Procurement</h3>
-        <p style={{ color: 'var(--brown-light)', margin: '0 0 16px' }}>
-          Nenhuma requisição ou encomenda associada a este projeto.
-        </p>
-        <p style={{ color: 'var(--brown-light)', fontSize: '13px' }}>
-          As requisições e cotações serão criadas automaticamente pelo sistema de agentes ou manualmente no painel de Procurement.
-        </p>
-      </div>
-    )
-  }
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      {/* Summary Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
-        {[
-          { label: 'Requisições', value: activeReqs.length, color: '#3B82F6' },
-          { label: 'Cotações', value: cotacoes.length, color: '#D97706' },
-          { label: 'POs Ativas', value: activePOs.length, color: '#059669' },
-          { label: 'Valor POs', value: formatCurrency(stats.valor_pos_aprovadas), color: '#10B981' },
-        ].map(card => (
-          <div key={card.label} className="card" style={{
-            padding: '14px 16px', borderLeft: `3px solid ${card.color}`
-          }}>
-            <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--brown)' }}>{card.value}</div>
-            <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>{card.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Requisições List */}
-      {activeReqs.length > 0 && (
-        <div className="card" style={{ padding: '20px' }}>
-          <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', color: 'var(--brown)' }}>Requisições Ativas</h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            {activeReqs.map(req => (
-              <div key={req.id} style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                padding: '8px 12px', borderRadius: '6px', background: 'var(--cream)', fontSize: '13px'
-              }}>
-                <div>
-                  <span style={{ fontWeight: 600, color: 'var(--accent-olive)', marginRight: '8px' }}>{req.codigo}</span>
-                  <span style={{ color: 'var(--brown)' }}>{req.titulo}</span>
-                </div>
-                <span style={{
-                  padding: '2px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 500,
-                  background: req.estado === 'em_cotacao' ? '#FFF7ED' : req.estado === 'decidida' ? '#ECFDF5' : '#EFF6FF',
-                  color: req.estado === 'em_cotacao' ? '#D97706' : req.estado === 'decidida' ? '#059669' : '#3B82F6'
-                }}>
-                  {req.estado?.replace(/_/g, ' ')}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Purchase Orders */}
-      {activePOs.length > 0 && (
-        <div className="card" style={{ padding: '20px' }}>
-          <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', color: 'var(--brown)' }}>Purchase Orders</h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            {activePOs.map(po => (
-              <div key={po.id} style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                padding: '8px 12px', borderRadius: '6px', background: 'var(--cream)', fontSize: '13px'
-              }}>
-                <div>
-                  <span style={{ fontWeight: 600, color: 'var(--accent-olive)', marginRight: '8px' }}>{po.codigo}</span>
-                  <span style={{ color: 'var(--brown)' }}>{formatCurrency(po.valor_total)}</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {po.data_entrega_prevista && (
-                    <span style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
-                      Entrega: {formatDate(po.data_entrega_prevista)}
-                    </span>
-                  )}
-                  <span style={{
-                    padding: '2px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 500,
-                    background: po.estado === 'entregue' ? '#ECFDF5' : po.estado === 'confirmada' ? '#EFF6FF' : '#FFF7ED',
-                    color: po.estado === 'entregue' ? '#059669' : po.estado === 'confirmada' ? '#3B82F6' : '#D97706'
-                  }}>
-                    {po.estado?.replace(/_/g, ' ')}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   )
 }

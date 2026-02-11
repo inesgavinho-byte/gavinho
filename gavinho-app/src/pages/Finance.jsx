@@ -93,8 +93,8 @@ export default function Finance() {
         .from('v_custos_por_capitulo')
         .select('*')
 
-      // 2b. Buscar faturas para calcular valores faturados
-      const { data: faturasData } = await supabase
+      // 2.5. Buscar faturas emitidas aos clientes (para calcular faturação)
+      const { data: faturasData, error: faturasError } = await supabase
         .from('faturas')
         .select('projeto_id, total, estado')
         .in('estado', ['emitida', 'paga'])
@@ -104,6 +104,7 @@ export default function Finance() {
         .from('projeto_pagamentos')
         .select('projeto_id, valor, estado')
         .eq('estado', 'pago')
+
 
       // 3. Buscar fornecedores ativos
       const { data: forns, error: fornError } = await supabase
@@ -119,11 +120,18 @@ export default function Finance() {
       const projectsProcessed = projetos.map(projeto => {
         // Custos deste projeto
         const projetoCustos = custosView?.filter(c => c.projeto_id === projeto.id) || []
-        
+
         // Totais por estado
         const totalComprometido = projetoCustos.reduce((sum, c) => sum + parseFloat(c.comprometido || 0), 0)
         const totalRealizado = projetoCustos.reduce((sum, c) => sum + parseFloat(c.realizado || 0), 0)
-        const totalFaturado = projetoCustos.reduce((sum, c) => sum + parseFloat(c.faturado || 0), 0)
+        const totalFaturadoCustos = projetoCustos.reduce((sum, c) => sum + parseFloat(c.faturado || 0), 0)
+
+        // Faturas ao cliente (emitidas e pagas)
+        const projetoFaturas = faturasData?.filter(f => f.projeto_id === projeto.id) || []
+        const totalFaturadoCliente = projetoFaturas.reduce((sum, f) => sum + parseFloat(f.total || 0), 0)
+        const totalRecebido = projetoFaturas
+          .filter(f => f.estado === 'paga')
+          .reduce((sum, f) => sum + parseFloat(f.total || 0), 0)
         
         // Orçamento do projeto
         const orcamentoAtual = parseFloat(projeto.orcamento_atual || projeto.valor_contratado || 0)
@@ -191,13 +199,11 @@ export default function Finance() {
           custos: {
             comprometido: totalComprometido,
             realizado: totalRealizado,
-            faturado: totalFaturado
+            faturado: totalFaturadoCustos
           },
           faturacao: {
             contratado: orcamentoAtual,
-            faturado: (faturasData || [])
-              .filter(f => f.projeto_id === projeto.id)
-              .reduce((sum, f) => sum + parseFloat(f.total || 0), 0),
+            faturado: totalFaturadoCliente,
             recebido: (pagamentosData || [])
               .filter(p => p.projeto_id === projeto.id)
               .reduce((sum, p) => sum + parseFloat(p.valor || 0), 0)

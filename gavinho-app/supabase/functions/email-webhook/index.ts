@@ -135,7 +135,7 @@ serve(async (req) => {
 
     // Gerar Message-ID único se não vier nos headers
     const messageId = emailData.headers?.match(/Message-ID:\s*<([^>]+)>/i)?.[1]
-      || `${Date.now()}-${Math.random().toString(36).substring(7)}@gavinho.pt`
+      || `${Date.now()}-${Math.random().toString(36).substring(7)}@gavinhogroup.com`
 
     // Processar anexos (se houver)
     let anexos = null

@@ -7,7 +7,7 @@ import {
   Reply, Forward, Trash2, Archive, Sparkles, Plus, Loader2,
   ClipboardCheck, CheckCircle2, AlertCircle, FileText, ListTodo,
   Bot, ChevronUp, ChevronDown, Check, X, Undo2, Zap, Clock, Eye,
-  Brain, Shield
+  Brain, Shield, Send, UserPlus
 } from 'lucide-react'
 
 // ============================================
@@ -700,6 +700,490 @@ const EmailDetail = ({
 }
 
 // ============================================
+// REPLY MODAL COMPONENT
+// ============================================
+const ReplyModal = ({ email, onClose, onSent, suggestedReply }) => {
+  const [replyText, setReplyText] = useState(suggestedReply || '')
+  const [sending, setSending] = useState(false)
+  const [error, setError] = useState(null)
+
+  const handleSend = async () => {
+    if (!replyText.trim()) {
+      setError('Escreve uma resposta')
+      return
+    }
+
+    setSending(true)
+    setError(null)
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/email-send`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+          },
+          body: JSON.stringify({
+            to: [email.de_email],
+            subject: email.assunto?.startsWith('Re:') ? email.assunto : `Re: ${email.assunto}`,
+            body_text: replyText,
+            body_html: `<div style="font-family: Arial, sans-serif;">${replyText.replace(/\n/g, '<br>')}</div>
+              <br><hr style="border: none; border-top: 1px solid #ccc;">
+              <p style="color: #666; font-size: 12px;">Em ${new Date(email.data_recebido).toLocaleString('pt-PT')}, ${email.de_nome || email.de_email} escreveu:</p>
+              <blockquote style="margin: 10px 0; padding: 10px; border-left: 3px solid #ccc; color: #555;">
+                ${email.corpo_texto?.replace(/\n/g, '<br>') || ''}
+              </blockquote>`,
+            obra_id: email.obra_id,
+            reply_to_message_id: email.id
+          })
+        }
+      )
+
+      const result = await response.json()
+
+      if (!result.success) {
+        throw new Error(result.error || 'Erro ao enviar email')
+      }
+
+      onSent && onSent(result)
+      onClose()
+    } catch (err) {
+      console.error('Erro ao enviar resposta:', err)
+      setError(err.message)
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <div style={{
+      position: 'fixed',
+      inset: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1000
+    }}>
+      <div style={{
+        backgroundColor: brand.white,
+        borderRadius: '12px',
+        width: '600px',
+        maxWidth: '90vw',
+        maxHeight: '80vh',
+        display: 'flex',
+        flexDirection: 'column',
+        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+      }}>
+        {/* Header */}
+        <div style={{
+          padding: '16px 20px',
+          borderBottom: `1px solid ${brand.borderLight}`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Reply size={20} style={{ color: brand.oliveGray }} />
+            <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>Responder</h3>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '4px'
+            }}
+          >
+            <X size={20} style={{ color: brand.brown }} />
+          </button>
+        </div>
+
+        {/* Recipients */}
+        <div style={{
+          padding: '12px 20px',
+          borderBottom: `1px solid ${brand.borderLight}`,
+          fontSize: '13px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ color: functional.textTertiary, width: '40px' }}>Para:</span>
+            <span style={{ color: functional.textPrimary }}>{email.de_nome || email.de_email}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+            <span style={{ color: functional.textTertiary, width: '40px' }}>Assunto:</span>
+            <span style={{ color: functional.textPrimary }}>
+              {email.assunto?.startsWith('Re:') ? email.assunto : `Re: ${email.assunto}`}
+            </span>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div style={{ flex: 1, padding: '16px 20px', overflow: 'auto' }}>
+          <textarea
+            value={replyText}
+            onChange={(e) => setReplyText(e.target.value)}
+            placeholder="Escreve a tua resposta..."
+            style={{
+              width: '100%',
+              minHeight: '200px',
+              padding: '12px',
+              border: `1px solid ${brand.borderSubtle}`,
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontFamily: "'Quattrocento Sans', sans-serif",
+              resize: 'vertical',
+              outline: 'none'
+            }}
+          />
+
+          {/* Original message preview */}
+          <div style={{
+            marginTop: '16px',
+            padding: '12px',
+            backgroundColor: '#f9f9f9',
+            borderRadius: '8px',
+            borderLeft: '3px solid #ccc'
+          }}>
+            <div style={{ fontSize: '11px', color: functional.textTertiary, marginBottom: '8px' }}>
+              Em {new Date(email.data_recebido).toLocaleString('pt-PT')}, {email.de_nome || email.de_email} escreveu:
+            </div>
+            <div style={{
+              fontSize: '12px',
+              color: functional.textSecondary,
+              maxHeight: '100px',
+              overflow: 'auto',
+              whiteSpace: 'pre-wrap'
+            }}>
+              {email.corpo_texto?.substring(0, 500)}
+              {email.corpo_texto?.length > 500 ? '...' : ''}
+            </div>
+          </div>
+
+          {error && (
+            <div style={{
+              marginTop: '12px',
+              padding: '10px',
+              backgroundColor: functional.urgentRedBg,
+              color: functional.urgentRed,
+              borderRadius: '6px',
+              fontSize: '13px'
+            }}>
+              {error}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{
+          padding: '16px 20px',
+          borderTop: `1px solid ${brand.borderLight}`,
+          display: 'flex',
+          justifyContent: 'flex-end',
+          gap: '12px'
+        }}>
+          <button
+            onClick={onClose}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: brand.white,
+              color: brand.brown,
+              border: `1px solid ${brand.borderSubtle}`,
+              borderRadius: '8px',
+              fontSize: '14px',
+              cursor: 'pointer'
+            }}
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSend}
+            disabled={sending}
+            style={{
+              padding: '10px 24px',
+              backgroundColor: brand.oliveGray,
+              color: brand.white,
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: 500,
+              cursor: sending ? 'wait' : 'pointer',
+              opacity: sending ? 0.7 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+          >
+            {sending ? <Loader2 size={16} className="spin" /> : <Send size={16} />}
+            Enviar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============================================
+// FORWARD MODAL COMPONENT
+// ============================================
+const ForwardModal = ({ email, onClose, onSent }) => {
+  const [toEmail, setToEmail] = useState('')
+  const [message, setMessage] = useState('')
+  const [sending, setSending] = useState(false)
+  const [error, setError] = useState(null)
+
+  const handleSend = async () => {
+    if (!toEmail.trim()) {
+      setError('Introduz um email de destino')
+      return
+    }
+
+    // Validar email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(toEmail)) {
+      setError('Email invalido')
+      return
+    }
+
+    setSending(true)
+    setError(null)
+
+    try {
+      const forwardBody = message
+        ? `${message}\n\n---------- Mensagem encaminhada ----------\nDe: ${email.de_nome || email.de_email}\nData: ${new Date(email.data_recebido).toLocaleString('pt-PT')}\nAssunto: ${email.assunto}\n\n${email.corpo_texto}`
+        : `---------- Mensagem encaminhada ----------\nDe: ${email.de_nome || email.de_email}\nData: ${new Date(email.data_recebido).toLocaleString('pt-PT')}\nAssunto: ${email.assunto}\n\n${email.corpo_texto}`
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/email-send`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+          },
+          body: JSON.stringify({
+            to: [toEmail],
+            subject: `Fwd: ${email.assunto}`,
+            body_text: forwardBody,
+            body_html: `<div style="font-family: Arial, sans-serif;">
+              ${message ? `<p>${message.replace(/\n/g, '<br>')}</p><br>` : ''}
+              <hr style="border: none; border-top: 1px solid #ccc;">
+              <p style="color: #666; font-size: 12px;"><strong>---------- Mensagem encaminhada ----------</strong></p>
+              <p style="color: #666; font-size: 12px;">
+                <strong>De:</strong> ${email.de_nome || email.de_email}<br>
+                <strong>Data:</strong> ${new Date(email.data_recebido).toLocaleString('pt-PT')}<br>
+                <strong>Assunto:</strong> ${email.assunto}
+              </p>
+              <div style="padding: 10px; background: #f9f9f9; border-radius: 8px; margin-top: 10px;">
+                ${email.corpo_texto?.replace(/\n/g, '<br>') || email.corpo_html || ''}
+              </div>
+            </div>`,
+            obra_id: email.obra_id
+          })
+        }
+      )
+
+      const result = await response.json()
+
+      if (!result.success) {
+        throw new Error(result.error || 'Erro ao encaminhar email')
+      }
+
+      onSent && onSent(result)
+      onClose()
+    } catch (err) {
+      console.error('Erro ao encaminhar:', err)
+      setError(err.message)
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <div style={{
+      position: 'fixed',
+      inset: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1000
+    }}>
+      <div style={{
+        backgroundColor: brand.white,
+        borderRadius: '12px',
+        width: '600px',
+        maxWidth: '90vw',
+        maxHeight: '80vh',
+        display: 'flex',
+        flexDirection: 'column',
+        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+      }}>
+        {/* Header */}
+        <div style={{
+          padding: '16px 20px',
+          borderBottom: `1px solid ${brand.borderLight}`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Forward size={20} style={{ color: brand.oliveGray }} />
+            <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>Encaminhar</h3>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '4px'
+            }}
+          >
+            <X size={20} style={{ color: brand.brown }} />
+          </button>
+        </div>
+
+        {/* Recipients */}
+        <div style={{
+          padding: '12px 20px',
+          borderBottom: `1px solid ${brand.borderLight}`,
+          fontSize: '13px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ color: functional.textTertiary, width: '40px' }}>Para:</span>
+            <input
+              type="email"
+              value={toEmail}
+              onChange={(e) => setToEmail(e.target.value)}
+              placeholder="email@exemplo.com"
+              style={{
+                flex: 1,
+                padding: '8px 12px',
+                border: `1px solid ${brand.borderSubtle}`,
+                borderRadius: '6px',
+                fontSize: '14px',
+                outline: 'none'
+              }}
+            />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+            <span style={{ color: functional.textTertiary, width: '40px' }}>Assunto:</span>
+            <span style={{ color: functional.textPrimary }}>Fwd: {email.assunto}</span>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div style={{ flex: 1, padding: '16px 20px', overflow: 'auto' }}>
+          <textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="Adiciona uma mensagem (opcional)..."
+            style={{
+              width: '100%',
+              minHeight: '100px',
+              padding: '12px',
+              border: `1px solid ${brand.borderSubtle}`,
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontFamily: "'Quattrocento Sans', sans-serif",
+              resize: 'vertical',
+              outline: 'none'
+            }}
+          />
+
+          {/* Original message preview */}
+          <div style={{
+            marginTop: '16px',
+            padding: '12px',
+            backgroundColor: '#f9f9f9',
+            borderRadius: '8px',
+            border: `1px solid ${brand.borderLight}`
+          }}>
+            <div style={{ fontSize: '11px', color: functional.textTertiary, marginBottom: '8px' }}>
+              <strong>---------- Mensagem encaminhada ----------</strong><br />
+              <strong>De:</strong> {email.de_nome || email.de_email}<br />
+              <strong>Data:</strong> {new Date(email.data_recebido).toLocaleString('pt-PT')}<br />
+              <strong>Assunto:</strong> {email.assunto}
+            </div>
+            <div style={{
+              fontSize: '12px',
+              color: functional.textSecondary,
+              maxHeight: '150px',
+              overflow: 'auto',
+              whiteSpace: 'pre-wrap'
+            }}>
+              {email.corpo_texto?.substring(0, 800)}
+              {email.corpo_texto?.length > 800 ? '...' : ''}
+            </div>
+          </div>
+
+          {error && (
+            <div style={{
+              marginTop: '12px',
+              padding: '10px',
+              backgroundColor: functional.urgentRedBg,
+              color: functional.urgentRed,
+              borderRadius: '6px',
+              fontSize: '13px'
+            }}>
+              {error}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{
+          padding: '16px 20px',
+          borderTop: `1px solid ${brand.borderLight}`,
+          display: 'flex',
+          justifyContent: 'flex-end',
+          gap: '12px'
+        }}>
+          <button
+            onClick={onClose}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: brand.white,
+              color: brand.brown,
+              border: `1px solid ${brand.borderSubtle}`,
+              borderRadius: '8px',
+              fontSize: '14px',
+              cursor: 'pointer'
+            }}
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSend}
+            disabled={sending}
+            style={{
+              padding: '10px 24px',
+              backgroundColor: brand.oliveGray,
+              color: brand.white,
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: 500,
+              cursor: sending ? 'wait' : 'pointer',
+              opacity: sending ? 0.7 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+          >
+            {sending ? <Loader2 size={16} className="spin" /> : <Forward size={16} />}
+            Encaminhar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============================================
 // MAIN EMAILS PAGE
 // ============================================
 export default function Emails() {
@@ -735,6 +1219,12 @@ export default function Emails() {
 
   // Stats
   const [stats, setStats] = useState({ total: 0, naoLidos: 0, urgentes: 0 })
+
+  // Modal states
+  const [showReplyModal, setShowReplyModal] = useState(false)
+  const [showForwardModal, setShowForwardModal] = useState(false)
+  const [emailToReply, setEmailToReply] = useState(null)
+  const [suggestedReply, setSuggestedReply] = useState('')
 
   useEffect(() => {
     loadEmails()
@@ -957,11 +1447,20 @@ export default function Emails() {
   }
 
   const handleReply = (email) => {
-    toast.info('Info', 'Funcionalidade de resposta em desenvolvimento')
+    setEmailToReply(email)
+    setSuggestedReply('')
+    setShowReplyModal(true)
   }
 
   const handleForward = (email) => {
-    toast.info('Info', 'Funcionalidade de encaminhar em desenvolvimento')
+    setEmailToReply(email)
+    setShowForwardModal(true)
+  }
+
+  const handleEmailSent = (result) => {
+    // Recarregar emails para mostrar o enviado
+    loadEmails()
+    setSelectedEmail(null)
   }
 
   const handleSuggestReply = async (email) => {
@@ -983,7 +1482,10 @@ export default function Emails() {
       if (error) throw error
 
       if (data?.resposta) {
-        toast.info('Sugestão de Resposta', data.resposta)
+        // Abrir modal de reply com a sugestão pre-preenchida
+        setEmailToReply(email)
+        setSuggestedReply(data.resposta)
+        setShowReplyModal(true)
       } else {
         toast.warning('Aviso', 'Não foi possível gerar uma sugestão.')
       }
@@ -1583,6 +2085,32 @@ export default function Emails() {
           </div>
         )}
       </div>
+
+      {/* Reply Modal */}
+      {showReplyModal && emailToReply && (
+        <ReplyModal
+          email={emailToReply}
+          onClose={() => {
+            setShowReplyModal(false)
+            setEmailToReply(null)
+            setSuggestedReply('')
+          }}
+          onSent={handleEmailSent}
+          suggestedReply={suggestedReply}
+        />
+      )}
+
+      {/* Forward Modal */}
+      {showForwardModal && emailToReply && (
+        <ForwardModal
+          email={emailToReply}
+          onClose={() => {
+            setShowForwardModal(false)
+            setEmailToReply(null)
+          }}
+          onSent={handleEmailSent}
+        />
+      )}
 
       {/* CSS for spin animation */}
       <style>{`

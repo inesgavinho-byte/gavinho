@@ -138,7 +138,7 @@ export default function Workspace() {
     loading, equipas, equipaAtiva, equipasExpanded, canais, canalAtivo,
     channelTopics, activeTopic, showAddTopic, newTopicName, activeTab, membros, favoriteChannels,
     setEquipaAtiva, setEquipasExpanded, setCanalAtivo, setActiveTopic, setShowAddTopic,
-    setNewTopicName, setActiveTab, setMembros, loadData, loadTopics, addTopic,
+    setNewTopicName, setActiveTab, setMembros, loadData, loadTopics, addTopic, renameTopic, removeTopic,
     getEquipaCanais, toggleEquipa, selectCanal, toggleFavorite, isFavorite, getChannelLink
   } = useChannelData()
 
@@ -471,6 +471,18 @@ export default function Workspace() {
       }
 
       setPosts(prev => [...prev, newPost])
+
+      // Criar notificações para @menções
+      if (parseMentions && findMentionedUserIds && createMentionNotifications) {
+        const mentionedNames = parseMentions(messageInput)
+        if (mentionedNames.length > 0) {
+          const mentionedUserIds = findMentionedUserIds(mentionedNames, membros)
+          if (mentionedUserIds.length > 0) {
+            await createMentionNotifications(insertedMessage, mentionedUserIds, canalAtivo)
+          }
+        }
+      }
+
       setMessageInput('')
       setSelectedFiles([])
       setReplyingTo(null)
@@ -828,18 +840,20 @@ export default function Workspace() {
 
   const handleCreateTask = async (taskData) => {
     try {
+      // Inserir tarefa na base de dados
       const { error } = await supabase
         .from('tarefas')
         .insert({
-          titulo: taskData.titulo,
-          descricao: taskData.descricao,
+          projeto_id: canalAtivo?.id,
+          titulo: taskData.titulo || taskData.title,
+          descricao: taskData.descricao || taskData.description,
           prioridade: taskData.prioridade || 'media',
-          data_limite: taskData.prazo || null,
           status: 'pendente',
+          data_limite: taskData.dataLimite || taskData.dueDate || null,
           categoria: 'geral',
-          origem_tipo: taskData.mensagem_origem ? 'manual' : 'manual',
-          origem_id: taskData.mensagem_origem || null,
-          criado_por_id: profile?.id
+          origem_tipo: 'manual',
+          criado_por_id: profile?.id,
+          notas: taskFromMessage?.conteudo ? `Criada a partir de mensagem: "${taskFromMessage.conteudo.substring(0, 200)}"` : null
         })
 
       if (error) throw error
@@ -866,18 +880,23 @@ export default function Workspace() {
     const targetChannel = canais.find(c => c.id === targetChannelId)
 
     try {
+      // Inserir mensagem reencaminhada no canal de destino
       const { error } = await supabase
         .from('chat_mensagens')
         .insert({
           canal_id: targetChannelId,
           autor_id: profile?.id,
           conteudo: messageToForward.conteudo,
-          tipo: messageToForward.imagem_url ? 'imagem' : 'texto',
-          imagem_url: messageToForward.imagem_url || null,
+          tipo: 'reencaminhada',
           metadata: {
             forwarded: true,
-            forwarded_from_id: messageToForward.id,
-            forwarded_from_autor: messageToForward.autor?.nome
+            forwarded_from: {
+              canal_id: canalAtivo?.id,
+              canal_nome: canalAtivo?.nome,
+              canal_codigo: canalAtivo?.codigo,
+              original_author: messageToForward.autor?.nome,
+              original_date: messageToForward.created_at
+            }
           }
         })
 
@@ -1069,6 +1088,17 @@ export default function Workspace() {
     }
   }
 
+  // Rename custom topic
+  const renameCustomTopic = (topicId, newName) => {
+    if (!canalAtivo || !newName.trim()) return
+    setChannelTopics(prev => ({
+      ...prev,
+      [canalAtivo.id]: (prev[canalAtivo.id] || DEFAULT_TOPICS).map(t =>
+        t.id === topicId ? { ...t, nome: newName.trim() } : t
+      )
+    }))
+  }
+
   // Get topic icon component
   const getTopicIcon = (iconName) => {
     const icons = {
@@ -1192,9 +1222,11 @@ export default function Workspace() {
 
   const createMeeting = async () => {
     try {
+      // Criar data de início e fim
       const dataInicio = new Date(`${meetingDetails.date}T${meetingDetails.time}:00`)
       const dataFim = new Date(dataInicio.getTime() + parseInt(meetingDetails.duration) * 60000)
 
+      // Inserir evento no calendário
       const { error } = await supabase
         .from('calendario_eventos')
         .insert({
@@ -1203,7 +1235,9 @@ export default function Workspace() {
           tipo: 'reuniao',
           data_inicio: dataInicio.toISOString(),
           data_fim: dataFim.toISOString(),
+          projeto_id: canalAtivo?.id,
           criado_por: profile?.id,
+          participantes: meetingDetails.participants.map(p => ({ id: p.id, nome: p.nome })),
           notificar: true
         })
 
@@ -1213,7 +1247,7 @@ export default function Workspace() {
       setShowScheduleMeetingModal(false)
       setMeetingDetails({ title: '', date: '', time: '', duration: '30', participants: [], description: '' })
     } catch (err) {
-      console.error('Erro ao agendar reunião:', err)
+      console.error('Erro ao criar reunião:', err)
       toastError('Erro ao agendar reunião')
     }
   }
@@ -1749,6 +1783,7 @@ export default function Workspace() {
           setNewTopicName={setNewTopicName}
           onAddCustomTopic={addCustomTopic}
           onRemoveCustomTopic={removeCustomTopic}
+          onRenameCustomTopic={renameCustomTopic}
           showPinnedMessages={showPinnedMessages}
           setShowPinnedMessages={setShowPinnedMessages}
           getCurrentChannelPinnedMessages={getCurrentChannelPinnedMessages}

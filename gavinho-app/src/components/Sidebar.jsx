@@ -1,6 +1,7 @@
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import ThemeToggle from './ui/ThemeToggle'
+import { NotificationBell } from './ui/NotificationPanel'
 import {
   LayoutDashboard,
   FolderKanban,
@@ -260,7 +261,24 @@ export default function Sidebar({ isOpen, onClose, isMobile, collapsed, onToggle
           <div className="logo-mark">G</div>
           {!collapsed && <span className="logo-text">GAVINHO</span>}
         </NavLink>
+        {!collapsed && (
+          <div style={{ marginLeft: 'auto' }}>
+            <NotificationBell collapsed={false} />
+          </div>
+        )}
       </div>
+
+      {/* Notification Bell - Collapsed Mode */}
+      {collapsed && (
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          padding: '8px',
+          borderBottom: '1px solid var(--stone)'
+        }}>
+          <NotificationBell collapsed={true} />
+        </div>
+      )}
 
       {/* Collapse Toggle Button */}
       {!isMobile && (

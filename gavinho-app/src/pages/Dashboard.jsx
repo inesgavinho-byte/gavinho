@@ -21,6 +21,12 @@ import {
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import {
+  CriticalDeadlinesWidget,
+  BudgetHealthWidget,
+  PendingApprovalsWidget,
+  UnreadMessagesWidget
+} from '../components/DashboardWidgets'
 
 export default function Dashboard() {
   const navigate = useNavigate()
@@ -555,6 +561,14 @@ export default function Dashboard() {
             <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginTop: '2px' }}>Em Risco / Bloqueados</div>
           </div>
         </div>
+      </div>
+
+      {/* KPI Widgets Row */}
+      <div className="grid grid-4 mb-xl" style={{ gap: '20px' }}>
+        <CriticalDeadlinesWidget />
+        <BudgetHealthWidget />
+        <PendingApprovalsWidget />
+        <UnreadMessagesWidget />
       </div>
 
       {/* Main Content Grid */}

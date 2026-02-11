@@ -3,8 +3,9 @@ import { supabase } from '../lib/supabase'
 import {
   Clock, Calendar, Users, Building2, Search, Filter,
   ChevronLeft, ChevronRight, Download, Loader2, LogIn, LogOut,
-  CalendarDays, TrendingUp, AlertCircle
+  CalendarDays, TrendingUp, AlertCircle, FileText
 } from 'lucide-react'
+import jsPDF from 'jspdf'
 
 export default function Presencas() {
   const [presencas, setPresencas] = useState([])
@@ -126,7 +127,7 @@ export default function Presencas() {
   }
 
   const exportCSV = () => {
-    const headers = ['Data', 'Trabalhador', 'Cargo', 'Obra', 'Entrada', 'Saída', 'Horas', 'Notas']
+    const headers = ['Data', 'Trabalhador', 'Cargo', 'Obra', 'Entrada', 'Saida', 'Horas', 'Notas']
     const rows = presencas.map(p => [
       p.data,
       p.trabalhadores?.nome || '',
@@ -147,6 +148,176 @@ export default function Presencas() {
     link.click()
   }
 
+  const exportPDF = () => {
+    const pdf = new jsPDF()
+    let y = 15
+
+    // Titulo
+    pdf.setFontSize(18)
+    pdf.setFont('helvetica', 'bold')
+    pdf.text('Relatorio de Presencas', 105, y, { align: 'center' })
+    y += 8
+
+    // Periodo
+    pdf.setFontSize(11)
+    pdf.setFont('helvetica', 'normal')
+    pdf.setTextColor(100)
+    pdf.text(`Periodo: ${dataInicio} a ${dataFim}`, 105, y, { align: 'center' })
+    y += 6
+
+    // Filtros aplicados
+    const obraSelecionada = obras.find(o => o.id === filtroObra)
+    const trabSelecionado = trabalhadores.find(t => t.id === filtroTrabalhador)
+    if (obraSelecionada || trabSelecionado) {
+      const filtros = []
+      if (obraSelecionada) filtros.push(`Obra: ${obraSelecionada.codigo}`)
+      if (trabSelecionado) filtros.push(`Trabalhador: ${trabSelecionado.nome}`)
+      pdf.text(filtros.join(' | '), 105, y, { align: 'center' })
+      y += 6
+    }
+
+    y += 5
+
+    // Estatisticas
+    pdf.setFontSize(10)
+    pdf.setFont('helvetica', 'bold')
+    pdf.setTextColor(0)
+    pdf.text(`Total: ${stats.total} registos | ${stats.horasTotal}h trabalhadas | Media: ${stats.mediaHoras}h/dia`, 15, y)
+    y += 10
+
+    // Linha separadora
+    pdf.setDrawColor(200)
+    pdf.line(15, y, 195, y)
+    y += 5
+
+    // Cabecalho da tabela
+    pdf.setFontSize(9)
+    pdf.setFont('helvetica', 'bold')
+    pdf.setFillColor(245, 245, 245)
+    pdf.rect(15, y - 3, 180, 8, 'F')
+    pdf.text('Data', 17, y + 2)
+    pdf.text('Trabalhador', 42, y + 2)
+    pdf.text('Cargo', 87, y + 2)
+    pdf.text('Obra', 117, y + 2)
+    pdf.text('Entrada', 140, y + 2)
+    pdf.text('Saida', 160, y + 2)
+    pdf.text('Horas', 180, y + 2)
+    y += 10
+
+    // Dados
+    pdf.setFont('helvetica', 'normal')
+    pdf.setFontSize(8)
+
+    // Agrupar por trabalhador para resumo
+    const horasPorTrabalhador = {}
+
+    presencas.forEach((p, index) => {
+      // Nova pagina se necessario
+      if (y > 275) {
+        pdf.addPage()
+        y = 15
+        // Repetir cabecalho
+        pdf.setFont('helvetica', 'bold')
+        pdf.setFontSize(9)
+        pdf.setFillColor(245, 245, 245)
+        pdf.rect(15, y - 3, 180, 8, 'F')
+        pdf.text('Data', 17, y + 2)
+        pdf.text('Trabalhador', 42, y + 2)
+        pdf.text('Cargo', 87, y + 2)
+        pdf.text('Obra', 117, y + 2)
+        pdf.text('Entrada', 140, y + 2)
+        pdf.text('Saida', 160, y + 2)
+        pdf.text('Horas', 180, y + 2)
+        y += 10
+        pdf.setFont('helvetica', 'normal')
+        pdf.setFontSize(8)
+      }
+
+      const horas = calcularHoras(p.hora_entrada, p.hora_saida)
+
+      // Acumular horas por trabalhador
+      const trabNome = p.trabalhadores?.nome || 'Desconhecido'
+      if (!horasPorTrabalhador[trabNome]) {
+        horasPorTrabalhador[trabNome] = { horas: 0, dias: 0 }
+      }
+      if (horas) {
+        horasPorTrabalhador[trabNome].horas += parseFloat(horas)
+        horasPorTrabalhador[trabNome].dias += 1
+      }
+
+      // Alternar cor de fundo
+      if (index % 2 === 0) {
+        pdf.setFillColor(252, 252, 252)
+        pdf.rect(15, y - 3, 180, 6, 'F')
+      }
+
+      pdf.setTextColor(60)
+      pdf.text(p.data || '', 17, y)
+      pdf.text((p.trabalhadores?.nome || '').substring(0, 20), 42, y)
+      pdf.text((p.trabalhadores?.cargo || '').substring(0, 12), 87, y)
+      pdf.text(p.obras?.codigo || '', 117, y)
+      pdf.text(formatTime(p.hora_entrada), 140, y)
+      pdf.text(formatTime(p.hora_saida), 160, y)
+      pdf.setTextColor(0)
+      pdf.text(horas ? `${horas}h` : '-', 180, y)
+      y += 6
+    })
+
+    // Resumo por trabalhador
+    if (Object.keys(horasPorTrabalhador).length > 0) {
+      y += 10
+      if (y > 250) {
+        pdf.addPage()
+        y = 15
+      }
+
+      pdf.setDrawColor(200)
+      pdf.line(15, y, 195, y)
+      y += 8
+
+      pdf.setFontSize(12)
+      pdf.setFont('helvetica', 'bold')
+      pdf.text('Resumo por Trabalhador', 15, y)
+      y += 8
+
+      pdf.setFontSize(9)
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFillColor(240, 240, 240)
+      pdf.rect(15, y - 3, 180, 7, 'F')
+      pdf.text('Trabalhador', 17, y + 2)
+      pdf.text('Dias Trabalhados', 90, y + 2)
+      pdf.text('Total Horas', 140, y + 2)
+      y += 9
+
+      pdf.setFont('helvetica', 'normal')
+      Object.entries(horasPorTrabalhador)
+        .sort((a, b) => b[1].horas - a[1].horas)
+        .forEach(([nome, dados], index) => {
+          if (y > 280) {
+            pdf.addPage()
+            y = 15
+          }
+          if (index % 2 === 0) {
+            pdf.setFillColor(250, 250, 250)
+            pdf.rect(15, y - 3, 180, 6, 'F')
+          }
+          pdf.text(nome, 17, y)
+          pdf.text(`${dados.dias} dia(s)`, 90, y)
+          pdf.setFont('helvetica', 'bold')
+          pdf.text(`${dados.horas.toFixed(1)}h`, 140, y)
+          pdf.setFont('helvetica', 'normal')
+          y += 6
+        })
+    }
+
+    // Rodape
+    pdf.setFontSize(8)
+    pdf.setTextColor(150)
+    pdf.text(`Gerado em ${new Date().toLocaleString('pt-PT')}`, 195, 290, { align: 'right' })
+
+    pdf.save(`presencas_${dataInicio}_${dataFim}.pdf`)
+  }
+
   // Agrupar presenças por data
   const presencasPorData = presencas.reduce((acc, p) => {
     if (!acc[p.data]) acc[p.data] = []
@@ -165,10 +336,16 @@ export default function Presencas() {
           </h1>
           <p style={styles.subtitle}>Acompanhar presenças dos trabalhadores</p>
         </div>
-        <button onClick={exportCSV} style={styles.exportButton}>
-          <Download size={18} />
-          Exportar CSV
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={exportPDF} style={{ ...styles.exportButton, background: 'var(--gold)' }}>
+            <FileText size={18} />
+            PDF
+          </button>
+          <button onClick={exportCSV} style={styles.exportButton}>
+            <Download size={18} />
+            CSV
+          </button>
+        </div>
       </div>
 
       {/* Stats Cards */}

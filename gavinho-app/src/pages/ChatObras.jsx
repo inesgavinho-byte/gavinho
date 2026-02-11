@@ -632,6 +632,9 @@ export default function ChatObras() {
     }))
 
     try {
+      // Encontrar a sugestão nos dados locais
+      const suggestion = aiSuggestions?.[tipo]?.find(item => item.id === id)
+
       // Atualizar status na base de dados
       await supabase
         .from('ia_sugestoes')
@@ -641,91 +644,104 @@ export default function ChatObras() {
         })
         .eq('id', id)
 
-      // Criar entidade correspondente na tabela apropriada
+      // Criar entidade correspondente baseado no tipo
       let entidadeCriadaId = null
-      const obraId = selectedObra?.id
 
-      if (tipo === 'materiais') {
-        const suggestion = aiSuggestions?.materiais?.find(s => s.id === id)
-        if (suggestion && obraId) {
-          const { data } = await supabase
-            .from('requisicoes_materiais')
-            .insert({
-              obra_id: obraId,
-              descricao: suggestion.material,
-              quantidade: suggestion.quantidade,
-              unidade: suggestion.unidade,
-              urgencia: suggestion.urgente ? 'alta' : 'normal',
-              estado: 'pendente'
-            })
-            .select('id')
-            .single()
-          entidadeCriadaId = data?.id
-        }
-      } else if (tipo === 'horas') {
-        const suggestion = aiSuggestions?.horas?.find(s => s.id === id)
-        if (suggestion && obraId) {
-          const { data } = await supabase
-            .from('obra_diario')
-            .insert({
-              obra_id: obraId,
-              data: suggestion.data || new Date().toISOString().split('T')[0],
-              mao_obra_propria: suggestion.pessoas || 0,
-              descricao: suggestion.texto,
-              notas: `Horas totais: ${suggestion.horasTotal || suggestion.horas || 0}`
-            })
-            .select('id')
-            .single()
-          entidadeCriadaId = data?.id
-        }
-      } else if (tipo === 'tarefas') {
-        const suggestion = aiSuggestions?.tarefas?.find(s => s.id === id)
-        if (suggestion && obraId) {
-          const { data } = await supabase
-            .from('tarefas')
-            .insert({
-              obra_id: obraId,
-              titulo: suggestion.tarefa,
-              descricao: suggestion.texto,
-              prioridade: suggestion.prioridade || 'media',
-              status: 'pendente',
-              origem_tipo: 'sistema'
-            })
-            .select('id')
-            .single()
-          entidadeCriadaId = data?.id
-        }
-      } else if (tipo === 'naoConformidades') {
-        const suggestion = aiSuggestions?.naoConformidades?.find(s => s.id === id)
-        if (suggestion && obraId) {
-          const { data } = await supabase
-            .from('nao_conformidades')
-            .insert({
-              obra_id: obraId,
-              codigo: `NC-${Date.now()}`,
-              titulo: suggestion.descricao,
-              descricao: suggestion.texto,
-              gravidade: suggestion.gravidade || 'menor',
-              estado: 'aberta'
-            })
-            .select('id')
-            .single()
-          entidadeCriadaId = data?.id
-        }
-      } else if (tipo === 'trabalhos') {
-        const suggestion = aiSuggestions?.trabalhos?.find(s => s.id === id)
-        if (suggestion && obraId) {
-          const { data } = await supabase
-            .from('obras_execucao')
-            .insert({
-              obra_id: obraId,
-              percentagem_execucao: suggestion.percentagem || 0,
-              data_registo: new Date().toISOString().split('T')[0],
-              notas: suggestion.trabalho
-            })
-            .select('id')
-            .single()
-          entidadeCriadaId = data?.id
+      if (suggestion && selectedObra) {
+        switch (tipo) {
+          case 'materiais': {
+            // Criar requisição de material
+            const { data } = await supabase
+              .from('requisicoes_materiais')
+              .insert({
+                obra_id: selectedObra.id,
+                descricao: suggestion.material || suggestion.texto,
+                quantidade: suggestion.quantidade || 1,
+                unidade: suggestion.unidade || 'un',
+                urgencia: suggestion.urgente ? 'urgente' : 'normal',
+                estado: 'pendente',
+                solicitado_por_nome: suggestion.autor || 'Via WhatsApp'
+              })
+              .select('id')
+              .single()
+            entidadeCriadaId = data?.id
+            break
+          }
+
+          case 'tarefas': {
+            // Criar tarefa
+            const { data } = await supabase
+              .from('tarefas')
+              .insert({
+                obra_id: selectedObra.id,
+                titulo: suggestion.tarefa || suggestion.texto,
+                descricao: suggestion.texto,
+                prioridade: suggestion.prioridade || 'media',
+                status: 'pendente',
+                categoria: 'obra',
+                origem_tipo: 'sistema',
+                notas: `Criada automaticamente a partir de mensagem WhatsApp: "${suggestion.texto}"`
+              })
+              .select('id')
+              .single()
+            entidadeCriadaId = data?.id
+            break
+          }
+
+          case 'naoConformidades': {
+            // Criar não conformidade
+            const { data } = await supabase
+              .from('nao_conformidades')
+              .insert({
+                obra_id: selectedObra.id,
+                codigo: `NC-${Date.now()}`,
+                titulo: suggestion.descricao || suggestion.texto,
+                descricao: suggestion.texto,
+                gravidade: suggestion.gravidade || 'media',
+                estado: 'aberta',
+                origem: 'whatsapp'
+              })
+              .select('id')
+              .single()
+            entidadeCriadaId = data?.id
+            break
+          }
+
+          case 'trabalhos': {
+            // Registar no diário da obra
+            const { data } = await supabase
+              .from('obra_diario')
+              .insert({
+                obra_id: selectedObra.id,
+                tipo: 'geral',
+                descricao: `${suggestion.trabalho || suggestion.texto} - Progresso: ${suggestion.percentagem || 0}%`,
+                data: new Date().toISOString().split('T')[0]
+              })
+              .select('id')
+              .single()
+            entidadeCriadaId = data?.id
+            break
+          }
+
+          case 'horas': {
+            // Registar horas no diário da obra
+            const { data } = await supabase
+              .from('obra_diario')
+              .insert({
+                obra_id: selectedObra.id,
+                tipo: 'mao_obra',
+                descricao: suggestion.texto,
+                mao_obra_propria: suggestion.pessoas || 1,
+                data: suggestion.data || new Date().toISOString().split('T')[0]
+              })
+              .select('id')
+              .single()
+            entidadeCriadaId = data?.id
+            break
+          }
+
+          default:
+            console.log('Tipo de sugestão não suportado:', tipo)
         }
       }
 

@@ -92,7 +92,7 @@ serve(async (req) => {
     }
 
     // Gerar Message-ID único
-    const messageId = `${Date.now()}-${Math.random().toString(36).substring(7)}@gavinho.pt`
+    const messageId = `${Date.now()}-${Math.random().toString(36).substring(7)}@gavinhogroup.com`
 
     // Enviar email via SMTP (usando Resend, SendGrid, ou outro serviço)
     // Aqui usamos Resend como exemplo

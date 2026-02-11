@@ -151,7 +151,149 @@
   background: #3d3d3d;
 }
 
-/* Responsive */
+/* =====================================================
+   PROJETOS PAGE SKELETON
+   ===================================================== */
+
+.skeleton-projetos-page {
+  padding: 0;
+}
+
+.skeleton-projetos-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.skeleton-projetos-filters {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.skeleton-projetos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
+}
+
+.skeleton-projeto-card {
+  background: var(--white);
+  border-radius: 16px;
+  padding: 20px 20px 16px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.skeleton-projeto-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.skeleton-projeto-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.skeleton-projeto-card-progress {
+  margin-top: 8px;
+}
+
+.skeleton-projeto-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+}
+
+/* =====================================================
+   ARCHVIZ PAGE SKELETON
+   ===================================================== */
+
+.skeleton-archviz-page {
+  padding: 0;
+}
+
+.skeleton-archviz-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--stone);
+}
+
+.skeleton-archviz-section {
+  margin-bottom: 32px;
+}
+
+.skeleton-archviz-section-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.skeleton-archviz-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.skeleton-archviz-card {
+  background: var(--white);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.skeleton-archviz-thumbnail {
+  position: relative;
+  aspect-ratio: 16/10;
+  background: var(--cream);
+}
+
+.skeleton-archviz-badge-left {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+}
+
+.skeleton-archviz-badge-right {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
+.skeleton-archviz-content {
+  padding: 12px;
+}
+
+/* =====================================================
+   DARK MODE SUPPORT FOR NEW SKELETONS
+   ===================================================== */
+
+[data-theme="dark"] .skeleton-projeto-card,
+[data-theme="dark"] .skeleton-archviz-card {
+  background: #2d2d2d;
+}
+
+[data-theme="dark"] .skeleton-archviz-thumbnail {
+  background: #3d3d3d;
+}
+
+/* =====================================================
+   RESPONSIVE
+   ===================================================== */
+
 @media (max-width: 768px) {
   .skeleton-render-gallery {
     grid-template-columns: repeat(2, 1fr);
@@ -161,5 +303,36 @@
     flex-direction: column;
     gap: 16px;
     align-items: flex-start;
+  }
+
+  .skeleton-projetos-header {
+    flex-direction: column;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  .skeleton-projetos-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .skeleton-projetos-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .skeleton-archviz-header {
+    flex-direction: column;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  .skeleton-archviz-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .skeleton-archviz-grid {
+    grid-template-columns: 1fr;
   }
 }
