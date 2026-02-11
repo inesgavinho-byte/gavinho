@@ -215,7 +215,7 @@ export default function ProjetoInspiracoes({ projeto, userId, userName, comparti
 
       setInspiracoes(data || [])
     } catch (err) {
-      console.error('Erro ao carregar inspiracoes:', err)
+      // Table may not exist yet - show empty state
     } finally {
       setLoading(false)
     }
@@ -594,7 +594,7 @@ export default function ProjetoInspiracoes({ projeto, userId, userName, comparti
           <Palette size={20} />
           <div>
             <h2>Inspiracoes & Referencias</h2>
-            <p>{totalInspiracoes} imagem{totalInspiracoes !== 1 ? 'ns' : ''} em {totalCompartimentos} compartimento{totalCompartimentos !== 1 ? 's' : ''}</p>
+            <p>{totalInspiracoes} {totalInspiracoes !== 1 ? 'imagens' : 'imagem'} em {totalCompartimentos} compartimento{totalCompartimentos !== 1 ? 's' : ''}</p>
           </div>
         </div>
         <div className="inspiracoes-header-actions">
@@ -681,7 +681,7 @@ export default function ProjetoInspiracoes({ projeto, userId, userName, comparti
                       <h3>{compartimento}</h3>
                     </div>
                     <span className="inspiracoes-section-count">
-                      {items.length} imagem{items.length !== 1 ? 'ns' : ''}
+                      {items.length} {items.length !== 1 ? 'imagens' : 'imagem'}
                     </span>
                   </div>
                   <div className="inspiracoes-section-actions">

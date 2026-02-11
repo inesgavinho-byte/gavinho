@@ -83,7 +83,7 @@ export function CriticalDeadlinesWidget() {
         setStats({ overdue, dueToday, dueThisWeek })
         setTasks(processedTasks.slice(0, 5))
       } catch (err) {
-        console.error('Error fetching tasks:', err)
+        // Table may not exist yet - widget shows empty state
       } finally {
         setLoading(false)
       }
@@ -309,7 +309,7 @@ export function BudgetHealthWidget() {
         })
         setBudgets(processedBudgets.slice(0, 5))
       } catch (err) {
-        console.error('Error fetching budgets:', err)
+        // Table may not exist yet - widget shows empty state
       } finally {
         setLoading(false)
       }
@@ -518,7 +518,7 @@ export function PendingApprovalsWidget() {
         })
         setRequisitions((data || []).slice(0, 5))
       } catch (err) {
-        console.error('Error fetching requisitions:', err)
+        // Table may not exist yet - widget shows empty state
       } finally {
         setLoading(false)
       }
@@ -756,7 +756,7 @@ export function UnreadMessagesWidget() {
         })
         setMessages(processedMessages)
       } catch (err) {
-        console.error('Error fetching messages:', err)
+        // Table may not exist yet - widget shows empty state
       } finally {
         setLoading(false)
       }

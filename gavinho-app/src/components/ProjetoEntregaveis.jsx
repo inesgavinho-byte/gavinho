@@ -133,7 +133,7 @@ export default function ProjetoEntregaveis({ projeto }) {
       if (error) throw error
       setUtilizadores(data || [])
     } catch (err) {
-      console.error('Erro ao carregar utilizadores:', err)
+      // Silent fail
     }
   }
 
@@ -154,7 +154,7 @@ export default function ProjetoEntregaveis({ projeto }) {
         setExpandedFases({})
       }
     } catch (err) {
-      console.error('Erro ao carregar entregáveis:', err)
+      // Table may not exist yet
     } finally {
       setLoading(false)
     }

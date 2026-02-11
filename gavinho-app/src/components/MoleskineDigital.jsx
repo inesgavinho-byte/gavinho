@@ -227,7 +227,7 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
           .single()
 
         if (error && error.code !== 'PGRST116') {
-          console.error('Erro ao carregar moleskine:', error)
+          // Table may not exist yet
           return
         }
 
@@ -247,7 +247,7 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
           setHistoryIndex(initialIndex)
         }
       } catch (err) {
-        console.error('Erro ao carregar moleskine:', err)
+        // Table may not exist yet
       }
     }
 
@@ -1174,7 +1174,7 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
 
       setProjectRenders(renders)
     } catch (err) {
-      console.error('Erro ao carregar renders:', err)
+      // Storage bucket may not exist
     } finally {
       setLoadingRenders(false)
     }

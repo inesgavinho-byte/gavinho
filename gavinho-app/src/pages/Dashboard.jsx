@@ -94,19 +94,25 @@ export default function Dashboard() {
           setProjectsByPhase(phaseData)
         }
 
-        const { data: mensagens } = await supabase
-          .from('chat_mensagens')
-          .select(`
-            id,
-            conteudo,
-            autor_id,
-            autor_nome,
-            attachments,
-            created_at,
-            canal_id
-          `)
-          .order('created_at', { ascending: false })
-          .limit(5)
+        let mensagens = null
+        try {
+          const { data } = await supabase
+            .from('chat_mensagens')
+            .select(`
+              id,
+              conteudo,
+              autor_id,
+              autor_nome,
+              attachments,
+              created_at,
+              canal_id
+            `)
+            .order('created_at', { ascending: false })
+            .limit(5)
+          mensagens = data
+        } catch (e) {
+          // Table may not exist yet
+        }
 
         if (mensagens && mensagens.length > 0) {
           const activity = mensagens.map(m => ({

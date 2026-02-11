@@ -1,5 +1,6 @@
 -- Migration: Create projeto_inspiracoes table
 -- Table to store inspiration images and references for archviz projects
+-- SAFE: Handles case where table already exists with different schema
 
 -- =====================================================
 -- Table: projeto_inspiracoes
@@ -19,6 +20,18 @@ CREATE TABLE IF NOT EXISTS projeto_inspiracoes (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Add columns if table already existed with different schema
+ALTER TABLE projeto_inspiracoes ADD COLUMN IF NOT EXISTS compartimento TEXT DEFAULT 'Geral';
+ALTER TABLE projeto_inspiracoes ADD COLUMN IF NOT EXISTS titulo TEXT;
+ALTER TABLE projeto_inspiracoes ADD COLUMN IF NOT EXISTS descricao TEXT;
+ALTER TABLE projeto_inspiracoes ADD COLUMN IF NOT EXISTS url TEXT;
+ALTER TABLE projeto_inspiracoes ADD COLUMN IF NOT EXISTS fonte TEXT;
+ALTER TABLE projeto_inspiracoes ADD COLUMN IF NOT EXISTS tags TEXT[] DEFAULT '{}';
+ALTER TABLE projeto_inspiracoes ADD COLUMN IF NOT EXISTS created_by UUID;
+ALTER TABLE projeto_inspiracoes ADD COLUMN IF NOT EXISTS created_by_name TEXT;
+ALTER TABLE projeto_inspiracoes ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE projeto_inspiracoes ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 
 -- Indexes for faster queries
 CREATE INDEX IF NOT EXISTS idx_projeto_inspiracoes_projeto_id ON projeto_inspiracoes(projeto_id);
@@ -69,7 +82,12 @@ COMMENT ON COLUMN projeto_inspiracoes.fonte IS 'Source of inspiration (Pinterest
 COMMENT ON COLUMN projeto_inspiracoes.tags IS 'Array of tags for categorization and filtering';
 COMMENT ON COLUMN projeto_inspiracoes.url IS 'Public URL to the image in storage';
 
--- Log migration execution
-INSERT INTO seeds_executados (nome, executed_at)
-VALUES ('20250207_projeto_inspiracoes', NOW())
-ON CONFLICT (nome) DO UPDATE SET executed_at = NOW();
+-- Log migration execution (only if seeds_executados exists)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'seeds_executados') THEN
+    INSERT INTO seeds_executados (nome, executed_at)
+    VALUES ('20250207_projeto_inspiracoes', NOW())
+    ON CONFLICT (nome) DO UPDATE SET executed_at = NOW();
+  END IF;
+END $$;

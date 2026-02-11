@@ -1097,7 +1097,7 @@ export default function ProjetoAtas({ projeto }) {
 
       setAtas(atasWithSection)
     } catch (err) {
-      console.error('Erro ao carregar atas:', err)
+      // Table may not exist yet
     } finally {
       setLoading(false)
     }

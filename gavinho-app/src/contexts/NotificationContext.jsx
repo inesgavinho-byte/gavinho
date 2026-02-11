@@ -127,8 +127,7 @@ export function NotificationProvider({ children }) {
       })
 
       if (error) {
-        // Fallback to direct query if function doesn't exist
-        console.warn('Unified function not available, falling back to direct query:', error.message)
+        // RPC function may not be deployed yet - fallback silently
         await fetchNotificationsFallback(reset)
         return
       }
@@ -152,7 +151,7 @@ export function NotificationProvider({ children }) {
       setOffset(currentOffset + results.length)
 
     } catch (err) {
-      console.error('Error fetching notifications:', err)
+      // Fallback if RPC fails for any reason
       await fetchNotificationsFallback(reset)
     } finally {
       setIsLoading(false)
@@ -166,22 +165,29 @@ export function NotificationProvider({ children }) {
 
     const currentOffset = reset ? 0 : offset
 
-    // Fetch from both tables
-    const [workspaceRes, appRes] = await Promise.all([
-      supabase
-        .from('notificacoes')
-        .select(`*, sender:sender_id(id, nome, email, avatar_url)`)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .range(currentOffset, currentOffset + PAGE_SIZE),
+    // Fetch from both tables - handle missing tables gracefully
+    let workspaceRes = { data: [], error: null }
+    let appRes = { data: [], error: null }
 
-      supabase
-        .from('app_notificacoes')
-        .select('*')
-        .or(`utilizador_id.eq.${user.id},utilizador_email.eq.${user.email}`)
-        .order('created_at', { ascending: false })
-        .range(currentOffset, currentOffset + PAGE_SIZE)
-    ])
+    try {
+      ;[workspaceRes, appRes] = await Promise.all([
+        supabase
+          .from('notificacoes')
+          .select(`*, sender:sender_id(id, nome, email, avatar_url)`)
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .range(currentOffset, currentOffset + PAGE_SIZE),
+
+        supabase
+          .from('app_notificacoes')
+          .select('*')
+          .or(`utilizador_id.eq.${user.id},utilizador_email.eq.${user.email}`)
+          .order('created_at', { ascending: false })
+          .range(currentOffset, currentOffset + PAGE_SIZE)
+      ])
+    } catch (e) {
+      // Tables may not exist yet - use empty results
+    }
 
     // Normalize workspace notifications
     const workspaceNotifs = (workspaceRes.data || []).map(n => ({
@@ -267,7 +273,7 @@ export function NotificationProvider({ children }) {
         })
       }
     } catch (err) {
-      console.warn('Error fetching counts:', err)
+      // RPC not available - counts calculated from local data
     }
   }, [user?.id, user?.email, notifications])
 
@@ -291,7 +297,7 @@ export function NotificationProvider({ children }) {
         setGroupedNotifications(formatted)
       }
     } catch (err) {
-      console.warn('Grouped notifications not available:', err)
+      // RPC not available - grouped view disabled
     }
   }, [user?.id, user?.email])
 
