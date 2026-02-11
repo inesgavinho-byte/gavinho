@@ -104,7 +104,6 @@ export default function ChatObras() {
       const { data, error } = await supabase
         .from('obras')
         .select('id, codigo, nome, status')
-        .in('status', ['em_curso', 'em_projeto'])
         .order('codigo', { ascending: false })
       if (error) throw error
       setObras(data || [])
