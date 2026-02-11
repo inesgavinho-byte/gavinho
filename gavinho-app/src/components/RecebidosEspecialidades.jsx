@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { useToast } from './ui/Toast'
+import ConfirmModal from './ui/ConfirmModal'
 import {
   Plus, FileText, Edit2, Trash2, Save, X, Calendar, User, CheckCircle,
   Clock, AlertCircle, Download, Upload, ChevronRight, ChevronDown,
@@ -35,6 +37,8 @@ export default function RecebidosEspecialidades({ projeto }) {
   const [uploadedFile, setUploadedFile] = useState(null)
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef(null)
+  const toast = useToast()
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null })
 
   const [formData, setFormData] = useState({
     especialidade: 'estrutura',
@@ -221,7 +225,7 @@ export default function RecebidosEspecialidades({ projeto }) {
 
   const handleSave = async () => {
     if (!formData.codigo.trim() || !formData.descricao.trim()) {
-      alert('Código e Descrição são obrigatórios')
+      toast.warning('Aviso', 'Código e Descrição são obrigatórios')
       return
     }
 
@@ -260,32 +264,41 @@ export default function RecebidosEspecialidades({ projeto }) {
       loadRecebidos()
     } catch (err) {
       console.error('Erro ao guardar:', err)
-      alert('Erro ao guardar: ' + err.message)
+      toast.error('Erro', 'Erro ao guardar: ' + err.message)
     } finally {
       setSaving(false)
     }
   }
 
   const handleDelete = async (item) => {
-    if (!confirm(`Eliminar "${item.codigo} - ${item.descricao}"?`)) return
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar Documento',
+      message: `Eliminar "${item.codigo} - ${item.descricao}"?`,
+      type: 'danger',
+      onConfirm: async () => {
+        if (item.id.startsWith('sample-')) {
+          setRecebidos(prev => prev.filter(r => r.id !== item.id))
+          setConfirmModal(prev => ({ ...prev, isOpen: false }))
+          return
+        }
 
-    if (item.id.startsWith('sample-')) {
-      setRecebidos(prev => prev.filter(r => r.id !== item.id))
-      return
-    }
+        try {
+          const { error } = await supabase
+            .from('projeto_recebidos')
+            .delete()
+            .eq('id', item.id)
 
-    try {
-      const { error } = await supabase
-        .from('projeto_recebidos')
-        .delete()
-        .eq('id', item.id)
-
-      if (error) throw error
-      loadRecebidos()
-    } catch (err) {
-      console.error('Erro ao eliminar:', err)
-      alert('Erro ao eliminar: ' + err.message)
-    }
+          if (error) throw error
+          loadRecebidos()
+        } catch (err) {
+          console.error('Erro ao eliminar:', err)
+          toast.error('Erro', 'Erro ao eliminar: ' + err.message)
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      }
+    })
+    return
   }
 
   const updateStatus = async (item, newStatus) => {
@@ -920,6 +933,16 @@ export default function RecebidosEspecialidades({ projeto }) {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type || 'danger'}
+        confirmText="Confirmar"
+      />
     </div>
   )
 }

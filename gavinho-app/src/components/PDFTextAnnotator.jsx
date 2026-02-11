@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import * as pdfjsLib from 'pdfjs-dist'
+import { useToast } from './ui/Toast'
 import {
   X, Type, ChevronLeft, ChevronRight, ZoomIn, ZoomOut,
   Trash2, Save, Download, Loader2, Move, Undo, Redo,
@@ -22,6 +23,8 @@ export default function PDFTextAnnotator({
   onSave,
   documentName = 'documento'
 }) {
+  const toast = useToast()
+
   // PDF State
   const [pdfDoc, setPdfDoc] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
@@ -315,7 +318,7 @@ export default function PDFTextAnnotator({
       }
     } catch (err) {
       console.error('Erro ao exportar:', err)
-      alert('Erro ao exportar o documento')
+      toast.error('Erro', 'Erro ao exportar o documento')
     } finally {
       setSaving(false)
     }

@@ -1,22 +1,26 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { 
-  Plus, 
-  Search, 
-  Mail, 
-  Phone, 
+import {
+  Plus,
+  Search,
+  Mail,
+  Phone,
   MapPin,
   MoreVertical,
   X,
   Edit,
   Trash2,
-  User
+  User,
+  FolderKanban
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { useToast } from '../components/ui/Toast'
 
 export default function Clientes() {
   const navigate = useNavigate()
+  const toast = useToast()
   const [clients, setClients] = useState([])
+  const [projectCounts, setProjectCounts] = useState({})
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [showModal, setShowModal] = useState(false)
@@ -38,13 +42,23 @@ export default function Clientes() {
 
   const loadClients = async () => {
     try {
-      const { data, error } = await supabase
-        .from('clientes')
-        .select('*')
-        .order('nome', { ascending: true })
-      
-      if (error) throw error
-      setClients(data || [])
+      const [clientsRes, projectsRes] = await Promise.all([
+        supabase.from('clientes').select('*').order('nome', { ascending: true }),
+        supabase.from('projetos').select('id, cliente_id, codigo, nome, status').order('codigo')
+      ])
+
+      if (clientsRes.error) throw clientsRes.error
+      setClients(clientsRes.data || [])
+
+      // Build project count map per client
+      const counts = {}
+      ;(projectsRes.data || []).forEach(p => {
+        if (p.cliente_id) {
+          if (!counts[p.cliente_id]) counts[p.cliente_id] = []
+          counts[p.cliente_id].push(p)
+        }
+      })
+      setProjectCounts(counts)
     } catch (err) {
       console.error('Erro ao carregar clientes:', err)
     } finally {
@@ -146,7 +160,7 @@ export default function Clientes() {
       loadClients()
     } catch (err) {
       console.error('Erro ao guardar cliente:', err)
-      alert('Erro ao guardar cliente')
+      toast.error('Erro', 'Erro ao guardar cliente')
     }
   }
 
@@ -158,7 +172,7 @@ export default function Clientes() {
       loadClients()
     } catch (err) {
       console.error('Erro ao eliminar cliente:', err)
-      alert('Erro ao eliminar cliente. Verifique se não tem projetos associados.')
+      toast.error('Erro', 'Erro ao eliminar cliente. Verifique se não tem projetos associados.')
     }
   }
 
@@ -219,6 +233,7 @@ export default function Clientes() {
                   <th>Cliente</th>
                   <th>Tipo</th>
                   <th>Contacto</th>
+                  <th>Projetos</th>
                   <th>Localização</th>
                   <th>NIF</th>
                   <th></th>
@@ -248,6 +263,22 @@ export default function Clientes() {
                         {client.email && <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--brown-light)' }}><Mail size={12} />{client.email}</div>}
                         {client.telefone && <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--brown-light)' }}><Phone size={12} />{client.telefone}</div>}
                       </div>
+                    </td>
+                    <td>
+                      {projectCounts[client.id] ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', fontWeight: 500, color: 'var(--brown)' }}>
+                            <FolderKanban size={13} style={{ color: 'var(--accent-olive)' }} />
+                            {projectCounts[client.id].length} projeto{projectCounts[client.id].length !== 1 ? 's' : ''}
+                          </span>
+                          <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
+                            {projectCounts[client.id].slice(0, 2).map(p => p.codigo).join(', ')}
+                            {projectCounts[client.id].length > 2 && ` +${projectCounts[client.id].length - 2}`}
+                          </div>
+                        </div>
+                      ) : (
+                        <span style={{ fontSize: '12px', color: 'var(--brown-light)' }}>—</span>
+                      )}
                     </td>
                     <td>
                       {client.cidade && <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--brown-light)' }}><MapPin size={14} />{client.cidade}</div>}

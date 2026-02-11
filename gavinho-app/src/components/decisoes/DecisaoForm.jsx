@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../contexts/AuthContext'
+import PortalToggle from '../PortalToggle'
 
 const TIPO_OPTIONS = [
   { value: 'design', label: 'Design', icon: '🎨' },
@@ -23,10 +25,12 @@ const INITIAL_FORM = {
   decidido_por: '', decidido_por_tipo: 'cliente',
   data_decisao: new Date().toISOString().split('T')[0],
   impacto_orcamento: '', impacto_prazo_dias: '', divisao: '',
-  justificacao: '', categoria_orcamento: '', tags: [], alternativas: []
+  justificacao: '', categoria_orcamento: '', tags: [], alternativas: [],
+  publicar_no_portal: false, requer_resposta_cliente: false, prazo_resposta_cliente: ''
 }
 
 export default function DecisaoForm({ projetoId, decisao, onClose, onSave }) {
+  const { profile } = useAuth()
   const [form, setForm] = useState(INITIAL_FORM)
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState({})
@@ -46,7 +50,10 @@ export default function DecisaoForm({ projetoId, decisao, onClose, onSave }) {
         impacto_prazo_dias: decisao.impacto_prazo_dias || '',
         divisao: decisao.divisao || '', justificacao: decisao.justificacao || '',
         categoria_orcamento: decisao.categoria_orcamento || '',
-        tags: decisao.tags || [], alternativas: decisao.alternativas_consideradas || []
+        tags: decisao.tags || [], alternativas: decisao.alternativas_consideradas || [],
+        publicar_no_portal: decisao.publicar_no_portal || false,
+        requer_resposta_cliente: decisao.requer_resposta_cliente || false,
+        prazo_resposta_cliente: decisao.prazo_resposta_cliente || ''
       })
     }
   }, [decisao])
@@ -76,16 +83,18 @@ export default function DecisaoForm({ projetoId, decisao, onClose, onSave }) {
       categoria_orcamento: form.categoria_orcamento.trim() || null,
       tags: form.tags.length > 0 ? form.tags : null,
       alternativas_consideradas: form.alternativas.length > 0 ? form.alternativas : null,
-      fonte: 'manual', estado: 'validada'
+      fonte: 'manual', estado: 'validada',
+      publicar_no_portal: form.publicar_no_portal,
+      requer_resposta_cliente: form.requer_resposta_cliente,
+      prazo_resposta_cliente: form.prazo_resposta_cliente || null
     }
 
     try {
       if (isEditing) {
         await supabase.from('decisoes').update(dataToSave).eq('id', decisao.id)
       } else {
-        const user = (await supabase.auth.getUser()).data.user
-        dataToSave.created_by = user?.id
-        dataToSave.aprovado_por = user?.id
+        dataToSave.created_by = profile?.id
+        dataToSave.aprovado_por = profile?.id
         await supabase.from('decisoes').insert(dataToSave)
       }
       onSave?.()
@@ -252,6 +261,28 @@ export default function DecisaoForm({ projetoId, decisao, onClose, onSave }) {
                     <button type="button" onClick={() => removeTag(tag)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: '#9CA3AF', padding: 0 }}>×</button>
                   </span>
                 ))}
+              </div>
+            )}
+          </div>
+
+          {/* Portal Cliente */}
+          <div style={{ borderTop: '1px solid #E8E6DF', paddingTop: '12px' }}>
+            <PortalToggle
+              checked={form.publicar_no_portal}
+              onChange={v => updateForm('publicar_no_portal', v)}
+            />
+            {form.publicar_no_portal && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '8px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#5F5C59', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={form.requer_resposta_cliente} onChange={e => updateForm('requer_resposta_cliente', e.target.checked)} />
+                  Requer resposta do cliente
+                </label>
+                {form.requer_resposta_cliente && (
+                  <div>
+                    <label style={{ fontSize: '11px', color: '#8B8670', display: 'block', marginBottom: '2px' }}>Prazo de resposta</label>
+                    <input type="date" value={form.prazo_resposta_cliente} onChange={e => updateForm('prazo_resposta_cliente', e.target.value)} style={inputStyle} />
+                  </div>
+                )}
               </div>
             )}
           </div>

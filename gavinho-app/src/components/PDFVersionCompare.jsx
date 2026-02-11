@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import * as pdfjsLib from 'pdfjs-dist'
 import { supabase } from '../lib/supabase'
+import { useToast } from './ui/Toast'
 import {
   X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Loader2,
   GitCompare, CheckCircle, XCircle, AlertTriangle, Clock,
@@ -42,6 +43,8 @@ export default function PDFVersionCompare({
   userId,
   userName
 }) {
+  const toast = useToast()
+
   // PDF State
   const [pdfAnterior, setPdfAnterior] = useState(null)
   const [pdfAtual, setPdfAtual] = useState(null)
@@ -530,7 +533,7 @@ export default function PDFVersionCompare({
   // Submit review
   const handleSubmitReview = async () => {
     if (!reviewNotes.trim()) {
-      alert('Por favor adicione notas sobre esta revisao')
+      toast.warning('Aviso', 'Por favor adicione notas sobre esta revisão')
       return
     }
 
@@ -564,11 +567,11 @@ export default function PDFVersionCompare({
       }
 
       setShowSubmitModal(false)
-      alert('Revisao submetida e versao trancada com sucesso!')
+      toast.success('Sucesso', 'Revisão submetida e versão trancada com sucesso!')
       onClose()
     } catch (err) {
       console.error('Erro ao submeter revisao:', err)
-      alert('Erro ao submeter revisao. Por favor tente novamente.')
+      toast.error('Erro', 'Erro ao submeter revisão. Por favor tente novamente.')
     } finally {
       setSubmitting(false)
     }
@@ -577,7 +580,7 @@ export default function PDFVersionCompare({
   // Handle decision (Approve or Request Changes)
   const handleDecision = async (decision) => {
     if (!decisionNotes.trim()) {
-      alert('Por favor adicione notas sobre esta decisao')
+      toast.warning('Aviso', 'Por favor adicione notas sobre esta decisão')
       return
     }
 
@@ -615,15 +618,15 @@ export default function PDFVersionCompare({
       setDecisionNotes('')
 
       if (decision === 'aprovado') {
-        alert('Documento aprovado e versao trancada com sucesso!')
+        toast.success('Sucesso', 'Documento aprovado e versão trancada com sucesso!')
       } else {
-        alert('Pedido de alteracoes registado com sucesso!')
+        toast.success('Sucesso', 'Pedido de alterações registado com sucesso!')
       }
 
       onClose()
     } catch (err) {
       console.error('Erro ao registar decisao:', err)
-      alert('Erro ao registar decisao. Por favor tente novamente.')
+      toast.error('Erro', 'Erro ao registar decisão. Por favor tente novamente.')
     } finally {
       setSubmitting(false)
     }

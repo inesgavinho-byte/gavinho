@@ -30,6 +30,7 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { SeedInteligente } from '../components/admin'
+import { useToast } from '../components/ui/Toast'
 
 // Tabelas disponíveis para importação em massa
 const IMPORT_TABLES = {
@@ -76,6 +77,7 @@ const SEED_CARDS = {
 
 export default function AdminSeed() {
   const navigate = useNavigate()
+  const toast = useToast()
   const [loading, setLoading] = useState(false)
   const [logs, setLogs] = useState([])
   const [result, setResult] = useState(null)
@@ -237,7 +239,7 @@ export default function AdminSeed() {
 
   const handleBulkImport = async () => {
     if (parsedData.length === 0) {
-      alert('Nenhum dado para importar. Parse os dados primeiro.')
+      toast.warning('Aviso', 'Nenhum dado para importar. Parse os dados primeiro.')
       return
     }
 
@@ -2569,7 +2571,7 @@ export default function AdminSeed() {
                           onClick={() => {
                             // Copiar dados do item para clipboard para inserção manual
                             navigator.clipboard.writeText(JSON.stringify(item.data || item, null, 2))
-                            alert('Dados copiados para clipboard')
+                            toast.success('Sucesso', 'Dados copiados para clipboard')
                           }}
                           style={{
                             padding: '4px 10px',

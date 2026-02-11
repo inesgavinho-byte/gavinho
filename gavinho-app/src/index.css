@@ -282,18 +282,19 @@ h4 { font-size: 17px; }
    ======================================== */
 .sidebar {
   width: var(--sidebar-width);
-  background: rgba(250, 249, 247, 0.8);
+  background: rgba(250, 249, 247, 0.95);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   display: flex;
   flex-direction: column;
-  padding: 20px 12px;
+  padding: 16px 10px;
   border-right: 1px solid var(--stone);
   position: fixed;
   top: 0;
   left: 0;
   bottom: 0;
   z-index: 100;
+  transition: width 0.2s ease, padding 0.2s ease;
 }
 
 .sidebar-header {
@@ -337,13 +338,13 @@ h4 { font-size: 17px; }
 }
 
 .nav-section-title {
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 10px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--brown-light);
+  letter-spacing: 1px;
+  color: var(--blush-dark);
   padding: 0 12px;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .nav-item {
@@ -362,13 +363,15 @@ h4 { font-size: 17px; }
 }
 
 .nav-item:hover {
-  background: rgba(195, 186, 175, 0.2);
+  background: rgba(122, 139, 110, 0.12);
+  color: var(--accent-olive-dark);
 }
 
 .nav-item.active {
-  background: rgba(195, 186, 175, 0.35);
-  color: var(--brown);
+  background: var(--accent-olive);
+  color: var(--white);
   font-weight: 600;
+  box-shadow: 0 2px 8px rgba(122, 139, 110, 0.3);
 }
 
 .nav-item svg {
@@ -378,6 +381,10 @@ h4 { font-size: 17px; }
   stroke-width: 1.75;
   fill: none;
   flex-shrink: 0;
+}
+
+.nav-item.active svg {
+  stroke: var(--white);
 }
 
 .nav-item-badge {
@@ -391,8 +398,8 @@ h4 { font-size: 17px; }
 }
 
 .nav-item.active .nav-item-badge {
-  background: var(--blush);
-  color: var(--brown-dark);
+  background: rgba(255, 255, 255, 0.25);
+  color: var(--white);
 }
 
 .sidebar-footer {
@@ -1409,8 +1416,8 @@ tbody tr:last-child td {
    COLLAPSED SIDEBAR
    ======================================== */
 .sidebar.collapsed {
-  width: 72px;
-  padding: 20px 8px;
+  width: 68px;
+  padding: 16px 6px;
 }
 
 .sidebar.collapsed .nav-section-title {
@@ -1426,22 +1433,21 @@ tbody tr:last-child td {
 
 .sidebar.collapsed .nav-item {
   justify-content: center;
-  padding: 12px;
-  border-radius: 12px;
-  margin: 4px;
+  padding: 10px;
+  border-radius: 10px;
+  margin: 2px 4px;
   position: relative;
   transition: all 0.2s ease;
 }
 
 .sidebar.collapsed .nav-item:hover {
-  background: var(--cream);
-  transform: scale(1.05);
+  background: rgba(122, 139, 110, 0.15);
 }
 
 .sidebar.collapsed .nav-item.active {
   background: var(--accent-olive);
   color: var(--white);
-  box-shadow: 0 4px 12px rgba(163, 177, 138, 0.4);
+  box-shadow: 0 2px 8px rgba(122, 139, 110, 0.35);
 }
 
 .sidebar.collapsed .nav-item span:not(.nav-tooltip) {
@@ -1560,9 +1566,10 @@ tbody tr:last-child td {
 }
 
 .sidebar.collapsed .logo-mark {
-  width: 40px;
-  height: 40px;
-  font-size: 18px;
+  width: 38px;
+  height: 38px;
+  font-size: 16px;
+  border-radius: 10px;
   transition: all 0.2s ease;
 }
 
@@ -1598,7 +1605,7 @@ tbody tr:last-child td {
 }
 
 .app-layout.sidebar-collapsed .main-content {
-  margin-left: 72px;
+  margin-left: 68px;
 }
 
 /* Workspace mode - full width content */
@@ -1620,17 +1627,19 @@ tbody tr:last-child td {
 
 /* Nav item highlight (Workspace) - expanded mode */
 .nav-item.nav-item-highlight {
-  background: rgba(139, 155, 123, 0.15);
+  background: rgba(122, 139, 110, 0.1);
   border-left: 3px solid var(--accent-olive);
 }
 
 .nav-item.nav-item-highlight:hover {
-  background: rgba(139, 155, 123, 0.25);
+  background: rgba(122, 139, 110, 0.2);
 }
 
 .nav-item.nav-item-highlight.active {
-  background: rgba(139, 155, 123, 0.35);
-  color: var(--accent-olive);
+  background: var(--accent-olive-dark);
+  color: var(--white);
+  border-left: 3px solid var(--accent-olive-dark);
+  box-shadow: 0 2px 8px rgba(107, 122, 95, 0.35);
 }
 
 /* Nav item highlight (Workspace) - collapsed mode */
@@ -1652,8 +1661,9 @@ tbody tr:last-child td {
 
 /* Sidebar collapse button hover */
 .sidebar-collapse-btn:hover {
-  background: var(--cream) !important;
-  color: var(--brown) !important;
+  background: var(--accent-olive) !important;
+  color: var(--white) !important;
+  border-color: var(--accent-olive) !important;
 }
 
 /* ========================================
@@ -2698,15 +2708,29 @@ tbody tr:last-child td {
 
 .chat-message-actions {
   position: absolute;
-  top: 0;
-  right: 0;
+  top: -16px;
+  right: 8px;
   opacity: 0;
-  transition: opacity 0.2s ease;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
   z-index: 10;
 }
 
 .chat-message:hover .chat-message-actions {
   opacity: 1;
+  pointer-events: auto;
+}
+
+.chat-message:hover {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+/* Chat input placeholder */
+.chat-input-textarea::placeholder {
+  color: var(--brown-light);
+  font-style: italic;
+  font-weight: 400;
+  opacity: 0.6;
 }
 
 .chat-msg-action-btn {

@@ -1,13 +1,15 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import {
-  Plus, Upload, FileText, ChevronRight, ChevronDown, Edit2, Trash2, Save, X,
-  Calendar, User, CheckCircle, Clock, AlertCircle, Download, FileSpreadsheet,
-  Loader2, MoreVertical, Eye, CheckSquare, Square, Paperclip, Shield,
+  Plus, FileText, ChevronRight, ChevronDown, Edit2, Trash2, Save, X,
+  FileSpreadsheet,
+  Loader2, CheckSquare, Square, Paperclip, Shield,
   GripVertical, ChevronUp, FolderPlus
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { DeliveryFileSection } from './deliveries'
+import { useToast } from './ui/Toast'
+import { ConfirmModal } from './ui/ConfirmModal'
 
 const statusConfig = {
   'nao_iniciado': { label: 'Não Iniciado', color: '#95a5a6', bg: 'rgba(149, 165, 166, 0.15)' },
@@ -27,6 +29,10 @@ export default function ProjetoEntregaveis({ projeto }) {
   const [expandedGroups, setExpandedGroups] = useState({})
   const [saving, setSaving] = useState(false)
   const fileInputRef = useRef(null)
+  const toast = useToast()
+
+  // Estado para modal de confirmação
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null })
 
   // Estado para seleção múltipla
   const [selectedItems, setSelectedItems] = useState(new Set())
@@ -112,7 +118,6 @@ export default function ProjetoEntregaveis({ projeto }) {
       }
     } catch (err) {
       // Silently fail - table might not exist yet
-      console.log('Files cache not loaded (table may not exist)')
     }
   }
 
@@ -192,7 +197,7 @@ export default function ProjetoEntregaveis({ projeto }) {
 
   const handleSave = async () => {
     if (!formData.codigo.trim() || !formData.nome.trim()) {
-      alert('Código e Nome são obrigatórios')
+      toast.warning('Aviso', 'Código e Nome são obrigatórios')
       return
     }
 
@@ -241,26 +246,34 @@ export default function ProjetoEntregaveis({ projeto }) {
       loadEntregaveis(false) // Preservar expansão
     } catch (err) {
       console.error('Erro ao guardar:', err)
-      alert('Erro ao guardar: ' + err.message)
+      toast.error('Erro', 'Erro ao guardar: ' + err.message)
     } finally {
       setSaving(false)
     }
   }
 
   const handleDelete = async (item) => {
-    if (!confirm(`Eliminar "${item.codigo} - ${item.nome}"?`)) return
-
-    try {
-      const { error } = await supabase
-        .from('projeto_entregaveis')
-        .delete()
-        .eq('id', item.id)
-      if (error) throw error
-      loadEntregaveis(false) // Preservar expansão
-    } catch (err) {
-      console.error('Erro ao eliminar:', err)
-      alert('Erro ao eliminar')
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar Entregável',
+      message: `Eliminar "${item.codigo} - ${item.nome}"?`,
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase
+            .from('projeto_entregaveis')
+            .delete()
+            .eq('id', item.id)
+          if (error) throw error
+          loadEntregaveis(false) // Preservar expansão
+        } catch (err) {
+          console.error('Erro ao eliminar:', err)
+          toast.error('Erro', 'Erro ao eliminar')
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      }
+    })
+    return
   }
 
   // Seleção múltipla
@@ -286,20 +299,28 @@ export default function ProjetoEntregaveis({ projeto }) {
 
   const handleDeleteSelected = async () => {
     if (selectedItems.size === 0) return
-    if (!confirm(`Tem certeza que deseja eliminar ${selectedItems.size} entregável(is)?`)) return
-
-    try {
-      const { error } = await supabase
-        .from('projeto_entregaveis')
-        .delete()
-        .in('id', Array.from(selectedItems))
-      if (error) throw error
-      setSelectedItems(new Set())
-      loadEntregaveis(false)
-    } catch (err) {
-      console.error('Erro ao eliminar:', err)
-      alert('Erro ao eliminar: ' + err.message)
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar Entregáveis',
+      message: `Tem certeza que deseja eliminar ${selectedItems.size} entregável(is)?`,
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase
+            .from('projeto_entregaveis')
+            .delete()
+            .in('id', Array.from(selectedItems))
+          if (error) throw error
+          setSelectedItems(new Set())
+          loadEntregaveis(false)
+        } catch (err) {
+          console.error('Erro ao eliminar:', err)
+          toast.error('Erro', 'Erro ao eliminar: ' + err.message)
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      }
+    })
+    return
   }
 
   // Atualização inline de um campo específico
@@ -328,7 +349,7 @@ export default function ProjetoEntregaveis({ projeto }) {
       setEditingCell(null)
     } catch (err) {
       console.error('Erro ao atualizar:', err)
-      alert('Erro ao atualizar')
+      toast.error('Erro', 'Erro ao atualizar')
     }
   }
 
@@ -351,7 +372,6 @@ export default function ProjetoEntregaveis({ projeto }) {
       }])
 
       if (error) throw error
-      console.log('Tarefa criada para entregável:', entregavel.codigo)
     } catch (err) {
       console.error('Erro ao criar tarefa:', err)
     }
@@ -413,7 +433,7 @@ export default function ProjetoEntregaveis({ projeto }) {
       }
 
       if (headerRow === -1) {
-        alert('Não foi possível encontrar o cabeçalho da tabela')
+        toast.warning('Aviso', 'Não foi possível encontrar o cabeçalho da tabela')
         return
       }
 
@@ -424,7 +444,6 @@ export default function ProjetoEntregaveis({ projeto }) {
       // Fallback: usar primeira e segunda coluna se nao encontrar
       if (codigoIdx === -1 && headers.length >= 2) codigoIdx = 0
       if (nomeIdx === -1 && headers.length >= 2) nomeIdx = 1
-      console.log('Headers:', headers, 'codigoIdx:', codigoIdx, 'nomeIdx:', nomeIdx)
       const escalaIdx = headers.findIndex(h => h.includes('ESCALA'))
       const faseIdx = headers.findIndex(h => h.includes('FASE'))
       const dataInicioIdx = headers.findIndex(h => h.includes('INÀCIO') || h.includes('INICIO'))
@@ -433,7 +452,7 @@ export default function ProjetoEntregaveis({ projeto }) {
       const executanteIdx = headers.findIndex(h => h.includes('EXECUTANTE') || h.includes('PESSOA'))
 
       if (codigoIdx === -1 || nomeIdx === -1) {
-        alert('Colunas CÓDIGO e DESCRIÇÃO (ou DESENHO) são obrigatórias')
+        toast.warning('Aviso', 'Colunas CÓDIGO e DESCRIÇÃO (ou DESENHO) são obrigatórias')
         return
       }
 
@@ -472,7 +491,7 @@ export default function ProjetoEntregaveis({ projeto }) {
       }
 
       if (items.length === 0) {
-        alert('Nenhum item válido encontrado')
+        toast.warning('Aviso', 'Nenhum item válido encontrado')
         return
       }
 
@@ -483,11 +502,11 @@ export default function ProjetoEntregaveis({ projeto }) {
 
       if (error) throw error
 
-      alert(`âœ“ Importados ${items.length} entregáveis`)
+      toast.success('Sucesso', `Importados ${items.length} entregáveis`)
       loadEntregaveis()
     } catch (err) {
       console.error('Erro ao importar:', err)
-      alert('Erro ao importar: ' + err.message)
+      toast.error('Erro', 'Erro ao importar: ' + err.message)
     }
 
     e.target.value = ''
@@ -536,14 +555,14 @@ export default function ProjetoEntregaveis({ projeto }) {
   // Criar nova fase de projeto
   const handleCreateFase = async () => {
     if (!newFaseName.trim()) {
-      alert('O nome da fase é obrigatório')
+      toast.warning('Aviso', 'O nome da fase é obrigatório')
       return
     }
 
     // Verificar se a fase já existe
     if (FASES_OPCOES.includes(newFaseName.trim()) ||
         entregaveis.some(e => e.fase === newFaseName.trim())) {
-      alert('Esta fase já existe')
+      toast.warning('Aviso', 'Esta fase já existe')
       return
     }
 
@@ -571,7 +590,7 @@ export default function ProjetoEntregaveis({ projeto }) {
       setExpandedFases(prev => ({ ...prev, [newFaseName.trim()]: true }))
     } catch (err) {
       console.error('Erro ao criar fase:', err)
-      alert('Erro ao criar fase: ' + err.message)
+      toast.error('Erro', 'Erro ao criar fase: ' + err.message)
     } finally {
       setSavingFase(false)
     }
@@ -609,7 +628,7 @@ export default function ProjetoEntregaveis({ projeto }) {
       setEditingFase(null)
       loadEntregaveis(false)
     } catch (err) {
-      alert('Erro ao renomear fase: ' + err.message)
+      toast.error('Erro', 'Erro ao renomear fase: ' + err.message)
     }
   }
 
@@ -630,7 +649,7 @@ export default function ProjetoEntregaveis({ projeto }) {
     const { fase, nome, prefixoCodigo, isEditing, oldNome } = subcategoriaData
 
     if (!nome.trim()) {
-      alert('Nome da subcategoria é obrigatório')
+      toast.warning('Aviso', 'Nome da subcategoria é obrigatório')
       return
     }
 
@@ -657,7 +676,7 @@ export default function ProjetoEntregaveis({ projeto }) {
       setSubcategoriaData({ fase: '', nome: '', prefixoCodigo: '' })
       loadEntregaveis(false)
     } catch (err) {
-      alert('Erro ao guardar subcategoria: ' + err.message)
+      toast.error('Erro', 'Erro ao guardar subcategoria: ' + err.message)
     }
   }
 
@@ -699,7 +718,7 @@ export default function ProjetoEntregaveis({ projeto }) {
 
       loadEntregaveis(false)
     } catch (err) {
-      alert('Erro ao mover item: ' + err.message)
+      toast.error('Erro', 'Erro ao mover item: ' + err.message)
     }
   }
 

@@ -1,53 +1,28 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useToast } from '../components/ui/Toast'
+import { ConfirmModal } from '../components/ui/ConfirmModal'
 import {
   Search, Send, Image, X, HardHat, MessageSquare, Loader2, AlertCircle,
   Phone, Settings, Check, CheckCheck, Clock, Package, Users, Wrench,
   AlertTriangle, ListTodo, Sparkles, ChevronRight, RefreshCw, Plus,
-  ExternalLink, Wifi, WifiOff, Bot, Eye, EyeOff, ArrowLeft, Home
+  Wifi, WifiOff, Bot, ArrowLeft, Home
 } from 'lucide-react'
 
-// Dados mock para demonstrar funcionalidades da IA
-const MOCK_AI_SUGGESTIONS = {
-  materiais: [
-    { id: 1, texto: 'Preciso de 50 sacos de cimento para amanhã', material: 'Cimento', quantidade: 50, unidade: 'sacos', urgente: true, mensagemId: 1 },
-    { id: 2, texto: 'Faltam tubos de 110mm, uns 20 metros', material: 'Tubo PVC 110mm', quantidade: 20, unidade: 'm', urgente: false, mensagemId: 3 },
-  ],
-  horas: [
-    { id: 1, texto: 'Hoje estivemos cá das 8h às 17h, 4 pessoas', pessoas: 4, horasTotal: 36, data: '2025-01-17', mensagemId: 2 },
-    { id: 2, texto: 'O João saiu mais cedo, só fez 6 horas', pessoa: 'João', horas: 6, data: '2025-01-17', mensagemId: 4 },
-  ],
-  trabalhos: [
-    { id: 1, texto: 'Acabámos de betonar a laje do 1º andar', trabalho: 'Betonagem laje 1º andar', percentagem: 100, mensagemId: 5 },
-    { id: 2, texto: 'Estamos a meio das paredes da cozinha', trabalho: 'Alvenaria cozinha', percentagem: 50, mensagemId: 6 },
-  ],
-  tarefas: [
-    { id: 1, texto: 'Amanhã temos de chamar o eletricista para ver o quadro', tarefa: 'Contactar eletricista - verificar quadro', prioridade: 'alta', mensagemId: 7 },
-    { id: 2, texto: 'Não esquecer de encomendar as janelas', tarefa: 'Encomendar janelas', prioridade: 'media', mensagemId: 8 },
-  ],
-  naoConformidades: [
-    { id: 1, texto: 'O ferro que chegou está todo oxidado', descricao: 'Ferro oxidado na entrega', gravidade: 'media', mensagemId: 9 },
-    { id: 2, texto: 'A parede ficou fora de esquadria, vamos ter de demolir', descricao: 'Parede fora de esquadria - necessita demolição', gravidade: 'alta', mensagemId: 10 },
-  ]
+// Empty default structure for AI suggestions
+const EMPTY_AI_SUGGESTIONS = {
+  materiais: [],
+  horas: [],
+  trabalhos: [],
+  tarefas: [],
+  naoConformidades: []
 }
-
-// Mensagens mock estilo WhatsApp
-const MOCK_WHATSAPP_MESSAGES = [
-  { id: 1, tipo: 'recebida', autor: 'Manuel Encarregado', telefone: '+351912345678', conteudo: 'Bom dia! Preciso de 50 sacos de cimento para amanhã, conseguem enviar?', hora: '08:32', data: '2025-01-17' },
-  { id: 2, tipo: 'recebida', autor: 'Manuel Encarregado', telefone: '+351912345678', conteudo: 'Hoje estivemos cá das 8h às 17h, 4 pessoas a trabalhar na estrutura', hora: '17:45', data: '2025-01-17' },
-  { id: 3, tipo: 'enviada', autor: 'Gavinho', conteudo: 'Boa tarde Manuel! Vou verificar o stock e já digo algo.', hora: '18:02', data: '2025-01-17', lida: true },
-  { id: 4, tipo: 'recebida', autor: 'Manuel Encarregado', telefone: '+351912345678', conteudo: 'O João saiu mais cedo hoje, só fez 6 horas. Tinha consulta médica.', hora: '18:15', data: '2025-01-17' },
-  { id: 5, tipo: 'recebida', autor: 'Manuel Encarregado', telefone: '+351912345678', conteudo: 'Acabámos de betonar a laje do 1º andar! Correu tudo bem 💪', hora: '16:30', data: '2025-01-18' },
-  { id: 6, tipo: 'recebida', autor: 'Manuel Encarregado', telefone: '+351912345678', conteudo: 'Estamos a meio das paredes da cozinha, amanhã devemos acabar', hora: '17:00', data: '2025-01-18' },
-  { id: 7, tipo: 'recebida', autor: 'Manuel Encarregado', telefone: '+351912345678', conteudo: 'Amanhã temos de chamar o eletricista para ver o quadro, está a dar problemas', hora: '17:15', data: '2025-01-18' },
-  { id: 8, tipo: 'enviada', autor: 'Gavinho', conteudo: 'Ok, vou contactar o Sr. António amanhã de manhã.', hora: '17:20', data: '2025-01-18', lida: true },
-  { id: 9, tipo: 'recebida', autor: 'Manuel Encarregado', telefone: '+351912345678', conteudo: 'Atenção que o ferro que chegou hoje está todo oxidado, não podemos usar', hora: '09:00', data: '2025-01-18', imagem: null },
-  { id: 10, tipo: 'recebida', autor: 'Manuel Encarregado', telefone: '+351912345678', conteudo: 'A parede da suite ficou fora de esquadria, vamos ter de demolir e refazer 😔', hora: '11:30', data: '2025-01-18' },
-]
 
 export default function ChatObras() {
   const navigate = useNavigate()
+  const toast = useToast()
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null })
   const [obras, setObras] = useState([])
   const [selectedObra, setSelectedObra] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -158,7 +133,6 @@ export default function ChatObras() {
           table: 'obra_mensagens',
           filter: `obra_id=eq.${selectedObra.id}`
         }, (payload) => {
-          console.log('Nova mensagem recebida:', payload.new)
           loadMensagens()
         })
         .subscribe()
@@ -193,15 +167,12 @@ export default function ChatObras() {
 
   // Verificar se WhatsApp está configurado
   const checkWhatsAppConfig = async () => {
-    console.log('A verificar configuração WhatsApp...')
     try {
       const { data, error } = await supabase
         .from('whatsapp_config')
         .select('*')
         .eq('ativo', true)
         .maybeSingle() // Use maybeSingle instead of single to avoid error when no rows
-
-      console.log('Resultado da query whatsapp_config:', { data, error })
 
       if (error) {
         // Table might not exist yet
@@ -215,11 +186,6 @@ export default function ChatObras() {
       }
 
       if (data && data.twilio_account_sid && data.twilio_phone_number) {
-        console.log('WhatsApp config encontrada:', {
-          accountSid: data.twilio_account_sid?.substring(0, 10) + '...',
-          phoneNumber: data.twilio_phone_number,
-          ativo: data.ativo
-        })
         setWhatsappConnected(true)
         setTwilioConfig({
           accountSid: data.twilio_account_sid || '',
@@ -227,7 +193,6 @@ export default function ChatObras() {
           phoneNumber: data.twilio_phone_number || ''
         })
       } else {
-        console.log('WhatsApp config não encontrada ou incompleta:', data)
         setWhatsappConnected(false)
       }
     } catch (err) {
@@ -269,8 +234,6 @@ export default function ChatObras() {
         }
       }
 
-      console.log('Config existente:', existing)
-
       const configData = {
         twilio_account_sid: twilioConfig.accountSid,
         twilio_phone_number: twilioConfig.phoneNumber.replace(/\s/g, ''),
@@ -285,7 +248,6 @@ export default function ChatObras() {
 
       if (existing) {
         // Update existing config
-        console.log('A atualizar config existente:', existing.id)
         const { data: updated, error } = await supabase
           .from('whatsapp_config')
           .update(configData)
@@ -296,13 +258,11 @@ export default function ChatObras() {
           console.error('Erro ao atualizar config:', error)
           throw error
         }
-        console.log('Config atualizada:', updated)
       } else {
         // Insert new config - auth token é obrigatório
         if (!twilioConfig.authToken) {
           throw new Error('Auth Token é obrigatório na primeira configuração')
         }
-        console.log('A inserir nova config...')
         const { data: inserted, error } = await supabase
           .from('whatsapp_config')
           .insert({
@@ -316,10 +276,8 @@ export default function ChatObras() {
           console.error('Erro ao inserir config:', error)
           throw error
         }
-        console.log('Config inserida:', inserted)
       }
 
-      console.log('Config guardada com sucesso!')
       setWhatsappConnected(true)
       setShowConfig(false)
       setTwilioConfig(prev => ({ ...prev, authToken: '' })) // Clear token from memory
@@ -378,7 +336,7 @@ export default function ChatObras() {
       await loadObraContacts()
     } catch (err) {
       console.error('Erro ao guardar contacto:', err)
-      alert('Erro ao guardar contacto')
+      toast.error('Erro', 'Erro ao guardar contacto')
     } finally {
       setSavingContact(false)
     }
@@ -386,19 +344,27 @@ export default function ChatObras() {
 
   // Eliminar contacto
   const deleteContact = async (contactId) => {
-    if (!confirm('Eliminar este contacto?')) return
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar Contacto',
+      message: 'Eliminar este contacto?',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase
+            .from('whatsapp_contactos')
+            .delete()
+            .eq('id', contactId)
 
-    try {
-      const { error } = await supabase
-        .from('whatsapp_contactos')
-        .delete()
-        .eq('id', contactId)
-
-      if (error) throw error
-      await loadObraContacts()
-    } catch (err) {
-      console.error('Erro ao eliminar contacto:', err)
-    }
+          if (error) throw error
+          await loadObraContacts()
+        } catch (err) {
+          console.error('Erro ao eliminar contacto:', err)
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      }
+    })
+    return
   }
 
   // Testar conexão Twilio
@@ -425,7 +391,7 @@ export default function ChatObras() {
 
       if (response.ok) {
         setConfigError('')
-        alert('Conexão bem sucedida!')
+        toast.success('Sucesso', 'Conexão bem sucedida!')
       } else {
         const data = await response.json()
         throw new Error(data.message || 'Credenciais inválidas')
@@ -453,7 +419,7 @@ export default function ChatObras() {
         // Se tabela não existe, mostrar mock
         if (error.code === '42P01') {
           console.warn('Tabela obra_mensagens não existe')
-          setMensagens(MOCK_WHATSAPP_MESSAGES)
+          setMensagens([])
           return
         }
         throw error
@@ -536,13 +502,12 @@ export default function ChatObras() {
 
         setAiSuggestions(organized)
       } else {
-        // Usar dados mock para demonstração
-        setAiSuggestions(MOCK_AI_SUGGESTIONS)
+        // No pending suggestions
+        setAiSuggestions(EMPTY_AI_SUGGESTIONS)
       }
     } catch (err) {
       console.error('Erro ao carregar sugestões IA:', err)
-      // Fallback para mock
-      setAiSuggestions(MOCK_AI_SUGGESTIONS)
+      setAiSuggestions(EMPTY_AI_SUGGESTIONS)
     } finally {
       setAnalyzingAI(false)
     }
@@ -611,7 +576,6 @@ export default function ChatObras() {
           m.id === tempId ? { ...m, pending: false, lida: true } : m
         ))
 
-        console.log('Mensagem enviada via Twilio:', data)
       }
 
       // Guardar sempre na tabela obra_mensagens (partilhada com PWA)
@@ -645,9 +609,9 @@ export default function ChatObras() {
       if (!whatsappConnected) {
         // Silently save locally
       } else if (obraContacts.length === 0) {
-        alert('Adiciona um contacto WhatsApp para esta obra primeiro')
+        toast.warning('Aviso', 'Adiciona um contacto WhatsApp para esta obra primeiro')
       } else {
-        alert('Erro ao enviar mensagem: ' + err.message)
+        toast.error('Erro', 'Erro ao enviar mensagem: ' + err.message)
       }
     } finally {
       setSending(false)
@@ -681,11 +645,13 @@ export default function ChatObras() {
         .eq('id', id)
 
       // Criar entidade correspondente baseado no tipo
+      let entidadeCriadaId = null
+
       if (suggestion && selectedObra) {
         switch (tipo) {
-          case 'materiais':
+          case 'materiais': {
             // Criar requisição de material
-            await supabase
+            const { data } = await supabase
               .from('requisicoes_materiais')
               .insert({
                 obra_id: selectedObra.id,
@@ -696,39 +662,54 @@ export default function ChatObras() {
                 estado: 'pendente',
                 solicitado_por_nome: suggestion.autor || 'Via WhatsApp'
               })
+              .select('id')
+              .single()
+            entidadeCriadaId = data?.id
             break
+          }
 
-          case 'tarefas':
+          case 'tarefas': {
             // Criar tarefa
-            await supabase
+            const { data } = await supabase
               .from('tarefas')
               .insert({
                 obra_id: selectedObra.id,
                 titulo: suggestion.tarefa || suggestion.texto,
+                descricao: suggestion.texto,
                 prioridade: suggestion.prioridade || 'media',
                 status: 'pendente',
                 categoria: 'obra',
                 origem_tipo: 'sistema',
                 notas: `Criada automaticamente a partir de mensagem WhatsApp: "${suggestion.texto}"`
               })
+              .select('id')
+              .single()
+            entidadeCriadaId = data?.id
             break
+          }
 
-          case 'naoConformidades':
+          case 'naoConformidades': {
             // Criar não conformidade
-            await supabase
+            const { data } = await supabase
               .from('nao_conformidades')
               .insert({
                 obra_id: selectedObra.id,
-                descricao: suggestion.descricao || suggestion.texto,
+                codigo: `NC-${Date.now()}`,
+                titulo: suggestion.descricao || suggestion.texto,
+                descricao: suggestion.texto,
                 gravidade: suggestion.gravidade || 'media',
-                status: 'aberta',
+                estado: 'aberta',
                 origem: 'whatsapp'
               })
+              .select('id')
+              .single()
+            entidadeCriadaId = data?.id
             break
+          }
 
-          case 'trabalhos':
+          case 'trabalhos': {
             // Registar no diário da obra
-            await supabase
+            const { data } = await supabase
               .from('obra_diario')
               .insert({
                 obra_id: selectedObra.id,
@@ -736,11 +717,15 @@ export default function ChatObras() {
                 descricao: `${suggestion.trabalho || suggestion.texto} - Progresso: ${suggestion.percentagem || 0}%`,
                 data: new Date().toISOString().split('T')[0]
               })
+              .select('id')
+              .single()
+            entidadeCriadaId = data?.id
             break
+          }
 
-          case 'horas':
+          case 'horas': {
             // Registar horas no diário da obra
-            await supabase
+            const { data } = await supabase
               .from('obra_diario')
               .insert({
                 obra_id: selectedObra.id,
@@ -749,14 +734,29 @@ export default function ChatObras() {
                 mao_obra_propria: suggestion.pessoas || 1,
                 data: suggestion.data || new Date().toISOString().split('T')[0]
               })
+              .select('id')
+              .single()
+            entidadeCriadaId = data?.id
             break
+          }
 
           default:
             console.log('Tipo de sugestão não suportado:', tipo)
         }
       }
+
+      // Guardar referência da entidade criada
+      if (entidadeCriadaId) {
+        await supabase
+          .from('ia_sugestoes')
+          .update({ entidade_criada_id: entidadeCriadaId })
+          .eq('id', id)
+      }
+
+      toast.success('Sugestão aceite', 'Entidade criada com sucesso')
     } catch (err) {
       console.error('Erro ao aceitar sugestão:', err)
+      toast.error('Erro', 'Não foi possível processar a sugestão')
     }
   }
 
@@ -2106,6 +2106,16 @@ function SuggestionSection({ title, icon, color, items, tipo, renderItem, onAcce
           })}
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type || 'danger'}
+        confirmText="Confirmar"
+      />
     </div>
   )
 }

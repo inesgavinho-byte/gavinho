@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { useToast } from '../components/ui/Toast'
 import { 
   Search, Plus, Filter, Grid, List, X, Upload, Tag, Edit, Trash2,
   Image, Box, Sparkles, Mountain, Trees, Layers, Shirt, Square,
@@ -42,6 +43,7 @@ const ICON_MAP = {
 // COMPONENTE PRINCIPAL
 // ============================================
 export default function Biblioteca() {
+  const toast = useToast()
   const [activeTab, setActiveTab] = useState('materiais')
   const [viewMode, setViewMode] = useState('grid')
   const [searchTerm, setSearchTerm] = useState('')
@@ -200,7 +202,7 @@ export default function Biblioteca() {
       }
     } catch (err) {
       console.error('Erro upload:', err)
-      alert('Erro ao fazer upload do ficheiro')
+      toast.error('Erro', 'Erro ao fazer upload do ficheiro')
     } finally {
       setUploadingFile(false)
     }
@@ -300,7 +302,7 @@ export default function Biblioteca() {
       loadData()
     } catch (err) {
       console.error('Erro ao guardar:', err)
-      alert(`Erro ao guardar: ${err.message || 'Verifique os campos e tente novamente'}`)
+      toast.error('Erro', `Erro ao guardar: ${err.message || 'Verifique os campos e tente novamente'}`)
     }
   }
 
@@ -369,7 +371,7 @@ export default function Biblioteca() {
       setShowInlineTagInput(false)
     } catch (err) {
       console.error('Erro ao criar tag:', err)
-      alert('Erro ao criar tag')
+      toast.error('Erro', 'Erro ao criar tag')
     }
   }
 
@@ -383,7 +385,7 @@ export default function Biblioteca() {
       loadData()
     } catch (err) {
       console.error('Erro ao atualizar tag:', err)
-      alert('Erro ao atualizar tag')
+      toast.error('Erro', 'Erro ao atualizar tag')
     }
   }
 
@@ -394,7 +396,7 @@ export default function Biblioteca() {
       loadData()
     } catch (err) {
       console.error('Erro ao eliminar tag:', err)
-      alert('Erro ao eliminar tag')
+      toast.error('Erro', 'Erro ao eliminar tag')
     }
   }
 
@@ -411,7 +413,7 @@ export default function Biblioteca() {
       loadData()
     } catch (err) {
       console.error('Erro ao criar categoria:', err)
-      alert('Erro ao criar categoria')
+      toast.error('Erro', 'Erro ao criar categoria')
     }
   }
 
@@ -426,7 +428,7 @@ export default function Biblioteca() {
       loadData()
     } catch (err) {
       console.error('Erro ao atualizar categoria:', err)
-      alert('Erro ao atualizar categoria')
+      toast.error('Erro', 'Erro ao atualizar categoria')
     }
   }
 
@@ -436,7 +438,7 @@ export default function Biblioteca() {
       loadData()
     } catch (err) {
       console.error('Erro ao eliminar categoria:', err)
-      alert('Erro ao eliminar categoria (pode ter itens associados)')
+      toast.error('Erro', 'Erro ao eliminar categoria (pode ter itens associados)')
     }
   }
 

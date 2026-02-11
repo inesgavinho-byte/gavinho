@@ -6,9 +6,13 @@ import {
   Edit, Trash2, X, Check, Loader2, HardHat, Plus,
   ChevronDown, ChevronUp
 } from 'lucide-react'
+import { useToast } from '../components/ui/Toast'
+import ConfirmModal from '../components/ui/ConfirmModal'
 
 export default function Trabalhadores() {
   const { profile } = useAuth()
+  const toast = useToast()
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null })
   const [trabalhadores, setTrabalhadores] = useState([])
   const [obras, setObras] = useState([])
   const [loading, setLoading] = useState(true)
@@ -150,7 +154,7 @@ export default function Trabalhadores() {
       loadData()
     } catch (err) {
       console.error('Erro ao guardar:', err)
-      alert('Erro ao guardar trabalhador: ' + err.message)
+      toast.error('Erro', 'Erro ao guardar trabalhador: ' + err.message)
     } finally {
       setSaving(false)
     }
@@ -170,26 +174,34 @@ export default function Trabalhadores() {
   }
 
   const handleDelete = async (worker) => {
-    if (!confirm(`Tens a certeza que queres eliminar ${worker.nome}?`)) return
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar Trabalhador',
+      message: `Tens a certeza que queres eliminar ${worker.nome}?`,
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          await supabase
+            .from('trabalhador_obras')
+            .delete()
+            .eq('trabalhador_id', worker.id)
 
-    try {
-      await supabase
-        .from('trabalhador_obras')
-        .delete()
-        .eq('trabalhador_id', worker.id)
+          const { error } = await supabase
+            .from('trabalhadores')
+            .delete()
+            .eq('id', worker.id)
 
-      const { error } = await supabase
-        .from('trabalhadores')
-        .delete()
-        .eq('id', worker.id)
+          if (error) throw error
 
-      if (error) throw error
-
-      loadData()
-    } catch (err) {
-      console.error('Erro ao eliminar:', err)
-      alert('Erro ao eliminar trabalhador')
-    }
+          loadData()
+        } catch (err) {
+          console.error('Erro ao eliminar:', err)
+          toast.error('Erro', 'Erro ao eliminar trabalhador')
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      }
+    })
+    return
   }
 
   const resetForm = () => {
@@ -559,6 +571,16 @@ export default function Trabalhadores() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type || 'danger'}
+        confirmText="Confirmar"
+      />
 
       <style>{`
         @keyframes spin {

@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef, memo, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
+import { useToast } from './ui/Toast'
+import ConfirmModal from './ui/ConfirmModal'
 import {
-  Plus, Upload, Image, X, ChevronLeft, ChevronRight,
+  Plus, Upload, Image, X, ChevronLeft, ChevronRight, ChevronDown,
   Star, Trash2, Edit, Loader2, FolderPlus, Camera,
   AlertCircle, RefreshCw, Eye, MoreVertical
 } from 'lucide-react'
@@ -105,6 +107,9 @@ const LazyImage = memo(({ src, alt, className, onClick }) => {
 })
 
 export default function ProjetoLevantamento({ projeto, userId, userName }) {
+  const toast = useToast()
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null })
+
   // State
   const [compartimentos, setCompartimentos] = useState([])
   const [fotos, setFotos] = useState({}) // Mapa de compartimento_id -> fotos[]
@@ -131,6 +136,7 @@ export default function ProjetoLevantamento({ projeto, userId, userName }) {
 
   // Expanded sections
   const [expandedSections, setExpandedSections] = useState({})
+  const [collapsedDates, setCollapsedDates] = useState({})
   const ITEMS_PER_SECTION = 8
 
   // Refs
@@ -216,41 +222,49 @@ export default function ProjetoLevantamento({ projeto, userId, userName }) {
       setShowAddCompartimentoModal(false)
     } catch (err) {
       console.error('Erro ao criar compartimento:', err)
-      alert('Erro ao criar compartimento: ' + err.message)
+      toast.error('Erro', 'Erro ao criar compartimento: ' + err.message)
     }
   }
 
   // Delete compartimento
   const handleDeleteCompartimento = async (compartimento) => {
-    if (!confirm(`Eliminar "${compartimento.nome}" e todas as suas fotos?`)) return
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar Compartimento',
+      message: `Eliminar "${compartimento.nome}" e todas as suas fotos?`,
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          // Delete fotos from storage first
+          const compartimentoFotos = fotos[compartimento.id] || []
+          for (const foto of compartimentoFotos) {
+            if (foto.file_path) {
+              await supabase.storage.from('projeto-files').remove([foto.file_path])
+            }
+          }
 
-    try {
-      // Delete fotos from storage first
-      const compartimentoFotos = fotos[compartimento.id] || []
-      for (const foto of compartimentoFotos) {
-        if (foto.file_path) {
-          await supabase.storage.from('projeto-files').remove([foto.file_path])
+          // Delete compartimento (cascade will delete fotos records)
+          const { error } = await supabase
+            .from('projeto_levantamento_compartimentos')
+            .delete()
+            .eq('id', compartimento.id)
+
+          if (error) throw error
+
+          setCompartimentos(prev => prev.filter(c => c.id !== compartimento.id))
+          setFotos(prev => {
+            const newFotos = { ...prev }
+            delete newFotos[compartimento.id]
+            return newFotos
+          })
+        } catch (err) {
+          console.error('Erro ao eliminar compartimento:', err)
+          toast.error('Erro', 'Erro ao eliminar: ' + err.message)
         }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
       }
-
-      // Delete compartimento (cascade will delete fotos records)
-      const { error } = await supabase
-        .from('projeto_levantamento_compartimentos')
-        .delete()
-        .eq('id', compartimento.id)
-
-      if (error) throw error
-
-      setCompartimentos(prev => prev.filter(c => c.id !== compartimento.id))
-      setFotos(prev => {
-        const newFotos = { ...prev }
-        delete newFotos[compartimento.id]
-        return newFotos
-      })
-    } catch (err) {
-      console.error('Erro ao eliminar compartimento:', err)
-      alert('Erro ao eliminar: ' + err.message)
-    }
+    })
+    return
   }
 
   // Edit compartimento
@@ -277,7 +291,7 @@ export default function ProjetoLevantamento({ projeto, userId, userName }) {
       setEditForm({ nome: '', descricao: '' })
     } catch (err) {
       console.error('Erro ao editar compartimento:', err)
-      alert('Erro ao editar: ' + err.message)
+      toast.error('Erro', 'Erro ao editar: ' + err.message)
     }
   }
 
@@ -375,7 +389,7 @@ export default function ProjetoLevantamento({ projeto, userId, userName }) {
       if (fileInputRef.current) fileInputRef.current.value = ''
     } catch (err) {
       console.error('Erro no upload:', err)
-      alert('Erro ao fazer upload: ' + err.message)
+      toast.error('Erro', 'Erro ao fazer upload: ' + err.message)
     } finally {
       setUploading(false)
     }
@@ -383,30 +397,38 @@ export default function ProjetoLevantamento({ projeto, userId, userName }) {
 
   // Delete foto
   const handleDeleteFoto = async (compartimentoId, foto) => {
-    if (!confirm('Eliminar esta foto?')) return
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar Foto',
+      message: 'Eliminar esta foto?',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          // Delete from storage
+          if (foto.file_path) {
+            await supabase.storage.from('projeto-files').remove([foto.file_path])
+          }
 
-    try {
-      // Delete from storage
-      if (foto.file_path) {
-        await supabase.storage.from('projeto-files').remove([foto.file_path])
+          // Delete record
+          const { error } = await supabase
+            .from('projeto_levantamento_fotos')
+            .delete()
+            .eq('id', foto.id)
+
+          if (error) throw error
+
+          setFotos(prev => ({
+            ...prev,
+            [compartimentoId]: prev[compartimentoId].filter(f => f.id !== foto.id)
+          }))
+        } catch (err) {
+          console.error('Erro ao eliminar foto:', err)
+          toast.error('Erro', 'Erro ao eliminar: ' + err.message)
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
       }
-
-      // Delete record
-      const { error } = await supabase
-        .from('projeto_levantamento_fotos')
-        .delete()
-        .eq('id', foto.id)
-
-      if (error) throw error
-
-      setFotos(prev => ({
-        ...prev,
-        [compartimentoId]: prev[compartimentoId].filter(f => f.id !== foto.id)
-      }))
-    } catch (err) {
-      console.error('Erro ao eliminar foto:', err)
-      alert('Erro ao eliminar: ' + err.message)
-    }
+    })
+    return
   }
 
   // Toggle destaque
@@ -470,6 +492,29 @@ export default function ProjetoLevantamento({ projeto, userId, userName }) {
       ...prev,
       [compartimentoId]: !prev[compartimentoId]
     }))
+  }
+
+  // Toggle date collapse
+  const toggleDateCollapse = (key) => {
+    setCollapsedDates(prev => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  // Group photos by date
+  const groupByDate = (fotosList) => {
+    const groups = {}
+    fotosList.forEach(foto => {
+      const dateKey = foto.created_at
+        ? new Date(foto.created_at).toLocaleDateString('pt-PT', { year: 'numeric', month: 'long', day: 'numeric' })
+        : 'Sem data'
+      if (!groups[dateKey]) groups[dateKey] = []
+      groups[dateKey].push(foto)
+    })
+    // Sort dates newest first
+    return Object.entries(groups).sort((a, b) => {
+      const dateA = a[1][0]?.created_at ? new Date(a[1][0].created_at) : new Date(0)
+      const dateB = b[1][0]?.created_at ? new Date(b[1][0].created_at) : new Date(0)
+      return dateB - dateA
+    })
   }
 
   // Count total fotos
@@ -574,7 +619,7 @@ export default function ProjetoLevantamento({ projeto, userId, userName }) {
                   </div>
                 </div>
 
-                {/* Photos Grid */}
+                {/* Photos by Date */}
                 {compartimentoFotos.length === 0 ? (
                   <div className="levantamento-section-empty">
                     <Image size={24} />
@@ -589,68 +634,85 @@ export default function ProjetoLevantamento({ projeto, userId, userName }) {
                   </div>
                 ) : (
                   <>
-                    <div className="levantamento-grid">
-                      {visibleFotos.map((foto, index) => (
-                        <div key={foto.id} className="levantamento-card">
-                          <LazyImage
-                            src={foto.url}
-                            alt={foto.titulo || 'Foto'}
-                            className="levantamento-card-image"
-                            onClick={() => openLightbox(compartimento.id, foto, index)}
-                          />
-
-                          {foto.is_destaque && (
-                            <span className="levantamento-destaque-badge">
-                              <Star size={12} /> Destaque
+                    {groupByDate(compartimentoFotos).map(([dateLabel, dateFotos]) => {
+                      const dateKey = `${compartimento.id}_${dateLabel}`
+                      const isDateCollapsed = collapsedDates[dateKey]
+                      return (
+                        <div key={dateLabel} className="levantamento-date-group">
+                          <div
+                            className="levantamento-date-header"
+                            onClick={() => toggleDateCollapse(dateKey)}
+                          >
+                            <span className="levantamento-date-label">
+                              <ChevronDown
+                                size={16}
+                                className={`levantamento-date-chevron${isDateCollapsed ? ' collapsed' : ''}`}
+                              />
+                              {dateLabel}
+                              <span className="levantamento-date-count">
+                                ({dateFotos.length} foto{dateFotos.length !== 1 ? 's' : ''})
+                              </span>
                             </span>
-                          )}
-
-                          <div className="levantamento-card-overlay">
-                            <button
-                              className="levantamento-action-btn"
-                              title="Ver"
-                              onClick={() => openLightbox(compartimento.id, foto, index)}
-                            >
-                              <Eye size={18} />
-                            </button>
                           </div>
+                          {!isDateCollapsed && (
+                            <div className="levantamento-grid">
+                              {dateFotos.map((foto, index) => {
+                                const globalIndex = compartimentoFotos.indexOf(foto)
+                                return (
+                                  <div key={foto.id} className="levantamento-card">
+                                    <LazyImage
+                                      src={foto.url}
+                                      alt={foto.titulo || 'Foto'}
+                                      className="levantamento-card-image"
+                                      onClick={() => openLightbox(compartimento.id, foto, globalIndex)}
+                                    />
 
-                          <div className="levantamento-card-actions">
-                            <button
-                              className={`btn-icon ${foto.is_destaque ? 'active' : ''}`}
-                              onClick={() => handleToggleDestaque(compartimento.id, foto)}
-                              title={foto.is_destaque ? 'Remover destaque' : 'Marcar como destaque'}
-                            >
-                              <Star size={14} />
-                            </button>
-                            <button
-                              className="btn-icon btn-danger"
-                              onClick={() => handleDeleteFoto(compartimento.id, foto)}
-                              title="Eliminar"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
+                                    {foto.is_destaque && (
+                                      <span className="levantamento-destaque-badge">
+                                        <Star size={12} /> Destaque
+                                      </span>
+                                    )}
 
-                          {foto.titulo && (
-                            <div className="levantamento-card-title">
-                              {foto.titulo}
+                                    <div className="levantamento-card-overlay">
+                                      <button
+                                        className="levantamento-action-btn"
+                                        title="Ver"
+                                        onClick={() => openLightbox(compartimento.id, foto, globalIndex)}
+                                      >
+                                        <Eye size={18} />
+                                      </button>
+                                    </div>
+
+                                    <div className="levantamento-card-actions">
+                                      <button
+                                        className={`btn-icon ${foto.is_destaque ? 'active' : ''}`}
+                                        onClick={() => handleToggleDestaque(compartimento.id, foto)}
+                                        title={foto.is_destaque ? 'Remover destaque' : 'Marcar como destaque'}
+                                      >
+                                        <Star size={14} />
+                                      </button>
+                                      <button
+                                        className="btn-icon btn-danger"
+                                        onClick={() => handleDeleteFoto(compartimento.id, foto)}
+                                        title="Eliminar"
+                                      >
+                                        <Trash2 size={14} />
+                                      </button>
+                                    </div>
+
+                                    {foto.titulo && (
+                                      <div className="levantamento-card-title">
+                                        {foto.titulo}
+                                      </div>
+                                    )}
+                                  </div>
+                                )
+                              })}
                             </div>
                           )}
                         </div>
-                      ))}
-                    </div>
-
-                    {hasMore && (
-                      <button
-                        className="levantamento-show-more"
-                        onClick={() => toggleSection(compartimento.id)}
-                      >
-                        {isExpanded
-                          ? 'Mostrar menos'
-                          : `Ver mais ${compartimentoFotos.length - ITEMS_PER_SECTION} fotos`}
-                      </button>
-                    )}
+                      )
+                    })}
                   </>
                 )}
               </div>
@@ -855,6 +917,16 @@ export default function ProjetoLevantamento({ projeto, userId, userName }) {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type || 'danger'}
+        confirmText="Confirmar"
+      />
     </div>
   )
 }

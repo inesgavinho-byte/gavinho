@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef, Fragment } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { 
-  Plus, FileText, Calendar, Euro, CheckCircle, Clock, Send, 
-  ChevronDown, ChevronRight, Edit, Trash2, X, Loader2, 
+import { useToast } from './ui/Toast'
+import { ConfirmModal } from './ui/ConfirmModal'
+import {
+  Plus, FileText, Calendar, Euro, CheckCircle, Clock, Send,
+  ChevronDown, ChevronRight, Edit, Trash2, X, Loader2,
   AlertCircle, Download, Eye, Calculator, Percent, Lock, Upload,
   FileSpreadsheet, Printer
 } from 'lucide-react'
@@ -18,6 +20,8 @@ const STATUS_AUTO = {
 
 export default function ObraAutos({ obra }) {
   const { profile } = useAuth()
+  const toast = useToast()
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', type: 'danger', onConfirm: null })
   const [autos, setAutos] = useState([])
   const [orcamentoItems, setOrcamentoItems] = useState([])
   const [loading, setLoading] = useState(true)
@@ -237,7 +241,7 @@ export default function ObraAutos({ obra }) {
       loadData()
     } catch (err) {
       console.error('Erro ao guardar auto:', err)
-      alert(`Erro: ${err.message}`)
+      toast.error('Erro', err.message)
     } finally {
       setSaving(false)
     }
@@ -289,14 +293,22 @@ export default function ObraAutos({ obra }) {
   }
 
   const handleDeleteAuto = async (auto) => {
-    if (!confirm(`Eliminar Auto nº ${auto.numero}?`)) return
-    try {
-      await supabase.from('obra_auto_items').delete().eq('auto_id', auto.id)
-      await supabase.from('obra_autos').delete().eq('id', auto.id)
-      loadData()
-    } catch (err) {
-      alert(`Erro: ${err.message}`)
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar Auto',
+      message: `Eliminar Auto nº ${auto.numero}?`,
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          await supabase.from('obra_auto_items').delete().eq('auto_id', auto.id)
+          await supabase.from('obra_autos').delete().eq('id', auto.id)
+          loadData()
+        } catch (err) {
+          toast.error('Erro', err.message)
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      }
+    })
   }
 
   const areasUnicas = [...new Set(orcamentoItems.map(i => i.area).filter(Boolean))]
@@ -559,6 +571,15 @@ export default function ObraAutos({ obra }) {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type}
+      />
     </div>
   )
 }

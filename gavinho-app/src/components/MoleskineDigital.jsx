@@ -4,6 +4,7 @@ import * as pdfjsLib from 'pdfjs-dist'
 import { jsPDF } from 'jspdf'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { useToast } from './ui/Toast'
 import {
   Pencil,
   Highlighter,
@@ -135,6 +136,7 @@ const createBlankPage = (template = 'blank') => ({
 
 export default function MoleskineDigital({ projectId, projectName, onClose }) {
   const { profile } = useAuth()
+  const toast = useToast()
   const containerRef = useRef(null)
   const fileInputRef = useRef(null)
 
@@ -642,7 +644,7 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
       pdf.save(fileName)
     } catch (err) {
       console.error('Erro ao exportar PDF:', err)
-      alert('Erro ao exportar PDF. Tente novamente.')
+      toast.error('Erro', 'Erro ao exportar PDF. Tente novamente.')
     } finally {
       setIsExporting(false)
     }
@@ -1143,7 +1145,7 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
       updatePageElements([...currentPage.elements, newElement])
     } catch (err) {
       console.error('Erro ao fazer upload:', err)
-      alert('Erro ao fazer upload da imagem')
+      toast.error('Erro', 'Erro ao fazer upload da imagem')
     }
 
     e.target.value = ''
@@ -1234,7 +1236,7 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
 
     } catch (err) {
       console.error('Erro ao importar PDF:', err)
-      alert('Erro ao importar PDF. Verifique se o ficheiro é válido.')
+      toast.error('Erro', 'Erro ao importar PDF. Verifique se o ficheiro é válido.')
     } finally {
       setLoadingPdf(false)
       e.target.value = ''

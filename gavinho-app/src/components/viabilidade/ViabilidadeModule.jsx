@@ -14,6 +14,7 @@ import {
   MapPin,
   Calendar
 } from 'lucide-react'
+import { useToast } from '../ui/Toast'
 
 // Badge de classificação
 const ClassificacaoBadge = ({ classificacao, size = 'normal' }) => {
@@ -71,6 +72,7 @@ const EstadoBadge = ({ estado }) => {
 
 export default function ViabilidadeModule({ projeto, onSelectAnalise }) {
   const { user } = useAuth()
+  const toast = useToast()
   const [analises, setAnalises] = useState([])
   const [concelhos, setConcelhos] = useState([])
   const [loading, setLoading] = useState(true)
@@ -122,7 +124,7 @@ export default function ViabilidadeModule({ projeto, onSelectAnalise }) {
 
   const handleCreateAnalise = async () => {
     if (!novaAnaliseForm.concelho_id) {
-      alert('Selecione um concelho')
+      toast.warning('Aviso', 'Selecione um concelho')
       return
     }
 
@@ -165,7 +167,7 @@ export default function ViabilidadeModule({ projeto, onSelectAnalise }) {
       loadData()
     } catch (error) {
       console.error('Erro ao criar análise:', error)
-      alert('Erro ao criar análise')
+      toast.error('Erro', 'Erro ao criar análise')
     } finally {
       setCreating(false)
     }

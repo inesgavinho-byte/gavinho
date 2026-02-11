@@ -179,7 +179,9 @@ export default function Workspace() {
     updateDndSchedule, isDndActive, addReminder, removeReminder,
     markReminderComplete, getActiveReminders, openReminderModal,
     // Mention notifications
-    parseMentions, findMentionedUserIds, createMentionNotifications
+    mentionNotifications, unreadMentionsCount,
+    parseMentions, findMentionedUserIds, createMentionNotifications,
+    markMentionAsRead, markAllMentionsAsRead
   } = useNotifications(profile)
 
   // Toast & Confirm Hooks (replacing alert/confirm)
@@ -338,6 +340,8 @@ export default function Workspace() {
         table: 'chat_mensagens',
         filter: `canal_id=eq.${canalId}`
       }, (payload) => {
+        const isOwnMessage = payload.new.autor_id === profile?.id
+
         if (!payload.new.parent_id) {
           // Avoid duplicates - check if message already exists locally
           setPosts(prev => {
@@ -350,41 +354,32 @@ export default function Workspace() {
             [payload.new.parent_id]: [...(prev[payload.new.parent_id] || []), payload.new]
           }))
         }
+
+        // Notify user of new messages from others (if channel not muted)
+        if (!isOwnMessage && !isChannelMuted(canalId)) {
+          // Check if user was mentioned
+          const mentions = parseMentions(payload.new.conteudo || '')
+          const isMentioned = mentions.some(name => {
+            const profileName = profile?.nome?.toLowerCase() || ''
+            const mentionName = name.toLowerCase()
+            return profileName === mentionName ||
+                   profileName.startsWith(mentionName + ' ') ||
+                   profileName.split(' ')[0] === mentionName
+          })
+
+          if (isMentioned) {
+            playNotificationSound()
+            toastInfo('Menção', `Foste mencionado(a) numa mensagem`)
+          } else if (document.hidden) {
+            // Only show toast for non-mention messages when tab is not focused
+            playNotificationSound()
+          }
+        }
       })
       .subscribe()
 
     return () => supabase.removeChannel(channel)
   }
-
-  const getMockPosts = () => [
-    {
-      id: '1',
-      conteudo: 'Bom dia equipa! Precisamos de rever os materiais para a Suite Principal. A cliente quer opções mais sustentáveis.',
-      autor: { id: '1', nome: 'Maria Gavinho', avatar_url: null, funcao: 'Diretora Criativa' },
-      created_at: new Date(Date.now() - 3600000 * 24).toISOString(),
-      reacoes: [{ emoji: '👍', users: ['João', 'Ana'] }],
-      replyCount: 3,
-      pinned: true
-    },
-    {
-      id: '2',
-      conteudo: 'Já falei com o fornecedor de pedras. Têm uma nova linha de mármore reciclado que pode ser interessante. Vou partilhar o catálogo.',
-      autor: { id: '2', nome: 'João Umbelino', avatar_url: null, funcao: 'Procurement' },
-      created_at: new Date(Date.now() - 3600000 * 12).toISOString(),
-      reacoes: [{ emoji: '❤️', users: ['Maria'] }, { emoji: '🎉', users: ['Ana', 'Carlos'] }],
-      replyCount: 1,
-      attachments: [{ name: 'Catalogo_Marmore_2025.pdf', type: 'pdf', size: '2.4 MB' }]
-    },
-    {
-      id: '3',
-      conteudo: '@Maria Gavinho o render da sala está pronto para revisão. Implementei as alterações que discutimos ontem.',
-      autor: { id: '3', nome: 'Carolina Cipriano', avatar_url: null, funcao: 'Designer 3D' },
-      created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
-      reacoes: [],
-      replyCount: 0,
-      imagem_url: '/api/placeholder/600/400'
-    }
-  ]
 
   const handleSendMessage = async () => {
     if (!messageInput.trim() && selectedFiles.length === 0) return
@@ -452,6 +447,15 @@ export default function Workspace() {
           tipo: att.type
         }))
         await supabase.from('chat_anexos').insert(extraAttachments)
+      }
+
+      // Process @mentions and create notifications
+      const mentionedNames = parseMentions(messageInput)
+      if (mentionedNames.length > 0) {
+        const mentionedUserIds = findMentionedUserIds(mentionedNames, membros)
+        if (mentionedUserIds.length > 0) {
+          createMentionNotifications(insertedMessage, mentionedUserIds, canalAtivo)
+        }
       }
 
       // Adicionar attachments ao post para exibição local
@@ -848,6 +852,7 @@ export default function Workspace() {
           data_limite: taskData.dataLimite || taskData.dueDate || null,
           categoria: 'geral',
           origem_tipo: 'manual',
+          criado_por_id: profile?.id,
           notas: taskFromMessage?.conteudo ? `Criada a partir de mensagem: "${taskFromMessage.conteudo.substring(0, 200)}"` : null
         })
 
@@ -877,19 +882,19 @@ export default function Workspace() {
     try {
       // Inserir mensagem reencaminhada no canal de destino
       const { error } = await supabase
-        .from('chat_posts')
+        .from('chat_mensagens')
         .insert({
           canal_id: targetChannelId,
           autor_id: profile?.id,
-          autor_nome: profile?.nome || 'Utilizador',
           conteudo: messageToForward.conteudo,
           tipo: 'reencaminhada',
           metadata: {
+            forwarded: true,
             forwarded_from: {
               canal_id: canalAtivo?.id,
               canal_nome: canalAtivo?.nome,
               canal_codigo: canalAtivo?.codigo,
-              original_author: messageToForward.autor_nome,
+              original_author: messageToForward.autor?.nome,
               original_date: messageToForward.created_at
             }
           }
@@ -1226,7 +1231,7 @@ export default function Workspace() {
         .from('calendario_eventos')
         .insert({
           titulo: meetingDetails.title,
-          descricao: meetingDetails.description,
+          descricao: meetingDetails.description || null,
           tipo: 'reuniao',
           data_inicio: dataInicio.toISOString(),
           data_fim: dataFim.toISOString(),

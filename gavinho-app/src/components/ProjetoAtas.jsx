@@ -15,6 +15,8 @@ import {
 } from 'lucide-react'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
+import { useToast } from './ui/Toast'
+import { ConfirmModal } from './ui/ConfirmModal'
 
 // Status config
 const statusConfig = {
@@ -703,6 +705,7 @@ function AcoesInline({ acoes, onChange }) {
 function AtaPreview({ ata, projeto, onClose }) {
   const printRef = useRef(null)
   const [exporting, setExporting] = useState(false)
+  const toast = useToast()
 
   const handlePrint = () => {
     const printContent = printRef.current
@@ -782,7 +785,7 @@ function AtaPreview({ ata, projeto, onClose }) {
       pdf.save(`Ata_${ata.numero_ata}_${projeto.codigo || projeto.nome}.pdf`)
     } catch (err) {
       console.error('Erro ao exportar PDF:', err)
-      alert('Erro ao exportar PDF')
+      toast.error('Erro', 'Erro ao exportar PDF')
     } finally {
       setExporting(false)
     }
@@ -1014,6 +1017,8 @@ export default function ProjetoAtas({ projeto }) {
   const [selectedAta, setSelectedAta] = useState(null)
   const [previewAta, setPreviewAta] = useState(null)
   const [sections, setSections] = useState(defaultSections)
+  const toast = useToast()
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null })
 
   // Initialize expanded sections from localStorage or use defaults
   const [expandedSections, setExpandedSections] = useState(() => {
@@ -1125,7 +1130,8 @@ export default function ProjetoAtas({ projeto }) {
   const handleSave = async () => {
     if (!selectedAta) return
     if (!selectedAta.titulo?.trim() || !selectedAta.data_reuniao) {
-      return // Don't save if required fields are empty
+      toast.warning('Aviso', 'Preencha o titulo e a data da reuniao')
+      return
     }
 
     setSaving(true)
@@ -1170,6 +1176,7 @@ export default function ProjetoAtas({ projeto }) {
       setHasChanges(false)
     } catch (err) {
       console.error('Erro ao guardar ata:', err)
+      toast.error('Erro', 'Erro ao guardar ata: ' + err.message)
     } finally {
       setSaving(false)
     }
@@ -1181,21 +1188,29 @@ export default function ProjetoAtas({ projeto }) {
       return
     }
 
-    if (!confirm('Tem certeza que deseja eliminar esta ata?')) return
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar Ata',
+      message: 'Tem certeza que deseja eliminar esta ata?',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase
+            .from('projeto_atas')
+            .delete()
+            .eq('id', selectedAta.id)
 
-    try {
-      const { error } = await supabase
-        .from('projeto_atas')
-        .delete()
-        .eq('id', selectedAta.id)
+          if (error) throw error
 
-      if (error) throw error
-
-      setAtas(prev => prev.filter(a => a.id !== selectedAta.id))
-      setSelectedAta(null)
-    } catch (err) {
-      console.error('Erro ao eliminar ata:', err)
-    }
+          setAtas(prev => prev.filter(a => a.id !== selectedAta.id))
+          setSelectedAta(null)
+        } catch (err) {
+          console.error('Erro ao eliminar ata:', err)
+          toast.error('Erro', 'Erro ao eliminar ata')
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      }
+    })
   }
 
   const toggleSection = (sectionId) => {
@@ -1587,6 +1602,16 @@ export default function ProjetoAtas({ projeto }) {
           onClose={() => setPreviewAta(null)}
         />
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type || 'danger'}
+        confirmText="Confirmar"
+      />
     </div>
   )
 }

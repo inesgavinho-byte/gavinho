@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useToast } from '../components/ui/Toast'
 import {
   Plus, Search, HardHat, MapPin, Calendar, Users,
   MoreVertical, Eye, X, Edit, Trash2, Play, Pause, CheckCircle,
@@ -12,6 +13,7 @@ const tipoOptions = ['Todos', 'Construção Nova', 'Remodelação', 'Ampliação
 
 export default function Obras() {
   const navigate = useNavigate()
+  const toast = useToast()
   const [obras, setObras] = useState([])
   const [projetos, setProjetos] = useState([])
   const [loading, setLoading] = useState(true)
@@ -50,7 +52,6 @@ export default function Obras() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'obras' },
         (payload) => {
-          console.log('Obras alterado:', payload)
           if (payload.eventType === 'INSERT') {
             // Refetch to get joined data
             fetchObras()
@@ -72,13 +73,26 @@ export default function Obras() {
 
   const fetchObras = async () => {
     try {
-      const { data, error } = await supabase
-        .from('obras')
-        .select(`*, projetos (codigo, nome, cliente_nome)`)
-        .order('codigo', { ascending: true })
+      const [obrasRes, clientesRes] = await Promise.all([
+        supabase.from('obras').select(`*, projetos (codigo, nome, cliente_nome, cliente_id)`).order('codigo', { ascending: true }),
+        supabase.from('clientes').select('id, nome')
+      ])
 
-      if (error) throw error
-      setObras(data || [])
+      if (obrasRes.error) throw obrasRes.error
+
+      // Build clients map to resolve missing cliente_nome
+      const clientesMap = {}
+      ;(clientesRes.data || []).forEach(c => { clientesMap[c.id] = c.nome })
+
+      // Enrich obras with resolved client name
+      const enriched = (obrasRes.data || []).map(obra => {
+        if (obra.projetos && !obra.projetos.cliente_nome && obra.projetos.cliente_id) {
+          obra.projetos = { ...obra.projetos, cliente_nome: clientesMap[obra.projetos.cliente_id] || null }
+        }
+        return obra
+      })
+
+      setObras(enriched)
     } catch (error) {
       console.error('Erro ao carregar obras:', error)
     } finally {
@@ -137,7 +151,7 @@ export default function Obras() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!formData.nome.trim()) {
-      alert('O nome da obra é obrigatório')
+      toast.warning('Aviso', 'O nome da obra é obrigatório')
       return
     }
     setSaving(true)
@@ -180,7 +194,7 @@ export default function Obras() {
       fetchObras()
     } catch (error) {
       console.error('Erro ao guardar obra:', error)
-      alert('Erro ao guardar obra: ' + error.message)
+      toast.error('Erro', 'Erro ao guardar obra: ' + error.message)
     } finally {
       setSaving(false)
     }
@@ -198,7 +212,7 @@ export default function Obras() {
       fetchObras()
     } catch (error) {
       console.error('Erro ao eliminar obra:', error)
-      alert('Erro ao eliminar obra: ' + (error.message || JSON.stringify(error)))
+      toast.error('Erro', 'Erro ao eliminar obra: ' + (error.message || JSON.stringify(error)))
     }
   }
 
@@ -421,8 +435,13 @@ export default function Obras() {
                       color: 'var(--brown-light)',
                       margin: 0
                     }}>
-                      {obra.projetos?.cliente_nome || obra.encarregado || 'Encarregado não definido'}
+                      {obra.projetos?.cliente_nome || obra.encarregado || 'Sem cliente/encarregado'}
                     </p>
+                    {obra.projetos?.codigo && (
+                      <p style={{ fontSize: '11px', color: 'var(--accent-olive)', margin: '2px 0 0', fontWeight: 500 }}>
+                        {obra.projetos.codigo} — {obra.projetos.nome}
+                      </p>
+                    )}
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>

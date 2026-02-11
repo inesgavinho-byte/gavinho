@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { 
+import {
   AlertTriangle, CheckCircle2, Clock, Plus, Search, X, Euro, Calendar,
   ChevronRight, ChevronDown, Edit, Trash2, MessageSquare, Check, XCircle
 } from 'lucide-react'
+import { useToast } from '../components/ui/Toast'
 
 const TIPOS = [
   { id: 'bloqueio', label: 'Bloqueio', color: 'var(--error)', bg: 'rgba(184, 138, 138, 0.15)' },
@@ -33,6 +34,7 @@ const statusConfig = {
 }
 
 export default function BlockersDecisions() {
+  const toast = useToast()
   const [items, setItems] = useState([])
   const [projetos, setProjetos] = useState([])
   const [loading, setLoading] = useState(true)
@@ -76,7 +78,7 @@ export default function BlockersDecisions() {
   // CRUD
   const handleSave = async () => {
     if (!form.titulo.trim() || !form.projeto_id) {
-      alert('Preencha título e projeto')
+      toast.warning('Aviso', 'Preencha título e projeto')
       return
     }
 
@@ -105,7 +107,7 @@ export default function BlockersDecisions() {
       fetchData()
     } catch (err) {
       console.error('Erro:', err)
-      alert('Erro ao guardar')
+      toast.error('Erro', 'Erro ao guardar')
     }
   }
 
@@ -115,7 +117,7 @@ export default function BlockersDecisions() {
       setShowDeleteConfirm(null)
       fetchData()
     } catch (err) {
-      alert('Erro ao eliminar')
+      toast.error('Erro', 'Erro ao eliminar')
     }
   }
 
@@ -128,7 +130,7 @@ export default function BlockersDecisions() {
       }).eq('id', item.id)
       fetchData()
     } catch (err) {
-      alert('Erro ao resolver')
+      toast.error('Erro', 'Erro ao resolver')
     }
   }
 

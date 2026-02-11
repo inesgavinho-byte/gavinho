@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { useToast } from '../ui/Toast'
+import { useAuth } from '../../contexts/AuthContext'
 import {
   Search, Plus, Filter, AlertCircle, Mail, Mic, MessageSquare, Edit3,
   ChevronRight, ArrowRight, ArrowLeft, Check, XCircle, X, ExternalLink,
@@ -32,6 +34,9 @@ const FONTE_CONFIG = {
 }
 
 export default function ProjetoDecisoes({ projetoId }) {
+  const toast = useToast()
+  const { profile } = useAuth()
+
   // Estados principais
   const [decisoes, setDecisoes] = useState([])
   const [pendentes, setPendentes] = useState([])
@@ -150,13 +155,13 @@ export default function ProjetoDecisoes({ projetoId }) {
 
   const handleAprovar = async (id) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const utilizadorId = profile?.id
 
       const { error } = await supabase
         .from('decisoes')
         .update({
           estado: 'validada',
-          aprovado_por: user?.id
+          aprovado_por: utilizadorId
         })
         .eq('id', id)
 
@@ -168,7 +173,7 @@ export default function ProjetoDecisoes({ projetoId }) {
         campo_alterado: 'estado',
         valor_anterior: 'sugerida',
         valor_novo: 'validada',
-        alterado_por: user?.id,
+        alterado_por: utilizadorId,
         motivo: 'Aprovada manualmente'
       })
 
@@ -176,13 +181,13 @@ export default function ProjetoDecisoes({ projetoId }) {
       fetchPendentes()
     } catch (err) {
       console.error('Erro ao aprovar:', err)
-      alert('Erro ao aprovar decisão')
+      toast.error('Erro', 'Erro ao aprovar decisão')
     }
   }
 
   const handleRejeitar = async (id) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const utilizadorId = profile?.id
 
       const { error } = await supabase
         .from('decisoes')
@@ -196,27 +201,27 @@ export default function ProjetoDecisoes({ projetoId }) {
         campo_alterado: 'estado',
         valor_anterior: 'sugerida',
         valor_novo: 'rejeitada',
-        alterado_por: user?.id,
+        alterado_por: utilizadorId,
         motivo: 'Não é uma decisão válida'
       })
 
       fetchPendentes()
     } catch (err) {
       console.error('Erro ao rejeitar:', err)
-      alert('Erro ao rejeitar decisão')
+      toast.error('Erro', 'Erro ao rejeitar decisão')
     }
   }
 
   const handleCriarDecisao = async (e) => {
     e.preventDefault()
     if (!formData.titulo || !formData.descricao || !formData.decidido_por) {
-      alert('Preencha todos os campos obrigatórios')
+      toast.warning('Aviso', 'Preencha todos os campos obrigatórios')
       return
     }
 
     setSaving(true)
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const utilizadorId = profile?.id
 
       const { error } = await supabase
         .from('decisoes')
@@ -235,8 +240,8 @@ export default function ProjetoDecisoes({ projetoId }) {
           justificacao: formData.justificacao || null,
           fonte: 'manual',
           estado: 'validada',
-          aprovado_por: user?.id,
-          created_by: user?.id
+          aprovado_por: utilizadorId,
+          created_by: utilizadorId
         })
 
       if (error) throw error
@@ -260,7 +265,7 @@ export default function ProjetoDecisoes({ projetoId }) {
       fetchDecisoes()
     } catch (err) {
       console.error('Erro ao criar:', err)
-      alert('Erro ao criar decisão')
+      toast.error('Erro', 'Erro ao criar decisão')
     } finally {
       setSaving(false)
     }

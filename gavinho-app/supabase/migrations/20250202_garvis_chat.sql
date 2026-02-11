@@ -1,7 +1,19 @@
 -- =====================================================
 -- G.A.R.V.I.S. - Chat IA para Projetos
 -- Gavinho Assistant for Responsive Virtual Intelligence Support
+-- CORRIGIDO: model name, policies WITH CHECK, trigger function name
 -- =====================================================
+
+-- =====================================================
+-- 0. Garantir que a função update_updated_at_column existe
+-- =====================================================
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
 -- =====================================================
 -- 1. Add is_bot column to utilizadores if not exists
@@ -17,30 +29,10 @@ BEGIN
 END $$;
 
 -- =====================================================
--- 2. Insert GARVIS virtual user
+-- 2. GARVIS bot user - skipped
+-- The utilizadores table has auth constraints (utilizadores_team_requires_auth)
+-- GARVIS works without a bot user row - chat logs stand alone
 -- =====================================================
-INSERT INTO utilizadores (
-  id,
-  nome,
-  email,
-  cargo,
-  avatar_url,
-  is_bot,
-  ativo
-)
-VALUES (
-  'garvis-bot-001'::UUID,
-  'G.A.R.V.I.S.',
-  'garvis@gavinho.internal',
-  'Assistente IA',
-  '/avatars/garvis.png',
-  true,
-  true
-)
-ON CONFLICT (id) DO UPDATE SET
-  nome = EXCLUDED.nome,
-  cargo = EXCLUDED.cargo,
-  is_bot = EXCLUDED.is_bot;
 
 -- =====================================================
 -- 3. Create GARVIS chat logs table
@@ -49,12 +41,12 @@ CREATE TABLE IF NOT EXISTS garvis_chat_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
   -- Contexto
-  projeto_id UUID REFERENCES projetos(id) ON DELETE SET NULL,
-  topico_id UUID REFERENCES chat_topicos(id) ON DELETE SET NULL,
+  projeto_id UUID,
+  topico_id UUID,
 
   -- Mensagens
-  mensagem_utilizador_id UUID REFERENCES chat_mensagens(id) ON DELETE SET NULL,
-  mensagem_resposta_id UUID REFERENCES chat_mensagens(id) ON DELETE SET NULL,
+  mensagem_utilizador_id UUID,
+  mensagem_resposta_id UUID,
 
   -- Conteúdo original
   prompt_usuario TEXT NOT NULL,
@@ -64,7 +56,7 @@ CREATE TABLE IF NOT EXISTS garvis_chat_logs (
   contexto_projeto JSONB DEFAULT '{}',
 
   -- Métricas
-  modelo_usado TEXT DEFAULT 'claude-sonnet-4-20250514',
+  modelo_usado TEXT DEFAULT 'claude-sonnet-4-5-20250929',
   tokens_input INTEGER,
   tokens_output INTEGER,
   tempo_resposta_ms INTEGER,
@@ -83,9 +75,9 @@ CREATE INDEX IF NOT EXISTS idx_garvis_logs_created ON garvis_chat_logs(created_a
 -- Enable RLS
 ALTER TABLE garvis_chat_logs ENABLE ROW LEVEL SECURITY;
 
--- RLS Policy
+-- RLS Policy (com WITH CHECK para INSERT/UPDATE)
 DROP POLICY IF EXISTS "garvis_logs_all" ON garvis_chat_logs;
-CREATE POLICY "garvis_logs_all" ON garvis_chat_logs FOR ALL USING (true);
+CREATE POLICY "garvis_logs_all" ON garvis_chat_logs FOR ALL USING (true) WITH CHECK (true);
 
 -- =====================================================
 -- 4. GARVIS configuration per project
@@ -115,18 +107,14 @@ CREATE INDEX IF NOT EXISTS idx_garvis_config_projeto ON garvis_config_projeto(pr
 ALTER TABLE garvis_config_projeto ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "garvis_config_all" ON garvis_config_projeto;
-CREATE POLICY "garvis_config_all" ON garvis_config_projeto FOR ALL USING (true);
+CREATE POLICY "garvis_config_all" ON garvis_config_projeto FOR ALL USING (true) WITH CHECK (true);
 
--- Trigger for updated_at
+-- Trigger for updated_at (usa update_updated_at_column - nome correto)
 DROP TRIGGER IF EXISTS trigger_garvis_config_updated ON garvis_config_projeto;
 CREATE TRIGGER trigger_garvis_config_updated
   BEFORE UPDATE ON garvis_config_projeto
   FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at();
+  EXECUTE FUNCTION update_updated_at_column();
 
--- =====================================================
--- Comments for documentation
--- =====================================================
-COMMENT ON TABLE garvis_chat_logs IS 'Logs de todas as interações do GARVIS no chat';
-COMMENT ON TABLE garvis_config_projeto IS 'Configurações do GARVIS por projeto';
-COMMENT ON COLUMN garvis_chat_logs.contexto_projeto IS 'Dados do projeto usados para contextualizar a resposta';
+-- Documentation: garvis_chat_logs = GARVIS chat interaction logs
+-- Documentation: garvis_config_projeto = GARVIS config per project

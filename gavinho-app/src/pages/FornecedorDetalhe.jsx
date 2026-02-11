@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useToast } from '../components/ui/Toast'
+import { calculateMatchScore } from '../services/garvisMatching'
 import {
   ArrowLeft,
   Building2,
@@ -23,7 +25,10 @@ import {
   X,
   Check,
   AlertCircle,
-  MoreVertical
+  MoreVertical,
+  Shield,
+  Users,
+  Sparkles
 } from 'lucide-react'
 
 const TABS = [
@@ -36,6 +41,7 @@ const TABS = [
 export default function FornecedorDetalhe() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const toast = useToast()
   const [fornecedor, setFornecedor] = useState(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
@@ -57,12 +63,73 @@ export default function FornecedorDetalhe() {
     comentario_avaliacao: ''
   })
 
+  // GARVIS state
+  const [garvisData, setGarvisData] = useState({
+    certifications: [],
+    expiringCerts: [],
+    dealRooms: [],
+    matchScore: null
+  })
+
   useEffect(() => {
     fetchFornecedor()
     fetchTrabalhos()
     fetchRfqs()
     fetchProjetos()
+    fetchGarvisData()
   }, [id])
+
+  // Fetch GARVIS-related data for this supplier
+  const fetchGarvisData = async () => {
+    try {
+      // 1. Certifications
+      const { data: certs } = await supabase
+        .from('fornecedor_certificacoes')
+        .select('*')
+        .eq('fornecedor_id', id)
+        .order('data_validade')
+
+      const now = new Date()
+      const thirtyDays = new Date()
+      thirtyDays.setDate(thirtyDays.getDate() + 30)
+
+      const expiring = (certs || []).filter(c => {
+        const exp = new Date(c.data_validade)
+        return exp >= now && exp <= thirtyDays
+      })
+
+      // 2. Deal rooms involving this supplier
+      const { data: dealRoomLinks } = await supabase
+        .from('deal_room_fornecedores')
+        .select('*, deal_rooms(id, titulo, codigo, status, especialidade)')
+        .eq('fornecedor_id', id)
+        .order('created_at', { ascending: false })
+        .limit(10)
+
+      const activeDRs = (dealRoomLinks || [])
+        .filter(l => l.deal_rooms && l.deal_rooms.status !== 'cancelado')
+        .map(l => ({ ...l.deal_rooms, supplierStatus: l.status }))
+
+      setGarvisData({
+        certifications: certs || [],
+        expiringCerts: expiring,
+        dealRooms: activeDRs,
+        matchScore: null
+      })
+    } catch {
+      // GARVIS data is non-critical, tables may not exist
+    }
+  }
+
+  // Calculate match score once fornecedor is loaded
+  useEffect(() => {
+    if (fornecedor) {
+      const score = calculateMatchScore(fornecedor, {
+        especialidade: fornecedor.especialidade || fornecedor.categoria_principal
+      })
+      setGarvisData(prev => ({ ...prev, matchScore: score }))
+    }
+  }, [fornecedor])
 
   const fetchFornecedor = async () => {
     try {
@@ -168,7 +235,7 @@ export default function FornecedorDetalhe() {
       fetchFornecedor()
     } catch (error) {
       console.error('Erro ao guardar:', error)
-      alert('Erro ao guardar: ' + error.message)
+      toast.error('Erro', 'Erro ao guardar: ' + error.message)
     } finally {
       setSaving(false)
     }
@@ -214,7 +281,7 @@ export default function FornecedorDetalhe() {
       fetchFornecedor() // Refresh para atualizar médias
     } catch (error) {
       console.error('Erro ao adicionar avaliação:', error)
-      alert('Erro ao adicionar: ' + error.message)
+      toast.error('Erro', 'Erro ao adicionar: ' + error.message)
     } finally {
       setSaving(false)
     }
@@ -743,7 +810,7 @@ export default function FornecedorDetalhe() {
             {(fornecedor.contacto_principal || fornecedor.contacto_email || fornecedor.contacto_telefone) && (
               <div className="card">
                 <h3 style={{ marginBottom: 'var(--space-lg)', fontSize: '16px', fontWeight: 600 }}>Contacto Principal</h3>
-                
+
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
                   {fornecedor.contacto_principal && (
                     <div className="flex items-center gap-sm">
@@ -770,6 +837,127 @@ export default function FornecedorDetalhe() {
                 </div>
               </div>
             )}
+
+            {/* G.A.R.V.I.S. Intelligence */}
+            <div className="card" style={{ border: '1px solid rgba(122, 139, 110, 0.3)', background: 'rgba(122, 139, 110, 0.03)' }}>
+              <div className="flex items-center gap-sm" style={{ marginBottom: 'var(--space-lg)' }}>
+                <div style={{
+                  width: '28px', height: '28px', borderRadius: '50%',
+                  background: 'linear-gradient(135deg, var(--blush) 0%, var(--blush-dark) 100%)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '11px', fontWeight: 700, color: 'var(--brown-dark)'
+                }}>G</div>
+                <h3 style={{ fontSize: '14px', fontWeight: 600, margin: 0 }}>G.A.R.V.I.S.</h3>
+              </div>
+
+              {/* Match Score */}
+              {garvisData.matchScore && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '12px', background: 'var(--cream)', borderRadius: '10px',
+                  marginBottom: 'var(--space-md)'
+                }}>
+                  <div>
+                    <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginBottom: '2px' }}>Match Score</div>
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                      {garvisData.matchScore.justificacao.slice(0, 3).map((j, i) => (
+                        <span key={i} style={{
+                          fontSize: '10px', padding: '2px 6px', borderRadius: '4px',
+                          background: 'rgba(122, 139, 110, 0.1)', color: 'var(--accent-olive)'
+                        }}>
+                          {j}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{
+                    fontFamily: "'Cormorant Garamond', Georgia, serif",
+                    fontSize: '28px', fontWeight: 700,
+                    color: garvisData.matchScore.score >= 70 ? 'var(--accent-olive)' :
+                           garvisData.matchScore.score >= 40 ? 'var(--warning)' : 'var(--brown-light)',
+                    lineHeight: 1
+                  }}>
+                    {garvisData.matchScore.score}
+                    <span style={{ fontSize: '12px', fontWeight: 400, color: 'var(--brown-light)' }}>/100</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Expiring Certifications Alert */}
+              {garvisData.expiringCerts.length > 0 && (
+                <div style={{
+                  padding: '10px 12px', background: 'rgba(220, 38, 38, 0.06)',
+                  borderRadius: '8px', border: '1px solid rgba(220, 38, 38, 0.15)',
+                  marginBottom: 'var(--space-md)'
+                }}>
+                  <div className="flex items-center gap-xs" style={{ marginBottom: '4px' }}>
+                    <Shield size={14} style={{ color: 'var(--error)' }} />
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--error)' }}>
+                      {garvisData.expiringCerts.length} certificação{garvisData.expiringCerts.length > 1 ? 'ões' : ''} a expirar
+                    </span>
+                  </div>
+                  {garvisData.expiringCerts.map(cert => {
+                    const daysLeft = Math.ceil((new Date(cert.data_validade) - new Date()) / (1000 * 60 * 60 * 24))
+                    return (
+                      <div key={cert.id} style={{ fontSize: '11px', color: 'var(--brown)', padding: '2px 0' }}>
+                        {cert.tipo} — {daysLeft} dias ({new Date(cert.data_validade).toLocaleDateString('pt-PT')})
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* Certifications summary */}
+              {garvisData.certifications.length > 0 && garvisData.expiringCerts.length === 0 && (
+                <div className="flex items-center gap-sm" style={{ marginBottom: 'var(--space-md)', padding: '8px 0' }}>
+                  <Shield size={14} style={{ color: 'var(--accent-olive)' }} />
+                  <span style={{ fontSize: '12px', color: 'var(--accent-olive)', fontWeight: 500 }}>
+                    {garvisData.certifications.length} certificação{garvisData.certifications.length > 1 ? 'ões' : ''} válida{garvisData.certifications.length > 1 ? 's' : ''}
+                  </span>
+                </div>
+              )}
+
+              {/* Active Deal Rooms */}
+              {garvisData.dealRooms.length > 0 && (
+                <div style={{ marginBottom: 'var(--space-md)' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--brown-light)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
+                    Deal Rooms
+                  </div>
+                  {garvisData.dealRooms.map(dr => (
+                    <div key={dr.id} style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '6px 8px', borderRadius: '6px', background: 'var(--cream)',
+                      marginBottom: '4px', fontSize: '12px'
+                    }}>
+                      <div>
+                        <span style={{ fontWeight: 600, color: 'var(--brown)' }}>{dr.titulo}</span>
+                        <span style={{ color: 'var(--brown-light)', marginLeft: '6px' }}>{dr.codigo}</span>
+                      </div>
+                      <span style={{
+                        fontSize: '10px', padding: '2px 6px', borderRadius: '4px', fontWeight: 600,
+                        background: dr.supplierStatus === 'orcamento_recebido' ? 'rgba(22, 163, 74, 0.1)' :
+                                   dr.supplierStatus === 'convidado' ? 'rgba(37, 99, 235, 0.1)' : 'var(--cream)',
+                        color: dr.supplierStatus === 'orcamento_recebido' ? '#16a34a' :
+                               dr.supplierStatus === 'convidado' ? '#2563eb' : 'var(--brown-light)'
+                      }}>
+                        {dr.supplierStatus === 'orcamento_recebido' ? 'Orçamento recebido' :
+                         dr.supplierStatus === 'contactado' ? 'Contactado' :
+                         dr.supplierStatus === 'convidado' ? 'Convidado' :
+                         dr.supplierStatus === 'rejeitado' ? 'Rejeitado' : dr.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* No GARVIS data */}
+              {garvisData.certifications.length === 0 && garvisData.dealRooms.length === 0 && !garvisData.matchScore && (
+                <div style={{ fontSize: '12px', color: 'var(--brown-light)', textAlign: 'center', padding: '8px 0' }}>
+                  <Sparkles size={16} style={{ opacity: 0.4, margin: '0 auto 4px', display: 'block' }} />
+                  Adicione certificações e participe em deal rooms para ativar insights.
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useToast } from '../components/ui/Toast'
 import {
   ArrowLeft, MessageSquare, Mail, Phone, Filter, Search, Plus, Clock,
   AlertTriangle, CheckCircle2, Calendar, FileText, Paperclip, Users,
@@ -187,15 +188,10 @@ export default function ObraComunicacoes() {
 
       if (error) throw error
 
-      // Se nao houver dados reais, criar dados mock
-      if (!data || data.length === 0) {
-        setTimeline(gerarTimelineMock())
-      } else {
-        setTimeline(data)
-      }
+      setTimeline(data || [])
     } catch (err) {
       console.error('Erro ao carregar timeline:', err)
-      setTimeline(gerarTimelineMock())
+      setTimeline([])
     } finally {
       setTimelineLoading(false)
     }
@@ -219,12 +215,8 @@ export default function ObraComunicacoes() {
       if (error) throw error
 
       if (!data || data.length === 0) {
-        setAcoes(gerarAcoesMock())
-        setAcoesStats({
-          total_pendentes: 5,
-          por_tipo: { tarefa: 2, incidente: 1, confirmacao: 1, evidencia: 1 },
-          atrasadas: 1
-        })
+        setAcoes([])
+        setAcoesStats({ total_pendentes: 0, por_tipo: {}, atrasadas: 0 })
       } else {
         setAcoes(data)
         // Calcular stats
@@ -240,143 +232,10 @@ export default function ObraComunicacoes() {
       }
     } catch (err) {
       console.error('Erro ao carregar acoes:', err)
-      setAcoes(gerarAcoesMock())
+      setAcoes([])
+      setAcoesStats({ total_pendentes: 0, por_tipo: {}, atrasadas: 0 })
     }
   }
-
-  // Gerar dados mock para demonstracao
-  const gerarTimelineMock = () => {
-    const now = new Date()
-    return [
-      {
-        id: '1',
-        tipo_item: 'whatsapp_mensagem',
-        titulo: 'Mensagem recebida',
-        resumo: 'Precisamos de mais 50 sacos de cimento para amanha, conseguem enviar?',
-        autor_nome: 'Manuel Encarregado',
-        autor_contacto: '+351912345678',
-        data_evento: new Date(now - 2 * 60 * 60 * 1000).toISOString(),
-        lido: false,
-        importante: true,
-        tem_accoes: true,
-        metadados: { tipo: 'recebida', telefone: '+351912345678' }
-      },
-      {
-        id: '2',
-        tipo_item: 'email',
-        titulo: '[OBR-00402] Fatura materiais Janeiro',
-        resumo: 'Segue em anexo a fatura referente aos materiais entregues no mes de Janeiro.',
-        autor_nome: 'Fornecedor ABC',
-        autor_contacto: 'fornecedor@abc.pt',
-        data_evento: new Date(now - 5 * 60 * 60 * 1000).toISOString(),
-        lido: true,
-        tem_anexos: true,
-        anexos_count: 1,
-        metadados: { tipo: 'recebido', de_email: 'fornecedor@abc.pt' }
-      },
-      {
-        id: '3',
-        tipo_item: 'acao_tarefa',
-        titulo: 'Encomendar janelas suite principal',
-        resumo: 'Verificar medidas e encomendar janelas de aluminio para a suite.',
-        autor_nome: 'Sistema',
-        data_evento: new Date(now - 24 * 60 * 60 * 1000).toISOString(),
-        lido: true,
-        metadados: { tipo_acao: 'tarefa', prioridade: 'alta', estado: 'pendente' }
-      },
-      {
-        id: '4',
-        tipo_item: 'acao_incidente',
-        titulo: 'Ferro oxidado na entrega',
-        resumo: 'O ferro que chegou esta todo oxidado, nao podemos usar.',
-        autor_nome: 'Manuel Encarregado',
-        data_evento: new Date(now - 48 * 60 * 60 * 1000).toISOString(),
-        importante: true,
-        metadados: { tipo_acao: 'incidente', severidade: 'maior', estado: 'em_progresso' }
-      },
-      {
-        id: '5',
-        tipo_item: 'whatsapp_mensagem',
-        titulo: 'Mensagem enviada',
-        resumo: 'Boa tarde! Vou contactar o fornecedor sobre o ferro. Dou feedback amanha.',
-        autor_nome: 'Gavinho',
-        data_evento: new Date(now - 47 * 60 * 60 * 1000).toISOString(),
-        lido: true,
-        metadados: { tipo: 'enviada' }
-      },
-      {
-        id: '6',
-        tipo_item: 'acao_confirmacao',
-        titulo: 'Betonagem laje 1o andar concluida',
-        resumo: 'Trabalho de betonagem concluido com sucesso. 100% completo.',
-        autor_nome: 'Manuel Encarregado',
-        data_evento: new Date(now - 72 * 60 * 60 * 1000).toISOString(),
-        metadados: { tipo_acao: 'confirmacao', estado: 'concluida' }
-      }
-    ]
-  }
-
-  const gerarAcoesMock = () => [
-    {
-      id: '1',
-      tipo_acao: 'tarefa',
-      titulo: 'Encomendar janelas suite principal',
-      descricao: 'Verificar medidas e encomendar janelas de aluminio para a suite.',
-      responsavel_nome: 'Joao Silva',
-      prazo: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
-      estado: 'pendente',
-      prioridade: 'alta',
-      origem_tipo: 'whatsapp',
-      created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-    },
-    {
-      id: '2',
-      tipo_acao: 'incidente',
-      titulo: 'Ferro oxidado na entrega',
-      descricao: 'O ferro que chegou esta todo oxidado, nao podemos usar.',
-      responsavel_nome: 'Ana Costa',
-      prazo: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString(),
-      estado: 'em_progresso',
-      prioridade: 'urgente',
-      severidade: 'maior',
-      origem_tipo: 'whatsapp',
-      created_at: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()
-    },
-    {
-      id: '3',
-      tipo_acao: 'tarefa',
-      titulo: 'Contactar eletricista - verificar quadro',
-      descricao: 'O quadro eletrico esta a dar problemas, chamar eletricista.',
-      responsavel_nome: 'Pedro Santos',
-      prazo: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-      estado: 'pendente',
-      prioridade: 'alta',
-      origem_tipo: 'ia_sugestao',
-      created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-    },
-    {
-      id: '4',
-      tipo_acao: 'confirmacao',
-      titulo: 'Betonagem laje 1o andar',
-      descricao: 'Trabalho de betonagem concluido com sucesso.',
-      responsavel_nome: 'Manuel Encarregado',
-      estado: 'concluida',
-      prioridade: 'media',
-      origem_tipo: 'whatsapp',
-      created_at: new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString()
-    },
-    {
-      id: '5',
-      tipo_acao: 'evidencia',
-      titulo: 'Registo de horas - 17 Janeiro',
-      descricao: '4 pessoas, 36 horas totais.',
-      responsavel_nome: 'Sistema',
-      estado: 'concluida',
-      prioridade: 'baixa',
-      origem_tipo: 'ia_sugestao',
-      created_at: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()
-    }
-  ]
 
   const formatDate = (dateStr) => {
     const date = new Date(dateStr)
@@ -1068,6 +927,7 @@ export default function ObraComunicacoes() {
 
 // Modal para criar nova acao
 function ModalNovaAcao({ obraId, canais, onClose, onSave }) {
+  const toast = useToast()
   const [formData, setFormData] = useState({
     tipo_acao: 'tarefa',
     titulo: '',
@@ -1101,7 +961,7 @@ function ModalNovaAcao({ obraId, canais, onClose, onSave }) {
       onSave()
     } catch (err) {
       console.error('Erro ao criar acao:', err)
-      alert('Erro ao criar acao')
+      toast.error('Erro', 'Erro ao criar ação')
     } finally {
       setSaving(false)
     }

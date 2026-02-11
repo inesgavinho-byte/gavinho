@@ -210,7 +210,7 @@ export default function useNotifications(profile) {
     if (!mentionedUserIds.length || !profile?.id) return
 
     try {
-      // Insert notifications for each mentioned user (except self)
+      // Insert notifications into notificacoes for each mentioned user (except self)
       const notificationsToInsert = mentionedUserIds
         .filter(userId => userId !== profile.id)
         .map(userId => ({
@@ -233,8 +233,21 @@ export default function useNotifications(profile) {
         const { error } = await supabase.from('notificacoes').insert(notificationsToInsert)
         if (error) throw error
       }
+
+      // Also insert into chat_mencoes for mention tracking
+      const mencoesToInsert = mentionedUserIds
+        .filter(userId => userId !== profile.id)
+        .map(userId => ({
+          mensagem_id: message.id,
+          utilizador_id: userId,
+          lida: false
+        }))
+
+      if (mencoesToInsert.length > 0) {
+        await supabase.from('chat_mencoes').insert(mencoesToInsert)
+      }
     } catch (err) {
-      // Silent fail - notifications table might not exist
+      // Silent fail - tables might not exist yet
       console.warn('Could not create mention notifications:', err.message)
     }
   }, [profile])
@@ -260,7 +273,7 @@ export default function useNotifications(profile) {
         setUnreadMentionsCount(data.filter(n => !n.read).length)
       }
     } catch (err) {
-      // Silent fail
+      // Silent fail - table might not exist yet
     }
   }, [profile?.id])
 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { useToast } from '../components/ui/Toast'
 import { 
   Euro,
   TrendingUp,
@@ -45,6 +46,7 @@ const CAPITULOS_PADRAO = [
 ]
 
 export default function Finance() {
+  const toast = useToast()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [projectsFinance, setProjectsFinance] = useState([])
@@ -87,7 +89,7 @@ export default function Finance() {
       if (projError) throw projError
 
       // 2. Buscar custos agregados por capítulo (view)
-      const { data: custosView, error: custosError } = await supabase
+      const { data: custosView } = await supabase
         .from('v_custos_por_capitulo')
         .select('*')
 
@@ -96,6 +98,13 @@ export default function Finance() {
         .from('faturas')
         .select('projeto_id, total, estado')
         .in('estado', ['emitida', 'paga'])
+
+      // 2c. Buscar pagamentos recebidos
+      const { data: pagamentosData } = await supabase
+        .from('projeto_pagamentos')
+        .select('projeto_id, valor, estado')
+        .eq('estado', 'pago')
+
 
       // 3. Buscar fornecedores ativos
       const { data: forns, error: fornError } = await supabase
@@ -195,7 +204,9 @@ export default function Finance() {
           faturacao: {
             contratado: orcamentoAtual,
             faturado: totalFaturadoCliente,
-            recebido: totalRecebido
+            recebido: (pagamentosData || [])
+              .filter(p => p.projeto_id === projeto.id)
+              .reduce((sum, p) => sum + parseFloat(p.valor || 0), 0)
           },
           margem: {
             prevista: margemTarget,
@@ -225,7 +236,7 @@ export default function Finance() {
   // Guardar novo custo
   const handleSaveCost = async () => {
     if (!newCost.projeto_id || !newCost.capitulo || !newCost.valor_bruto || !newCost.descricao) {
-      alert('Preenche todos os campos obrigatórios')
+      toast.warning('Aviso', 'Preenche todos os campos obrigatórios')
       return
     }
 
@@ -276,7 +287,7 @@ export default function Finance() {
 
     } catch (error) {
       console.error('Erro ao guardar custo:', error)
-      alert('Erro ao guardar custo: ' + error.message)
+      toast.error('Erro', 'Erro ao guardar custo: ' + error.message)
     } finally {
       setSaving(false)
     }

@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { useToast } from './ui/Toast'
+import ConfirmModal from './ui/ConfirmModal'
 import {
   Upload, FileCode, Eye, Trash2, X, Plus, Loader2,
   Maximize2, Minimize2, ExternalLink, Download, Edit,
@@ -8,6 +10,8 @@ import {
 import './ProjetoMoodboards.css'
 
 export default function ProjetoMoodboards({ projeto, userId, userName }) {
+  const toast = useToast()
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null })
   const [moodboards, setMoodboards] = useState([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
@@ -93,14 +97,14 @@ export default function ProjetoMoodboards({ projeto, userId, userName }) {
 
     // Validate file type
     if (!file.name.endsWith('.html') && !file.name.endsWith('.htm')) {
-      alert('Por favor selecione um ficheiro HTML (.html ou .htm)')
+      toast.warning('Aviso', 'Por favor selecione um ficheiro HTML (.html ou .htm)')
       e.target.value = ''
       return
     }
 
     // Validate file size (max 50MB)
     if (file.size > 50 * 1024 * 1024) {
-      alert('Ficheiro demasiado grande. Máximo: 50MB')
+      toast.warning('Aviso', 'Ficheiro demasiado grande. Máximo: 50MB')
       e.target.value = ''
       return
     }
@@ -114,7 +118,7 @@ export default function ProjetoMoodboards({ projeto, userId, userName }) {
 
   const handleUpload = async () => {
     if (!newMoodboard.arquivo || !newMoodboard.titulo.trim()) {
-      alert('Por favor preencha o título e selecione um ficheiro')
+      toast.warning('Aviso', 'Por favor preencha o título e selecione um ficheiro')
       return
     }
 
@@ -161,43 +165,49 @@ export default function ProjetoMoodboards({ projeto, userId, userName }) {
       loadMoodboards()
     } catch (err) {
       console.error('Erro ao fazer upload:', err)
-      alert('Erro ao fazer upload: ' + err.message)
+      toast.error('Erro', 'Erro ao fazer upload: ' + err.message)
     } finally {
       setUploading(false)
     }
   }
 
   const handleDelete = async (moodboard) => {
-    if (!confirm(`Eliminar "${moodboard.titulo}"? Esta ação não pode ser desfeita.`)) {
-      return
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar Moodboard',
+      message: `Eliminar "${moodboard.titulo}"? Esta ação não pode ser desfeita.`,
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          // Delete from storage
+          if (moodboard.file_path) {
+            await supabase.storage
+              .from('projeto-files')
+              .remove([moodboard.file_path])
+          }
 
-    try {
-      // Delete from storage
-      if (moodboard.file_path) {
-        await supabase.storage
-          .from('projeto-files')
-          .remove([moodboard.file_path])
+          // Delete from database
+          const { error } = await supabase
+            .from('projeto_moodboards')
+            .delete()
+            .eq('id', moodboard.id)
+
+          if (error) throw error
+
+          // Close viewer if this was selected
+          if (selectedMoodboard?.id === moodboard.id) {
+            setSelectedMoodboard(null)
+          }
+
+          loadMoodboards()
+        } catch (err) {
+          console.error('Erro ao eliminar:', err)
+          toast.error('Erro', 'Erro ao eliminar: ' + err.message)
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
       }
-
-      // Delete from database
-      const { error } = await supabase
-        .from('projeto_moodboards')
-        .delete()
-        .eq('id', moodboard.id)
-
-      if (error) throw error
-
-      // Close viewer if this was selected
-      if (selectedMoodboard?.id === moodboard.id) {
-        setSelectedMoodboard(null)
-      }
-
-      loadMoodboards()
-    } catch (err) {
-      console.error('Erro ao eliminar:', err)
-      alert('Erro ao eliminar: ' + err.message)
-    }
+    })
+    return
   }
 
   const handleEdit = async () => {
@@ -221,7 +231,7 @@ export default function ProjetoMoodboards({ projeto, userId, userName }) {
       loadMoodboards()
     } catch (err) {
       console.error('Erro ao atualizar:', err)
-      alert('Erro ao atualizar: ' + err.message)
+      toast.error('Erro', 'Erro ao atualizar: ' + err.message)
     }
   }
 
@@ -558,6 +568,16 @@ export default function ProjetoMoodboards({ projeto, userId, userName }) {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type || 'danger'}
+        confirmText="Confirmar"
+      />
     </div>
   )
 }

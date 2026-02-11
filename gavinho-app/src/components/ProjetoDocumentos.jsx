@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import {
-  Plus, Upload, FileText, Download, Trash2, Edit2, Save, X,
-  Calendar, Euro, CheckCircle, Clock, AlertCircle, File,
+  Plus, Upload, FileText, Trash2, Edit2, Save, X,
+  Calendar, Euro, File,
   Loader2, Eye, FileCheck, FilePlus2, Type, GitCompare
 } from 'lucide-react'
 import PDFTextAnnotator from './PDFTextAnnotator'
 import PDFVersionCompare from './PDFVersionCompare'
+import { useToast } from './ui/Toast'
+import { ConfirmModal } from './ui/ConfirmModal'
 
 const tipoConfig = {
   'proposta': { label: 'Proposta', color: 'var(--warning)', icon: FileText },
@@ -30,6 +32,8 @@ export default function ProjetoDocumentos({ projeto, onValorUpdate }) {
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef(null)
+  const toast = useToast()
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null })
 
   const [formData, setFormData] = useState({
     tipo: 'proposta',
@@ -101,7 +105,7 @@ export default function ProjetoDocumentos({ projeto, onValorUpdate }) {
       }))
     } catch (err) {
       console.error('Erro ao fazer upload:', err)
-      alert('Erro ao fazer upload do ficheiro')
+      toast.error('Erro', 'Erro ao fazer upload do ficheiro')
     } finally {
       setUploading(false)
     }
@@ -111,7 +115,7 @@ export default function ProjetoDocumentos({ projeto, onValorUpdate }) {
 
   const handleSave = async () => {
     if (!formData.nome.trim()) {
-      alert('Nome é obrigatório')
+      toast.warning('Aviso', 'Nome é obrigatório')
       return
     }
 
@@ -148,26 +152,34 @@ export default function ProjetoDocumentos({ projeto, onValorUpdate }) {
       loadDocumentos()
     } catch (err) {
       console.error('Erro ao guardar:', err)
-      alert('Erro ao guardar: ' + err.message)
+      toast.error('Erro', 'Erro ao guardar: ' + err.message)
     } finally {
       setSaving(false)
     }
   }
 
   const handleDelete = async (doc) => {
-    if (!confirm(`Eliminar "${doc.nome}"?`)) return
-
-    try {
-      const { error } = await supabase
-        .from('projeto_documentos')
-        .delete()
-        .eq('id', doc.id)
-      if (error) throw error
-      loadDocumentos()
-    } catch (err) {
-      console.error('Erro ao eliminar:', err)
-      alert('Erro ao eliminar')
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar Documento',
+      message: `Eliminar "${doc.nome}"?`,
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase
+            .from('projeto_documentos')
+            .delete()
+            .eq('id', doc.id)
+          if (error) throw error
+          loadDocumentos()
+        } catch (err) {
+          console.error('Erro ao eliminar:', err)
+          toast.error('Erro', 'Erro ao eliminar')
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      }
+    })
+    return
   }
 
   const handleEdit = (doc) => {
@@ -496,7 +508,6 @@ export default function ProjetoDocumentos({ projeto, onValorUpdate }) {
           documentName={annotatingDoc.nome}
           onClose={() => setAnnotatingDoc(null)}
           onSave={async (annotations) => {
-            console.log('Anotacoes guardadas:', annotations)
             // Aqui pode-se guardar as anotacoes na base de dados se necessario
           }}
         />
@@ -513,12 +524,21 @@ export default function ProjetoDocumentos({ projeto, onValorUpdate }) {
           projetoId={projeto?.id}
           onClose={() => setComparingDoc(null)}
           onSubmitReview={async (reviewData) => {
-            console.log('Revisao submetida:', reviewData)
             // Recarregar documentos apos submissao
             loadDocumentos()
           }}
         />
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type || 'danger'}
+        confirmText="Confirmar"
+      />
 
       {/* Selected for Compare Indicator */}
       {selectedForCompare && (

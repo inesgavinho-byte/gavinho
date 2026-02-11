@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import TeamWorkloadGantt from '../components/TeamWorkloadGantt'
+import { useToast } from '../components/ui/Toast'
 
 // ============================================
 // CONSTANTS
@@ -63,6 +64,7 @@ const TABS = [
 
 export default function DashboardProjetos() {
   const navigate = useNavigate()
+  const toast = useToast()
   const [searchParams, setSearchParams] = useSearchParams()
   const activeTab = searchParams.get('tab') || 'dashboard'
 
@@ -340,7 +342,7 @@ export default function DashboardProjetos() {
 
   const handleSaveBloqueio = async () => {
     if (!bloqueioForm.titulo.trim() || !bloqueioForm.projeto_id) {
-      alert('Preencha título e projeto')
+      toast.warning('Aviso', 'Preencha título e projeto')
       return
     }
     try {

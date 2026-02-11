@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { useToast } from './ui/Toast'
+import { ConfirmModal } from './ui/ConfirmModal'
 import {
   Plus, Upload, Download, FileSpreadsheet, Edit2, Trash2, Save, X, Check,
   ChevronDown, ChevronRight, Search, Filter, Euro, Calculator, FileText,
@@ -29,6 +31,8 @@ const UNIDADES = ['un', 'm2', 'ml', 'm3', 'vg', 'dias', 'kg', 'sacos', 'cx', 'p�
 export default function ObraOrcamentacao({ obra, activeSubTab = 'custo' }) {
   const { profile } = useAuth()
   const fileInputRef = useRef(null)
+  const toast = useToast()
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', type: 'danger', onConfirm: null })
   
   // Estados principais
   const [propostas, setPropostas] = useState([])
@@ -121,7 +125,7 @@ export default function ObraOrcamentacao({ obra, activeSubTab = 'custo' }) {
   
   const handleSaveProposta = async () => {
     if (!propostaForm.codigo) {
-      alert('Insira o código da proposta')
+      toast.warning('Atenção', 'Insira o código da proposta')
       return
     }
     
@@ -160,21 +164,28 @@ export default function ObraOrcamentacao({ obra, activeSubTab = 'custo' }) {
       setPropostaForm({ codigo: '', nome: '', descricao: '', status: 'em_elaboracao' })
       loadData()
     } catch (err) {
-      alert(`Erro: ${err.message}`)
+      toast.error('Erro', err.message)
     } finally {
       setSaving(false)
     }
   }
 
-  const handleDeleteProposta = async (proposta) => {
-    if (!confirm(`Eliminar proposta "${proposta.codigo}"? Os artigos associados perderão a ligação.`)) return
-    
-    try {
-      await supabase.from('obra_propostas').delete().eq('id', proposta.id)
-      loadData()
-    } catch (err) {
-      alert(`Erro: ${err.message}`)
-    }
+  const handleDeleteProposta = (proposta) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar Proposta',
+      message: `Eliminar proposta "${proposta.codigo}"? Os artigos associados perderão a ligação.`,
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          await supabase.from('obra_propostas').delete().eq('id', proposta.id)
+          loadData()
+        } catch (err) {
+          toast.error('Erro', err.message)
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      }
+    })
   }
 
   const openEditProposta = (proposta) => {
@@ -199,7 +210,7 @@ export default function ObraOrcamentacao({ obra, activeSubTab = 'custo' }) {
 
   const handleSaveItem = async () => {
     if (!itemForm.descricao) {
-      alert('Insira a descrição do artigo')
+      toast.warning('Atenção', 'Insira a descrição do artigo')
       return
     }
     
@@ -243,7 +254,7 @@ export default function ObraOrcamentacao({ obra, activeSubTab = 'custo' }) {
       resetItemForm()
       loadData()
     } catch (err) {
-      alert(`Erro: ${err.message}`)
+      toast.error('Erro', err.message)
     } finally {
       setSaving(false)
     }
@@ -277,15 +288,22 @@ export default function ObraOrcamentacao({ obra, activeSubTab = 'custo' }) {
     setShowItemModal(true)
   }
 
-  const handleDeleteItem = async (item) => {
-    if (!confirm(`Eliminar artigo "${item.descricao}"?`)) return
-    
-    try {
-      await supabase.from('obra_orcamento_items').delete().eq('id', item.id)
-      loadData()
-    } catch (err) {
-      alert(`Erro: ${err.message}`)
-    }
+  const handleDeleteItem = (item) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar Artigo',
+      message: `Eliminar artigo "${item.descricao}"?`,
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          await supabase.from('obra_orcamento_items').delete().eq('id', item.id)
+          loadData()
+        } catch (err) {
+          toast.error('Erro', err.message)
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      }
+    })
   }
 
   // Marcar como eliminado (para nota de crédito)
@@ -305,7 +323,7 @@ export default function ObraOrcamentacao({ obra, activeSubTab = 'custo' }) {
       
       loadData()
     } catch (err) {
-      alert(`Erro: ${err.message}`)
+      toast.error('Erro', err.message)
     }
   }
 
@@ -369,8 +387,6 @@ export default function ObraOrcamentacao({ obra, activeSubTab = 'custo' }) {
       // Mapear propostas únicas (coluna 1)
       const propostasUnicas = [...new Set(dataRows.map(r => String(r[1] || '').trim()).filter(Boolean))]
       
-      console.log('Propostas encontradas:', propostasUnicas)
-      
       // Criar propostas que não existem
       for (const codigo of propostasUnicas) {
         const existe = propostas.find(p => p.codigo === codigo)
@@ -425,12 +441,12 @@ export default function ObraOrcamentacao({ obra, activeSubTab = 'custo' }) {
         await supabase.from('obra_orcamento_items').insert(batch)
       }
       
-      alert(`Importados ${itemsToInsert.length} artigos de ${propostasUnicas.length} propostas`)
+      toast.success('Sucesso', `Importados ${itemsToInsert.length} artigos de ${propostasUnicas.length} propostas`)
       loadData()
       
     } catch (err) {
       console.error('Erro na importação:', err)
-      alert(`Erro na importação: ${err.message}`)
+      toast.error('Erro', `Erro na importação: ${err.message}`)
     } finally {
       setLoading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
@@ -1143,6 +1159,15 @@ export default function ObraOrcamentacao({ obra, activeSubTab = 'custo' }) {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type}
+      />
     </div>
   )
 }

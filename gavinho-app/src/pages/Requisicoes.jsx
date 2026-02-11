@@ -6,9 +6,11 @@ import {
   Building2, AlertTriangle, Loader2, Calendar, User,
   ChevronDown, ChevronUp, Clock, Download
 } from 'lucide-react'
+import { useToast } from '../components/ui/Toast'
 
 export default function Requisicoes() {
   const { profile } = useAuth()
+  const toast = useToast()
   const [requisicoes, setRequisicoes] = useState([])
   const [obras, setObras] = useState([])
   const [loading, setLoading] = useState(true)
@@ -191,7 +193,7 @@ export default function Requisicoes() {
       loadRequisicoes()
     } catch (err) {
       console.error('Erro na ação:', err)
-      alert('Erro ao processar ação')
+      toast.error('Erro', 'Erro ao processar ação')
     } finally {
       setActionLoading(null)
     }

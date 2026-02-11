@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { useToast } from './ui/Toast'
+import { ConfirmModal } from './ui/ConfirmModal'
 import {
   AlertTriangle, Plus, X, Calendar, MapPin, Edit2, Trash2,
   ChevronDown, ChevronRight, Clock, User, Camera, CheckCircle,
@@ -44,6 +46,8 @@ const getEspecialidadeIcon = (nome) => {
 }
 
 export default function ObraNaoConformidades({ obra }) {
+  const toast = useToast()
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', type: 'danger', onConfirm: null })
   const [ncs, setNcs] = useState([])
   const [especialidades, setEspecialidades] = useState([])
   const [zonas, setZonas] = useState([])
@@ -156,7 +160,7 @@ export default function ObraNaoConformidades({ obra }) {
 
   const handleCreate = async () => {
     if (!formData.titulo || !formData.descricao) {
-      alert('Título e descrição são obrigatórios')
+      toast.warning('Atenção', 'Título e descrição são obrigatórios')
       return
     }
 
@@ -201,7 +205,7 @@ export default function ObraNaoConformidades({ obra }) {
       loadData()
     } catch (err) {
       console.error('Erro ao criar NC:', err)
-      alert('Erro ao criar: ' + err.message)
+      toast.error('Erro', 'Erro ao criar: ' + err.message)
     } finally {
       setSaving(false)
     }
@@ -240,29 +244,36 @@ export default function ObraNaoConformidades({ obra }) {
       loadData()
     } catch (err) {
       console.error('Erro ao atualizar NC:', err)
-      alert('Erro ao atualizar: ' + err.message)
+      toast.error('Erro', 'Erro ao atualizar: ' + err.message)
     } finally {
       setSaving(false)
     }
   }
 
-  const handleDelete = async (nc) => {
-    if (!confirm('Tem certeza que deseja apagar esta não conformidade?')) return
+  const handleDelete = (nc) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Apagar Não Conformidade',
+      message: 'Tem certeza que deseja apagar esta não conformidade?',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase
+            .from('nao_conformidades')
+            .delete()
+            .eq('id', nc.id)
 
-    try {
-      const { error } = await supabase
-        .from('nao_conformidades')
-        .delete()
-        .eq('id', nc.id)
+          if (error) throw error
 
-      if (error) throw error
-
-      if (selectedNC?.id === nc.id) setSelectedNC(null)
-      loadData()
-    } catch (err) {
-      console.error('Erro ao apagar:', err)
-      alert('Erro ao apagar NC')
-    }
+          if (selectedNC?.id === nc.id) setSelectedNC(null)
+          loadData()
+        } catch (err) {
+          console.error('Erro ao apagar:', err)
+          toast.error('Erro', 'Erro ao apagar NC')
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      }
+    })
   }
 
   const handleEstadoChange = async (nc, novoEstado) => {
@@ -299,7 +310,7 @@ export default function ObraNaoConformidades({ obra }) {
       }
     } catch (err) {
       console.error('Erro ao alterar estado:', err)
-      alert('Erro ao alterar estado')
+      toast.error('Erro', 'Erro ao alterar estado')
     }
   }
 
@@ -1577,6 +1588,15 @@ function NCDetailPanel({ nc, onClose, onEdit, onEstadoChange, formatDate }) {
           )}
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type}
+      />
     </div>
   )
 }
