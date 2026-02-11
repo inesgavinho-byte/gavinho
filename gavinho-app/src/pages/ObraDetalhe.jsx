@@ -244,10 +244,13 @@ export default function ObraDetalhe() {
 
   const fetchObra = async () => {
     try {
+      // Support both UUID (obra.id) and codigo in the URL
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+      const column = isUuid ? 'id' : 'codigo'
       const { data, error } = await supabase
         .from('obras')
         .select('*, projetos(id, codigo, nome, cliente_nome)')
-        .eq('codigo', id)
+        .eq(column, id)
         .single()
 
       if (error) throw error
