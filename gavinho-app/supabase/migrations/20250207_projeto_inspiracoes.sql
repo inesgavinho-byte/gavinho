@@ -1,5 +1,6 @@
 -- Migration: Create projeto_inspiracoes table
 -- Table to store inspiration images and references for archviz projects
+-- SAFE: Handles case where table already exists with different schema
 
 -- =====================================================
 -- Table: projeto_inspiracoes
@@ -19,6 +20,18 @@ CREATE TABLE IF NOT EXISTS projeto_inspiracoes (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Add columns if table already existed with different schema
+ALTER TABLE projeto_inspiracoes ADD COLUMN IF NOT EXISTS compartimento TEXT DEFAULT 'Geral';
+ALTER TABLE projeto_inspiracoes ADD COLUMN IF NOT EXISTS titulo TEXT;
+ALTER TABLE projeto_inspiracoes ADD COLUMN IF NOT EXISTS descricao TEXT;
+ALTER TABLE projeto_inspiracoes ADD COLUMN IF NOT EXISTS url TEXT;
+ALTER TABLE projeto_inspiracoes ADD COLUMN IF NOT EXISTS fonte TEXT;
+ALTER TABLE projeto_inspiracoes ADD COLUMN IF NOT EXISTS tags TEXT[] DEFAULT '{}';
+ALTER TABLE projeto_inspiracoes ADD COLUMN IF NOT EXISTS created_by UUID;
+ALTER TABLE projeto_inspiracoes ADD COLUMN IF NOT EXISTS created_by_name TEXT;
+ALTER TABLE projeto_inspiracoes ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE projeto_inspiracoes ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 
 -- Indexes for faster queries
 CREATE INDEX IF NOT EXISTS idx_projeto_inspiracoes_projeto_id ON projeto_inspiracoes(projeto_id);
