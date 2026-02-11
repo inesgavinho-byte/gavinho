@@ -1,10 +1,14 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { useToast } from './ui/Toast'
+import { ConfirmModal } from './ui/ConfirmModal'
 import {
   FileText, Plus, X, Calendar, Edit2, Trash2, Eye, Download,
   ChevronDown, ChevronRight, Send, Save, Clock, Loader2,
-  CheckCircle, AlertCircle, FileEdit, Image as ImageIcon, FileDown
+  CheckCircle, AlertCircle, FileEdit, Image as ImageIcon, FileDown,
+  Camera, Upload, ListOrdered, MessageSquare, AlertTriangle, ClipboardList
 } from 'lucide-react'
+import PortalToggle from './PortalToggle'
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
          AlignmentType, BorderStyle, WidthType, ShadingType, HeadingLevel } from 'docx'
 import { saveAs } from 'file-saver'
@@ -24,6 +28,9 @@ const ESTADOS_RELATORIO = {
 }
 
 export default function ObraRelatorios({ obra }) {
+  const toast = useToast()
+  const fileInputRef = useRef(null)
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', type: 'danger', onConfirm: null })
   const [relatorios, setRelatorios] = useState([])
   const [especialidades, setEspecialidades] = useState([])
   const [fotografias, setFotografias] = useState([])
@@ -32,12 +39,13 @@ export default function ObraRelatorios({ obra }) {
   const [showEditorModal, setShowEditorModal] = useState(false)
   const [editingRelatorio, setEditingRelatorio] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [uploadingFoto, setUploadingFoto] = useState(false)
 
   // Filtros
   const [filtroTipo, setFiltroTipo] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('')
 
-  // Form básico
+  // Form basico
   const [formData, setFormData] = useState({
     titulo: '',
     tipo: 'semanal',
@@ -55,7 +63,10 @@ export default function ObraRelatorios({ obra }) {
     observacoes: '',
     progresso_global: 0,
     progresso_por_especialidade: {},
-    fotos_selecionadas: []
+    topicos: [],
+    fotos_relatorio: [],
+    publicar_no_portal: false,
+    resumo_portal: ''
   })
 
   useEffect(() => {
@@ -83,7 +94,7 @@ export default function ObraRelatorios({ obra }) {
           .select('id, url, titulo, data_fotografia')
           .eq('obra_id', obra.id)
           .order('data_fotografia', { ascending: false })
-          .limit(50)
+          .limit(100)
       ])
 
       setRelatorios(relatoriosRes.data || [])
@@ -103,7 +114,7 @@ export default function ObraRelatorios({ obra }) {
 
   const handleCreate = async () => {
     if (!formData.titulo || !formData.data_inicio || !formData.data_fim) {
-      alert('Preencha todos os campos obrigatórios')
+      toast.warning('Atenção', 'Preencha todos os campos obrigatórios')
       return
     }
 
@@ -133,7 +144,7 @@ export default function ObraRelatorios({ obra }) {
       handleEdit(data)
     } catch (err) {
       console.error('Erro ao criar:', err)
-      alert('Erro ao criar relatório: ' + err.message)
+      toast.error('Erro', 'Erro ao criar relatório: ' + err.message)
     } finally {
       setSaving(false)
     }
@@ -150,7 +161,10 @@ export default function ObraRelatorios({ obra }) {
       observacoes: relatorio.observacoes || '',
       progresso_global: relatorio.progresso_global || 0,
       progresso_por_especialidade: relatorio.progresso_por_especialidade || {},
-      fotos_selecionadas: []
+      topicos: relatorio.topicos || [],
+      fotos_relatorio: relatorio.fotos_relatorio || [],
+      publicar_no_portal: relatorio.publicar_no_portal || false,
+      resumo_portal: relatorio.resumo_portal || ''
     })
     setShowEditorModal(true)
   }
@@ -168,7 +182,11 @@ export default function ObraRelatorios({ obra }) {
         decisoes_pendentes: editorData.decisoes_pendentes || null,
         observacoes: editorData.observacoes || null,
         progresso_global: editorData.progresso_global,
-        progresso_por_especialidade: editorData.progresso_por_especialidade
+        progresso_por_especialidade: editorData.progresso_por_especialidade,
+        topicos: editorData.topicos.length > 0 ? editorData.topicos : null,
+        fotos_relatorio: editorData.fotos_relatorio.length > 0 ? editorData.fotos_relatorio : null,
+        publicar_no_portal: editorData.publicar_no_portal,
+        resumo_portal: editorData.resumo_portal || null
       }
 
       if (publish) {
@@ -183,12 +201,13 @@ export default function ObraRelatorios({ obra }) {
 
       if (error) throw error
 
+      toast.success(publish ? 'Relatório publicado' : 'Rascunho guardado')
       setShowEditorModal(false)
       setEditingRelatorio(null)
       loadData()
     } catch (err) {
       console.error('Erro ao guardar:', err)
-      alert('Erro ao guardar: ' + err.message)
+      toast.error('Erro', 'Erro ao guardar: ' + err.message)
     } finally {
       setSaving(false)
     }
@@ -344,7 +363,7 @@ export default function ObraRelatorios({ obra }) {
       saveAs(blob, `${relatorio.codigo}_${obra?.codigo || 'obra'}.docx`)
     } catch (err) {
       console.error('Erro ao exportar DOCX:', err)
-      alert('Erro ao exportar DOCX')
+      toast.error('Erro', 'Erro ao exportar DOCX')
     }
   }
 
@@ -445,25 +464,27 @@ export default function ObraRelatorios({ obra }) {
       pdf.save(`${relatorio.codigo}_${obra?.codigo || 'obra'}.pdf`)
     } catch (err) {
       console.error('Erro ao exportar PDF:', err)
-      alert('Erro ao exportar PDF')
+      toast.error('Erro', 'Erro ao exportar PDF')
     }
   }
 
-  const handleDelete = async (relatorio) => {
-    if (!confirm('Tem certeza que deseja apagar este relatorio?')) return
-
-    try {
-      const { error } = await supabase
-        .from('obra_relatorios')
-        .delete()
-        .eq('id', relatorio.id)
-
-      if (error) throw error
-      loadData()
-    } catch (err) {
-      console.error('Erro ao apagar:', err)
-      alert('Erro ao apagar relatorio')
-    }
+  const handleDelete = (relatorio) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Apagar Relatório',
+      message: 'Tem certeza que deseja apagar este relatório?',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase.from('obra_relatorios').delete().eq('id', relatorio.id)
+          if (error) throw error
+          loadData()
+        } catch (err) {
+          toast.error('Erro', 'Erro ao apagar relatório')
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      }
+    })
   }
 
   const updateEspecialidadeProgresso = (espId, value) => {
@@ -473,6 +494,67 @@ export default function ObraRelatorios({ obra }) {
         ...prev.progresso_por_especialidade,
         [espId]: parseInt(value) || 0
       }
+    }))
+  }
+
+  // Topics management
+  const addTopico = () => {
+    setEditorData(prev => ({
+      ...prev,
+      topicos: [...prev.topicos, { titulo: '', descricao: '', tipo: 'info' }]
+    }))
+  }
+
+  const updateTopico = (index, field, value) => {
+    setEditorData(prev => ({
+      ...prev,
+      topicos: prev.topicos.map((t, i) => i === index ? { ...t, [field]: value } : t)
+    }))
+  }
+
+  const removeTopico = (index) => {
+    setEditorData(prev => ({
+      ...prev,
+      topicos: prev.topicos.filter((_, i) => i !== index)
+    }))
+  }
+
+  // Photo upload for report
+  const handleFotoUpload = async (e) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+    setUploadingFoto(true)
+    try {
+      for (const file of files) {
+        const fileName = `${obra.codigo}/relatorios/${Date.now()}_${file.name}`
+        const { error: uploadError } = await supabase.storage.from('obras').upload(fileName, file)
+        if (uploadError) throw uploadError
+        const { data: { publicUrl } } = supabase.storage.from('obras').getPublicUrl(fileName)
+        setEditorData(prev => ({
+          ...prev,
+          fotos_relatorio: [...prev.fotos_relatorio, { url: publicUrl, legenda: file.name.replace(/\.[^/.]+$/, '') }]
+        }))
+      }
+    } catch (err) {
+      toast.error('Erro', 'Erro ao fazer upload')
+    } finally {
+      setUploadingFoto(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  const removeFotoRelatorio = (index) => {
+    setEditorData(prev => ({
+      ...prev,
+      fotos_relatorio: prev.fotos_relatorio.filter((_, i) => i !== index)
+    }))
+  }
+
+  const addFotoFromGallery = (foto) => {
+    if (editorData.fotos_relatorio.some(f => f.url === foto.url)) return
+    setEditorData(prev => ({
+      ...prev,
+      fotos_relatorio: [...prev.fotos_relatorio, { url: foto.url, legenda: foto.titulo || '' }]
     }))
   }
 
@@ -840,6 +922,138 @@ export default function ObraRelatorios({ obra }) {
                 />
               </div>
 
+              {/* Tópicos */}
+              <div>
+                <label style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', display: 'block' }}>
+                  Tópicos {editorData.topicos.length > 0 && <span style={{ fontSize: '11px', color: 'var(--accent-olive)', fontWeight: 400 }}>({editorData.topicos.length})</span>}
+                </label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {editorData.topicos.map((topico, idx) => (
+                    <div key={idx} style={{ padding: '12px', background: 'var(--cream)', borderRadius: '8px', border: '1px solid var(--stone)' }}>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                        <span style={{
+                          width: '24px', height: '24px', borderRadius: '50%', background: 'var(--brown)', color: '#FFF',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: '11px', fontWeight: 600, flexShrink: 0, marginTop: '6px'
+                        }}>{idx + 1}</span>
+                        <div style={{ flex: 1 }}>
+                          <input
+                            type="text"
+                            value={topico.titulo}
+                            placeholder="Título do tópico..."
+                            onChange={e => updateTopico(idx, 'titulo', e.target.value)}
+                            style={{ width: '100%', fontWeight: 500, marginBottom: '6px' }}
+                          />
+                          <textarea
+                            value={topico.descricao}
+                            placeholder="Descrição, notas, pontos relevantes..."
+                            onChange={e => updateTopico(idx, 'descricao', e.target.value)}
+                            rows={2}
+                            style={{ width: '100%', fontSize: '12px', resize: 'vertical' }}
+                          />
+                          <select
+                            value={topico.tipo}
+                            onChange={e => updateTopico(idx, 'tipo', e.target.value)}
+                            style={{ width: 'auto', marginTop: '6px', fontSize: '11px', padding: '4px 8px' }}
+                          >
+                            <option value="info">Informação</option>
+                            <option value="progresso">Progresso</option>
+                            <option value="problema">Problema</option>
+                            <option value="decisao">Decisão</option>
+                          </select>
+                        </div>
+                        <button
+                          onClick={() => removeTopico(idx)}
+                          className="btn btn-ghost btn-icon"
+                          style={{ color: 'var(--error)', flexShrink: 0 }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  <button onClick={addTopico} className="btn btn-outline" style={{ alignSelf: 'flex-start' }}>
+                    <Plus size={14} /> Adicionar Tópico
+                  </button>
+                </div>
+              </div>
+
+              {/* Fotografias */}
+              <div>
+                <label style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', display: 'block' }}>
+                  Fotografias {editorData.fotos_relatorio.length > 0 && <span style={{ fontSize: '11px', color: 'var(--accent-olive)', fontWeight: 400 }}>({editorData.fotos_relatorio.length})</span>}
+                </label>
+
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
+                  <button onClick={() => fileInputRef.current?.click()} disabled={uploadingFoto} className="btn btn-outline">
+                    {uploadingFoto ? <Loader2 className="spin" size={14} /> : <Upload size={14} />}
+                    Fazer Upload
+                  </button>
+                  <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleFotoUpload} style={{ display: 'none' }} />
+                </div>
+
+                {/* Selected photos */}
+                {editorData.fotos_relatorio.length > 0 && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px', marginBottom: '12px' }}>
+                    {editorData.fotos_relatorio.map((foto, idx) => (
+                      <div key={idx} style={{ position: 'relative', borderRadius: '8px', overflow: 'hidden' }}>
+                        <img src={foto.url} alt={foto.legenda} style={{ width: '100%', height: '100px', objectFit: 'cover', display: 'block', borderRadius: '8px' }} />
+                        <button
+                          onClick={() => removeFotoRelatorio(idx)}
+                          style={{
+                            position: 'absolute', top: '4px', right: '4px', width: '20px', height: '20px',
+                            background: 'rgba(0,0,0,0.6)', color: 'white', border: 'none', borderRadius: '50%',
+                            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                          }}
+                        >
+                          <X size={10} />
+                        </button>
+                        <input
+                          type="text"
+                          value={foto.legenda}
+                          placeholder="Legenda..."
+                          onChange={e => {
+                            const updated = [...editorData.fotos_relatorio]
+                            updated[idx] = { ...updated[idx], legenda: e.target.value }
+                            setEditorData(prev => ({ ...prev, fotos_relatorio: updated }))
+                          }}
+                          style={{
+                            position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,0.5)',
+                            border: 'none', color: 'white', fontSize: '10px', padding: '4px 6px', outline: 'none'
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Gallery picker */}
+                {fotografias.length > 0 && (
+                  <div>
+                    <p style={{ fontSize: '11px', color: 'var(--brown-light)', marginBottom: '8px' }}>Selecionar da galeria da obra:</p>
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', maxHeight: '120px', overflowY: 'auto' }}>
+                      {fotografias.slice(0, 20).map(foto => {
+                        const selected = editorData.fotos_relatorio.some(f => f.url === foto.url)
+                        return (
+                          <div
+                            key={foto.id}
+                            onClick={() => !selected && addFotoFromGallery(foto)}
+                            style={{
+                              width: '52px', height: '52px', borderRadius: '6px', overflow: 'hidden',
+                              cursor: selected ? 'default' : 'pointer', opacity: selected ? 0.4 : 1,
+                              border: selected ? '2px solid var(--accent-olive)' : '2px solid transparent',
+                              transition: 'all 0.15s', flexShrink: 0
+                            }}
+                          >
+                            <img src={foto.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Progresso por Especialidade */}
               <div>
                 <label style={{ fontSize: '13px', fontWeight: 600, marginBottom: '12px', display: 'block' }}>
@@ -922,6 +1136,28 @@ export default function ObraRelatorios({ obra }) {
                   style={{ width: '100%', resize: 'vertical' }}
                 />
               </div>
+
+              {/* Portal */}
+              <div style={{ borderTop: '1px solid var(--stone)', paddingTop: '16px' }}>
+                <PortalToggle
+                  checked={editorData.publicar_no_portal}
+                  onChange={v => setEditorData({ ...editorData, publicar_no_portal: v })}
+                />
+                {editorData.publicar_no_portal && (
+                  <div style={{ marginTop: '8px' }}>
+                    <label style={{ fontSize: '12px', fontWeight: 500, marginBottom: '4px', display: 'block' }}>
+                      Resumo para o Portal
+                    </label>
+                    <textarea
+                      value={editorData.resumo_portal}
+                      onChange={e => setEditorData({ ...editorData, resumo_portal: e.target.value })}
+                      placeholder="Resumo simplificado visível ao cliente..."
+                      rows={3}
+                      style={{ width: '100%', resize: 'vertical' }}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="modal-footer" style={{ position: 'sticky', bottom: 0, background: 'white', borderTop: '1px solid var(--border)' }}>
@@ -940,6 +1176,15 @@ export default function ObraRelatorios({ obra }) {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type}
+      />
     </div>
   )
 }
