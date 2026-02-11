@@ -353,22 +353,29 @@ export default function ChatObras() {
       // Auto-register photo in obra_fotografias (Acompanhamento de Obra)
       if (photoUrl) {
         const now = new Date()
-        await supabase
+        const fotoRecord = {
+          obra_id: selectedObra.id,
+          url: photoUrl,
+          filename: photoFileName || `chat_${now.getTime()}.jpg`,
+          titulo: `Chat - ${now.toLocaleDateString('pt-PT')} ${now.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}`,
+          descricao: `Enviada via Chat por ${currentUser.nome}`,
+          data_fotografia: now.toISOString(),
+          autor_nome: currentUser.nome,
+          tags: ['chat']
+        }
+        // Try with autor_id FK first, fallback without it
+        const { error: fotoErr } = await supabase
           .from('obra_fotografias')
-          .insert({
-            obra_id: selectedObra.id,
-            url: photoUrl,
-            filename: photoFileName || `chat_${now.getTime()}.jpg`,
-            titulo: `Chat - ${now.toLocaleDateString('pt-PT')} ${now.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}`,
-            descricao: `Enviada via Chat por ${currentUser.nome}`,
-            data_fotografia: now.toISOString(),
-            autor_id: currentUser.id,
-            autor_nome: currentUser.nome,
-            tags: ['chat']
-          })
-          .then(({ error: fotoErr }) => {
-            if (fotoErr) console.warn('Aviso: foto não registada no acompanhamento:', fotoErr.message)
-          })
+          .insert({ ...fotoRecord, autor_id: currentUser.id })
+        if (fotoErr) {
+          console.warn('Retry sem autor_id FK:', fotoErr.message)
+          await supabase
+            .from('obra_fotografias')
+            .insert(fotoRecord)
+            .then(({ error: retryErr }) => {
+              if (retryErr) console.warn('Aviso: foto não registada no acompanhamento:', retryErr.message)
+            })
+        }
       }
 
       setMessages(prev => prev.map(m =>
