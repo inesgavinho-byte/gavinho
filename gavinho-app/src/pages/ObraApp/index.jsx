@@ -312,18 +312,21 @@ export default function ObraApp() {
     },
     badge: {
       position: 'absolute',
-      top: -4,
-      right: -4,
+      top: -6,
+      right: -6,
       background: '#ef4444',
       color: 'white',
-      fontSize: 10,
-      fontWeight: 600,
-      width: 16,
-      height: 16,
-      borderRadius: '50%',
+      fontSize: 9,
+      fontWeight: 700,
+      minWidth: 18,
+      height: 18,
+      padding: '0 4px',
+      borderRadius: 9,
       display: 'flex',
       alignItems: 'center',
-      justifyContent: 'center'
+      justifyContent: 'center',
+      border: `2px solid ${colors.primary}`,
+      boxSizing: 'border-box'
     },
     // Obra dropdown
     obraSelector: {
@@ -333,13 +336,14 @@ export default function ObraApp() {
     obraSelectorButton: {
       display: 'flex',
       alignItems: 'center',
-      gap: 4,
+      gap: 8,
       padding: '6px 12px',
-      background: '#2563eb',
+      background: 'rgba(255,255,255,0.1)',
       borderRadius: 8,
-      border: 'none',
+      border: '1px solid rgba(255,255,255,0.15)',
       cursor: 'pointer',
-      color: 'white'
+      color: 'white',
+      transition: 'background 0.2s'
     },
     obraDropdown: {
       position: 'absolute',
@@ -478,9 +482,9 @@ export default function ObraApp() {
       right: 0,
       bottom: 0,
       width: '100%',
-      maxWidth: 320,
+      maxWidth: 340,
       background: 'white',
-      boxShadow: '-4px 0 12px rgba(0,0,0,0.1)',
+      boxShadow: '-4px 0 20px rgba(0,0,0,0.15)',
       zIndex: 200,
       display: 'flex',
       flexDirection: 'column',
@@ -490,18 +494,23 @@ export default function ObraApp() {
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
-      padding: 16,
-      borderBottom: '1px solid #e5e7eb'
+      padding: '16px',
+      paddingTop: 'max(16px, env(safe-area-inset-top))',
+      borderBottom: '1px solid #e5e7eb',
+      background: colors.primary,
+      color: 'white'
     },
     notificationItem: {
       display: 'flex',
       gap: 12,
-      padding: 12,
+      padding: '12px 16px',
       borderBottom: '1px solid #f3f4f6',
-      cursor: 'pointer'
+      cursor: 'pointer',
+      transition: 'background 0.15s'
     },
     notificationItemUnread: {
-      background: '#f0f9ff'
+      background: '#f0f9ff',
+      borderLeft: `3px solid ${colors.primary}`
     }
   }
 
@@ -678,7 +687,7 @@ export default function ObraApp() {
             onClick={() => setShowNotifications(true)}
             style={{ ...styles.iconButton, ...localStyles.notificationBell }}
           >
-            <Bell size={20} color={unreadCount > 0 ? colors.primary : '#6b7280'} />
+            <Bell size={20} color="white" />
             {unreadCount > 0 && (
               <span style={localStyles.badge}>
                 {unreadCount > 9 ? '9+' : unreadCount}
@@ -706,85 +715,68 @@ export default function ObraApp() {
             >
               <div
                 style={{
-                  width: 48,
-                  height: 48,
+                  width: 38,
+                  height: 38,
                   borderRadius: '50%',
-                  background: user.avatar ? 'transparent' : colors.primary,
+                  background: user.avatar ? 'transparent' : 'rgba(255,255,255,0.15)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   position: 'relative',
                   overflow: 'hidden',
-                  border: '2px solid rgba(255,255,255,0.3)'
+                  border: '2px solid rgba(255,255,255,0.25)',
+                  flexShrink: 0
                 }}
               >
                 {user.avatar ? (
                   <img src={user.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
-                  <span style={{ color: 'white', fontWeight: 600, fontSize: 16 }}>
+                  <span style={{ color: 'white', fontWeight: 600, fontSize: 13 }}>
                     {user.nome?.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()}
                   </span>
                 )}
-                <div style={{
-                  position: 'absolute',
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  background: 'rgba(0,0,0,0.5)',
-                  padding: '2px 0',
-                  display: 'flex',
-                  justifyContent: 'center'
-                }}>
-                  <Camera size={10} color="white" />
-                </div>
               </div>
-              <div style={{ flex: 1 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <strong>{user.nome}</strong>
+                  <strong style={{ fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.nome}</strong>
                   {user.isAdmin && (
                     <span style={{
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: 2,
-                      background: '#fef3c7',
-                      color: '#d97706',
+                      background: 'rgba(255,255,255,0.15)',
+                      color: '#fbbf24',
                       fontSize: 9,
-                      padding: '2px 6px',
-                      borderRadius: 4,
+                      padding: '1px 5px',
+                      borderRadius: 3,
                       fontWeight: 600
                     }}>
-                      <Shield size={10} /> Admin
+                      <Shield size={9} /> Admin
                     </span>
                   )}
                 </div>
-                <p style={{ margin: 0, fontSize: 12, opacity: 0.7 }}>{user.cargo || 'Equipa'}</p>
-                {user.role && user.role !== 'user' && (
-                  <p style={{ margin: '2px 0 0', fontSize: 10, opacity: 0.5 }}>
-                    Nível: {user.role}
-                  </p>
-                )}
+                <p style={{ margin: 0, fontSize: 11, opacity: 0.6 }}>{user.cargo || 'Equipa'}</p>
               </div>
-              <Settings size={18} style={{ opacity: 0.6 }} />
+              <Settings size={16} style={{ opacity: 0.5, flexShrink: 0 }} />
             </div>
 
             {/* Obra selector in menu - collapsible */}
             {obras.length > 0 && (
-              <div style={{ borderBottom: '1px solid #e5e7eb' }}>
-                {/* Header with collapse toggle and refresh */}
+              <div style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  padding: '12px 16px',
+                  padding: '8px 16px',
                   cursor: 'pointer',
-                  background: '#f9fafb'
+                  background: 'rgba(255,255,255,0.03)'
                 }}>
                   <div
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1 }}
                     onClick={() => setObrasExpanded(!obrasExpanded)}
                   >
-                    {obrasExpanded ? <ChevronUp size={16} color="#6b7280" /> : <ChevronDown size={16} color="#6b7280" />}
-                    <span style={{ fontSize: 11, color: '#6b7280', textTransform: 'uppercase', fontWeight: 600 }}>
+                    {obrasExpanded ? <ChevronUp size={14} color="rgba(255,255,255,0.5)" /> : <ChevronDown size={14} color="rgba(255,255,255,0.5)" />}
+                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: 0.5 }}>
                       Obras ({obras.length})
                     </span>
                   </div>
@@ -800,20 +792,18 @@ export default function ObraApp() {
                         display: 'flex',
                         alignItems: 'center'
                       }}
-                      title="Atualizar lista de obras"
                     >
                       <RefreshCw
-                        size={14}
-                        color="#6b7280"
+                        size={12}
+                        color="rgba(255,255,255,0.4)"
                         style={refreshingObras ? { animation: 'spin 1s linear infinite' } : {}}
                       />
                     </button>
                   )}
                 </div>
 
-                {/* Collapsible obras list */}
                 {obrasExpanded && (
-                  <div style={{ padding: '0 16px 16px', maxHeight: 300, overflowY: 'auto' }}>
+                  <div style={{ padding: '0 10px 10px', maxHeight: 220, overflowY: 'auto' }}>
                     {obras.map(o => (
                       <button
                         key={o.id}
@@ -821,26 +811,26 @@ export default function ObraApp() {
                         style={{
                           display: 'flex',
                           alignItems: 'center',
-                          gap: 12,
+                          gap: 10,
                           width: '100%',
-                          padding: '10px 12px',
-                          marginBottom: 4,
-                          background: obra?.id === o.id ? `${colors.primary}30` : 'white',
-                          border: obra?.id === o.id ? `2px solid ${colors.primary}` : '1px solid #e5e7eb',
-                          borderLeft: obra?.id === o.id ? `4px solid ${colors.primary}` : '1px solid #e5e7eb',
-                          borderRadius: 8,
+                          padding: '8px 10px',
+                          marginBottom: 2,
+                          background: obra?.id === o.id ? 'rgba(255,255,255,0.12)' : 'transparent',
+                          border: 'none',
+                          borderLeft: obra?.id === o.id ? '3px solid white' : '3px solid transparent',
+                          borderRadius: 4,
                           cursor: 'pointer',
                           textAlign: 'left',
-                          transition: 'all 0.2s',
-                          boxShadow: obra?.id === o.id ? '0 2px 8px rgba(61, 67, 73, 0.15)' : 'none'
+                          transition: 'all 0.15s',
+                          color: 'white'
                         }}
                       >
-                        <HardHat size={18} color={obra?.id === o.id ? colors.primary : '#6b7280'} />
+                        <HardHat size={15} color={obra?.id === o.id ? 'white' : 'rgba(255,255,255,0.5)'} />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{
-                            fontSize: 13,
-                            fontWeight: 600,
-                            color: obra?.id === o.id ? colors.primary : '#374151',
+                            fontSize: 12,
+                            fontWeight: obra?.id === o.id ? 600 : 500,
+                            color: obra?.id === o.id ? 'white' : 'rgba(255,255,255,0.8)',
                             whiteSpace: 'nowrap',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis'
@@ -848,33 +838,14 @@ export default function ObraApp() {
                             {o.codigo}
                           </div>
                           <div style={{
-                            fontSize: 11,
-                            color: obra?.id === o.id ? '#374151' : '#6b7280',
-                            fontWeight: obra?.id === o.id ? 500 : 400,
+                            fontSize: 10,
+                            color: obra?.id === o.id ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.45)',
                             whiteSpace: 'nowrap',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis'
                           }}>{o.nome}</div>
-                          {o.status && (
-                            <span style={{
-                              fontSize: 9,
-                              padding: '2px 6px',
-                              borderRadius: 4,
-                              background: o.status === 'em_curso' ? '#dcfce7' :
-                                         o.status === 'concluída' ? '#dbeafe' :
-                                         o.status === 'pausada' ? '#fef3c7' : '#f3f4f6',
-                              color: o.status === 'em_curso' ? '#16a34a' :
-                                    o.status === 'concluída' ? '#2563eb' :
-                                    o.status === 'pausada' ? '#d97706' : '#6b7280',
-                              textTransform: 'capitalize',
-                              marginTop: 4,
-                              display: 'inline-block'
-                            }}>
-                              {o.status.replace('_', ' ')}
-                            </span>
-                          )}
                         </div>
-                        {obra?.id === o.id && <Check size={16} color={colors.primary} />}
+                        {obra?.id === o.id && <Check size={14} color="white" />}
                       </button>
                     ))}
                   </div>
@@ -890,17 +861,17 @@ export default function ObraApp() {
                   disabled={!obra}
                   style={{
                     ...styles.menuItem,
-                    ...(activeTab === item.key ? { background: `${colors.primary}10`, color: colors.primary } : {}),
+                    ...(activeTab === item.key ? styles.menuItemActive : {}),
                     opacity: obra ? 1 : 0.5,
                     cursor: obra ? 'pointer' : 'not-allowed'
                   }}
                 >
-                  <item.icon size={20} /> {item.label}
+                  <item.icon size={18} /> {item.label}
                 </button>
               ))}
             </nav>
             <button onClick={handleLogout} style={styles.logoutButton}>
-              <LogOut size={20} /> Sair
+              <LogOut size={16} /> Sair
             </button>
           </div>
         </div>
@@ -976,29 +947,64 @@ export default function ObraApp() {
           />
           <div style={localStyles.notificationsPanel}>
             <div style={localStyles.notificationsPanelHeader}>
-              <h3 style={{ margin: 0, fontSize: 16 }}>Notificações</h3>
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Bell size={18} color="white" />
+                <h3 style={{ margin: 0, fontSize: 16, color: 'white' }}>Notificações</h3>
+                {unreadCount > 0 && (
+                  <span style={{
+                    background: '#ef4444',
+                    color: 'white',
+                    fontSize: 10,
+                    fontWeight: 700,
+                    padding: '2px 6px',
+                    borderRadius: 10,
+                    minWidth: 18,
+                    textAlign: 'center'
+                  }}>{unreadCount}</span>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 {unreadCount > 0 && (
                   <button
                     onClick={markAllAsRead}
-                    style={{ background: 'none', border: 'none', color: colors.primary, fontSize: 12, cursor: 'pointer' }}
+                    style={{
+                      background: 'rgba(255,255,255,0.15)',
+                      border: 'none',
+                      color: 'white',
+                      fontSize: 11,
+                      cursor: 'pointer',
+                      padding: '4px 10px',
+                      borderRadius: 4
+                    }}
                   >
-                    Marcar todas lidas
+                    Marcar lidas
                   </button>
                 )}
                 <button
                   onClick={() => setShowNotifications(false)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
                 >
-                  <X size={20} color="#6b7280" />
+                  <X size={20} color="white" />
                 </button>
               </div>
             </div>
             <div style={{ flex: 1, overflow: 'auto' }}>
               {notifications.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>
-                  <Bell size={32} style={{ opacity: 0.3, marginBottom: 8 }} />
-                  <p>Sem notificações</p>
+                <div style={{ textAlign: 'center', padding: 48, color: '#9ca3af' }}>
+                  <div style={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: '50%',
+                    background: '#f3f4f6',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 16px'
+                  }}>
+                    <Bell size={28} color="#d1d5db" />
+                  </div>
+                  <p style={{ margin: 0, fontSize: 15, fontWeight: 500, color: '#6b7280' }}>Tudo em dia!</p>
+                  <p style={{ margin: '4px 0 0', fontSize: 13, color: '#9ca3af' }}>Sem notificações de momento</p>
                 </div>
               ) : (
                 notifications.map(notif => (
@@ -1010,18 +1016,59 @@ export default function ObraApp() {
                     }}
                     onClick={() => markAsRead(notif.id)}
                   >
-                    <span style={{ fontSize: 20 }}>{notif.icon}</span>
-                    <div style={{ flex: 1 }}>
-                      <p style={{ margin: 0, fontSize: 13, fontWeight: notif.read ? 400 : 600 }}>
+                    <div style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: '50%',
+                      background: notif.color ? `${notif.color}15` : '#f3f4f6',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                      fontSize: 18
+                    }}>
+                      {notif.icon}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{
+                        margin: 0,
+                        fontSize: 13,
+                        fontWeight: notif.read ? 400 : 600,
+                        color: '#374151',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}>
                         {notif.title}
                       </p>
-                      <p style={{ margin: '4px 0 0', fontSize: 12, color: '#6b7280' }}>
+                      <p style={{
+                        margin: '2px 0 0',
+                        fontSize: 12,
+                        color: '#6b7280',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical'
+                      }}>
                         {notif.message}
                       </p>
                       <p style={{ margin: '4px 0 0', fontSize: 11, color: '#9ca3af' }}>
-                        {new Date(notif.createdAt).toLocaleString('pt-PT')}
+                        {new Date(notif.createdAt).toLocaleString('pt-PT', {
+                          day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
+                        })}
                       </p>
                     </div>
+                    {!notif.read && (
+                      <div style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: '50%',
+                        background: colors.primary,
+                        flexShrink: 0,
+                        alignSelf: 'center'
+                      }} />
+                    )}
                   </div>
                 ))
               )}
@@ -1042,6 +1089,14 @@ export default function ObraApp() {
         @keyframes slideLeft {
           from { transform: translateX(100%); }
           to { transform: translateX(0); }
+        }
+        @keyframes menuSlideIn {
+          from { transform: translateX(-100%); }
+          to { transform: translateX(0); }
+        }
+        @keyframes menuOverlayIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
       `}</style>
 

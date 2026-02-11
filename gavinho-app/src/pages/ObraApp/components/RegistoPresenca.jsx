@@ -1,14 +1,14 @@
 // =====================================================
 // REGISTO PRESENCA COMPONENT
 // Check-in/Check-out attendance tracking
-// Features: Weekly summary, >12h warning
+// Features: GPS geofencing, Weekly summary, >12h warning
 // =====================================================
 
 import { useState, useEffect, useMemo } from 'react'
 import {
   Clock, CalendarDays, LogIn, LogOut as LogOutIcon,
   Check, CheckCheck, Loader2, AlertTriangle, TrendingUp,
-  BarChart3
+  BarChart3, MapPin, Navigation, Shield, XCircle, RefreshCw
 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import { styles } from '../styles'
@@ -23,7 +23,7 @@ const localStyles = {
     borderRadius: 16,
     overflow: 'hidden',
     boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-    marginBottom: 24
+    marginBottom: 16
   },
   statusHeader: {
     display: 'flex',
@@ -35,7 +35,7 @@ const localStyles = {
     fontSize: 14
   },
   statusBody: {
-    padding: 24,
+    padding: '20px 16px',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center'
@@ -313,7 +313,93 @@ const localStyles = {
   overtimeWarningDesc: {
     fontSize: 12,
     color: '#b45309'
+  },
+  // GPS Geofence styles
+  gpsCard: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+    padding: '12px 16px',
+    borderRadius: 12,
+    marginBottom: 16,
+    transition: 'all 0.3s'
+  },
+  gpsCardLoading: {
+    background: '#f8fafc',
+    border: '1px solid #e2e8f0'
+  },
+  gpsCardOk: {
+    background: 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)',
+    border: '1px solid #86efac'
+  },
+  gpsCardFar: {
+    background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+    border: '1px solid #fca5a5'
+  },
+  gpsCardNoCoords: {
+    background: '#fffbeb',
+    border: '1px solid #fde68a'
+  },
+  gpsIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0
+  },
+  gpsIconLoading: {
+    background: '#e2e8f0',
+    color: '#64748b'
+  },
+  gpsIconOk: {
+    background: '#22c55e',
+    color: 'white'
+  },
+  gpsIconFar: {
+    background: '#ef4444',
+    color: 'white'
+  },
+  gpsIconNoCoords: {
+    background: '#f59e0b',
+    color: 'white'
+  },
+  gpsText: {
+    flex: 1
+  },
+  gpsTitle: {
+    fontWeight: 600,
+    fontSize: 14,
+    marginBottom: 2
+  },
+  gpsDesc: {
+    fontSize: 12
+  },
+  gpsRefresh: {
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    padding: 6,
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center'
   }
+}
+
+const DEFAULT_GEOFENCE_RADIUS = 50 // meters - default if obra has no raio_geofence
+
+// Haversine formula: calculates distance between two GPS points in meters
+function calculateGpsDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371000 // Earth radius in meters
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLon = (lon2 - lon1) * Math.PI / 180
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return R * c
 }
 
 export default function RegistoPresenca({ obra, user }) {
@@ -323,6 +409,13 @@ export default function RegistoPresenca({ obra, user }) {
   const [actionLoading, setActionLoading] = useState(false)
   const [notas, setNotas] = useState('')
   const [showWeeklySummary, setShowWeeklySummary] = useState(true)
+
+  // GPS geofencing state
+  const [obraCoords, setObraCoords] = useState(null) // { latitude, longitude, raio_geofence }
+  const [userLocation, setUserLocation] = useState(null) // { latitude, longitude, accuracy }
+  const [gpsLoading, setGpsLoading] = useState(true)
+  const [gpsError, setGpsError] = useState(null)
+  const [distance, setDistance] = useState(null) // meters from obra
 
   const hoje = new Date().toISOString().split('T')[0]
 
@@ -400,7 +493,13 @@ export default function RegistoPresenca({ obra, user }) {
 
   useEffect(() => {
     loadPresencas()
+    loadObraCoords()
   }, [obra, user])
+
+  // Request GPS when component mounts or obra changes
+  useEffect(() => {
+    requestGpsLocation()
+  }, [obra])
 
   const loadPresencas = async () => {
     setLoading(true)
@@ -437,20 +536,119 @@ export default function RegistoPresenca({ obra, user }) {
     }
   }
 
+  const loadObraCoords = async () => {
+    try {
+      const { data } = await supabase
+        .from('obras')
+        .select('latitude, longitude, raio_geofence')
+        .eq('id', obra.id)
+        .single()
+
+      if (data && data.latitude && data.longitude) {
+        setObraCoords(data)
+      } else {
+        setObraCoords(null)
+      }
+    } catch (err) {
+      console.error('Erro ao carregar coordenadas da obra:', err)
+    }
+  }
+
+  const requestGpsLocation = () => {
+    if (!navigator.geolocation) {
+      setGpsError('Geolocalização não suportada neste dispositivo')
+      setGpsLoading(false)
+      return
+    }
+
+    setGpsLoading(true)
+    setGpsError(null)
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const loc = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy
+        }
+        setUserLocation(loc)
+        setGpsLoading(false)
+
+        // Calculate distance if obra has coordinates
+        if (obraCoords) {
+          const dist = calculateGpsDistance(
+            loc.latitude, loc.longitude,
+            obraCoords.latitude, obraCoords.longitude
+          )
+          setDistance(Math.round(dist))
+        }
+      },
+      (error) => {
+        console.error('GPS error:', error)
+        setGpsError(
+          error.code === 1 ? 'Permissão de localização negada. Ativa nas definições.' :
+          error.code === 2 ? 'Localização indisponível. Tenta ao ar livre.' :
+          error.code === 3 ? 'Tempo esgotado. Tenta novamente.' :
+          'Erro ao obter localização'
+        )
+        setGpsLoading(false)
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 30000
+      }
+    )
+  }
+
+  // Recalculate distance when obraCoords or userLocation changes
+  useEffect(() => {
+    if (obraCoords && userLocation) {
+      const dist = calculateGpsDistance(
+        userLocation.latitude, userLocation.longitude,
+        obraCoords.latitude, obraCoords.longitude
+      )
+      setDistance(Math.round(dist))
+    }
+  }, [obraCoords, userLocation])
+
+  // Geofence check
+  const geofenceRadius = obraCoords?.raio_geofence || DEFAULT_GEOFENCE_RADIUS
+  const isWithinGeofence = obraCoords && distance !== null ? distance <= geofenceRadius : null
+  const canDoAction = !obraCoords || isWithinGeofence === true // Allow if no coords configured
+
   const handleCheckIn = async () => {
+    if (!canDoAction) {
+      alert(`Estás a ${distance}m da obra. Precisas de estar a menos de ${geofenceRadius}m para fazer check-in.`)
+      return
+    }
+
     setActionLoading(true)
     try {
       const agora = new Date().toISOString()
 
+      const insertData = {
+        trabalhador_id: user.id,
+        obra_id: obra.id,
+        data: hoje,
+        hora_entrada: agora,
+        notas: notas || null,
+        metodo: userLocation ? 'gps' : 'manual',
+        dispositivo: navigator.userAgent?.substring(0, 100) || null
+      }
+
+      // Add GPS data if available
+      if (userLocation) {
+        insertData.latitude_entrada = userLocation.latitude
+        insertData.longitude_entrada = userLocation.longitude
+        insertData.precisao_entrada = userLocation.accuracy
+        insertData.distancia_entrada = distance
+        insertData.dentro_geofence_entrada = isWithinGeofence
+      }
+
       const { data, error } = await supabase
         .from('presencas')
-        .insert({
-          trabalhador_id: user.id,
-          obra_id: obra.id,
-          data: hoje,
-          hora_entrada: agora,
-          notas: notas || null
-        })
+        .insert(insertData)
         .select()
         .single()
 
@@ -480,16 +678,32 @@ export default function RegistoPresenca({ obra, user }) {
   const handleCheckOut = async () => {
     if (!presencaHoje) return
 
+    if (!canDoAction) {
+      alert(`Estás a ${distance}m da obra. Precisas de estar a menos de ${geofenceRadius}m para fazer check-out.`)
+      return
+    }
+
     setActionLoading(true)
     try {
       const agora = new Date().toISOString()
 
+      const updateData = {
+        hora_saida: agora,
+        notas: notas || presencaHoje.notas
+      }
+
+      // Add GPS data if available
+      if (userLocation) {
+        updateData.latitude_saida = userLocation.latitude
+        updateData.longitude_saida = userLocation.longitude
+        updateData.precisao_saida = userLocation.accuracy
+        updateData.distancia_saida = distance
+        updateData.dentro_geofence_saida = isWithinGeofence
+      }
+
       const { error } = await supabase
         .from('presencas')
-        .update({
-          hora_saida: agora,
-          notas: notas || presencaHoje.notas
-        })
+        .update(updateData)
         .eq('id', presencaHoje.id)
 
       if (error) throw error
@@ -638,6 +852,83 @@ export default function RegistoPresenca({ obra, user }) {
         </div>
       )}
 
+      {/* GPS Location Status */}
+      {!jaFezCheckOut && (
+        <div style={{
+          ...localStyles.gpsCard,
+          ...(gpsLoading ? localStyles.gpsCardLoading :
+              gpsError ? localStyles.gpsCardFar :
+              !obraCoords ? localStyles.gpsCardNoCoords :
+              isWithinGeofence ? localStyles.gpsCardOk :
+              localStyles.gpsCardFar)
+        }}>
+          <div style={{
+            ...localStyles.gpsIcon,
+            ...(gpsLoading ? localStyles.gpsIconLoading :
+                gpsError ? localStyles.gpsIconFar :
+                !obraCoords ? localStyles.gpsIconNoCoords :
+                isWithinGeofence ? localStyles.gpsIconOk :
+                localStyles.gpsIconFar)
+          }}>
+            {gpsLoading ? (
+              <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
+            ) : gpsError ? (
+              <XCircle size={20} />
+            ) : !obraCoords ? (
+              <MapPin size={20} />
+            ) : isWithinGeofence ? (
+              <Shield size={20} />
+            ) : (
+              <Navigation size={20} />
+            )}
+          </div>
+          <div style={localStyles.gpsText}>
+            <div style={{
+              ...localStyles.gpsTitle,
+              color: gpsLoading ? '#64748b' :
+                     gpsError ? '#dc2626' :
+                     !obraCoords ? '#d97706' :
+                     isWithinGeofence ? '#16a34a' :
+                     '#dc2626'
+            }}>
+              {gpsLoading ? 'A obter localização...' :
+               gpsError ? 'Localização indisponível' :
+               !obraCoords ? 'Obra sem coordenadas GPS' :
+               isWithinGeofence ? `Na obra (${distance}m)` :
+               `Fora da obra (${distance}m)`}
+            </div>
+            <div style={{
+              ...localStyles.gpsDesc,
+              color: gpsLoading ? '#94a3b8' :
+                     gpsError ? '#f87171' :
+                     !obraCoords ? '#f59e0b' :
+                     isWithinGeofence ? '#22c55e' :
+                     '#f87171'
+            }}>
+              {gpsLoading ? 'GPS de alta precisão ativado' :
+               gpsError ? gpsError :
+               !obraCoords ? 'Check-in/out permitido sem validação GPS' :
+               isWithinGeofence ? `Dentro do raio de ${geofenceRadius}m ✓` :
+               `Precisas estar a menos de ${geofenceRadius}m da obra`}
+            </div>
+            {userLocation && !gpsLoading && (
+              <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>
+                Precisão: ±{Math.round(userLocation.accuracy)}m
+              </div>
+            )}
+          </div>
+          {!gpsLoading && (
+            <button
+              onClick={requestGpsLocation}
+              style={localStyles.gpsRefresh}
+              title="Atualizar localização"
+            >
+              <RefreshCw size={16} color="#64748b" />
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Status Card */}
       <div style={localStyles.statusCard}>
         <div style={localStyles.statusHeader}>
@@ -665,11 +956,25 @@ export default function RegistoPresenca({ obra, user }) {
 
               <button
                 onClick={handleCheckIn}
-                disabled={actionLoading}
-                style={localStyles.checkInButton}
+                disabled={actionLoading || gpsLoading || !canDoAction}
+                style={{
+                  ...localStyles.checkInButton,
+                  opacity: (actionLoading || gpsLoading || !canDoAction) ? 0.5 : 1,
+                  cursor: (actionLoading || gpsLoading || !canDoAction) ? 'not-allowed' : 'pointer'
+                }}
               >
                 {actionLoading ? (
                   <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
+                ) : gpsLoading ? (
+                  <>
+                    <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
+                    A verificar localização...
+                  </>
+                ) : !canDoAction ? (
+                  <>
+                    <XCircle size={20} />
+                    Fora da zona ({distance}m)
+                  </>
                 ) : (
                   <>
                     <LogIn size={20} />
@@ -709,11 +1014,25 @@ export default function RegistoPresenca({ obra, user }) {
 
               <button
                 onClick={handleCheckOut}
-                disabled={actionLoading}
-                style={localStyles.checkOutButton}
+                disabled={actionLoading || gpsLoading || !canDoAction}
+                style={{
+                  ...localStyles.checkOutButton,
+                  opacity: (actionLoading || gpsLoading || !canDoAction) ? 0.5 : 1,
+                  cursor: (actionLoading || gpsLoading || !canDoAction) ? 'not-allowed' : 'pointer'
+                }}
               >
                 {actionLoading ? (
                   <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
+                ) : gpsLoading ? (
+                  <>
+                    <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
+                    A verificar localização...
+                  </>
+                ) : !canDoAction ? (
+                  <>
+                    <XCircle size={20} />
+                    Fora da zona ({distance}m)
+                  </>
                 ) : (
                   <>
                     <LogOutIcon size={20} />

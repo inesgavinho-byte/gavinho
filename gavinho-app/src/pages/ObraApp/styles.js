@@ -52,6 +52,7 @@ export const styles = {
     background: colors.primary,
     color: 'white',
     padding: '12px 16px',
+    paddingTop: 'max(12px, env(safe-area-inset-top))',
     display: 'flex',
     alignItems: 'center',
     gap: 12,
@@ -100,54 +101,69 @@ export const styles = {
   menuOverlay: {
     position: 'fixed',
     inset: 0,
-    background: 'rgba(0,0,0,0.5)',
-    zIndex: 200
+    background: 'rgba(0,0,0,0.45)',
+    zIndex: 200,
+    animation: 'menuOverlayIn 0.2s ease'
   },
   menu: {
     position: 'absolute',
     left: 0,
     top: 0,
     bottom: 0,
-    width: 280,
+    width: 'min(280px, 82vw)',
     background: colors.primary,
     color: 'white',
     display: 'flex',
-    flexDirection: 'column'
+    flexDirection: 'column',
+    animation: 'menuSlideIn 0.2s ease',
+    overflowY: 'auto',
+    WebkitOverflowScrolling: 'touch'
   },
   menuHeader: {
-    padding: 20,
+    padding: '14px 16px',
     display: 'flex',
     alignItems: 'center',
-    gap: 12,
-    borderBottom: '1px solid rgba(255,255,255,0.1)'
+    gap: 10,
+    borderBottom: '1px solid rgba(255,255,255,0.1)',
+    flexShrink: 0
   },
   menuNav: {
     flex: 1,
-    padding: '12px 0'
+    padding: '6px 0',
+    overflowY: 'auto'
   },
   menuItem: {
     display: 'flex',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
     width: '100%',
-    padding: '14px 20px',
+    padding: '11px 16px',
     background: 'none',
     border: 'none',
-    color: 'white',
-    fontSize: 14,
+    borderLeft: '3px solid transparent',
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 13,
+    fontWeight: 500,
     cursor: 'pointer',
-    textAlign: 'left'
+    textAlign: 'left',
+    transition: 'all 0.15s'
+  },
+  menuItemActive: {
+    background: 'rgba(255,255,255,0.08)',
+    color: 'white',
+    borderLeftColor: 'white'
   },
   logoutButton: {
     display: 'flex',
     alignItems: 'center',
-    gap: 12,
-    padding: '16px 20px',
+    gap: 10,
+    padding: '12px 16px',
     background: 'rgba(244, 67, 54, 0.1)',
     border: 'none',
     color: colors.error,
-    fontSize: 14,
-    cursor: 'pointer'
+    fontSize: 13,
+    cursor: 'pointer',
+    flexShrink: 0
   },
 
   // Bottom Navigation
@@ -155,7 +171,8 @@ export const styles = {
     display: 'flex',
     background: 'white',
     borderTop: `1px solid ${colors.border}`,
-    padding: '8px 0'
+    padding: '8px 0',
+    paddingBottom: 'max(8px, env(safe-area-inset-bottom))'
   },
   navButton: {
     flex: 1,
@@ -425,8 +442,9 @@ export const styles = {
   // Forms
   formContainer: {
     flex: 1,
-    padding: 20,
-    overflowY: 'auto'
+    padding: '16px 12px',
+    overflowY: 'auto',
+    WebkitOverflowScrolling: 'touch'
   },
   formTitle: {
     display: 'flex',

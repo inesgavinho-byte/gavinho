@@ -1,7 +1,7 @@
 // =====================================================
 // TAREFAS COMPONENT
 // Task management for obra workers
-// Features: Due-soon alerts, Quick status buttons
+// Features: Due-soon alerts, Quick status buttons, Task creation
 // =====================================================
 
 import { useState, useEffect } from 'react'
@@ -9,7 +9,7 @@ import { supabase } from '../../../lib/supabase'
 import {
   CheckCircle2, Circle, Clock, AlertCircle, User,
   Calendar, ChevronRight, Loader2, Filter, Search,
-  AlertTriangle, Play, Bell
+  AlertTriangle, Play, Bell, Plus, X, ChevronDown
 } from 'lucide-react'
 import { styles, colors } from '../styles'
 import { formatDate, formatDateTime } from '../utils'
@@ -50,9 +50,27 @@ export default function Tarefas({ obra, user }) {
   const [updating, setUpdating] = useState(false)
   const [showDueAlert, setShowDueAlert] = useState(true)
 
+  // Task creation state
+  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [equipa, setEquipa] = useState([])
+  const [newTask, setNewTask] = useState({
+    titulo: '',
+    descricao: '',
+    prioridade: 'media',
+    responsavel_id: '',
+    data_limite: ''
+  })
+
+  // Permission check: only admin, gestao, or encarregado can create tasks
+  const canCreateTask = user.isAdmin ||
+    user.tipo === 'gestao' ||
+    user.cargo?.toLowerCase() === 'encarregado'
+
   useEffect(() => {
     if (obra) {
       loadTarefas()
+      loadEquipa()
       const unsubscribe = subscribeToTarefas()
       return unsubscribe
     }
@@ -95,6 +113,93 @@ export default function Tarefas({ obra, user }) {
       .subscribe()
 
     return () => supabase.removeChannel(channel)
+  }
+
+  const loadEquipa = async () => {
+    try {
+      // Load workers assigned to this obra
+      const { data: trabalhadores } = await supabase
+        .from('trabalhador_obras')
+        .select('trabalhador_id, trabalhadores(id, nome, cargo)')
+        .eq('obra_id', obra.id)
+
+      // Load gestão users (profiles)
+      const { data: gestao } = await supabase
+        .from('profiles')
+        .select('id, nome')
+
+      const members = []
+      if (trabalhadores) {
+        trabalhadores.forEach(t => {
+          if (t.trabalhadores) {
+            members.push({ id: t.trabalhadores.id, nome: t.trabalhadores.nome, cargo: t.trabalhadores.cargo })
+          }
+        })
+      }
+      if (gestao) {
+        gestao.forEach(g => {
+          if (!members.find(m => m.id === g.id)) {
+            members.push({ id: g.id, nome: g.nome, cargo: 'Gestão' })
+          }
+        })
+      }
+      setEquipa(members)
+    } catch (err) {
+      console.error('Erro ao carregar equipa:', err)
+    }
+  }
+
+  const handleCreateTask = async () => {
+    if (!newTask.titulo.trim()) {
+      alert('O título é obrigatório')
+      return
+    }
+
+    setCreating(true)
+    try {
+      const taskData = {
+        titulo: newTask.titulo.trim(),
+        descricao: newTask.descricao.trim() || null,
+        obra_id: obra.id,
+        criado_por_id: user.id,
+        responsavel_id: newTask.responsavel_id || null,
+        prioridade: newTask.prioridade,
+        estado: 'pendente',
+        data_limite: newTask.data_limite || null,
+        categoria: 'obra',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+
+      const { data, error } = await supabase
+        .from('tarefas')
+        .insert(taskData)
+        .select()
+
+      if (error) throw error
+
+      // Notify assigned person
+      if (newTask.responsavel_id && newTask.responsavel_id !== user.id) {
+        await createNotification({
+          utilizadorId: newTask.responsavel_id,
+          tipo: NOTIFICATION_TYPES.TAREFA_ATRIBUIDA,
+          mensagem: `${user.nome} atribuiu-te a tarefa: ${newTask.titulo}`,
+          obraId: obra.id,
+          tarefaId: data?.[0]?.id,
+          dados: { titulo: newTask.titulo, atribuidoPor: user.nome }
+        })
+      }
+
+      // Reset form
+      setNewTask({ titulo: '', descricao: '', prioridade: 'media', responsavel_id: '', data_limite: '' })
+      setShowCreateForm(false)
+      loadTarefas()
+    } catch (err) {
+      console.error('Erro ao criar tarefa:', err)
+      alert('Erro ao criar tarefa')
+    } finally {
+      setCreating(false)
+    }
   }
 
   const updateTarefaStatus = async (tarefa, newStatus) => {
@@ -476,6 +581,144 @@ export default function Tarefas({ obra, user }) {
       background: '#eff6ff',
       color: '#2563eb'
     },
+    // FAB button
+    fab: {
+      position: 'fixed',
+      bottom: 80,
+      right: 16,
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      background: colors.primary,
+      color: 'white',
+      border: 'none',
+      boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      cursor: 'pointer',
+      zIndex: 50,
+      transition: 'transform 0.2s'
+    },
+    // Create form modal
+    createModal: {
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'rgba(0,0,0,0.5)',
+      display: 'flex',
+      alignItems: 'flex-end',
+      zIndex: 100
+    },
+    createContent: {
+      background: 'white',
+      borderRadius: '16px 16px 0 0',
+      width: '100%',
+      maxHeight: '85vh',
+      overflow: 'auto',
+      animation: 'slideUp 0.3s ease',
+      paddingBottom: 'max(16px, env(safe-area-inset-bottom))'
+    },
+    createHeader: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: '16px',
+      borderBottom: '1px solid #e5e7eb',
+      position: 'sticky',
+      top: 0,
+      background: 'white',
+      zIndex: 1
+    },
+    createBody: {
+      padding: 16
+    },
+    formField: {
+      marginBottom: 16
+    },
+    formLabel: {
+      display: 'block',
+      fontSize: 12,
+      fontWeight: 600,
+      color: '#374151',
+      marginBottom: 6,
+      textTransform: 'uppercase',
+      letterSpacing: 0.3
+    },
+    formInput: {
+      width: '100%',
+      padding: '10px 12px',
+      border: '1.5px solid #e5e7eb',
+      borderRadius: 8,
+      fontSize: 14,
+      outline: 'none',
+      boxSizing: 'border-box',
+      transition: 'border-color 0.2s'
+    },
+    formTextarea: {
+      width: '100%',
+      padding: '10px 12px',
+      border: '1.5px solid #e5e7eb',
+      borderRadius: 8,
+      fontSize: 14,
+      outline: 'none',
+      boxSizing: 'border-box',
+      minHeight: 80,
+      resize: 'vertical',
+      fontFamily: 'inherit'
+    },
+    formSelect: {
+      width: '100%',
+      padding: '10px 12px',
+      border: '1.5px solid #e5e7eb',
+      borderRadius: 8,
+      fontSize: 14,
+      outline: 'none',
+      boxSizing: 'border-box',
+      background: 'white',
+      appearance: 'none',
+      backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%236b7280\' stroke-width=\'2\'%3E%3Cpath d=\'M6 9l6 6 6-6\'/%3E%3C/svg%3E")',
+      backgroundRepeat: 'no-repeat',
+      backgroundPosition: 'right 12px center'
+    },
+    formRow: {
+      display: 'flex',
+      gap: 12
+    },
+    priorityChips: {
+      display: 'flex',
+      gap: 8
+    },
+    priorityChip: {
+      flex: 1,
+      padding: '8px 12px',
+      border: '1.5px solid #e5e7eb',
+      borderRadius: 8,
+      fontSize: 12,
+      fontWeight: 500,
+      cursor: 'pointer',
+      textAlign: 'center',
+      transition: 'all 0.2s',
+      background: 'white'
+    },
+    createButton: {
+      width: '100%',
+      padding: 14,
+      background: colors.primary,
+      border: 'none',
+      borderRadius: 8,
+      color: 'white',
+      fontSize: 15,
+      fontWeight: 600,
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      marginTop: 8
+    },
     // Due soon badge styles
     dueSoonBadge: {
       display: 'inline-flex',
@@ -745,6 +988,138 @@ export default function Tarefas({ obra, user }) {
         )}
       </div>
 
+      {/* FAB - Create Task Button */}
+      {canCreateTask && (
+        <button
+          style={tarefaStyles.fab}
+          onClick={() => setShowCreateForm(true)}
+          title="Nova tarefa"
+        >
+          <Plus size={24} />
+        </button>
+      )}
+
+      {/* Create Task Modal */}
+      {showCreateForm && (
+        <div style={tarefaStyles.createModal} onClick={() => setShowCreateForm(false)}>
+          <div style={tarefaStyles.createContent} onClick={e => e.stopPropagation()}>
+            <div style={tarefaStyles.createHeader}>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>Nova Tarefa</h3>
+              <button
+                onClick={() => setShowCreateForm(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
+              >
+                <X size={20} color="#6b7280" />
+              </button>
+            </div>
+            <div style={tarefaStyles.createBody}>
+              {/* Title */}
+              <div style={tarefaStyles.formField}>
+                <label style={tarefaStyles.formLabel}>Título *</label>
+                <input
+                  type="text"
+                  placeholder="Descreve a tarefa..."
+                  value={newTask.titulo}
+                  onChange={e => setNewTask(prev => ({ ...prev, titulo: e.target.value }))}
+                  style={tarefaStyles.formInput}
+                  autoFocus
+                />
+              </div>
+
+              {/* Description */}
+              <div style={tarefaStyles.formField}>
+                <label style={tarefaStyles.formLabel}>Descrição</label>
+                <textarea
+                  placeholder="Detalhes adicionais..."
+                  value={newTask.descricao}
+                  onChange={e => setNewTask(prev => ({ ...prev, descricao: e.target.value }))}
+                  style={tarefaStyles.formTextarea}
+                  rows={3}
+                />
+              </div>
+
+              {/* Priority */}
+              <div style={tarefaStyles.formField}>
+                <label style={tarefaStyles.formLabel}>Prioridade</label>
+                <div style={tarefaStyles.priorityChips}>
+                  {[
+                    { key: 'baixa', label: 'Baixa', color: '#6b7280' },
+                    { key: 'media', label: 'Média', color: '#f59e0b' },
+                    { key: 'alta', label: 'Alta', color: '#ef4444' }
+                  ].map(p => (
+                    <button
+                      key={p.key}
+                      onClick={() => setNewTask(prev => ({ ...prev, prioridade: p.key }))}
+                      style={{
+                        ...tarefaStyles.priorityChip,
+                        ...(newTask.prioridade === p.key ? {
+                          borderColor: p.color,
+                          background: `${p.color}10`,
+                          color: p.color
+                        } : {})
+                      }}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Responsavel & Due date row */}
+              <div style={tarefaStyles.formRow}>
+                <div style={{ ...tarefaStyles.formField, flex: 1 }}>
+                  <label style={tarefaStyles.formLabel}>Responsável</label>
+                  <select
+                    value={newTask.responsavel_id}
+                    onChange={e => setNewTask(prev => ({ ...prev, responsavel_id: e.target.value }))}
+                    style={tarefaStyles.formSelect}
+                  >
+                    <option value="">Sem atribuição</option>
+                    {equipa.map(m => (
+                      <option key={m.id} value={m.id}>
+                        {m.nome}{m.cargo ? ` (${m.cargo})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div style={{ ...tarefaStyles.formField, flex: 1 }}>
+                  <label style={tarefaStyles.formLabel}>Data Limite</label>
+                  <input
+                    type="date"
+                    value={newTask.data_limite}
+                    onChange={e => setNewTask(prev => ({ ...prev, data_limite: e.target.value }))}
+                    style={tarefaStyles.formInput}
+                    min={new Date().toISOString().split('T')[0]}
+                  />
+                </div>
+              </div>
+
+              {/* Submit */}
+              <button
+                onClick={handleCreateTask}
+                disabled={creating || !newTask.titulo.trim()}
+                style={{
+                  ...tarefaStyles.createButton,
+                  opacity: creating || !newTask.titulo.trim() ? 0.6 : 1
+                }}
+              >
+                {creating ? (
+                  <>
+                    <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
+                    A criar...
+                  </>
+                ) : (
+                  <>
+                    <Plus size={18} />
+                    Criar Tarefa
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Task detail modal */}
       {selectedTarefa && (
         <div style={tarefaStyles.modal} onClick={() => setSelectedTarefa(null)}>
@@ -758,7 +1133,7 @@ export default function Tarefas({ obra, user }) {
                     color: TASK_STATUS[selectedTarefa.estado].color
                   }}
                 >
-                  {React.createElement(TASK_STATUS[selectedTarefa.estado].icon, { size: 14 })}
+                  {(() => { const Icon = TASK_STATUS[selectedTarefa.estado].icon; return <Icon size={14} /> })()}
                   {TASK_STATUS[selectedTarefa.estado].label}
                 </span>
                 {selectedTarefa.prioridade && (
@@ -852,6 +1227,10 @@ export default function Tarefas({ obra, user }) {
         @keyframes slideUp {
           from { transform: translateY(100%); }
           to { transform: translateY(0); }
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
       `}</style>
     </div>

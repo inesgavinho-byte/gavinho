@@ -17,7 +17,7 @@
 
 **Deploy:**
 - Netlify (via ZIP drag-and-drop)
-- URL: gavinhogroup.netlify.app
+- URL: gavinhoplatform.netlify.app
 
 ## Estrutura do Projeto
 
