@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from './ui/Toast'
@@ -43,12 +43,18 @@ export default function CentralEntregas({ projeto, onNavigateToDesignReview }) {
   const [convertCodigo, setConvertCodigo] = useState('')
   const toast = useToast()
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', type: 'danger', onConfirm: null })
+  const [teamMembers, setTeamMembers] = useState([])
+  const [destQuery, setDestQuery] = useState('')
+  const [showDestDropdown, setShowDestDropdown] = useState(false)
+  const [selectedDestUser, setSelectedDestUser] = useState(null)
+  const destRef = useRef(null)
 
   const [formData, setFormData] = useState({
     titulo: '',
     descricao: '',
     tipo: 'interna',
     destinatario: '',
+    destinatario_id: null,
     data_prevista: '',
     data_entrega: '',
     status: 'pendente',
@@ -61,6 +67,30 @@ export default function CentralEntregas({ projeto, onNavigateToDesignReview }) {
       loadEntregas()
     }
   }, [projeto?.id])
+
+  // Load team members for @mention autocomplete
+  useEffect(() => {
+    const loadTeam = async () => {
+      const { data } = await supabase
+        .from('utilizadores')
+        .select('id, nome, funcao, avatar_url')
+        .eq('ativo', true)
+        .order('nome')
+      if (data) setTeamMembers(data)
+    }
+    loadTeam()
+  }, [])
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (destRef.current && !destRef.current.contains(e.target)) {
+        setShowDestDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
 
   const loadEntregas = async () => {
     try {
@@ -134,11 +164,14 @@ export default function CentralEntregas({ projeto, onNavigateToDesignReview }) {
   ]
 
   const resetForm = () => {
+    setSelectedDestUser(null)
+    setDestQuery('')
     setFormData({
       titulo: '',
       descricao: '',
       tipo: activeSection,
       destinatario: activeSection === 'cliente' ? (projeto?.cliente?.nome || '') : '',
+      destinatario_id: null,
       data_prevista: '',
       data_entrega: '',
       status: 'pendente',
@@ -270,9 +303,34 @@ export default function CentralEntregas({ projeto, onNavigateToDesignReview }) {
         if (error) throw error
       }
 
+      // Create notification for the recipient
+      if (formData.destinatario_id && formData.destinatario_id !== profile?.id) {
+        try {
+          await supabase.from('notificacoes').insert({
+            user_id: formData.destinatario_id,
+            sender_id: profile?.id,
+            type: 'entrega',
+            title: 'Nova Entrega',
+            message: `${profile?.nome || 'Alguém'} atribuiu-te a entrega "${formData.titulo}"`,
+            context: {
+              project: projeto?.codigo || projeto?.nome,
+              entrega_titulo: formData.titulo,
+              tipo: formData.tipo,
+              data_prevista: formData.data_prevista
+            },
+            link: `/projetos/${projeto?.codigo}?tab=entregas`,
+            read: false
+          })
+        } catch (notifErr) {
+          console.warn('Could not create delivery notification:', notifErr.message)
+        }
+      }
+
       setShowModal(false)
       setEditingItem(null)
       resetForm()
+      setSelectedDestUser(null)
+      setDestQuery('')
       loadEntregas()
     } catch (err) {
       console.error('Erro ao guardar:', err)
@@ -1037,23 +1095,152 @@ export default function CentralEntregas({ projeto, onNavigateToDesignReview }) {
               </div>
 
               {/* Destinatário */}
-              <div>
+              <div ref={destRef} style={{ position: 'relative' }}>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--brown)', marginBottom: '6px' }}>
                   Destinatário
                 </label>
-                <input
-                  type="text"
-                  value={formData.destinatario}
-                  onChange={(e) => setFormData({ ...formData, destinatario: e.target.value })}
-                  placeholder={formData.tipo === 'cliente' ? 'Nome do cliente' : 'Equipa ou pessoa'}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    border: '1px solid var(--stone)',
-                    borderRadius: '8px',
-                    fontSize: '14px'
-                  }}
-                />
+                {formData.tipo === 'cliente' ? (
+                  <input
+                    type="text"
+                    value={formData.destinatario}
+                    onChange={(e) => setFormData({ ...formData, destinatario: e.target.value, destinatario_id: null })}
+                    placeholder="Nome do cliente"
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      border: '1px solid var(--stone)',
+                      borderRadius: '8px',
+                      fontSize: '14px'
+                    }}
+                  />
+                ) : (
+                  <>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '10px 12px',
+                        border: '1px solid var(--stone)',
+                        borderRadius: '8px',
+                        cursor: 'text',
+                        background: 'var(--white)'
+                      }}
+                      onClick={() => setShowDestDropdown(true)}
+                    >
+                      {selectedDestUser ? (
+                        <>
+                          <div style={{
+                            width: '24px', height: '24px', borderRadius: '50%',
+                            background: 'linear-gradient(135deg, var(--accent-olive), var(--accent-olive-dark))',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: '10px', fontWeight: 600, color: 'white', flexShrink: 0
+                          }}>
+                            {selectedDestUser.avatar_url
+                              ? <img src={selectedDestUser.avatar_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                              : selectedDestUser.nome?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+                            }
+                          </div>
+                          <span style={{ fontSize: '14px', color: 'var(--brown)', flex: 1 }}>
+                            {selectedDestUser.nome}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setSelectedDestUser(null)
+                              setFormData(prev => ({ ...prev, destinatario: '', destinatario_id: null }))
+                              setDestQuery('')
+                            }}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--brown-light)' }}
+                          >
+                            <X size={14} />
+                          </button>
+                        </>
+                      ) : (
+                        <input
+                          type="text"
+                          value={destQuery}
+                          onChange={(e) => {
+                            setDestQuery(e.target.value)
+                            setShowDestDropdown(true)
+                          }}
+                          onFocus={() => setShowDestDropdown(true)}
+                          placeholder="Pesquisar pessoa..."
+                          style={{
+                            border: 'none',
+                            outline: 'none',
+                            width: '100%',
+                            fontSize: '14px',
+                            background: 'transparent'
+                          }}
+                        />
+                      )}
+                    </div>
+                    {showDestDropdown && !selectedDestUser && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        marginTop: '4px',
+                        background: 'var(--white)',
+                        borderRadius: '8px',
+                        boxShadow: 'var(--shadow-lg)',
+                        border: '1px solid var(--stone)',
+                        maxHeight: '200px',
+                        overflowY: 'auto',
+                        zIndex: 50
+                      }}>
+                        {teamMembers
+                          .filter(m => !destQuery || m.nome?.toLowerCase().includes(destQuery.toLowerCase()))
+                          .map(m => (
+                            <div
+                              key={m.id}
+                              onClick={() => {
+                                setSelectedDestUser(m)
+                                setFormData(prev => ({ ...prev, destinatario: m.nome, destinatario_id: m.id }))
+                                setShowDestDropdown(false)
+                                setDestQuery('')
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px',
+                                padding: '10px 12px',
+                                cursor: 'pointer',
+                                transition: 'background 0.15s'
+                              }}
+                              onMouseEnter={(e) => e.currentTarget.style.background = 'var(--cream)'}
+                              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                            >
+                              <div style={{
+                                width: '28px', height: '28px', borderRadius: '50%',
+                                background: 'linear-gradient(135deg, var(--accent-olive), var(--accent-olive-dark))',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: '10px', fontWeight: 600, color: 'white', flexShrink: 0
+                              }}>
+                                {m.avatar_url
+                                  ? <img src={m.avatar_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                                  : m.nome?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+                                }
+                              </div>
+                              <div>
+                                <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--brown)' }}>{m.nome}</div>
+                                {m.funcao && <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>{m.funcao}</div>}
+                              </div>
+                            </div>
+                          ))
+                        }
+                        {teamMembers.filter(m => !destQuery || m.nome?.toLowerCase().includes(destQuery.toLowerCase())).length === 0 && (
+                          <div style={{ padding: '12px', fontSize: '13px', color: 'var(--brown-light)', textAlign: 'center' }}>
+                            Nenhum resultado
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
 
               {/* Datas */}
