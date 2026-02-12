@@ -137,7 +137,7 @@ export default function Workspace() {
   const {
     loading, equipas, equipaAtiva, equipasExpanded, canais, canalAtivo,
     channelTopics, activeTopic, showAddTopic, newTopicName, activeTab, membros, favoriteChannels,
-    setEquipaAtiva, setEquipasExpanded, setCanalAtivo, setActiveTopic, setShowAddTopic,
+    setCanais, setEquipaAtiva, setEquipasExpanded, setCanalAtivo, setActiveTopic, setShowAddTopic,
     setNewTopicName, setActiveTab, setMembros, loadData, loadTopics, addTopic, renameTopic, removeTopic,
     getEquipaCanais, toggleEquipa, selectCanal, toggleFavorite, isFavorite, getChannelLink
   } = useChannelData()
@@ -396,17 +396,20 @@ export default function Workspace() {
           .from('chat-files')
           .upload(fileName, file.file)
 
-        if (!uploadError) {
-          const { data: { publicUrl } } = supabase.storage
-            .from('chat-files')
-            .getPublicUrl(fileName)
-          attachments.push({
-            name: file.name,
-            url: publicUrl,
-            type: file.type,
-            size: file.size
-          })
+        if (uploadError) {
+          console.error('Erro ao enviar ficheiro:', file.name, uploadError)
+          toastError(`Erro ao enviar "${file.name}"`)
+          continue
         }
+        const { data: { publicUrl } } = supabase.storage
+          .from('chat-files')
+          .getPublicUrl(fileName)
+        attachments.push({
+          name: file.name,
+          url: publicUrl,
+          type: file.type,
+          size: file.size
+        })
       }
 
       // Inserir mensagem na base de dados
@@ -471,17 +474,6 @@ export default function Workspace() {
       }
 
       setPosts(prev => [...prev, newPost])
-
-      // Criar notificações para @menções
-      if (parseMentions && findMentionedUserIds && createMentionNotifications) {
-        const mentionedNames = parseMentions(messageInput)
-        if (mentionedNames.length > 0) {
-          const mentionedUserIds = findMentionedUserIds(mentionedNames, membros)
-          if (mentionedUserIds.length > 0) {
-            await createMentionNotifications(insertedMessage, mentionedUserIds, canalAtivo)
-          }
-        }
-      }
 
       setMessageInput('')
       setSelectedFiles([])
@@ -756,7 +748,7 @@ export default function Workspace() {
   // Filter posts by topic (moved here to avoid TDZ error)
   const getPostsForTopic = (postsToFilter) => {
     if (activeTopic === 'geral') return postsToFilter
-    return postsToFilter.filter(p => p.topic === activeTopic)
+    return postsToFilter.filter(p => p.topico_id === activeTopic || p.topic === activeTopic)
   }
 
   const filteredPosts = getPostsForTopic(applyFilters(posts))
@@ -1256,7 +1248,8 @@ export default function Workspace() {
   const sendAIMessage = async () => {
     if (!aiInput.trim()) return
 
-    const userMessage = { role: 'user', content: aiInput, timestamp: new Date().toISOString() }
+    const userQuery = aiInput // Capture before clearing
+    const userMessage = { role: 'user', content: userQuery, timestamp: new Date().toISOString() }
     setAiMessages(prev => [...prev, userMessage])
     setAiInput('')
     setAiLoading(true)
@@ -1265,7 +1258,7 @@ export default function Workspace() {
     setTimeout(() => {
       const aiResponse = {
         role: 'assistant',
-        content: getAIResponse(aiInput),
+        content: getAIResponse(userQuery),
         timestamp: new Date().toISOString()
       }
       setAiMessages(prev => [...prev, aiResponse])
@@ -1312,9 +1305,10 @@ export default function Workspace() {
     const confirmed = await confirmArchive(`canal "${channel.codigo}"`)
     if (confirmed) {
       setArchivedChannels(prev => [...prev, { ...channel, archivedAt: new Date().toISOString() }])
+      const remaining = canais.filter(c => c.id !== channelId)
       setCanais(prev => prev.filter(c => c.id !== channelId))
       if (canalAtivo?.id === channelId) {
-        setCanalAtivo(canais[0] || null)
+        setCanalAtivo(remaining[0] || null)
       }
       toastSuccess(`Canal "${channel.codigo}" arquivado`)
     }
@@ -1502,12 +1496,12 @@ export default function Workspace() {
       active: true
     }
     setWebhooks(prev => [...prev, webhook])
-    showToast(`Webhook "${webhook.name}" adicionado`, 'success')
+    toastSuccess(`Webhook "${webhook.name}" adicionado`)
   }
 
   const deleteWebhook = (webhookId) => {
     setWebhooks(prev => prev.filter(w => w.id !== webhookId))
-    showToast('Webhook removido', 'success')
+    toastSuccess('Webhook removido')
   }
 
   const toggleWebhook = (webhookId) => {
@@ -2216,10 +2210,10 @@ export default function Workspace() {
         channelInfo={canalAtivo}
         messages={posts}
         onSuccess={(result) => {
-          showToast(`Exportação concluída: ${result.filename}`, 'success')
+          toastSuccess(`Exportação concluída: ${result.filename}`)
         }}
         onError={(error) => {
-          showToast(`Erro na exportação: ${error}`, 'error')
+          toastError(`Erro na exportação: ${error}`)
         }}
       />
 
@@ -2240,7 +2234,7 @@ export default function Workspace() {
             createdBy: profile?.id
           }
           setPrivateChannels(prev => [...prev, channel])
-          showToast(`Canal privado "${channelData.name}" criado`, 'success')
+          toastSuccess(`Canal privado "${channelData.name}" criado`)
         }}
       />
 
