@@ -125,6 +125,8 @@ export default function Moleskine({
   const textareaRef = useRef(null)
   const fileInputRef = useRef(null)
   const annotationsRef = useRef([])
+  const pencilModeRef = useRef(false) // Apple Pencil detected
+  const activePointerRef = useRef(null) // Active pointer ID for pen
 
   // Tool state
   const [activeTool, setActiveTool] = useState(TOOLS.PEN)
@@ -428,24 +430,135 @@ export default function Moleskine({
   }, [scale, offset])
 
   // =============================
-  // NON-PASSIVE TOUCH HANDLERS (fix preventDefault warnings)
+  // POINTER EVENT HANDLERS (Apple Pencil + touch + palm rejection)
   // =============================
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
 
-    const onTouchStart = (e) => {
-      if (e.touches.length > 1) return // let multi-touch through for pinch
-      e.preventDefault()
-      handlePointerDown(e)
+    const onPointerDown = (e) => {
+      // Detect Apple Pencil
+      if (e.pointerType === 'pen') {
+        pencilModeRef.current = true
+        activePointerRef.current = e.pointerId
+        try { container.setPointerCapture(e.pointerId) } catch (_) {}
+      }
+
+      // Palm rejection: when Apple Pencil is the primary tool, finger → pan
+      if (e.pointerType === 'touch' && pencilModeRef.current) {
+        e.preventDefault()
+        setIsPanning(true)
+        setPanStart({ x: e.clientX - offset.x, y: e.clientY - offset.y })
+        return
+      }
+
+      // For pen and mouse, use normal handler
+      if (e.pointerType === 'pen' || e.pointerType === 'mouse') {
+        e.preventDefault()
+        handlePointerDown(e)
+        return
+      }
+
+      // For touch without pencil mode, use normal handler
+      if (e.pointerType === 'touch') {
+        e.preventDefault()
+        handlePointerDown(e)
+      }
     }
-    const onTouchMove = (e) => {
+
+    const onPointerMove = (e) => {
+      // Palm rejection: finger → pan when pencil active
+      if (e.pointerType === 'touch' && pencilModeRef.current && isPanning) {
+        e.preventDefault()
+        setOffset({ x: e.clientX - panStart.x, y: e.clientY - panStart.y })
+        return
+      }
+
       e.preventDefault()
       handlePointerMove(e)
     }
-    const onTouchEnd = (e) => {
-      e.preventDefault()
+
+    const onPointerUp = (e) => {
+      // Release pointer capture for pen
+      if (e.pointerType === 'pen' && activePointerRef.current === e.pointerId) {
+        try { container.releasePointerCapture(e.pointerId) } catch (_) {}
+        activePointerRef.current = null
+      }
+
       handlePointerUp()
+    }
+
+    const onPointerCancel = (e) => {
+      // Handle interrupted strokes (e.g., system alert)
+      if (activePointerRef.current === e.pointerId) {
+        activePointerRef.current = null
+      }
+      handlePointerUp()
+    }
+
+    container.addEventListener('pointerdown', onPointerDown, { passive: false })
+    container.addEventListener('pointermove', onPointerMove, { passive: false })
+    container.addEventListener('pointerup', onPointerUp, { passive: false })
+    container.addEventListener('pointercancel', onPointerCancel, { passive: false })
+
+    return () => {
+      container.removeEventListener('pointerdown', onPointerDown)
+      container.removeEventListener('pointermove', onPointerMove)
+      container.removeEventListener('pointerup', onPointerUp)
+      container.removeEventListener('pointercancel', onPointerCancel)
+    }
+  }, [imageLoaded, activeTool, isDrawing, isPanning, currentAnnotation, annotations, strokeColor, strokeWidth, scale, offset, panStart, selectedAnnotation, isDraggingAnnotation, resizeHandle, resizeStart, dragOffset])
+
+  // =============================
+  // PINCH-TO-ZOOM (multi-touch, works alongside pencil mode)
+  // =============================
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    let lastPinchDist = null
+    let lastPinchCenter = null
+
+    const onTouchStart = (e) => {
+      if (e.touches.length === 2) {
+        e.preventDefault()
+        const dx = e.touches[0].clientX - e.touches[1].clientX
+        const dy = e.touches[0].clientY - e.touches[1].clientY
+        lastPinchDist = Math.hypot(dx, dy)
+        lastPinchCenter = {
+          x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+          y: (e.touches[0].clientY + e.touches[1].clientY) / 2,
+        }
+      }
+    }
+
+    const onTouchMove = (e) => {
+      if (e.touches.length === 2 && lastPinchDist !== null) {
+        e.preventDefault()
+        const dx = e.touches[0].clientX - e.touches[1].clientX
+        const dy = e.touches[0].clientY - e.touches[1].clientY
+        const dist = Math.hypot(dx, dy)
+        const pinchDelta = dist / lastPinchDist
+        const newScale = Math.min(3, Math.max(0.1, scale * pinchDelta))
+
+        const rect = container.getBoundingClientRect()
+        const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left
+        const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top
+
+        setScale(newScale)
+        setOffset({
+          x: cx - (cx - offset.x) * (newScale / scale),
+          y: cy - (cy - offset.y) * (newScale / scale),
+        })
+        lastPinchDist = dist
+      }
+    }
+
+    const onTouchEnd = (e) => {
+      if (e.touches.length < 2) {
+        lastPinchDist = null
+        lastPinchCenter = null
+      }
     }
 
     container.addEventListener('touchstart', onTouchStart, { passive: false })
@@ -457,7 +570,7 @@ export default function Moleskine({
       container.removeEventListener('touchmove', onTouchMove)
       container.removeEventListener('touchend', onTouchEnd)
     }
-  }, [imageLoaded, activeTool, isDrawing, isPanning, currentAnnotation, annotations, strokeColor, strokeWidth, scale, offset, panStart, selectedAnnotation, isDraggingAnnotation, resizeHandle, resizeStart, dragOffset])
+  }, [scale, offset])
 
   // =============================
   // CLIPBOARD PASTE (images)
@@ -2024,10 +2137,7 @@ export default function Moleskine({
         {/* Canvas Area */}
         <div
           ref={containerRef}
-          onMouseDown={handlePointerDown}
-          onMouseMove={handlePointerMove}
-          onMouseUp={handlePointerUp}
-          onMouseLeave={() => {
+          onPointerLeave={() => {
             handlePointerUp()
             setHoveredAnnotation(null)
           }}
@@ -2037,6 +2147,12 @@ export default function Moleskine({
             overflow: 'hidden',
             background: '#1a1a1a',
             cursor: getCursor(),
+            // iPad + Apple Pencil: prevent browser gestures on canvas
+            touchAction: 'none',
+            WebkitUserSelect: 'none',
+            WebkitTapHighlightColor: 'transparent',
+            WebkitTouchCallout: 'none',
+            userSelect: 'none',
           }}
         >
           {!imageLoaded ? (
