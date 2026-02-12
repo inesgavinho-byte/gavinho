@@ -49,6 +49,19 @@ const TOOLS = {
   PAN: 'pan',
 }
 
+// Tool labels and shortcuts
+const TOOL_INFO = {
+  [TOOLS.SELECT]: { label: 'Selecionar', shortcut: 'V' },
+  [TOOLS.PEN]: { label: 'Caneta', shortcut: 'P' },
+  [TOOLS.HIGHLIGHTER]: { label: 'Marcador', shortcut: 'H' },
+  [TOOLS.RECTANGLE]: { label: 'Retangulo', shortcut: 'R' },
+  [TOOLS.CIRCLE]: { label: 'Circulo', shortcut: 'C' },
+  [TOOLS.ARROW]: { label: 'Seta', shortcut: 'A' },
+  [TOOLS.TEXT]: { label: 'Texto', shortcut: 'T' },
+  [TOOLS.ERASER]: { label: 'Borracha', shortcut: 'E' },
+  [TOOLS.PAN]: { label: 'Mover', shortcut: 'Espaco' },
+}
+
 // Espessuras de linha
 const STROKE_WIDTHS = [2, 4, 6, 8]
 
@@ -105,15 +118,18 @@ export default function Moleskine({
   const containerRef = useRef(null)
   const canvasRef = useRef(null)
   const imageRef = useRef(null)
+  const textareaRef = useRef(null)
 
   // Tool state
   const [activeTool, setActiveTool] = useState(TOOLS.PEN)
+  const [previousTool, setPreviousTool] = useState(null) // For Space-bar pan
   const [strokeColor, setStrokeColor] = useState(STROKE_COLORS[0].color)
   const [strokeWidth, setStrokeWidth] = useState(4)
 
   // Annotations state
   const [annotations, setAnnotations] = useState([])
   const [currentAnnotation, setCurrentAnnotation] = useState(null)
+  const [hoveredAnnotation, setHoveredAnnotation] = useState(null) // Eraser hover
 
   // History state (undo/redo)
   const [history, setHistory] = useState([[]])
@@ -124,6 +140,7 @@ export default function Moleskine({
   const [offset, setOffset] = useState({ x: 0, y: 0 })
   const [isPanning, setIsPanning] = useState(false)
   const [panStart, setPanStart] = useState({ x: 0, y: 0 })
+  const [isSpacePanning, setIsSpacePanning] = useState(false) // Space-bar pan
 
   // Drawing state
   const [isDrawing, setIsDrawing] = useState(false)
@@ -142,6 +159,7 @@ export default function Moleskine({
   const [isSaving, setIsSaving] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [showConfirmClear, setShowConfirmClear] = useState(false)
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false)
 
   // Load background image
   useEffect(() => {
@@ -152,7 +170,6 @@ export default function Moleskine({
         setImageDimensions({ width: img.width, height: img.height })
         imageRef.current = img
         setImageLoaded(true)
-        // Fit to screen initially
         fitToScreen()
       }
       img.onerror = () => {
@@ -198,12 +215,12 @@ export default function Moleskine({
     if (!containerRef.current || !imageDimensions.width) return
 
     const container = containerRef.current
-    const containerWidth = container.clientWidth - 120 // Leave space for toolbar
+    const containerWidth = container.clientWidth - 120
     const containerHeight = container.clientHeight - 80
 
     const scaleX = containerWidth / imageDimensions.width
     const scaleY = containerHeight / imageDimensions.height
-    const newScale = Math.min(scaleX, scaleY, 1) // Max 100%
+    const newScale = Math.min(scaleX, scaleY, 1)
 
     setScale(newScale)
     setOffset({
@@ -218,6 +235,183 @@ export default function Moleskine({
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   }, [fitToScreen])
+
+  // =============================
+  // KEYBOARD SHORTCUTS
+  // =============================
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Don't intercept when typing in text input
+      if (isAddingText) return
+
+      // Ctrl/Cmd shortcuts
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === 'z' && !e.shiftKey) {
+          e.preventDefault()
+          handleUndo()
+          return
+        }
+        if (e.key === 'z' && e.shiftKey) {
+          e.preventDefault()
+          handleRedo()
+          return
+        }
+        if (e.key === 'y') {
+          e.preventDefault()
+          handleRedo()
+          return
+        }
+        if (e.key === 's') {
+          e.preventDefault()
+          if (hasUnsavedChanges) saveAnnotations()
+          return
+        }
+        return
+      }
+
+      // Space bar pan (hold)
+      if (e.key === ' ' && !e.repeat) {
+        e.preventDefault()
+        if (activeTool !== TOOLS.PAN) {
+          setPreviousTool(activeTool)
+          setActiveTool(TOOLS.PAN)
+          setIsSpacePanning(true)
+        }
+        return
+      }
+
+      // Escape - cancel current action or close
+      if (e.key === 'Escape') {
+        if (isAddingText) {
+          setIsAddingText(false)
+          setTextPosition(null)
+          setTextInput('')
+        } else if (isDrawing) {
+          setIsDrawing(false)
+          setCurrentAnnotation(null)
+          setStartPoint(null)
+        } else {
+          handleClose()
+        }
+        return
+      }
+
+      // Delete - remove hovered annotation
+      if ((e.key === 'Delete' || e.key === 'Backspace') && hoveredAnnotation && activeTool === TOOLS.ERASER) {
+        const newAnnotations = annotations.filter(a => a.id !== hoveredAnnotation.id)
+        setAnnotations(newAnnotations)
+        pushToHistory(newAnnotations)
+        setHasUnsavedChanges(true)
+        setHoveredAnnotation(null)
+        return
+      }
+
+      // Tool shortcuts (single keys)
+      const key = e.key.toLowerCase()
+      if (key === 'v') setActiveTool(TOOLS.SELECT)
+      else if (key === 'p') setActiveTool(TOOLS.PEN)
+      else if (key === 'h') setActiveTool(TOOLS.HIGHLIGHTER)
+      else if (key === 'r') setActiveTool(TOOLS.RECTANGLE)
+      else if (key === 'c') setActiveTool(TOOLS.CIRCLE)
+      else if (key === 'a') setActiveTool(TOOLS.ARROW)
+      else if (key === 't') setActiveTool(TOOLS.TEXT)
+      else if (key === 'e') setActiveTool(TOOLS.ERASER)
+      // +/- for zoom
+      else if (key === '+' || key === '=') setScale(s => Math.min(3, s + 0.15))
+      else if (key === '-') setScale(s => Math.max(0.1, s - 0.15))
+      else if (key === '0') fitToScreen()
+      // [ and ] for stroke width
+      else if (key === '[') {
+        setStrokeWidth(w => {
+          const idx = STROKE_WIDTHS.indexOf(w)
+          return idx > 0 ? STROKE_WIDTHS[idx - 1] : w
+        })
+      } else if (key === ']') {
+        setStrokeWidth(w => {
+          const idx = STROKE_WIDTHS.indexOf(w)
+          return idx < STROKE_WIDTHS.length - 1 ? STROKE_WIDTHS[idx + 1] : w
+        })
+      }
+    }
+
+    const handleKeyUp = (e) => {
+      // Release Space bar → return to previous tool
+      if (e.key === ' ' && isSpacePanning) {
+        setActiveTool(previousTool || TOOLS.PEN)
+        setIsSpacePanning(false)
+        setPreviousTool(null)
+        setIsPanning(false)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('keyup', handleKeyUp)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('keyup', handleKeyUp)
+    }
+  }, [activeTool, isAddingText, isDrawing, isSpacePanning, previousTool, hasUnsavedChanges, hoveredAnnotation, annotations, historyIndex, history])
+
+  // =============================
+  // NON-PASSIVE WHEEL HANDLER (fix preventDefault in passive listener)
+  // =============================
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const handleWheelNonPassive = (e) => {
+      e.preventDefault()
+      const delta = e.deltaY > 0 ? 0.92 : 1.08
+      const newScale = Math.min(3, Math.max(0.1, scale * delta))
+
+      const rect = container.getBoundingClientRect()
+      const mouseX = e.clientX - rect.left
+      const mouseY = e.clientY - rect.top
+
+      const newOffset = {
+        x: mouseX - (mouseX - offset.x) * (newScale / scale),
+        y: mouseY - (mouseY - offset.y) * (newScale / scale)
+      }
+
+      setScale(newScale)
+      setOffset(newOffset)
+    }
+
+    container.addEventListener('wheel', handleWheelNonPassive, { passive: false })
+    return () => container.removeEventListener('wheel', handleWheelNonPassive)
+  }, [scale, offset])
+
+  // =============================
+  // NON-PASSIVE TOUCH HANDLERS (fix preventDefault warnings)
+  // =============================
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const onTouchStart = (e) => {
+      if (e.touches.length > 1) return // let multi-touch through for pinch
+      e.preventDefault()
+      handlePointerDown(e)
+    }
+    const onTouchMove = (e) => {
+      e.preventDefault()
+      handlePointerMove(e)
+    }
+    const onTouchEnd = (e) => {
+      e.preventDefault()
+      handlePointerUp()
+    }
+
+    container.addEventListener('touchstart', onTouchStart, { passive: false })
+    container.addEventListener('touchmove', onTouchMove, { passive: false })
+    container.addEventListener('touchend', onTouchEnd, { passive: false })
+
+    return () => {
+      container.removeEventListener('touchstart', onTouchStart)
+      container.removeEventListener('touchmove', onTouchMove)
+      container.removeEventListener('touchend', onTouchEnd)
+    }
+  }, [imageLoaded, activeTool, isDrawing, isPanning, currentAnnotation, annotations, strokeColor, strokeWidth, scale, offset, panStart])
 
   // Save annotations to database
   const saveAnnotations = async () => {
@@ -257,7 +451,7 @@ export default function Moleskine({
 
     const saveTimeout = setTimeout(() => {
       saveAnnotations()
-    }, 3000) // 3 seconds debounce
+    }, 3000)
 
     return () => clearTimeout(saveTimeout)
   }, [annotations, hasUnsavedChanges])
@@ -266,7 +460,6 @@ export default function Moleskine({
   const pushToHistory = (newAnnotations) => {
     const newHistory = history.slice(0, historyIndex + 1)
     newHistory.push(newAnnotations)
-    // Keep max 50 history items
     if (newHistory.length > 50) newHistory.shift()
     setHistory(newHistory)
     setHistoryIndex(newHistory.length - 1)
@@ -299,6 +492,15 @@ export default function Moleskine({
     setShowConfirmClear(false)
   }
 
+  // Close with unsaved warning
+  const handleClose = () => {
+    if (hasUnsavedChanges) {
+      setShowCloseConfirm(true)
+    } else {
+      onClose()
+    }
+  }
+
   // Get canvas coordinates from mouse/touch event
   const getCanvasCoords = (e) => {
     if (!containerRef.current) return { x: 0, y: 0 }
@@ -317,12 +519,22 @@ export default function Moleskine({
   const handlePointerDown = (e) => {
     if (!imageLoaded) return
 
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY
     const { x, y } = getCanvasCoords(e)
 
-    // Pan mode
+    // Middle mouse button → always pan
+    if (e.button === 1) {
+      e.preventDefault()
+      setIsPanning(true)
+      setPanStart({ x: clientX - offset.x, y: clientY - offset.y })
+      return
+    }
+
+    // Pan mode (including Space-bar pan)
     if (activeTool === TOOLS.PAN || (e.altKey && !isDrawing)) {
       setIsPanning(true)
-      setPanStart({ x: e.clientX - offset.x, y: e.clientY - offset.y })
+      setPanStart({ x: clientX - offset.x, y: clientY - offset.y })
       return
     }
 
@@ -341,6 +553,7 @@ export default function Moleskine({
         setAnnotations(newAnnotations)
         pushToHistory(newAnnotations)
         setHasUnsavedChanges(true)
+        setHoveredAnnotation(null)
       }
       return
     }
@@ -377,13 +590,23 @@ export default function Moleskine({
 
   // Handle pointer move
   const handlePointerMove = (e) => {
+    const clientX = e.touches ? e.touches[0]?.clientX : e.clientX
+    const clientY = e.touches ? e.touches[0]?.clientY : e.clientY
+
     // Panning
     if (isPanning) {
       setOffset({
-        x: e.clientX - panStart.x,
-        y: e.clientY - panStart.y
+        x: clientX - panStart.x,
+        y: clientY - panStart.y
       })
       return
+    }
+
+    // Eraser hover feedback
+    if (activeTool === TOOLS.ERASER && !isDrawing) {
+      const { x, y } = getCanvasCoords(e)
+      const hit = findAnnotationAtPoint(x, y)
+      setHoveredAnnotation(hit || null)
     }
 
     if (!isDrawing || !currentAnnotation) return
@@ -440,7 +663,7 @@ export default function Moleskine({
     setStartPoint(null)
   }
 
-  // Handle text submit
+  // Handle text submit (supports multiline)
   const handleTextSubmit = () => {
     if (!textInput.trim() || !textPosition) return
 
@@ -496,6 +719,7 @@ export default function Moleskine({
         const cy = (ann.y1 + ann.y2) / 2
         const rx = Math.abs(ann.x2 - ann.x1) / 2
         const ry = Math.abs(ann.y2 - ann.y1) / 2
+        if (rx === 0 || ry === 0) continue
         const dist = Math.sqrt(((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2)
 
         if (Math.abs(dist - 1) < threshold / Math.max(rx, ry)) return ann
@@ -520,28 +744,6 @@ export default function Moleskine({
     }
 
     return null
-  }
-
-  // Handle zoom
-  const handleWheel = (e) => {
-    if (e.ctrlKey || e.metaKey) {
-      e.preventDefault()
-      const delta = e.deltaY > 0 ? 0.9 : 1.1
-      const newScale = Math.min(3, Math.max(0.1, scale * delta))
-
-      // Zoom towards mouse position
-      const rect = containerRef.current.getBoundingClientRect()
-      const mouseX = e.clientX - rect.left
-      const mouseY = e.clientY - rect.top
-
-      const newOffset = {
-        x: mouseX - (mouseX - offset.x) * (newScale / scale),
-        y: mouseY - (mouseY - offset.y) * (newScale / scale)
-      }
-
-      setScale(newScale)
-      setOffset(newOffset)
-    }
   }
 
   // Export as PNG
@@ -605,7 +807,6 @@ export default function Moleskine({
         ctx.lineTo(ann.x2, ann.y2)
         ctx.stroke()
 
-        // Arrowhead
         const angle = Math.atan2(ann.y2 - ann.y1, ann.x2 - ann.x1)
         const headLength = 15
         ctx.beginPath()
@@ -622,39 +823,67 @@ export default function Moleskine({
         ctx.stroke()
       } else if (ann.type === TOOLS.TEXT) {
         ctx.font = `${ann.fontSize}px 'Quattrocento Sans', sans-serif`
-        ctx.fillText(ann.text, ann.x, ann.y)
+        // Handle multiline
+        const lines = ann.text.split('\n')
+        lines.forEach((line, i) => {
+          ctx.fillText(line, ann.x, ann.y + i * ann.fontSize * 1.2)
+        })
       }
     })
   }
 
-  // Render single annotation to SVG
+  // Render single annotation to SVG (with optional highlight for eraser)
   const renderAnnotation = (ann) => {
     const key = ann.id
+    const isHovered = hoveredAnnotation?.id === ann.id
 
     if (ann.type === TOOLS.PEN) {
       const stroke = getStroke(ann.points, getPenOptions(ann.width))
       return (
-        <path
-          key={key}
-          d={getSvgPathFromStroke(stroke)}
-          fill={ann.color}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
+        <g key={key}>
+          {isHovered && (
+            <path
+              d={getSvgPathFromStroke(stroke)}
+              fill="none"
+              stroke="#FF4444"
+              strokeWidth={3 / scale}
+              strokeDasharray={`${6/scale} ${4/scale}`}
+              opacity={0.8}
+            />
+          )}
+          <path
+            d={getSvgPathFromStroke(stroke)}
+            fill={ann.color}
+            opacity={isHovered ? 0.5 : 1}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </g>
       )
     }
 
     if (ann.type === TOOLS.HIGHLIGHTER) {
       const stroke = getStroke(ann.points, getHighlighterOptions(ann.width))
       return (
-        <path
-          key={key}
-          d={getSvgPathFromStroke(stroke)}
-          fill={ann.color}
-          opacity={0.3}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
+        <g key={key}>
+          {isHovered && (
+            <path
+              d={getSvgPathFromStroke(stroke)}
+              fill="none"
+              stroke="#FF4444"
+              strokeWidth={3 / scale}
+              strokeDasharray={`${6/scale} ${4/scale}`}
+              opacity={0.8}
+            />
+          )}
+          <path
+            d={getSvgPathFromStroke(stroke)}
+            fill={ann.color}
+            opacity={isHovered ? 0.15 : 0.3}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </g>
       )
     }
 
@@ -664,18 +893,32 @@ export default function Moleskine({
       const w = Math.abs(ann.x2 - ann.x1)
       const h = Math.abs(ann.y2 - ann.y1)
       return (
-        <rect
-          key={key}
-          x={x}
-          y={y}
-          width={w}
-          height={h}
-          fill="none"
-          stroke={ann.color}
-          strokeWidth={ann.width}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
+        <g key={key}>
+          {isHovered && (
+            <rect
+              x={x - 2/scale}
+              y={y - 2/scale}
+              width={w + 4/scale}
+              height={h + 4/scale}
+              fill="rgba(255,68,68,0.1)"
+              stroke="#FF4444"
+              strokeWidth={2 / scale}
+              strokeDasharray={`${6/scale} ${4/scale}`}
+            />
+          )}
+          <rect
+            x={x}
+            y={y}
+            width={w}
+            height={h}
+            fill="none"
+            stroke={ann.color}
+            strokeWidth={ann.width}
+            opacity={isHovered ? 0.5 : 1}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </g>
       )
     }
 
@@ -685,16 +928,30 @@ export default function Moleskine({
       const rx = Math.abs(ann.x2 - ann.x1) / 2
       const ry = Math.abs(ann.y2 - ann.y1) / 2
       return (
-        <ellipse
-          key={key}
-          cx={cx}
-          cy={cy}
-          rx={rx}
-          ry={ry}
-          fill="none"
-          stroke={ann.color}
-          strokeWidth={ann.width}
-        />
+        <g key={key}>
+          {isHovered && (
+            <ellipse
+              cx={cx}
+              cy={cy}
+              rx={rx + 3/scale}
+              ry={ry + 3/scale}
+              fill="rgba(255,68,68,0.1)"
+              stroke="#FF4444"
+              strokeWidth={2 / scale}
+              strokeDasharray={`${6/scale} ${4/scale}`}
+            />
+          )}
+          <ellipse
+            cx={cx}
+            cy={cy}
+            rx={rx}
+            ry={ry}
+            fill="none"
+            stroke={ann.color}
+            strokeWidth={ann.width}
+            opacity={isHovered ? 0.5 : 1}
+          />
+        </g>
       )
     }
 
@@ -702,7 +959,19 @@ export default function Moleskine({
       const angle = Math.atan2(ann.y2 - ann.y1, ann.x2 - ann.x1)
       const headLength = 15
       return (
-        <g key={key}>
+        <g key={key} opacity={isHovered ? 0.5 : 1}>
+          {isHovered && (
+            <line
+              x1={ann.x1}
+              y1={ann.y1}
+              x2={ann.x2}
+              y2={ann.y2}
+              stroke="#FF4444"
+              strokeWidth={(ann.width + 6) / scale}
+              strokeLinecap="round"
+              opacity={0.3}
+            />
+          )}
           <line
             x1={ann.x1}
             y1={ann.y1}
@@ -735,45 +1004,76 @@ export default function Moleskine({
     }
 
     if (ann.type === TOOLS.TEXT) {
+      const lines = ann.text.split('\n')
       return (
-        <text
-          key={key}
-          x={ann.x}
-          y={ann.y}
-          fill={ann.color}
-          fontSize={ann.fontSize}
-          fontFamily="'Quattrocento Sans', sans-serif"
-        >
-          {ann.text}
-        </text>
+        <g key={key} opacity={isHovered ? 0.5 : 1}>
+          {isHovered && (
+            <rect
+              x={ann.x - 4/scale}
+              y={ann.y - ann.fontSize - 2/scale}
+              width={Math.max(...lines.map(l => l.length)) * ann.fontSize * 0.6 + 8/scale}
+              height={lines.length * ann.fontSize * 1.2 + 4/scale}
+              fill="rgba(255,68,68,0.1)"
+              stroke="#FF4444"
+              strokeWidth={2 / scale}
+              strokeDasharray={`${6/scale} ${4/scale}`}
+            />
+          )}
+          {lines.map((line, i) => (
+            <text
+              key={i}
+              x={ann.x}
+              y={ann.y + i * ann.fontSize * 1.2}
+              fill={ann.color}
+              fontSize={ann.fontSize}
+              fontFamily="'Quattrocento Sans', sans-serif"
+            >
+              {line}
+            </text>
+          ))}
+        </g>
       )
     }
 
     return null
   }
 
-  // Tool button component
-  const ToolButton = ({ tool, icon: Icon, label }) => (
-    <button
-      onClick={() => setActiveTool(tool)}
-      title={label}
-      style={{
-        width: 40,
-        height: 40,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderRadius: 8,
-        border: 'none',
-        background: activeTool === tool ? '#8B8670' : 'transparent',
-        color: activeTool === tool ? '#FFFFFF' : '#5F5C59',
-        cursor: 'pointer',
-        transition: 'all 0.15s ease',
-      }}
-    >
-      <Icon size={20} />
-    </button>
-  )
+  // Get cursor for current tool
+  const getCursor = () => {
+    if (isPanning) return 'grabbing'
+    if (activeTool === TOOLS.PAN || isSpacePanning) return 'grab'
+    if (activeTool === TOOLS.ERASER) return hoveredAnnotation ? 'pointer' : 'crosshair'
+    if (activeTool === TOOLS.TEXT) return 'text'
+    if (activeTool === TOOLS.SELECT) return 'default'
+    return 'crosshair'
+  }
+
+  // Tool button component with shortcut
+  const ToolButton = ({ tool, icon: Icon, label }) => {
+    const info = TOOL_INFO[tool]
+    return (
+      <button
+        onClick={() => setActiveTool(tool)}
+        title={`${info.label} (${info.shortcut})`}
+        style={{
+          width: 40,
+          height: 40,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: 8,
+          border: 'none',
+          background: activeTool === tool ? '#8B8670' : 'transparent',
+          color: activeTool === tool ? '#FFFFFF' : '#5F5C59',
+          cursor: 'pointer',
+          transition: 'all 0.15s ease',
+          position: 'relative',
+        }}
+      >
+        <Icon size={20} />
+      </button>
+    )
+  }
 
   return (
     <div
@@ -792,9 +1092,10 @@ export default function Moleskine({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '12px 20px',
+          padding: '10px 20px',
           background: '#F2F0E7',
           borderBottom: '1px solid #E0DED8',
+          minHeight: 52,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -814,7 +1115,22 @@ export default function Moleskine({
               {renderName}
             </span>
           )}
-          {hasUnsavedChanges && (
+          {/* Annotation count badge */}
+          {annotations.length > 0 && (
+            <span
+              style={{
+                fontSize: 11,
+                padding: '2px 8px',
+                borderRadius: 10,
+                background: '#E0DED8',
+                color: '#5F5C59',
+                fontWeight: 600,
+              }}
+            >
+              {annotations.length} anotac{annotations.length === 1 ? 'ao' : 'oes'}
+            </span>
+          )}
+          {hasUnsavedChanges && !isSaving && (
             <span
               style={{
                 fontSize: 11,
@@ -824,7 +1140,7 @@ export default function Moleskine({
                 color: '#D97706',
               }}
             >
-              Alteracoes por guardar
+              Por guardar
             </span>
           )}
           {isSaving && (
@@ -849,6 +1165,7 @@ export default function Moleskine({
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <button
             onClick={handleExport}
+            title="Exportar PNG"
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -868,6 +1185,7 @@ export default function Moleskine({
           <button
             onClick={saveAnnotations}
             disabled={isSaving || !hasUnsavedChanges}
+            title="Guardar (Ctrl+S)"
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -885,7 +1203,8 @@ export default function Moleskine({
             Guardar
           </button>
           <button
-            onClick={onClose}
+            onClick={handleClose}
+            title="Fechar (Esc)"
             style={{
               width: 36,
               height: 36,
@@ -916,18 +1235,19 @@ export default function Moleskine({
             display: 'flex',
             flexDirection: 'column',
             gap: 4,
+            overflowY: 'auto',
           }}
         >
           {/* Drawing Tools */}
-          <ToolButton tool={TOOLS.SELECT} icon={MousePointer2} label="Selecionar" />
-          <ToolButton tool={TOOLS.PEN} icon={Pencil} label="Caneta" />
-          <ToolButton tool={TOOLS.HIGHLIGHTER} icon={Highlighter} label="Marcador" />
-          <ToolButton tool={TOOLS.RECTANGLE} icon={Square} label="Retangulo" />
-          <ToolButton tool={TOOLS.CIRCLE} icon={Circle} label="Circulo" />
-          <ToolButton tool={TOOLS.ARROW} icon={ArrowUpRight} label="Seta" />
-          <ToolButton tool={TOOLS.TEXT} icon={Type} label="Texto" />
-          <ToolButton tool={TOOLS.ERASER} icon={Eraser} label="Borracha" />
-          <ToolButton tool={TOOLS.PAN} icon={Move} label="Mover (Alt)" />
+          <ToolButton tool={TOOLS.SELECT} icon={MousePointer2} />
+          <ToolButton tool={TOOLS.PEN} icon={Pencil} />
+          <ToolButton tool={TOOLS.HIGHLIGHTER} icon={Highlighter} />
+          <ToolButton tool={TOOLS.RECTANGLE} icon={Square} />
+          <ToolButton tool={TOOLS.CIRCLE} icon={Circle} />
+          <ToolButton tool={TOOLS.ARROW} icon={ArrowUpRight} />
+          <ToolButton tool={TOOLS.TEXT} icon={Type} />
+          <ToolButton tool={TOOLS.ERASER} icon={Eraser} />
+          <ToolButton tool={TOOLS.PAN} icon={Move} />
 
           <div style={{ height: 1, background: '#E0DED8', margin: '8px 0' }} />
 
@@ -942,10 +1262,11 @@ export default function Moleskine({
                   width: 24,
                   height: 24,
                   borderRadius: '50%',
-                  border: strokeColor === c.color ? '2px solid #5F5C59' : '2px solid transparent',
+                  border: strokeColor === c.color ? '3px solid #5F5C59' : '2px solid transparent',
                   background: c.color,
                   cursor: 'pointer',
                   transition: 'transform 0.1s',
+                  boxShadow: strokeColor === c.color ? '0 0 0 2px #F2F0E7' : 'none',
                 }}
               />
             ))}
@@ -959,7 +1280,7 @@ export default function Moleskine({
               <button
                 key={w}
                 onClick={() => setStrokeWidth(w)}
-                title={`Espessura ${w}`}
+                title={`Espessura ${w}  [ / ]`}
                 style={{
                   width: 32,
                   height: 24,
@@ -1009,7 +1330,7 @@ export default function Moleskine({
           <button
             onClick={handleRedo}
             disabled={historyIndex >= history.length - 1}
-            title="Refazer (Ctrl+Y)"
+            title="Refazer (Ctrl+Shift+Z)"
             style={{
               width: 40,
               height: 40,
@@ -1056,23 +1377,16 @@ export default function Moleskine({
           onMouseDown={handlePointerDown}
           onMouseMove={handlePointerMove}
           onMouseUp={handlePointerUp}
-          onMouseLeave={handlePointerUp}
-          onTouchStart={handlePointerDown}
-          onTouchMove={handlePointerMove}
-          onTouchEnd={handlePointerUp}
-          onWheel={handleWheel}
+          onMouseLeave={() => {
+            handlePointerUp()
+            setHoveredAnnotation(null)
+          }}
           style={{
             flex: 1,
             position: 'relative',
             overflow: 'hidden',
             background: '#1a1a1a',
-            cursor: activeTool === TOOLS.PAN || isPanning
-              ? 'grab'
-              : activeTool === TOOLS.ERASER
-                ? 'crosshair'
-                : activeTool === TOOLS.TEXT
-                  ? 'text'
-                  : 'crosshair',
+            cursor: getCursor(),
           }}
         >
           {!imageLoaded ? (
@@ -1128,7 +1442,7 @@ export default function Moleskine({
             </div>
           )}
 
-          {/* Text Input Modal */}
+          {/* Text Input Modal (multiline) */}
           {isAddingText && textPosition && (
             <div
               style={{
@@ -1137,19 +1451,44 @@ export default function Moleskine({
                 top: textPosition.y * scale + offset.y,
                 transform: 'translate(-50%, -100%)',
                 background: '#FFFFFF',
-                borderRadius: 8,
-                padding: 12,
-                boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+                borderRadius: 10,
+                padding: 14,
+                boxShadow: '0 4px 24px rgba(0,0,0,0.35)',
                 zIndex: 100,
+                minWidth: 240,
               }}
               onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
             >
-              <input
-                type="text"
+              {/* Color indicator */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                marginBottom: 8,
+                paddingBottom: 8,
+                borderBottom: '1px solid #F0EDE8',
+              }}>
+                <div style={{
+                  width: 12,
+                  height: 12,
+                  borderRadius: '50%',
+                  background: strokeColor,
+                }} />
+                <span style={{ fontSize: 11, color: '#8B8670' }}>
+                  Tamanho: {strokeWidth * 4 + 8}px
+                </span>
+              </div>
+              <textarea
+                ref={textareaRef}
                 value={textInput}
                 onChange={(e) => setTextInput(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleTextSubmit()
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    handleTextSubmit()
+                  }
                   if (e.key === 'Escape') {
                     setIsAddingText(false)
                     setTextPosition(null)
@@ -1158,16 +1497,25 @@ export default function Moleskine({
                 }}
                 autoFocus
                 placeholder="Escreva aqui..."
+                rows={2}
                 style={{
-                  width: 200,
+                  width: '100%',
                   padding: '8px 12px',
                   borderRadius: 6,
                   border: '1px solid #E0DED8',
                   fontSize: 14,
                   outline: 'none',
+                  resize: 'vertical',
+                  minHeight: 40,
+                  maxHeight: 120,
+                  fontFamily: "'Quattrocento Sans', sans-serif",
+                  boxSizing: 'border-box',
                 }}
               />
-              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <div style={{ fontSize: 10, color: '#ABA89A', marginTop: 4, marginBottom: 8 }}>
+                Enter para adicionar · Shift+Enter nova linha · Esc cancelar
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
                 <button
                   onClick={() => {
                     setIsAddingText(false)
@@ -1176,7 +1524,7 @@ export default function Moleskine({
                   }}
                   style={{
                     flex: 1,
-                    padding: '6px 12px',
+                    padding: '7px 12px',
                     borderRadius: 6,
                     border: '1px solid #E0DED8',
                     background: '#FFFFFF',
@@ -1191,7 +1539,7 @@ export default function Moleskine({
                   disabled={!textInput.trim()}
                   style={{
                     flex: 1,
-                    padding: '6px 12px',
+                    padding: '7px 12px',
                     borderRadius: 6,
                     border: 'none',
                     background: textInput.trim() ? '#8B8670' : '#E5E5E5',
@@ -1206,7 +1554,48 @@ export default function Moleskine({
             </div>
           )}
 
-          {/* Zoom Controls */}
+          {/* Status bar (bottom-left) */}
+          <div
+            style={{
+              position: 'absolute',
+              bottom: 20,
+              left: 20,
+              display: 'flex',
+              gap: 8,
+              alignItems: 'center',
+              background: 'rgba(30, 30, 30, 0.85)',
+              backdropFilter: 'blur(8px)',
+              padding: '6px 14px',
+              borderRadius: 8,
+              color: '#CCCCCC',
+              fontSize: 12,
+              userSelect: 'none',
+            }}
+          >
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              color: '#FFFFFF',
+              fontWeight: 600,
+            }}>
+              {TOOL_INFO[activeTool]?.label}
+            </span>
+            <span style={{ opacity: 0.4 }}>|</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <div style={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                background: strokeColor,
+              }} />
+              {STROKE_COLORS.find(c => c.color === strokeColor)?.name}
+            </span>
+            <span style={{ opacity: 0.4 }}>|</span>
+            <span>{strokeWidth}px</span>
+          </div>
+
+          {/* Zoom Controls (bottom-right) */}
           <div
             style={{
               position: 'absolute',
@@ -1223,6 +1612,7 @@ export default function Moleskine({
           >
             <button
               onClick={() => setScale((s) => Math.max(0.1, s - 0.25))}
+              title="Diminuir zoom (-)"
               style={{
                 width: 28,
                 height: 28,
@@ -1242,6 +1632,7 @@ export default function Moleskine({
             </span>
             <button
               onClick={() => setScale((s) => Math.min(3, s + 0.25))}
+              title="Aumentar zoom (+)"
               style={{
                 width: 28,
                 height: 28,
@@ -1258,7 +1649,7 @@ export default function Moleskine({
             </button>
             <button
               onClick={fitToScreen}
-              title="Ajustar ao ecra"
+              title="Ajustar ao ecra (0)"
               style={{
                 width: 28,
                 height: 28,
@@ -1312,7 +1703,7 @@ export default function Moleskine({
               Limpar Anotacoes
             </h3>
             <p style={{ fontSize: 14, color: '#6B7280', marginBottom: 20 }}>
-              Tem a certeza que deseja apagar todas as anotacoes? Esta acao nao pode ser desfeita.
+              Tem a certeza que deseja apagar todas as {annotations.length} anotacoes? Esta acao nao pode ser desfeita.
             </p>
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
               <button
@@ -1342,6 +1733,98 @@ export default function Moleskine({
                 }}
               >
                 Limpar Tudo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Close Unsaved Warning Modal */}
+      {showCloseConfirm && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+          }}
+          onClick={() => setShowCloseConfirm(false)}
+        >
+          <div
+            style={{
+              background: '#FFFFFF',
+              borderRadius: 12,
+              padding: 24,
+              maxWidth: 420,
+              width: '90%',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3
+              style={{
+                fontSize: 18,
+                fontWeight: 600,
+                color: '#5F5C59',
+                marginBottom: 12,
+              }}
+            >
+              Alteracoes por guardar
+            </h3>
+            <p style={{ fontSize: 14, color: '#6B7280', marginBottom: 20 }}>
+              Tem alteracoes que ainda nao foram guardadas. O que deseja fazer?
+            </p>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => {
+                  setShowCloseConfirm(false)
+                  onClose()
+                }}
+                style={{
+                  padding: '10px 16px',
+                  borderRadius: 6,
+                  border: '1px solid #E0DED8',
+                  background: '#FFFFFF',
+                  color: '#DC2626',
+                  fontSize: 14,
+                  cursor: 'pointer',
+                }}
+              >
+                Descartar
+              </button>
+              <button
+                onClick={() => setShowCloseConfirm(false)}
+                style={{
+                  padding: '10px 16px',
+                  borderRadius: 6,
+                  border: '1px solid #E0DED8',
+                  background: '#FFFFFF',
+                  color: '#5F5C59',
+                  fontSize: 14,
+                  cursor: 'pointer',
+                }}
+              >
+                Continuar a editar
+              </button>
+              <button
+                onClick={async () => {
+                  await saveAnnotations()
+                  setShowCloseConfirm(false)
+                  onClose()
+                }}
+                style={{
+                  padding: '10px 16px',
+                  borderRadius: 6,
+                  border: 'none',
+                  background: '#8B8670',
+                  color: '#FFFFFF',
+                  fontSize: 14,
+                  cursor: 'pointer',
+                }}
+              >
+                Guardar e fechar
               </button>
             </div>
           </div>
