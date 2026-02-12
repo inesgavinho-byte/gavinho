@@ -700,10 +700,7 @@ export default function Biblioteca() {
           </button>
         </div>
       ) : viewMode === 'grid' ? (
-        <div style={{
-          columnCount: 4,
-          columnGap: '16px',
-        }} className="biblioteca-masonry">
+        <div className={activeTab === 'inspiracao' ? 'biblioteca-masonry' : 'biblioteca-grid-regular'}>
           {filteredItems.map(item => (
             <ItemCard
               key={item.id}
@@ -715,6 +712,7 @@ export default function Biblioteca() {
               onDelete={() => setShowDeleteConfirm(item)}
               onPreview={() => setShowPreview(item)}
               onToggleFavorite={activeTab === 'inspiracao' ? () => handleToggleFavorite(item) : null}
+              fixedHeight={activeTab !== 'inspiracao'}
             />
           ))}
         </div>
@@ -2220,15 +2218,28 @@ export default function Biblioteca() {
           .biblioteca-masonry { column-count: 1; }
         }
 
+        .biblioteca-grid-regular {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+          gap: 16px;
+        }
+        .biblioteca-grid-regular .bib-pin-card {
+          margin-bottom: 0;
+        }
+        @media (max-width: 600px) {
+          .biblioteca-grid-regular { grid-template-columns: 1fr; }
+        }
+
         .bib-pin-card {
           break-inside: avoid;
           margin-bottom: 16px;
           border-radius: 12px;
-          overflow: hidden;
+          overflow: visible;
           background: white;
           border: 1px solid var(--stone);
           transition: transform 0.2s ease, box-shadow 0.2s ease;
           cursor: default;
+          position: relative;
         }
         .bib-pin-card:hover {
           transform: translateY(-3px);
@@ -2241,6 +2252,7 @@ export default function Biblioteca() {
           cursor: pointer;
           line-height: 0;
           background: var(--cream);
+          border-radius: 12px 12px 0 0;
         }
 
         .bib-pin-overlay {
@@ -2335,9 +2347,8 @@ export default function Biblioteca() {
           border: 1px solid var(--stone);
           border-radius: 10px;
           box-shadow: 0 6px 20px rgba(0,0,0,0.12);
-          z-index: 10;
+          z-index: 100;
           min-width: 140px;
-          overflow: hidden;
         }
 
         .bib-pin-menu-item {
@@ -2363,7 +2374,7 @@ export default function Biblioteca() {
 // ============================================
 // ITEM CARD COMPONENT
 // ============================================
-function ItemCard({ item, type, tags, categorias, onEdit, onDelete, onPreview, onToggleFavorite }) {
+function ItemCard({ item, type, tags, categorias, onEdit, onDelete, onPreview, onToggleFavorite, fixedHeight }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [imgLoaded, setImgLoaded] = useState(false)
 
@@ -2412,7 +2423,8 @@ function ItemCard({ item, type, tags, categorias, onEdit, onDelete, onPreview, o
             onLoad={() => setImgLoaded(true)}
             style={{
               width: '100%',
-              height: 'auto',
+              height: fixedHeight ? '180px' : 'auto',
+              objectFit: fixedHeight ? 'cover' : undefined,
               display: 'block',
               opacity: imgLoaded ? 1 : 0,
               transition: 'opacity 0.3s ease',
@@ -2420,7 +2432,7 @@ function ItemCard({ item, type, tags, categorias, onEdit, onDelete, onPreview, o
           />
         ) : (
           <div style={{
-            height: '140px',
+            height: fixedHeight ? '180px' : '140px',
             background: 'linear-gradient(135deg, var(--cream) 0%, var(--stone) 100%)',
             display: 'flex',
             alignItems: 'center',
