@@ -294,6 +294,7 @@ export default function useChannelData() {
     favoriteChannels,
 
     // Setters
+    setCanais,
     setEquipaAtiva,
     setEquipasExpanded,
     setCanalAtivo,
