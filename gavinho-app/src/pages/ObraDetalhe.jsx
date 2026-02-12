@@ -210,12 +210,15 @@ export default function ObraDetalhe() {
   }
 
   const fetchChecklistCount = async () => {
-    const { count } = await supabase
-      .from('checklist_items')
-      .select('*', { count: 'exact', head: true })
-      .eq('obra_id', obra.id)
-      .eq('estado', 'aberto')
-    setChecklistCount(count || 0)
+    try {
+      const { count, error } = await supabase
+        .from('checklist_items')
+        .select('*', { count: 'exact', head: true })
+        .eq('obra_id', obra.id)
+        .eq('estado', 'aberto')
+      if (error) { setChecklistCount(0); return }
+      setChecklistCount(count || 0)
+    } catch { setChecklistCount(0) }
   }
 
   useEffect(() => {
@@ -1816,38 +1819,39 @@ export default function ObraDetalhe() {
   const fotoInputRef = useRef(null)
 
   const loadFotos = useCallback(async () => {
-    if (!id) return
+    if (!obra?.id) return
     setFotosLoading(true)
     try {
       const [fotosRes, zonasRes, especRes] = await Promise.all([
-        supabase.from('obra_fotografias').select('*, obra_zonas(nome), especialidades(nome, cor)').eq('obra_id', id).order('data_fotografia', { ascending: false }),
-        supabase.from('obra_zonas').select('id, nome, piso').eq('obra_id', id).order('nome'),
+        supabase.from('obra_fotografias').select('*, obra_zonas(nome), especialidades(nome, cor)').eq('obra_id', obra.id).order('data_fotografia', { ascending: false }),
+        supabase.from('obra_zonas').select('id, nome, piso').eq('obra_id', obra.id).order('nome'),
         supabase.from('especialidades').select('id, nome, cor, categoria').eq('ativo', true).order('ordem')
       ])
+      if (fotosRes.error) throw fotosRes.error
       setFotos(fotosRes.data || [])
       setZonas(zonasRes.data || [])
       setEspecialidades(especRes.data || [])
     } catch (err) { console.error('Erro fotos:', err) }
     finally { setFotosLoading(false) }
-  }, [id])
+  }, [obra?.id])
 
   useEffect(() => {
-    if (activeMainTab === 'acompanhamento' && activeAcompanhamentoSubtab === 'fotografias' && id) loadFotos()
-  }, [activeMainTab, activeAcompanhamentoSubtab, id, loadFotos])
+    if (activeMainTab === 'acompanhamento' && activeAcompanhamentoSubtab === 'fotografias' && obra?.id) loadFotos()
+  }, [activeMainTab, activeAcompanhamentoSubtab, obra?.id, loadFotos])
 
   const handleFotoUpload = async () => {
-    if (!fotoForm.files.length) return
+    if (!fotoForm.files.length || !obra?.id) return
     setFotoUploading(true)
     try {
       for (const file of fotoForm.files) {
         const ext = file.name.split('.').pop()
-        const fileName = `${id}/fotos/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+        const fileName = `${obra.codigo || obra.id}/fotos/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
         const { error: upErr } = await supabase.storage.from('obras').upload(fileName, file)
         if (upErr) throw upErr
         const { data: urlData } = supabase.storage.from('obras').getPublicUrl(fileName)
 
         await supabase.from('obra_fotografias').insert({
-          obra_id: id,
+          obra_id: obra.id,
           url: urlData.publicUrl,
           filename: file.name,
           tamanho_bytes: file.size,
@@ -1856,8 +1860,8 @@ export default function ObraDetalhe() {
           zona_id: fotoForm.zona_id || null,
           especialidade_id: fotoForm.especialidade_id || null,
           data_fotografia: new Date().toISOString().split('T')[0],
-          autor: currentUser?.nome || null,
-          created_by: currentUser?.id || null
+          autor_nome: currentUser?.nome || null,
+          autor_id: currentUser?.id || null
         })
       }
       setShowFotoModal(false)
