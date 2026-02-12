@@ -82,10 +82,10 @@
   --warm-beige: #7A7768;
   --olive-gray: #8B8978;
   --brown: #E8E4DA;
-  --brown-light: #A8A498;
+  --brown-light: #C4C0B4;
   --brown-dark: #F2EFE6;
   --text-dark: #E8E4DA;
-  --text-muted: #A8A498;
+  --text-muted: #C4C0B4;
 
   /* Neutrals - warm dark tones */
   --white: #2A2924;
@@ -3817,7 +3817,7 @@ tbody tr:last-child td {
 }
 
 [data-theme="dark"] .message-card:hover {
-  background: var(--cream) !important;
+  background: #33312C !important;
 }
 
 /* Message action toolbar */
@@ -3908,7 +3908,7 @@ tbody tr:last-child td {
 /* Badge unread count */
 [data-theme="dark"] .chat-badge {
   background: var(--stone);
-  color: var(--brown-light);
+  color: var(--brown);
 }
 
 /* Channel icon */
