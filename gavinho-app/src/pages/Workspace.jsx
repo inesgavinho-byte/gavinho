@@ -99,6 +99,7 @@ import {
 
 import { ConfirmModal, ToastContainer, ExportModal, CreatePrivateChannelModal, WebhookSettingsModal, ScheduleMessageModal, EmailSettingsModal } from './Workspace/components/Modals'
 import CentralEntregasChat from './Workspace/components/CentralEntregasChat'
+import { usePushNotifications } from '../hooks/usePushNotifications'
 
 export default function Workspace() {
   // Handle OAuth callback in popup
@@ -187,6 +188,14 @@ export default function Workspace() {
   // Toast & Confirm Hooks (replacing alert/confirm)
   const { toasts, success: toastSuccess, error: toastError, info: toastInfo, dismissToast } = useToast()
   const { confirmState, confirm, closeConfirm, confirmArchive } = useConfirm()
+
+  // Push Notifications Hook
+  const {
+    isSupported: pushSupported,
+    isSubscribed: pushSubscribed,
+    isGranted: pushGranted,
+    subscribe: pushSubscribe
+  } = usePushNotifications()
 
   // ========== REMAINING LOCAL STATE ==========
 
@@ -320,6 +329,13 @@ export default function Workspace() {
       clearInterval(presenceIntervalRef.current)
     }
   }, [])
+
+  // Auto-subscribe to push notifications when permission is granted
+  useEffect(() => {
+    if (pushSupported && pushGranted && !pushSubscribed && profile?.id) {
+      pushSubscribe()
+    }
+  }, [pushSupported, pushGranted, pushSubscribed, profile?.id, pushSubscribe])
 
   useEffect(() => {
     if (canalAtivo) {
