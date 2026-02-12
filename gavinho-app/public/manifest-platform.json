@@ -1,13 +1,13 @@
 {
-  "name": "Gavinho Platform",
-  "short_name": "Gavinho",
+  "name": "GAVINHO Platform",
+  "short_name": "GAVINHO",
   "description": "Plataforma de Gestão de Projetos - Arquitetura, Interiores e Construção",
   "start_url": "/",
   "scope": "/",
   "id": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#3d4349",
+  "background_color": "#F2F0E7",
+  "theme_color": "#4a5d4a",
   "orientation": "any",
   "icons": [
     {
@@ -38,13 +38,36 @@
   "shortcuts": [
     {
       "name": "Dashboard",
+      "short_name": "Dashboard",
       "url": "/",
       "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
     },
     {
       "name": "Projetos",
+      "short_name": "Projetos",
       "url": "/projetos",
       "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Obras",
+      "short_name": "Obras",
+      "url": "/obras",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Workspace",
+      "short_name": "Chat",
+      "url": "/workspace",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Calendário",
+      "short_name": "Calendário",
+      "url": "/calendario",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
     }
-  ]
+  ],
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  }
 }
