@@ -1325,7 +1325,7 @@ export default function DesignReview({ projeto, initialReviewId }) {
   }
 
   return (
-    <div ref={designReviewRef} style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 280px)', minHeight: '600px' }}>
+    <div ref={designReviewRef} style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 280px)', minHeight: '600px', overflow: 'hidden' }}>
       {/* Tabs Bar */}
       <div style={{
         display: 'flex',
@@ -1503,7 +1503,7 @@ export default function DesignReview({ projeto, initialReviewId }) {
       </div>
 
       {/* Main Content */}
-      <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+      <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
       {/* Show message when no tabs open */}
       {openTabs.length === 0 ? (
         <div style={{
@@ -1544,7 +1544,7 @@ export default function DesignReview({ projeto, initialReviewId }) {
       ) : (
       <>
       {/* Main PDF Viewer Area */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#F5F5F0', minWidth: 0 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#F5F5F0', minWidth: 0, overflow: 'hidden' }}>
         {/* Toolbar */}
         <div style={{
           display: 'flex',
@@ -1942,14 +1942,12 @@ export default function DesignReview({ projeto, initialReviewId }) {
           <div
             ref={containerRef}
             style={{
-              width: '100%',
-              height: '100%',
+              position: 'absolute',
+              inset: 0,
               overflow: 'auto',
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'flex-start',
               padding: '24px',
-              paddingLeft: '80px' // Espaço para a toolbar flutuante
+              paddingLeft: '80px', // Espaço para a toolbar flutuante
+              textAlign: 'center',
             }}
           >
           {selectedVersion?.file_url ? (
@@ -1958,6 +1956,8 @@ export default function DesignReview({ projeto, initialReviewId }) {
               onClick={handlePdfClick}
               style={{
                 position: 'relative',
+                display: 'inline-block',
+                textAlign: 'left',
                 cursor: activeTool === 'comment' ? 'crosshair' :
                         ['pencil', 'rectangle', 'arrow', 'circle', 'line'].includes(activeTool) ? 'crosshair' : 'default',
                 boxShadow: '0 4px 20px rgba(0,0,0,0.15)'
@@ -2260,6 +2260,7 @@ export default function DesignReview({ projeto, initialReviewId }) {
       <div style={{
         width: '320px',
         minWidth: '280px',
+        flexShrink: 0,
         borderLeft: '1px solid var(--stone)',
         display: 'flex',
         flexDirection: 'column',
