@@ -655,7 +655,7 @@
 .suggestion-chip.active {
   background: var(--brown, #4a5d4a);
   border-color: var(--brown, #4a5d4a);
-  color: white;
+  color: var(--off-white);
 }
 
 /* Edit Preview */
@@ -735,7 +735,7 @@
 
 .btn-primary {
   background: var(--brown, #4a5d4a);
-  color: white;
+  color: var(--off-white);
 }
 
 .btn-primary:hover:not(:disabled) {
@@ -809,7 +809,7 @@
 .btn-add-to-compartimento:hover {
   background: var(--brown, #4a5d4a);
   border-color: var(--brown, #4a5d4a);
-  color: white;
+  color: var(--off-white);
 }
 
 /* Compartimento Management Modal */
@@ -880,7 +880,7 @@
 .compartimento-item-badge {
   padding: 2px 8px;
   background: var(--brown, #4a5d4a);
-  color: white;
+  color: var(--off-white);
   border-radius: 4px;
   font-size: 10px;
   font-weight: 500;

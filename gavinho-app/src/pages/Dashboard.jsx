@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { useIsMobile } from '../hooks/useIsMobile'
 import {
   CriticalDeadlinesWidget,
   BudgetHealthWidget,
@@ -31,6 +32,7 @@ import {
 export default function Dashboard() {
   const navigate = useNavigate()
   const { profile } = useAuth()
+  const isMobile = useIsMobile()
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({
     totalProjetos: 0,
@@ -273,8 +275,8 @@ export default function Dashboard() {
       {/* KPI Cards */}
       <div className="stagger-children" style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(4, 1fr)',
-        gap: '16px',
+        gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
+        gap: isMobile ? '10px' : '16px',
         marginBottom: '24px'
       }}>
         {/* Projetos Ativos */}
@@ -474,7 +476,7 @@ export default function Dashboard() {
       {/* Status Summary Strip */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(3, 1fr)',
+        gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
         gap: '12px',
         marginBottom: '24px'
       }}>
@@ -578,7 +580,7 @@ export default function Dashboard() {
       </div>
 
       {/* Main Content Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '20px', marginBottom: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 340px', gap: '20px', marginBottom: '24px' }}>
         {/* Recent Projects */}
         <div style={{
           background: 'var(--white)',
@@ -609,11 +611,11 @@ export default function Dashboard() {
           </div>
 
           {recentProjects.length > 0 ? (
-            <div>
+            <div style={isMobile ? { overflowX: 'auto' } : undefined}>
               {/* Table header */}
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: '100px 1fr 120px 130px 120px',
+                gridTemplateColumns: '100px 1fr 120px 130px 120px', minWidth: '590px',
                 padding: '10px 24px',
                 borderBottom: '1px solid var(--stone)',
                 background: 'var(--cream)'
@@ -638,7 +640,7 @@ export default function Dashboard() {
                   onClick={() => navigate(`/projetos/${project.codigo}`)}
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: '100px 1fr 120px 130px 120px',
+                    gridTemplateColumns: '100px 1fr 120px 130px 120px', minWidth: '590px',
                     padding: '14px 24px',
                     alignItems: 'center',
                     cursor: 'pointer',
