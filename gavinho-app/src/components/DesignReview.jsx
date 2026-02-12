@@ -77,6 +77,7 @@ export default function DesignReview({ projeto, initialReviewId }) {
   const { user, profile } = useAuth()
   const toast = useToast()
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null })
+  const designReviewRef = useRef(null)
   const containerRef = useRef(null)
   const pdfContainerRef = useRef(null)
 
@@ -137,6 +138,21 @@ export default function DesignReview({ projeto, initialReviewId }) {
   const [newReviewFile, setNewReviewFile] = useState(null)
   const [createLoading, setCreateLoading] = useState(false)
   const [createError, setCreateError] = useState(null)
+
+  // Prevent browser zoom on Ctrl+scroll — route to drawing zoom only
+  useEffect(() => {
+    const el = designReviewRef.current
+    if (!el) return
+    const handleWheel = (e) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault()
+        const zoomFactor = 1 - (e.deltaY * 0.001)
+        setScale(prev => Math.min(3, Math.max(0.25, prev * zoomFactor)))
+      }
+    }
+    el.addEventListener('wheel', handleWheel, { passive: false })
+    return () => el.removeEventListener('wheel', handleWheel)
+  }, [])
 
   // Load reviews
   useEffect(() => {
@@ -1233,7 +1249,7 @@ export default function DesignReview({ projeto, initialReviewId }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 280px)', minHeight: '600px' }}>
+    <div ref={designReviewRef} style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 280px)', minHeight: '600px' }}>
       {/* Tabs Bar */}
       <div style={{
         display: 'flex',
@@ -1802,13 +1818,6 @@ export default function DesignReview({ projeto, initialReviewId }) {
           {/* Scrollable PDF Area */}
           <div
             ref={containerRef}
-            onWheel={(e) => {
-              if (e.ctrlKey || e.metaKey) {
-                e.preventDefault()
-                const zoomFactor = 1 - (e.deltaY * 0.001)
-                setScale(prev => Math.min(3, Math.max(0.25, prev * zoomFactor)))
-              }
-            }}
             style={{
               width: '100%',
               height: '100%',

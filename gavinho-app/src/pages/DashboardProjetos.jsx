@@ -760,9 +760,9 @@ export default function DashboardProjetos() {
           >
             <tab.icon size={18} />
             {tab.label}
-            {tab.id === 'tarefas' && tarefas.filter(t => t.status === 'pendente').length > 0 && (
+            {tab.id === 'tarefas' && tarefas.filter(t => t.status !== 'concluida').length > 0 && (
               <span style={{ background: 'var(--warning)', color: 'white', fontSize: '11px', padding: '2px 6px', borderRadius: '10px', fontWeight: 600 }}>
-                {tarefas.filter(t => t.status === 'pendente').length}
+                {tarefas.filter(t => t.status !== 'concluida').length}
               </span>
             )}
             {tab.id === 'bloqueios' && bloqueios.filter(b => b.status === 'pendente').length > 0 && (

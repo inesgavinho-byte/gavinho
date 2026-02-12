@@ -406,6 +406,7 @@ h4 { font-size: 17px; }
 .sidebar-footer {
   padding-top: 16px;
   border-top: 1px solid var(--stone);
+  overflow: hidden;
 }
 
 .user-card {
