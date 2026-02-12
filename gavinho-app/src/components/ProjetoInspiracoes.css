@@ -183,13 +183,13 @@
 
 .inspiracoes-grid-wrapper > .inspiracoes-grid {
   min-height: 0;
-  overflow: hidden;
 }
 
-/* Photos Grid - Pinterest/Masonry Style */
+/* Photos Grid - Responsive auto-fill grid */
 .inspiracoes-grid {
-  column-count: 5;
-  column-gap: 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
   padding: 16px;
 }
 
@@ -198,8 +198,6 @@
   border-radius: 16px;
   overflow: hidden;
   background: var(--cream, #fafaf8);
-  break-inside: avoid;
-  margin-bottom: 16px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
@@ -215,11 +213,14 @@
   display: block;
   cursor: pointer;
   line-height: 0;
+  max-height: 320px;
 }
 
 .inspiracoes-card-image {
   width: 100%;
-  height: auto;
+  height: 100%;
+  max-height: 320px;
+  object-fit: cover;
   display: block;
   transition: opacity 0.3s;
   opacity: 0;
@@ -910,19 +911,7 @@
   line-height: 1.5;
 }
 
-/* Responsive - Masonry column counts */
-@media (max-width: 1400px) {
-  .inspiracoes-grid {
-    column-count: 4;
-  }
-}
-
-@media (max-width: 1100px) {
-  .inspiracoes-grid {
-    column-count: 3;
-  }
-}
-
+/* Responsive */
 @media (max-width: 768px) {
   .inspiracoes-header {
     flex-direction: column;
@@ -936,13 +925,12 @@
   }
 
   .inspiracoes-grid {
-    column-count: 2;
-    column-gap: 10px;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 10px;
     padding: 12px;
   }
 
   .inspiracoes-card {
-    margin-bottom: 10px;
     border-radius: 12px;
   }
 
@@ -969,7 +957,7 @@
 
 @media (max-width: 480px) {
   .inspiracoes-grid {
-    column-count: 1;
+    grid-template-columns: 1fr;
     padding: 10px;
   }
 
