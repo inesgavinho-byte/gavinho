@@ -7,6 +7,7 @@ import { useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Bell,
+  BellRing,
   X,
   Check,
   CheckCheck,
@@ -28,6 +29,7 @@ import {
   AlertTriangle
 } from 'lucide-react'
 import { useNotifications, NOTIFICATION_TYPES, NOTIFICATION_FILTERS, NOTIFICATION_CONFIG } from '../../contexts/NotificationContext'
+import { usePushNotifications } from '../../hooks/usePushNotifications'
 import './NotificationPanel.css'
 
 // Get icon component for notification type
@@ -359,6 +361,23 @@ export default function NotificationPanel() {
     closePanel
   } = useNotifications()
 
+  const {
+    isSupported: pushSupported,
+    isSubscribed: pushEnabled,
+    isDenied: pushDenied,
+    loading: pushLoading,
+    subscribe: enablePush,
+    unsubscribe: disablePush
+  } = usePushNotifications()
+
+  const handlePushToggle = useCallback(async () => {
+    if (pushEnabled) {
+      await disablePush()
+    } else {
+      await enablePush()
+    }
+  }, [pushEnabled, enablePush, disablePush])
+
   // Close panel when clicking outside
   useEffect(() => {
     function handleClickOutside(event) {
@@ -452,15 +471,27 @@ export default function NotificationPanel() {
             )}
           </div>
           <div className="header-actions">
+            {pushSupported && (
+              <button
+                className={`header-btn ${pushEnabled ? 'active' : ''}`}
+                onClick={handlePushToggle}
+                disabled={pushLoading || pushDenied}
+                title={
+                  pushDenied ? 'Push bloqueado pelo browser — altere nas definições'
+                  : pushEnabled ? 'Desativar notificações push'
+                  : 'Ativar notificações push'
+                }
+                style={pushEnabled ? { color: 'var(--success)' } : pushDenied ? { opacity: 0.4 } : {}}
+              >
+                <BellRing size={18} />
+              </button>
+            )}
             <button
               className={`header-btn ${viewMode === 'grouped' ? 'active' : ''}`}
               onClick={toggleViewMode}
               title={viewMode === 'grouped' ? 'Vista lista' : 'Vista agrupada'}
             >
               {viewMode === 'grouped' ? <List size={18} /> : <Layers size={18} />}
-            </button>
-            <button className="header-btn" title="Opções">
-              <MoreHorizontal size={18} />
             </button>
             <button className="header-btn close-btn" onClick={closePanel} title="Fechar">
               <X size={18} />

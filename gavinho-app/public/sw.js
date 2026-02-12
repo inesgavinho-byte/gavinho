@@ -123,10 +123,14 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true })
       .then((clientList) => {
-        // Se já tem uma janela aberta, focar nela
+        // Se já tem uma janela aberta, focar nela e navegar
         for (const client of clientList) {
-          if (client.url.includes('/obra-app') && 'focus' in client) {
-            return client.focus();
+          if ('focus' in client) {
+            client.focus();
+            if (url && client.url !== url) {
+              client.navigate(url);
+            }
+            return;
           }
         }
         // Senão, abrir nova janela
