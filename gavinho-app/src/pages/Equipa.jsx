@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/ui/Toast';
+import { useIsMobile } from '../hooks/useIsMobile';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import {
   Users,
@@ -30,6 +31,7 @@ import {
 export default function Equipa() {
   const { profile, isAdmin } = useAuth();
   const toast = useToast();
+  const isMobile = useIsMobile();
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
   const [utilizadores, setUtilizadores] = useState([]);
   const [pendingUsers, setPendingUsers] = useState([]);
@@ -758,12 +760,12 @@ export default function Equipa() {
     title: { fontSize: '28px', fontWeight: '300', color: '#44403c', margin: 0 },
     subtitle: { color: '#78716c', marginTop: '4px', fontSize: '14px' },
     roleBadge: { display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '500' },
-    kpiGrid: { display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px', marginTop: '20px' },
+    kpiGrid: { display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(5, 1fr)', gap: '12px', marginTop: '20px' },
     kpiCard: { background: 'white', borderRadius: '12px', padding: '16px', border: '1px solid #e7e5e4' },
     kpiValue: { fontSize: '24px', fontWeight: '600', color: '#44403c' },
     kpiLabel: { fontSize: '12px', color: '#78716c', marginTop: '4px' },
-    mainLayout: { display: 'flex' },
-    sidebar: { width: '280px', background: 'white', borderRight: '1px solid #e7e5e4', minHeight: 'calc(100vh - 160px)' },
+    mainLayout: { display: 'flex', flexDirection: isMobile ? 'column' : 'row' },
+    sidebar: { width: isMobile ? '100%' : '280px', background: 'white', borderRight: isMobile ? 'none' : '1px solid #e7e5e4', borderBottom: isMobile ? '1px solid #e7e5e4' : 'none', minHeight: isMobile ? 'auto' : 'calc(100vh - 160px)', maxHeight: isMobile ? '300px' : 'none' },
     sidebarHeader: { padding: '16px', borderBottom: '1px solid #f5f5f4' },
     searchInput: { width: '100%', padding: '8px 12px 8px 36px', border: '1px solid #e7e5e4', borderRadius: '8px', fontSize: '14px', outline: 'none' },
     filterRow: { display: 'flex', gap: '8px', marginTop: '12px' },
@@ -783,7 +785,7 @@ export default function Equipa() {
     profileCargo: { fontSize: '14px', color: '#78716c', marginTop: '4px' },
     profileMeta: { display: 'flex', gap: '16px', marginTop: '12px', flexWrap: 'wrap' },
     metaItem: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#78716c' },
-    profileStats: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #f5f5f4' },
+    profileStats: { display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '16px', marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #f5f5f4' },
     statBox: { textAlign: 'center' },
     statValue: { fontSize: '20px', fontWeight: '600', color: '#44403c' },
     statLabel: { fontSize: '11px', color: '#a8a29e', marginTop: '2px' },
@@ -794,7 +796,7 @@ export default function Equipa() {
     sectionHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' },
     sectionTitle: { fontSize: '16px', fontWeight: '500', color: '#44403c' },
     btnPrimary: { display: 'flex', alignItems: 'center', gap: '8px', background: '#5F5C59', color: 'white', padding: '10px 16px', borderRadius: '10px', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: '500' },
-    table: { width: '100%', borderCollapse: 'collapse' },
+    table: { width: '100%', borderCollapse: 'collapse', minWidth: '600px' },
     th: { textAlign: 'left', padding: '10px 12px', fontSize: '11px', fontWeight: '600', color: '#a8a29e', textTransform: 'uppercase', borderBottom: '1px solid #e7e5e4' },
     td: { padding: '12px', fontSize: '13px', color: '#44403c', borderBottom: '1px solid #f5f5f4' },
     actionBtn: { padding: '6px 10px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: '500', display: 'inline-flex', alignItems: 'center', gap: '4px' },
@@ -806,7 +808,7 @@ export default function Equipa() {
     formGroup: { marginBottom: '16px' },
     formLabel: { display: 'block', fontSize: '13px', fontWeight: '500', color: '#44403c', marginBottom: '6px' },
     formInput: { width: '100%', padding: '10px 12px', border: '1px solid #e7e5e4', borderRadius: '10px', fontSize: '14px', outline: 'none', boxSizing: 'border-box' },
-    formRow: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' },
+    formRow: { display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '16px' },
     empty: { textAlign: 'center', padding: '40px', color: '#a8a29e' }
   };
 
@@ -1109,7 +1111,7 @@ export default function Equipa() {
               </button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '24px' }}>
               {/* Encerramentos da Empresa */}
               <div style={{ background: 'white', borderRadius: '12px', padding: '20px', border: '1px solid #e7e5e4' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
@@ -1283,7 +1285,7 @@ export default function Equipa() {
                   ✓ Sem recibos pendentes
                 </p>
               ) : (
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', minWidth: '550px' }}>
                   <thead>
                     <tr style={{ borderBottom: '2px solid #e7e5e4' }}>
                       <th style={{ padding: '10px', textAlign: 'left' }}>Colaborador</th>
@@ -1327,7 +1329,7 @@ export default function Equipa() {
                       </tr>
                     ))}
                   </tbody>
-                </table>
+                </table></div>
               )}
             </div>
           </div>
@@ -1712,7 +1714,7 @@ export default function Equipa() {
         {activeTab === 'perfil' && (
           <div style={styles.section}>
             <h3 style={{ ...styles.sectionTitle, marginBottom: '20px' }}>Informações Pessoais</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '20px' }}>
               <div>
                 <div style={{ fontSize: '12px', color: '#a8a29e', marginBottom: '4px' }}>Email</div>
                 <div style={{ fontSize: '14px', color: '#44403c' }}>{selectedUser.email || '"”'}</div>
@@ -1780,7 +1782,7 @@ export default function Equipa() {
             {ausencias.length === 0 ? (
               <div style={styles.empty}>Sem ausências registadas</div>
             ) : (
-              <table style={styles.table}>
+              <div style={{ overflowX: 'auto' }}><table style={styles.table}>
                 <thead>
                   <tr>
                     <th style={styles.th}>Tipo</th>
@@ -1829,7 +1831,7 @@ export default function Equipa() {
                     );
                   })}
                 </tbody>
-              </table>
+              </table></div>
             )}
           </div>
         )}
@@ -1849,7 +1851,7 @@ export default function Equipa() {
             {timesheets.length === 0 ? (
               <div style={styles.empty}>Sem registos de horas</div>
             ) : (
-              <table style={styles.table}>
+              <div style={{ overflowX: 'auto' }}><table style={styles.table}>
                 <thead>
                   <tr>
                     <th style={styles.th}>Data</th>
@@ -1870,7 +1872,7 @@ export default function Equipa() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
             )}
           </div>
         )}
@@ -1896,7 +1898,7 @@ export default function Equipa() {
             {recibos.length === 0 ? (
               <div style={styles.empty}>Sem recibos submetidos</div>
             ) : (
-              <table style={styles.table}>
+              <div style={{ overflowX: 'auto' }}><table style={styles.table}>
                 <thead>
                   <tr>
                     <th style={styles.th}>Mês/Ano</th>
@@ -1944,7 +1946,7 @@ export default function Equipa() {
                     );
                   })}
                 </tbody>
-              </table>
+              </table></div>
             )}
           </div>
         )}

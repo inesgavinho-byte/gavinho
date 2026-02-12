@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { useToast } from '../components/ui/Toast'
 import { ConfirmModal } from '../components/ui/ConfirmModal'
+import { useIsMobile } from '../hooks/useIsMobile'
 
 const TIPOS_EVENTO = [
   { id: 'reuniao_cliente', label: 'Reunião Cliente', color: '#C9A882' },
@@ -81,6 +82,7 @@ const getFeriadosPortugal = (ano) => {
 }
 
 export default function Calendario() {
+  const isMobile = useIsMobile()
   const [currentDate, setCurrentDate] = useState(new Date())
   const [viewMode, setViewMode] = useState('mes')
   const [eventos, setEventos] = useState([])
@@ -569,8 +571,8 @@ export default function Calendario() {
           {/* Header dias da semana */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: 'var(--cream)', borderBottom: '1px solid var(--stone)' }}>
             {DIAS_SEMANA.map(dia => (
-              <div key={dia} style={{ padding: '12px', textAlign: 'center', fontSize: '11px', fontWeight: 600, color: 'var(--brown-light)' }}>
-                {dia}
+              <div key={dia} style={{ padding: isMobile ? '8px 2px' : '12px', textAlign: 'center', fontSize: isMobile ? '10px' : '11px', fontWeight: 600, color: 'var(--brown-light)' }}>
+                {isMobile ? dia.slice(0, 3) : dia}
               </div>
             ))}
           </div>
@@ -595,8 +597,8 @@ export default function Calendario() {
                   key={index}
                   onClick={() => handleAddEvent(day.date)}
                   style={{
-                    minHeight: '100px',
-                    padding: '6px',
+                    minHeight: isMobile ? '60px' : '100px',
+                    padding: isMobile ? '3px' : '6px',
                     borderRight: (index + 1) % 7 !== 0 ? '1px solid var(--stone)' : 'none',
                     borderBottom: '1px solid var(--stone)',
                     background: bgColor,
@@ -615,7 +617,7 @@ export default function Calendario() {
                     </span>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    {dayEvents.slice(0, 3).map(evento => {
+                    {dayEvents.slice(0, isMobile ? 2 : 3).map(evento => {
                       const tipoConfig = getTipoConfig(evento.tipo)
                       const isSpecialEvent = evento.isFeriado || evento.isEncerramento || evento.isFerias
                       return (
@@ -636,8 +638,8 @@ export default function Calendario() {
                         </div>
                       )
                     })}
-                    {dayEvents.length > 3 && (
-                      <div style={{ fontSize: '9px', color: 'var(--brown-light)', textAlign: 'center' }}>+{dayEvents.length - 3} mais</div>
+                    {dayEvents.length > (isMobile ? 2 : 3) && (
+                      <div style={{ fontSize: '9px', color: 'var(--brown-light)', textAlign: 'center' }}>+{dayEvents.length - (isMobile ? 2 : 3)} mais</div>
                     )}
                   </div>
                 </div>
@@ -648,10 +650,12 @@ export default function Calendario() {
       ) : (
         /* VISTA SEMANAL COM HORAS (8:00 - 20:00) */
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+         <div style={{ overflowX: isMobile ? 'auto' : 'visible' }}>
           {/* Header com dias da semana (segunda a sexta) */}
           <div style={{
             display: 'grid',
             gridTemplateColumns: '60px repeat(5, 1fr)',
+            minWidth: isMobile ? '600px' : 'auto',
             background: 'var(--cream)',
             borderBottom: '1px solid var(--stone)'
           }}>
@@ -702,8 +706,9 @@ export default function Calendario() {
           <div style={{
             display: 'grid',
             gridTemplateColumns: '60px repeat(5, 1fr)',
+            minWidth: isMobile ? '600px' : 'auto',
             maxHeight: 'calc(100vh - 280px)',
-            minHeight: '600px',
+            minHeight: isMobile ? '400px' : '600px',
             overflowY: 'auto'
           }}>
             {HORAS_DIA.map((hora, horaIdx) => (
@@ -797,6 +802,7 @@ export default function Calendario() {
               </div>
             ))}
           </div>
+         </div>
         </div>
       )}
 

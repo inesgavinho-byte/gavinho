@@ -13,6 +13,7 @@ import { ConfirmModal } from '../components/ui/ConfirmModal'
 import GarvisPanel from '../components/GarvisPanel'
 import DealRoomModal from '../components/DealRoomModal'
 import { useGarvisAlerts } from '../hooks/useGarvisAlerts'
+import { useIsMobile } from '../hooks/useIsMobile'
 import { useDealRooms } from '../hooks/useDealRooms'
 import { useGarvisKPIs } from '../hooks/useGarvisKPIs'
 import { getTopRecommendations } from '../services/garvisMatching'
@@ -35,6 +36,7 @@ export default function Fornecedores() {
   const { profile } = useAuth()
   const toast = useToast()
   const navigate = useNavigate()
+  const isMobile = useIsMobile()
   const fileInputRef = useRef(null)
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null })
 
@@ -376,8 +378,8 @@ export default function Fornecedores() {
           {/* KPI Cards */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(5, 1fr)',
-            gap: '16px',
+            gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(5, 1fr)',
+            gap: isMobile ? '10px' : '16px',
             marginBottom: '24px'
           }}>
             <KPICard value={kpis.total} label="Total Fornecedores" />
@@ -513,7 +515,8 @@ export default function Fornecedores() {
             border: '1px solid var(--stone)',
             overflow: 'hidden'
           }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+           <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', minWidth: '600px' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--stone)' }}>
                   <th style={thStyle}>FORNECEDOR</th>
@@ -633,6 +636,7 @@ export default function Fornecedores() {
                 )}
               </tbody>
             </table>
+           </div>
           </div>
         </div>
       </div>
