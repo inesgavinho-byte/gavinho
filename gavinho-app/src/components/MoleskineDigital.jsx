@@ -357,14 +357,14 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
         }
       }
 
-      // Zoom shortcuts
+      // Zoom shortcuts (10% steps, 5% below 50%)
       if ((e.ctrlKey || e.metaKey) && e.key === '=') {
         e.preventDefault()
-        setScale(s => Math.min(3, s + 0.25))
+        setScale(s => Math.min(3, s + (s >= 0.5 ? 0.1 : 0.05)))
       }
       if ((e.ctrlKey || e.metaKey) && e.key === '-') {
         e.preventDefault()
-        setScale(s => Math.max(0.2, s - 0.25))
+        setScale(s => Math.max(0.1, s - (s > 0.5 ? 0.1 : 0.05)))
       }
       if ((e.ctrlKey || e.metaKey) && e.key === '0') {
         e.preventDefault()
@@ -1319,12 +1319,12 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
     return null
   }
 
-  // Handle wheel zoom
+  // Handle wheel zoom (smooth, proportional steps)
   const handleWheel = (e) => {
     if (e.ctrlKey || e.metaKey) {
       e.preventDefault()
-      const delta = e.deltaY > 0 ? 0.9 : 1.1
-      const newScale = Math.min(3, Math.max(0.2, scale * delta))
+      const delta = e.deltaY > 0 ? 0.95 : 1.05
+      const newScale = Math.min(3, Math.max(0.1, scale * delta))
 
       const rect = containerRef.current.getBoundingClientRect()
       const mouseX = e.clientX - rect.left
@@ -2206,44 +2206,67 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
           {/* Zoom Controls */}
           <div style={{
             position: 'absolute', bottom: 20, right: 20,
-            display: 'flex', gap: 6, alignItems: 'center',
-            background: '#F2F0E7', padding: '8px 12px', borderRadius: 8,
+            display: 'flex', gap: 8, alignItems: 'center',
+            background: '#F2F0E7', padding: '8px 14px', borderRadius: 8,
             boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
           }}>
-            <button onClick={() => setScale(s => Math.max(0.25, s - 0.25))}
+            <button onClick={() => {
+              const newScale = Math.max(0.1, scale - (scale > 0.5 ? 0.1 : 0.05))
+              setScale(newScale)
+            }}
+              title="Zoom out (⌘-)"
               style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
                 borderRadius: 4, border: '1px solid #E0DED8', background: '#FFFFFF', cursor: 'pointer' }}>
               <ZoomOut size={16} />
             </button>
 
-            {/* Preset zoom levels */}
-            <div style={{ display: 'flex', gap: 2 }}>
-              {[0.5, 0.75, 1, 1.5, 2].map(level => (
-                <button
-                  key={level}
-                  onClick={() => {
-                    setScale(level)
-                    // Center after zoom change
-                    if (containerRef.current) {
-                      setOffset({
-                        x: (containerRef.current.clientWidth - canvasWidth * level) / 2,
-                        y: (containerRef.current.clientHeight - canvasHeight * level) / 2
-                      })
-                    }
-                  }}
-                  style={{
-                    padding: '4px 8px', borderRadius: 4, border: 'none',
-                    background: Math.abs(scale - level) < 0.05 ? '#8B8670' : 'transparent',
-                    color: Math.abs(scale - level) < 0.05 ? '#FFFFFF' : '#5F5C59',
-                    fontSize: 11, fontWeight: 500, cursor: 'pointer',
-                  }}
-                >
-                  {level * 100}%
-                </button>
-              ))}
-            </div>
+            {/* Smooth zoom slider */}
+            <input
+              type="range"
+              min={10}
+              max={300}
+              step={5}
+              value={Math.round(scale * 100)}
+              onChange={(e) => {
+                const newScale = parseInt(e.target.value) / 100
+                setScale(newScale)
+              }}
+              style={{
+                width: 120,
+                height: 4,
+                accentColor: '#8B8670',
+                cursor: 'pointer',
+              }}
+              title={`Zoom: ${Math.round(scale * 100)}%`}
+            />
 
-            <button onClick={() => setScale(s => Math.min(3, s + 0.25))}
+            {/* Current zoom percentage - clickable to reset to 100% */}
+            <button
+              onClick={() => {
+                setScale(1)
+                if (containerRef.current) {
+                  setOffset({
+                    x: (containerRef.current.clientWidth - canvasWidth) / 2,
+                    y: (containerRef.current.clientHeight - canvasHeight) / 2
+                  })
+                }
+              }}
+              title="Clica para repor 100%"
+              style={{
+                minWidth: 44, padding: '3px 6px', borderRadius: 4, border: 'none',
+                background: Math.abs(scale - 1) < 0.03 ? '#8B8670' : 'transparent',
+                color: Math.abs(scale - 1) < 0.03 ? '#FFFFFF' : '#5F5C59',
+                fontSize: 11, fontWeight: 600, cursor: 'pointer', textAlign: 'center',
+              }}
+            >
+              {Math.round(scale * 100)}%
+            </button>
+
+            <button onClick={() => {
+              const newScale = Math.min(3, scale + (scale >= 0.5 ? 0.1 : 0.05))
+              setScale(newScale)
+            }}
+              title="Zoom in (⌘+)"
               style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
                 borderRadius: 4, border: '1px solid #E0DED8', background: '#FFFFFF', cursor: 'pointer' }}>
               <ZoomIn size={16} />
