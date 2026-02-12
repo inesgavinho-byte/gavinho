@@ -247,8 +247,7 @@ export default function useNotifications(profile) {
         await supabase.from('chat_mencoes').insert(mencoesToInsert)
       }
     } catch (err) {
-      // Silent fail - tables might not exist yet
-      console.warn('Could not create mention notifications:', err.message)
+      console.error('Failed to create mention notifications:', err.message)
     }
   }, [profile])
 

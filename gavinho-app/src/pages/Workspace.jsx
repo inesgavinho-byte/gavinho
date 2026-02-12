@@ -457,7 +457,7 @@ export default function Workspace() {
       if (mentionedNames.length > 0) {
         const mentionedUserIds = findMentionedUserIds(mentionedNames, membros)
         if (mentionedUserIds.length > 0) {
-          createMentionNotifications(insertedMessage, mentionedUserIds, canalAtivo)
+          await createMentionNotifications(insertedMessage, mentionedUserIds, canalAtivo)
         }
       }
 

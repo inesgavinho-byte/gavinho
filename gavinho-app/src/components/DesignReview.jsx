@@ -1085,6 +1085,81 @@ export default function DesignReview({ projeto, initialReviewId }) {
     }
   }
 
+  // Delete a version (file from storage + DB record)
+  const handleDeleteVersion = async () => {
+    if (!selectedVersion) return
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar Versão',
+      message: `Tem certeza que deseja eliminar a Versão ${selectedVersion.numero_versao}? Todas as anotações e desenhos desta versão serão apagados.`,
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          // Delete file from storage
+          if (selectedVersion.file_url) {
+            const urlParts = selectedVersion.file_url.split('/project-files/')
+            if (urlParts[1]) {
+              await supabase.storage.from('project-files').remove([decodeURIComponent(urlParts[1])])
+            }
+          }
+          // Delete version record (cascades to annotations + drawings)
+          const { error } = await supabase
+            .from('design_review_versions')
+            .delete()
+            .eq('id', selectedVersion.id)
+          if (error) throw error
+
+          toast.success('Versão eliminada')
+          await loadVersions()
+        } catch (err) {
+          console.error('Error deleting version:', err)
+          toast.error('Erro', 'Não foi possível eliminar a versão')
+        }
+      }
+    })
+  }
+
+  // Delete entire review package
+  const handleDeleteReview = async () => {
+    if (!selectedReview) return
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar Pacote de Desenhos',
+      message: `Tem certeza que deseja eliminar "${selectedReview.nome}"? Todas as versões, anotações e ficheiros serão apagados permanentemente.`,
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          // Delete all version files from storage
+          for (const v of versions) {
+            if (v.file_url) {
+              const urlParts = v.file_url.split('/project-files/')
+              if (urlParts[1]) {
+                await supabase.storage.from('project-files').remove([decodeURIComponent(urlParts[1])])
+              }
+            }
+          }
+          // Delete review record (cascades to versions, annotations, drawings)
+          const { error } = await supabase
+            .from('design_reviews')
+            .delete()
+            .eq('id', selectedReview.id)
+          if (error) throw error
+
+          toast.success('Pacote eliminado')
+          // Remove from open tabs
+          setOpenTabs(prev => prev.filter(t => t.reviewId !== selectedReview.id))
+          setSelectedReview(null)
+          setVersions([])
+          setSelectedVersion(null)
+          await loadReviews()
+        } catch (err) {
+          console.error('Error deleting review:', err)
+          toast.error('Erro', 'Não foi possível eliminar o pacote')
+        }
+      }
+    })
+  }
+
   const handleUploadNewVersion = async (file) => {
     if (!file || !selectedReview) return
 
@@ -1702,6 +1777,24 @@ export default function DesignReview({ projeto, initialReviewId }) {
 
           {/* Actions */}
           <button
+            onClick={handleDeleteVersion}
+            title="Eliminar esta versão"
+            style={{
+              width: '36px',
+              height: '36px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '8px',
+              border: '1px solid rgba(180, 100, 100, 0.3)',
+              background: 'var(--white)',
+              cursor: 'pointer',
+              color: 'var(--error)'
+            }}
+          >
+            <Trash2 size={16} />
+          </button>
+          <button
             onClick={() => loadVersions()}
             title="Atualizar"
             style={{
@@ -2111,14 +2204,25 @@ export default function DesignReview({ projeto, initialReviewId }) {
           >
             <ChevronRight size={18} />
           </button>
-          <button
-            onClick={() => setShowUploadModal(true)}
-            className="btn btn-secondary"
-            style={{ marginLeft: 'auto', padding: '8px 12px' }}
-          >
-            <Upload size={14} style={{ marginRight: '6px' }} />
-            Nova Versao
-          </button>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
+            <button
+              onClick={handleDeleteReview}
+              className="btn"
+              style={{ padding: '8px 12px', color: 'var(--error)', border: '1px solid rgba(180,100,100,0.3)' }}
+              title="Eliminar pacote de desenhos"
+            >
+              <Trash2 size={14} style={{ marginRight: '6px' }} />
+              Eliminar
+            </button>
+            <button
+              onClick={() => setShowUploadModal(true)}
+              className="btn btn-secondary"
+              style={{ padding: '8px 12px' }}
+            >
+              <Upload size={14} style={{ marginRight: '6px' }} />
+              Nova Versao
+            </button>
+          </div>
         </div>
       </div>
 
