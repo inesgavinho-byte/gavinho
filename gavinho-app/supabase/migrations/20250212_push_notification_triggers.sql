@@ -6,7 +6,7 @@
 -- =====================================================
 
 -- Enable pg_net extension (HTTP client from PostgreSQL)
-CREATE EXTENSION IF NOT EXISTS pg_net WITH SCHEMA extensions;
+CREATE EXTENSION IF NOT EXISTS pg_net WITH SCHEMA net;
 
 -- =====================================================
 -- 1. Helper function: call send-push edge function
@@ -45,7 +45,7 @@ BEGIN
   END IF;
 
   -- Call the send-push edge function via pg_net
-  PERFORM extensions.http_post(
+  PERFORM net.http_post(
     url := v_supabase_url || '/functions/v1/send-push',
     body := json_build_object(
       'user_id', p_user_id::text,
@@ -53,7 +53,7 @@ BEGIN
       'body', p_body,
       'url', p_url,
       'tag', p_tag
-    )::text,
+    )::jsonb,
     headers := json_build_object(
       'Content-Type', 'application/json',
       'Authorization', 'Bearer ' || v_service_key
