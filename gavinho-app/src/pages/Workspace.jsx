@@ -206,6 +206,9 @@ export default function Workspace() {
   const [filterByTag, setFilterByTag] = useState(null)
   const typingTimeoutRef = useRef(null)
 
+  // Track mentioned user IDs from autocomplete selection (more reliable than re-parsing text)
+  const mentionedUserIdsRef = useRef([])
+
   // Modals
   const [showCreateTaskModal, setShowCreateTaskModal] = useState(false)
   const [taskFromMessage, setTaskFromMessage] = useState(null)
@@ -453,13 +456,19 @@ export default function Workspace() {
       }
 
       // Process @mentions and create notifications
-      const mentionedNames = parseMentions(messageInput)
-      if (mentionedNames.length > 0) {
-        const mentionedUserIds = findMentionedUserIds(mentionedNames, membros)
-        if (mentionedUserIds.length > 0) {
-          await createMentionNotifications(insertedMessage, mentionedUserIds, canalAtivo)
+      // Primary: use tracked IDs from autocomplete selection (reliable)
+      // Fallback: parse text for manually typed @mentions
+      let mentionedUserIds = [...mentionedUserIdsRef.current]
+      if (mentionedUserIds.length === 0) {
+        const mentionedNames = parseMentions(messageInput)
+        if (mentionedNames.length > 0) {
+          mentionedUserIds = findMentionedUserIds(mentionedNames, membros)
         }
       }
+      if (mentionedUserIds.length > 0) {
+        await createMentionNotifications(insertedMessage, mentionedUserIds, canalAtivo)
+      }
+      mentionedUserIdsRef.current = []
 
       // Adicionar attachments ao post para exibição local
       const newPost = {
@@ -478,6 +487,7 @@ export default function Workspace() {
       setMessageInput('')
       setSelectedFiles([])
       setReplyingTo(null)
+      mentionedUserIdsRef.current = []
 
     } catch (err) {
       toastError(err.message, 'Erro ao enviar mensagem')
@@ -612,6 +622,11 @@ export default function Workspace() {
     setShowMentions(false)
     setMentionQuery('')
     setMentionStartIndex(-1)
+
+    // Track this user ID for notification creation (avoids fragile text re-parsing)
+    if (membro.id && !mentionedUserIdsRef.current.includes(membro.id)) {
+      mentionedUserIdsRef.current.push(membro.id)
+    }
 
     // Focus back on input
     setTimeout(() => messageInputRef.current?.focus(), 0)

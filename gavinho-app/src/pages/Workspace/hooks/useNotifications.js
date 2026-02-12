@@ -230,8 +230,12 @@ export default function useNotifications(profile) {
         }))
 
       if (notificationsToInsert.length > 0) {
-        const { error } = await supabase.from('notificacoes').insert(notificationsToInsert)
-        if (error) throw error
+        const { data, error } = await supabase.from('notificacoes').insert(notificationsToInsert).select('id')
+        if (error) {
+          console.error('[Mention] Insert failed:', error.message, error.details, error.hint)
+          throw error
+        }
+        console.log('[Mention] Created', data?.length, 'notification(s) for users:', mentionedUserIds.filter(id => id !== profile.id))
       }
 
       // Also insert into chat_mencoes for mention tracking
@@ -247,7 +251,7 @@ export default function useNotifications(profile) {
         await supabase.from('chat_mencoes').insert(mencoesToInsert)
       }
     } catch (err) {
-      console.error('Failed to create mention notifications:', err.message)
+      console.error('[Mention] Failed to create notifications:', err.message, err)
     }
   }, [profile])
 

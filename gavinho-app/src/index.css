@@ -73,37 +73,48 @@
    DARK MODE THEME
    ======================================== */
 [data-theme="dark"] {
-  --sandy-beach: #1a1a1a;
-  --soft-cream: #1a1a1a;
-  --blush: #6B6B6B;
-  --blush-light: #7B7B7B;
-  --blush-dark: #5B5B5B;
-  --warm-beige: #6B6B6B;
-  --olive-gray: #7B7B7B;
-  --brown: #E5E5E5;
-  --brown-light: #A0A0A0;
-  --brown-dark: #F0F0F0;
-  --text-dark: #E5E5E5;
-  --text-muted: #A0A0A0;
+  /* Warm dark palette - keeps GAVINHO identity */
+  --sandy-beach: #1C1B19;
+  --soft-cream: #1C1B19;
+  --blush: #7A7768;
+  --blush-light: #55534A;
+  --blush-dark: #6B6960;
+  --warm-beige: #7A7768;
+  --olive-gray: #8B8978;
+  --brown: #E8E4DA;
+  --brown-light: #A8A498;
+  --brown-dark: #F2EFE6;
+  --text-dark: #E8E4DA;
+  --text-muted: #A8A498;
 
-  /* Neutrals */
-  --white: #2D2D2D;
-  --cream: #252525;
-  --off-white: #1F1F1F;
-  --stone: #3D3D3D;
-  --stone-dark: #4D4D4D;
-  --border-light: #3D3D3D;
+  /* Neutrals - warm dark tones */
+  --white: #2A2924;
+  --cream: #232220;
+  --off-white: #1E1D1B;
+  --stone: #3A3834;
+  --stone-dark: #4A4842;
+  --border-light: #3A3834;
 
-  /* Status - softer in dark mode */
-  --success: #8FA882;
-  --warning: #D4B87A;
-  --error: #B8867A;
-  --info: #8FA8B8;
+  /* Status - brighter for dark backgrounds */
+  --success: #96B888;
+  --warning: #D9C07E;
+  --error: #C49080;
+  --info: #96B0C4;
 
-  /* Shadows - more subtle in dark mode */
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 8px 40px rgba(0, 0, 0, 0.5);
+  /* Status Backgrounds */
+  --success-bg: rgba(150, 184, 136, 0.15);
+  --warning-bg: rgba(217, 192, 126, 0.15);
+  --error-bg: rgba(196, 144, 128, 0.15);
+  --alert-warning-bg: rgba(217, 192, 126, 0.12);
+
+  /* Accent - brighter olive for visibility */
+  --accent-olive: #96B888;
+  --accent-olive-dark: #84A676;
+
+  /* Shadows - deeper in dark mode */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 8px 40px rgba(0, 0, 0, 0.55);
 }
 
 /* Smooth theme transition */
@@ -113,6 +124,40 @@ html {
 
 [data-theme="dark"] body {
   color-scheme: dark;
+}
+
+/* ========================================
+   DARK MODE - GLOBAL OVERRIDES
+   ======================================== */
+
+/* Inputs & textareas */
+[data-theme="dark"] input,
+[data-theme="dark"] textarea,
+[data-theme="dark"] select {
+  background-color: var(--cream);
+  color: var(--brown);
+  border-color: var(--stone);
+}
+
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder {
+  color: var(--brown-light);
+}
+
+/* Scrollbar styling */
+[data-theme="dark"] ::-webkit-scrollbar-track {
+  background: var(--off-white);
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: var(--stone-dark);
+}
+
+/* Cards and panels */
+[data-theme="dark"] .card,
+[data-theme="dark"] .panel {
+  background: var(--white);
+  border-color: var(--stone);
 }
 
 /* ========================================
@@ -3709,6 +3754,218 @@ tbody tr:last-child td {
   .masonry-grid {
     column-count: 1;
   }
+}
+
+/* ========================================
+   DARK MODE — CHAT / WORKSPACE MODULE
+   ======================================== */
+
+/* Sidebar */
+[data-theme="dark"] .chat-sidebar {
+  background: var(--cream);
+  border-right-color: var(--stone);
+}
+
+[data-theme="dark"] .chat-search-input {
+  background: var(--off-white);
+  border-color: var(--stone);
+  color: var(--brown);
+}
+
+[data-theme="dark"] .chat-projeto-item.active,
+[data-theme="dark"] .chat-list-item.active {
+  background: rgba(150, 184, 136, 0.12);
+}
+
+[data-theme="dark"] .chat-projeto-item:hover,
+[data-theme="dark"] .chat-list-item:hover,
+[data-theme="dark"] .chat-canal-item:hover {
+  background: var(--stone);
+}
+
+[data-theme="dark"] .chat-canal-item.active {
+  background: rgba(150, 184, 136, 0.12);
+  color: var(--brown);
+}
+
+/* Header */
+[data-theme="dark"] .chat-header {
+  background: var(--white);
+  border-bottom-color: var(--stone);
+}
+
+/* Mode bar / topic tabs */
+[data-theme="dark"] .chat-mode-bar {
+  background: var(--cream);
+  border-bottom-color: var(--stone);
+}
+
+[data-theme="dark"] .chat-mode-btn.active {
+  background: var(--accent-olive);
+  color: #1C1B19;
+}
+
+/* Message area */
+[data-theme="dark"] .chat-messages {
+  background: var(--off-white);
+}
+
+/* Message cards (inline-styled, so use !important sparingly) */
+[data-theme="dark"] .message-card {
+  background: var(--white) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) !important;
+}
+
+[data-theme="dark"] .message-card:hover {
+  background: var(--cream) !important;
+}
+
+/* Message action toolbar */
+[data-theme="dark"] .message-actions button:hover {
+  background: var(--stone);
+}
+
+/* Date separator */
+[data-theme="dark"] .chat-date-separator {
+  color: var(--brown-light);
+}
+
+[data-theme="dark"] .chat-date-separator::before,
+[data-theme="dark"] .chat-date-separator::after {
+  background: var(--stone);
+}
+
+/* Input area */
+[data-theme="dark"] .chat-input-area {
+  background: var(--white);
+  border-top-color: var(--stone);
+}
+
+[data-theme="dark"] .chat-input-wrapper {
+  background: var(--cream);
+  border-color: var(--stone);
+}
+
+[data-theme="dark"] .chat-input-wrapper:focus-within {
+  border-color: var(--accent-olive);
+}
+
+[data-theme="dark"] .chat-input,
+[data-theme="dark"] .chat-input-textarea {
+  background: transparent;
+  color: var(--brown);
+}
+
+/* Mention dropdown */
+[data-theme="dark"] .mention-dropdown,
+[data-theme="dark"] .mention-list {
+  background: var(--white);
+  border-color: var(--stone);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .mention-item:hover {
+  background: var(--cream);
+}
+
+/* Emoji picker */
+[data-theme="dark"] .emoji-picker {
+  background: var(--white);
+  border-color: var(--stone);
+}
+
+/* Topic buttons */
+[data-theme="dark"] .chat-topic-btn {
+  background: var(--stone);
+  color: var(--brown-light);
+}
+
+[data-theme="dark"] .chat-topic-btn.active {
+  background: var(--accent-olive);
+  color: #1C1B19;
+}
+
+/* Thread panel */
+[data-theme="dark"] .thread-panel {
+  background: var(--white);
+  border-left-color: var(--stone);
+}
+
+/* Filter buttons */
+[data-theme="dark"] .chat-filter-btn {
+  background: var(--stone);
+  color: var(--brown-light);
+  border-color: var(--stone);
+}
+
+[data-theme="dark"] .chat-filter-btn.active,
+[data-theme="dark"] .chat-filter-btn:hover {
+  background: rgba(150, 184, 136, 0.15);
+  color: var(--accent-olive);
+  border-color: var(--accent-olive);
+}
+
+/* Badge unread count */
+[data-theme="dark"] .chat-badge {
+  background: var(--stone);
+  color: var(--brown-light);
+}
+
+/* Channel icon */
+[data-theme="dark"] .chat-canal-icon {
+  background: var(--stone);
+}
+
+/* ========================================
+   DARK MODE — MAIN APP SIDEBAR & LAYOUT
+   ======================================== */
+
+[data-theme="dark"] .sidebar {
+  background: var(--cream);
+  border-right-color: var(--stone);
+}
+
+[data-theme="dark"] .main-content {
+  background: var(--off-white);
+}
+
+[data-theme="dark"] .page-title {
+  color: var(--brown-dark);
+}
+
+/* Tables */
+[data-theme="dark"] table th {
+  background: var(--cream);
+  color: var(--brown-light);
+  border-color: var(--stone);
+}
+
+[data-theme="dark"] table td {
+  border-color: var(--stone);
+  color: var(--brown);
+}
+
+[data-theme="dark"] table tr:hover td {
+  background: rgba(150, 184, 136, 0.05);
+}
+
+/* Buttons */
+[data-theme="dark"] .btn-secondary,
+[data-theme="dark"] .btn-outline {
+  background: var(--stone);
+  color: var(--brown);
+  border-color: var(--stone-dark);
+}
+
+/* Modals */
+[data-theme="dark"] .modal-overlay {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+[data-theme="dark"] .modal-content,
+[data-theme="dark"] [role="dialog"] > div {
+  background: var(--white);
+  border-color: var(--stone);
 }
 
 /* ========================================
