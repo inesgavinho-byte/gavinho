@@ -1143,6 +1143,8 @@ export default function Moleskine({
                 zIndex: 100,
               }}
               onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
             >
               <input
                 type="text"
