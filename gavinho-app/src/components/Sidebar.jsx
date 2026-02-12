@@ -2,6 +2,7 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import ThemeToggle from './ui/ThemeToggle'
 import { NotificationBell } from './ui/NotificationPanel'
+import { useInstallPrompt } from '../hooks/useInstallPrompt'
 import {
   LayoutDashboard,
   FolderKanban,
@@ -37,7 +38,8 @@ import {
   CreditCard,
   FileText,
   Building2,
-  MessagesSquare
+  MessagesSquare,
+  Download
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -127,6 +129,7 @@ export default function Sidebar({ isOpen, onClose, isMobile, collapsed, onToggle
   const [expandedItems, setExpandedItems] = useState({})
   const [viewAsRole, setViewAsRole] = useState(null) // null = normal, 'user' = ver como utilizador normal
   const [showViewAsMenu, setShowViewAsMenu] = useState(false)
+  const { canInstall, install } = useInstallPrompt()
 
   // Verificar se deve mostrar como admin (real ou simulado)
   const shouldShowAsAdmin = () => {
@@ -330,6 +333,36 @@ export default function Sidebar({ isOpen, onClose, isMobile, collapsed, onToggle
 
       {/* Footer */}
       <div className="sidebar-footer" style={collapsed ? { padding: '12px 8px' } : {}}>
+        {/* Install App */}
+        {canInstall && (
+          <button
+            onClick={install}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: collapsed ? 0 : '8px',
+              justifyContent: collapsed ? 'center' : 'flex-start',
+              width: '100%',
+              padding: collapsed ? '8px' : '8px 12px',
+              marginBottom: collapsed ? '8px' : '10px',
+              background: 'linear-gradient(135deg, var(--accent-olive), var(--accent-olive-dark, #5a7a4e))',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '12px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'opacity 0.2s'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
+            onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+            title="Instalar como app"
+          >
+            <Download size={collapsed ? 16 : 14} />
+            {!collapsed && 'Instalar App'}
+          </button>
+        )}
+
         {/* Theme Toggle */}
         <div style={{
           marginBottom: collapsed ? '8px' : '12px',
