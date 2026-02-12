@@ -140,14 +140,15 @@ export default function DesignReview({ projeto, initialReviewId }) {
   const [createError, setCreateError] = useState(null)
 
   // Prevent browser zoom on Ctrl+scroll — route to drawing zoom only
+  // Attached to the PDF scrollable area (containerRef), NOT the whole component
   useEffect(() => {
-    const el = designReviewRef.current
+    const el = containerRef.current
     if (!el) return
     const handleWheel = (e) => {
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault()
-        const zoomFactor = 1 - (e.deltaY * 0.001)
-        setScale(prev => Math.min(3, Math.max(0.25, prev * zoomFactor)))
+        const zoomFactor = 1 - (e.deltaY * 0.002)
+        setScale(prev => Math.min(3, Math.max(0.1, prev * zoomFactor)))
       }
     }
     el.addEventListener('wheel', handleWheel, { passive: false })
@@ -1319,7 +1320,7 @@ export default function DesignReview({ projeto, initialReviewId }) {
       const scaleX = containerWidth / pdfDimensions.width
       const scaleY = containerHeight / pdfDimensions.height
       const newScale = Math.min(scaleX, scaleY, 2)
-      setScale(Math.max(0.25, newScale))
+      setScale(Math.max(0.1, newScale))
     }
   }
 
@@ -1696,9 +1697,10 @@ export default function DesignReview({ projeto, initialReviewId }) {
           <div style={{ width: '1px', height: '24px', background: 'var(--stone)' }} />
 
           {/* Zoom Controls */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <button
-              onClick={() => setScale(s => Math.max(0.25, s - 0.25))}
+              onClick={() => setScale(s => Math.max(0.1, s - (s > 0.5 ? 0.1 : 0.05)))}
+              title="Zoom out"
               style={{
                 width: '32px',
                 height: '32px',
@@ -1713,11 +1715,39 @@ export default function DesignReview({ projeto, initialReviewId }) {
             >
               <Minus size={16} />
             </button>
-            <span style={{ minWidth: '60px', textAlign: 'center', fontSize: '13px', fontWeight: 500 }}>
-              {Math.round(scale * 100)}%
-            </span>
+            <input
+              type="range"
+              min={10}
+              max={300}
+              step={5}
+              value={Math.round(scale * 100)}
+              onChange={(e) => setScale(parseInt(e.target.value) / 100)}
+              style={{ width: 100, height: 4, accentColor: 'var(--accent-olive)', cursor: 'pointer' }}
+              title={`Zoom: ${Math.round(scale * 100)}%`}
+            />
             <button
-              onClick={() => setScale(s => Math.min(3, s + 0.25))}
+              onClick={() => {
+                setScale(1)
+              }}
+              title="Repor 100%"
+              style={{
+                minWidth: '44px',
+                padding: '4px 6px',
+                borderRadius: '4px',
+                border: 'none',
+                background: Math.abs(scale - 1) < 0.03 ? 'var(--accent-olive)' : 'transparent',
+                color: Math.abs(scale - 1) < 0.03 ? 'white' : 'var(--brown)',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                textAlign: 'center'
+              }}
+            >
+              {Math.round(scale * 100)}%
+            </button>
+            <button
+              onClick={() => setScale(s => Math.min(3, s + (s >= 0.5 ? 0.1 : 0.05)))}
+              title="Zoom in"
               style={{
                 width: '32px',
                 height: '32px',
