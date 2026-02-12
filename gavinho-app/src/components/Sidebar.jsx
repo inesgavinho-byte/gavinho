@@ -399,13 +399,13 @@ export default function Sidebar({ isOpen, onClose, isMobile, collapsed, onToggle
                 position: 'absolute',
                 bottom: '100%',
                 left: 0,
-                right: 0,
+                minWidth: '220px',
                 marginBottom: '4px',
                 background: 'var(--white)',
                 borderRadius: '8px',
                 boxShadow: 'var(--shadow-lg)',
                 overflow: 'hidden',
-                zIndex: 100
+                zIndex: 1000
               }}>
                 <div style={{ padding: '8px 12px', fontSize: '11px', color: 'var(--brown-light)', borderBottom: '1px solid var(--stone)' }}>
                   Visualizar plataforma como:
@@ -508,26 +508,30 @@ export default function Sidebar({ isOpen, onClose, isMobile, collapsed, onToggle
 
           {/* User Menu Dropdown */}
           {showUserMenu && (
-            <div 
+            <div
               style={{
                 position: 'absolute',
                 bottom: '100%',
-                left: 0,
-                right: 0,
+                left: collapsed ? '0' : '0',
+                right: collapsed ? 'auto' : '0',
+                minWidth: '220px',
                 marginBottom: '8px',
                 background: 'var(--white)',
                 borderRadius: '12px',
                 boxShadow: 'var(--shadow-lg)',
-                overflow: 'hidden',
-                zIndex: 100
+                zIndex: 1000
               }}
             >
-              <div 
+              <div
                 style={{
                   padding: '12px 16px',
                   borderBottom: '1px solid var(--stone)',
                   fontSize: '12px',
-                  color: 'var(--brown-light)'
+                  color: 'var(--brown-light)',
+                  borderRadius: '12px 12px 0 0',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
                 }}
               >
                 {user?.email}
