@@ -184,8 +184,10 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const [isResizing, setIsResizing] = useState(false)
-  const [resizeHandle, setResizeHandle] = useState(null) // 'nw', 'ne', 'sw', 'se'
+  const [resizeHandle, setResizeHandle] = useState(null) // 'nw', 'ne', 'sw', 'se', 'n', 'e', 's', 'w'
   const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 })
+  const [hoveredElement, setHoveredElement] = useState(null)
+  const [hoveredHandle, setHoveredHandle] = useState(null)
 
   // Floating toolbar state
   const [showFloatingToolbar, setShowFloatingToolbar] = useState(true)
@@ -914,21 +916,35 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
     }
   }
 
-  // Get resize handle at point
+  // Get resize handle at point (corners + edges)
   const getResizeHandleAtPoint = (element, x, y) => {
     if (!element || element.type !== 'image') return null
-    const handleSize = 12 / scale
-    const handles = {
+    const hs = 12 / scale // handle hit size
+    const midX = element.x + element.width / 2
+    const midY = element.y + element.height / 2
+
+    // Corner handles (higher priority)
+    const corners = {
       nw: { x: element.x, y: element.y },
       ne: { x: element.x + element.width, y: element.y },
       sw: { x: element.x, y: element.y + element.height },
       se: { x: element.x + element.width, y: element.y + element.height },
     }
-    for (const [key, pos] of Object.entries(handles)) {
-      if (Math.abs(x - pos.x) < handleSize && Math.abs(y - pos.y) < handleSize) {
-        return key
-      }
+    for (const [key, pos] of Object.entries(corners)) {
+      if (Math.abs(x - pos.x) < hs && Math.abs(y - pos.y) < hs) return key
     }
+
+    // Edge handles
+    const edges = {
+      n: { x: midX, y: element.y },
+      s: { x: midX, y: element.y + element.height },
+      w: { x: element.x, y: midY },
+      e: { x: element.x + element.width, y: midY },
+    }
+    for (const [key, pos] of Object.entries(edges)) {
+      if (Math.abs(x - pos.x) < hs && Math.abs(y - pos.y) < hs) return key
+    }
+
     return null
   }
 
@@ -944,6 +960,25 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
 
     const { x, y } = getCanvasCoords(e)
 
+    // Track hover for cursor feedback in SELECT mode
+    if (activeTool === TOOLS.SELECT && !isDragging && !isResizing) {
+      if (selectedElement && selectedElement.type === 'image') {
+        const handle = getResizeHandleAtPoint(selectedElement, x, y)
+        if (handle) {
+          setHoveredHandle(handle)
+          setHoveredElement(null)
+        } else {
+          setHoveredHandle(null)
+          const hit = findElementAtPoint(x, y)
+          setHoveredElement(hit)
+        }
+      } else {
+        setHoveredHandle(null)
+        const hit = findElementAtPoint(x, y)
+        setHoveredElement(hit)
+      }
+    }
+
     // Handle resizing
     if (isResizing && selectedElement && resizeHandle) {
       const dx = x - resizeStart.mouseX
@@ -952,9 +987,8 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
       let newY = resizeStart.y
       let newWidth = resizeStart.width
       let newHeight = resizeStart.height
-
-      // Maintain aspect ratio with shift key (optional)
       const aspectRatio = resizeStart.width / resizeStart.height
+      const isCorner = resizeHandle.length === 2 // 'nw','ne','sw','se'
 
       if (resizeHandle.includes('e')) {
         newWidth = Math.max(50, resizeStart.width + dx)
@@ -969,6 +1003,22 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
       if (resizeHandle.includes('n')) {
         newHeight = Math.max(50, resizeStart.height - dy)
         newY = resizeStart.y + (resizeStart.height - newHeight)
+      }
+
+      // Shift key → lock aspect ratio for corner handles
+      if (e.shiftKey && isCorner) {
+        const newAR = newWidth / newHeight
+        if (newAR > aspectRatio) {
+          newWidth = Math.max(50, newHeight * aspectRatio)
+          if (resizeHandle.includes('w')) {
+            newX = resizeStart.x + resizeStart.width - newWidth
+          }
+        } else {
+          newHeight = Math.max(50, newWidth / aspectRatio)
+          if (resizeHandle.includes('n')) {
+            newY = resizeStart.y + resizeStart.height - newHeight
+          }
+        }
       }
 
       // Update element in page
@@ -1148,6 +1198,9 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
       }
 
       updatePageElements([...currentPage.elements, newElement])
+      // Auto-select the new image and switch to SELECT tool
+      setSelectedElement(newElement)
+      setActiveTool(TOOLS.SELECT)
     } catch (err) {
       console.error('Erro ao fazer upload:', err)
       toast.error('Erro', 'Erro ao fazer upload da imagem')
@@ -1268,6 +1321,9 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
 
     updatePageElements([...currentPage.elements, newElement])
     setShowRenderPicker(false)
+    // Auto-select the new image and switch to SELECT tool
+    setSelectedElement(newElement)
+    setActiveTool(TOOLS.SELECT)
   }
 
   // Find element at point
@@ -1459,6 +1515,27 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
     }
 
     return null
+  }
+
+  // Compute dynamic cursor
+  const getCanvasCursor = () => {
+    if (activeTool === TOOLS.PAN || isPanning) return 'grab'
+    if (activeTool === TOOLS.ERASER) return 'crosshair'
+    if (activeTool === TOOLS.TEXT) return 'text'
+    if (activeTool === TOOLS.SELECT) {
+      if (isDragging) return 'grabbing'
+      if (isResizing) {
+        const cursorMap = { nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize', n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize' }
+        return cursorMap[resizeHandle] || 'default'
+      }
+      if (hoveredHandle) {
+        const cursorMap = { nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize', n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize' }
+        return cursorMap[hoveredHandle] || 'default'
+      }
+      if (hoveredElement) return 'move'
+      return 'default'
+    }
+    return 'crosshair'
   }
 
   // Tool button
@@ -1835,6 +1912,14 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
           onMouseMove={handlePointerMove}
           onMouseUp={handlePointerUp}
           onMouseLeave={handlePointerUp}
+          onDoubleClick={(e) => {
+            const { x, y } = getCanvasCoords(e)
+            const hit = findElementAtPoint(x, y)
+            if (hit && hit.type === 'image') {
+              setActiveTool(TOOLS.SELECT)
+              setSelectedElement(hit)
+            }
+          }}
           onTouchStart={handlePointerDown}
           onTouchMove={handlePointerMove}
           onTouchEnd={handlePointerUp}
@@ -1842,9 +1927,7 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
           style={{
             flex: 1, position: 'relative', overflow: 'hidden',
             background: '#2a2a2a',
-            cursor: activeTool === TOOLS.PAN || isPanning ? 'grab'
-              : activeTool === TOOLS.ERASER ? 'crosshair'
-              : activeTool === TOOLS.TEXT ? 'text' : 'crosshair',
+            cursor: getCanvasCursor(),
           }}
         >
           {/* Canvas */}
@@ -1915,10 +1998,26 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
                 {currentPage.elements.map(renderElement)}
                 {currentElement && renderElement(currentElement)}
 
+                {/* Hover highlight for images in SELECT mode */}
+                {activeTool === TOOLS.SELECT && hoveredElement && hoveredElement.type === 'image' && hoveredElement.id !== selectedElement?.id && (
+                  <rect
+                    x={hoveredElement.x - 1}
+                    y={hoveredElement.y - 1}
+                    width={hoveredElement.width + 2}
+                    height={hoveredElement.height + 2}
+                    fill="none"
+                    stroke="#8B8670"
+                    strokeWidth={1.5}
+                    strokeDasharray="6,3"
+                    opacity={0.6}
+                    pointerEvents="none"
+                  />
+                )}
+
                 {/* Selection highlight and resize handles */}
                 {selectedElement && activeTool === TOOLS.SELECT && (
                   <>
-                    {/* Selection box */}
+                    {/* Selection box for images */}
                     {selectedElement.type === 'image' && (
                       <>
                         <rect
@@ -1931,7 +2030,7 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
                           strokeWidth={2}
                           strokeDasharray="5,5"
                         />
-                        {/* Resize handles */}
+                        {/* Corner resize handles */}
                         {['nw', 'ne', 'sw', 'se'].map(handle => {
                           const hx = handle.includes('e') ? selectedElement.x + selectedElement.width : selectedElement.x
                           const hy = handle.includes('s') ? selectedElement.y + selectedElement.height : selectedElement.y
@@ -1942,10 +2041,33 @@ export default function MoleskineDigital({ projectId, projectName, onClose }) {
                               y={hy - 6}
                               width={12}
                               height={12}
-                              fill="#FFFFFF"
+                              fill={hoveredHandle === handle ? '#4338CA' : '#FFFFFF'}
                               stroke="#4338CA"
                               strokeWidth={2}
-                              style={{ cursor: `${handle}-resize` }}
+                              rx={1}
+                              style={{ cursor: handle === 'nw' || handle === 'se' ? 'nwse-resize' : 'nesw-resize' }}
+                            />
+                          )
+                        })}
+                        {/* Edge resize handles */}
+                        {['n', 'e', 's', 'w'].map(handle => {
+                          const midX = selectedElement.x + selectedElement.width / 2
+                          const midY = selectedElement.y + selectedElement.height / 2
+                          const hx = handle === 'w' ? selectedElement.x : handle === 'e' ? selectedElement.x + selectedElement.width : midX
+                          const hy = handle === 'n' ? selectedElement.y : handle === 's' ? selectedElement.y + selectedElement.height : midY
+                          const isHoriz = handle === 'n' || handle === 's'
+                          return (
+                            <rect
+                              key={handle}
+                              x={hx - (isHoriz ? 8 : 4)}
+                              y={hy - (isHoriz ? 4 : 8)}
+                              width={isHoriz ? 16 : 8}
+                              height={isHoriz ? 8 : 16}
+                              fill={hoveredHandle === handle ? '#4338CA' : '#FFFFFF'}
+                              stroke="#4338CA"
+                              strokeWidth={1.5}
+                              rx={2}
+                              style={{ cursor: isHoriz ? 'ns-resize' : 'ew-resize' }}
                             />
                           )
                         })}
