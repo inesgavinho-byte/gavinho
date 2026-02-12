@@ -53,6 +53,11 @@ export default function useChannelData() {
           .order('nome')
       ])
 
+      // Populate members list (all active org members for @mentions)
+      if (membrosRes.data) {
+        setMembros(membrosRes.data)
+      }
+
       if (projetosRes.data) {
         const canaisComEquipa = projetosRes.data.map(p => ({
           ...p,
@@ -90,10 +95,6 @@ export default function useChannelData() {
         }
 
         return canaisComEquipa
-      }
-
-      if (membrosRes.data) {
-        setMembros(membrosRes.data)
       }
 
       return []

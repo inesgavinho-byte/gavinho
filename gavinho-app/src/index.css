@@ -249,6 +249,7 @@ body {
   color: var(--brown);
   background: var(--sandy-beach);
   min-height: 100vh;
+  overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -1801,15 +1802,59 @@ tbody tr:last-child td {
     min-width: 600px;
   }
   
-  /* Botões */
+  /* Botões - minimum 44px touch target */
   .btn {
-    padding: 10px 16px;
+    padding: 12px 16px;
     font-size: 13px;
+    min-height: 44px;
   }
-  
+
+  .btn-sm {
+    min-height: 36px;
+    padding: 8px 12px;
+  }
+
+  /* Mobile menu button - accessible touch target */
+  .mobile-menu-btn {
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
   /* Filtros em coluna */
   .filters-row {
     flex-direction: column !important;
+  }
+
+  /* Tab buttons - larger touch targets */
+  [role="tab"],
+  .tab-btn,
+  .chat-mode-btn {
+    min-height: 40px;
+    padding: 8px 14px;
+  }
+
+  /* Inline flex-row → stack on mobile */
+  .flex-row-mobile-stack {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  /* Hide non-essential columns on mobile */
+  .hide-mobile {
+    display: none !important;
+  }
+
+  /* Full-width inputs on mobile */
+  input[type="text"],
+  input[type="search"],
+  input[type="email"],
+  input[type="number"],
+  select,
+  textarea {
+    font-size: 16px; /* Prevents iOS auto-zoom on focus */
   }
 }
 
@@ -1818,11 +1863,30 @@ tbody tr:last-child td {
   .main-content {
     padding: var(--space-sm);
   }
-  
+
   h1, .page-title { font-size: 20px !important; }
-  
+
   .card {
     padding: 12px;
+    border-radius: var(--radius-md);
+  }
+
+  /* Stack action buttons */
+  .page-header .btn {
+    width: 100%;
+  }
+
+  /* Smaller badges */
+  .badge, .status-badge {
+    font-size: 10px;
+    padding: 2px 6px;
+  }
+
+  /* Fullwidth modals on small screens */
+  .modal-content,
+  [role="dialog"] > div {
+    max-width: 100% !important;
+    margin: 0 8px;
     border-radius: var(--radius-md);
   }
 }
@@ -3643,5 +3707,181 @@ tbody tr:last-child td {
 @media (max-width: 480px) {
   .masonry-grid {
     column-count: 1;
+  }
+}
+
+/* ========================================
+   ENHANCED MOBILE RESPONSIVE — IPHONE & IPAD
+   ======================================== */
+
+/* iPad landscape & portrait (768-1024px) */
+@media (max-width: 1024px) and (min-width: 769px) {
+  /* Two-column grids instead of 3/4 */
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* Reduce sidebar width for tablets */
+  .sidebar:not(.collapsed) {
+    width: 220px;
+  }
+
+  .main-content {
+    padding: var(--space-md);
+  }
+}
+
+/* Mobile-first patterns (≤768px) */
+@media (max-width: 768px) {
+  /* Prevent horizontal overflow from inline styles */
+  #root {
+    overflow-x: hidden;
+  }
+
+  /* Stats cards: 2-column grid on mobile */
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+
+  /* Inline flex containers → column on mobile */
+  .page-header,
+  .card-header {
+    flex-wrap: wrap;
+  }
+
+  /* Compact stat cards */
+  .stat-card {
+    padding: 12px !important;
+  }
+  .stat-card .stat-value {
+    font-size: 20px !important;
+  }
+
+  /* Tables: card-like rows on mobile */
+  table thead {
+    font-size: 11px;
+  }
+  table td, table th {
+    padding: 8px 6px !important;
+    font-size: 12px;
+  }
+
+  /* Workspace/Chat: full height */
+  .chat-container {
+    height: calc(100vh - 56px) !important;
+    border-radius: 0 !important;
+  }
+
+  /* Chat sidebar: overlay on mobile */
+  .chat-sidebar {
+    position: fixed !important;
+    left: 0;
+    top: 56px;
+    bottom: 0;
+    z-index: 90;
+    width: 280px !important;
+    background: var(--white);
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* Chat input area: stick to bottom */
+  .chat-input-area {
+    padding: 8px 12px !important;
+  }
+
+  /* Fix wide inline elements */
+  img, video, iframe, embed, object {
+    max-width: 100% !important;
+    height: auto;
+  }
+
+  /* Avatar sizes on mobile */
+  .avatar-lg {
+    width: 36px !important;
+    height: 36px !important;
+  }
+
+  /* Dropdown menus: wider on mobile for easier tapping */
+  .dropdown-menu,
+  [role="menu"] {
+    min-width: 200px;
+  }
+
+  /* Modal adjustments */
+  .modal-overlay {
+    padding: 8px;
+  }
+
+  /* Floating action button pattern */
+  .fab-mobile {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    box-shadow: var(--shadow-lg);
+    z-index: 80;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Bottom safe area for iPhone with notch */
+  .main-content {
+    padding-bottom: calc(var(--space-md) + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* iPhone SE / very small screens */
+@media (max-width: 375px) {
+  .main-content {
+    padding: 8px;
+  }
+
+  .page-title {
+    font-size: 18px !important;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .btn {
+    font-size: 12px;
+    padding: 10px 12px;
+  }
+}
+
+/* Landscape phone */
+@media (max-height: 500px) and (orientation: landscape) {
+  .mobile-header {
+    height: 44px;
+  }
+
+  .main-content {
+    margin-top: 44px;
+  }
+}
+
+/* Dark mode mobile adjustments */
+@media (max-width: 768px) {
+  [data-theme="dark"] .mobile-header {
+    background: rgba(26, 26, 26, 0.95);
+    border-bottom-color: var(--stone);
+  }
+
+  [data-theme="dark"] .chat-sidebar {
+    background: var(--white);
+  }
+}
+
+/* Print: hide mobile-only elements */
+@media print {
+  .mobile-header,
+  .sidebar-overlay,
+  .fab-mobile {
+    display: none !important;
   }
 }

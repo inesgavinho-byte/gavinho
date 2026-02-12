@@ -24,7 +24,9 @@ import {
   ZoomIn,
   ZoomOut,
   Move,
-  Maximize2
+  Maximize2,
+  ImagePlus,
+  Crop,
 } from 'lucide-react'
 
 // Cores por categoria (consistente com Design Review)
@@ -45,6 +47,7 @@ const TOOLS = {
   CIRCLE: 'circle',
   ARROW: 'arrow',
   TEXT: 'text',
+  IMAGE: 'image',
   ERASER: 'eraser',
   PAN: 'pan',
 }
@@ -58,6 +61,7 @@ const TOOL_INFO = {
   [TOOLS.CIRCLE]: { label: 'Circulo', shortcut: 'C' },
   [TOOLS.ARROW]: { label: 'Seta', shortcut: 'A' },
   [TOOLS.TEXT]: { label: 'Texto', shortcut: 'T' },
+  [TOOLS.IMAGE]: { label: 'Imagem', shortcut: 'I' },
   [TOOLS.ERASER]: { label: 'Borracha', shortcut: 'E' },
   [TOOLS.PAN]: { label: 'Mover', shortcut: 'Espaco' },
 }
@@ -119,6 +123,10 @@ export default function Moleskine({
   const canvasRef = useRef(null)
   const imageRef = useRef(null)
   const textareaRef = useRef(null)
+  const fileInputRef = useRef(null)
+  const annotationsRef = useRef([])
+  const pencilModeRef = useRef(false) // Apple Pencil detected
+  const activePointerRef = useRef(null) // Active pointer ID for pen
 
   // Tool state
   const [activeTool, setActiveTool] = useState(TOOLS.PEN)
@@ -160,6 +168,25 @@ export default function Moleskine({
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [showConfirmClear, setShowConfirmClear] = useState(false)
   const [showCloseConfirm, setShowCloseConfirm] = useState(false)
+
+  // Selection / drag / resize state
+  const [selectedAnnotation, setSelectedAnnotation] = useState(null)
+  const [isDraggingAnnotation, setIsDraggingAnnotation] = useState(false)
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
+  const [resizeHandle, setResizeHandle] = useState(null) // 'nw','ne','sw','se'
+  const [resizeStart, setResizeStart] = useState(null) // { x, y, ann: snapshot }
+
+  // Crop state
+  const [isCropping, setIsCropping] = useState(false)
+  const [cropAnnotation, setCropAnnotation] = useState(null)
+  const [cropRect, setCropRect] = useState({ x: 0, y: 0, w: 100, h: 100 })
+  const [cropDragging, setCropDragging] = useState(null) // 'move' | 'nw' | 'ne' | 'sw' | 'se' | null
+  const [cropDragStart, setCropDragStart] = useState({ x: 0, y: 0, rect: null })
+
+  // Keep annotations ref in sync
+  useEffect(() => {
+    annotationsRef.current = annotations
+  }, [annotations])
 
   // Load background image
   useEffect(() => {
@@ -241,8 +268,8 @@ export default function Moleskine({
   // =============================
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Don't intercept when typing in text input
-      if (isAddingText) return
+      // Don't intercept when typing in text input or cropping
+      if (isAddingText || isCropping) return
 
       // Ctrl/Cmd shortcuts
       if (e.ctrlKey || e.metaKey) {
@@ -266,6 +293,7 @@ export default function Moleskine({
           if (hasUnsavedChanges) saveAnnotations()
           return
         }
+        // Ctrl+V paste is handled by paste event listener
         return
       }
 
@@ -286,6 +314,8 @@ export default function Moleskine({
           setIsAddingText(false)
           setTextPosition(null)
           setTextInput('')
+        } else if (selectedAnnotation) {
+          setSelectedAnnotation(null)
         } else if (isDrawing) {
           setIsDrawing(false)
           setCurrentAnnotation(null)
@@ -296,13 +326,26 @@ export default function Moleskine({
         return
       }
 
-      // Delete - remove hovered annotation
-      if ((e.key === 'Delete' || e.key === 'Backspace') && hoveredAnnotation && activeTool === TOOLS.ERASER) {
-        const newAnnotations = annotations.filter(a => a.id !== hoveredAnnotation.id)
-        setAnnotations(newAnnotations)
-        pushToHistory(newAnnotations)
-        setHasUnsavedChanges(true)
-        setHoveredAnnotation(null)
+      // Delete/Backspace - remove selected or hovered annotation
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        // Delete selected annotation in SELECT mode
+        if (selectedAnnotation && activeTool === TOOLS.SELECT) {
+          const newAnnotations = annotations.filter(a => a.id !== selectedAnnotation)
+          setAnnotations(newAnnotations)
+          pushToHistory(newAnnotations)
+          setHasUnsavedChanges(true)
+          setSelectedAnnotation(null)
+          return
+        }
+        // Delete hovered annotation in ERASER mode
+        if (hoveredAnnotation && activeTool === TOOLS.ERASER) {
+          const newAnnotations = annotations.filter(a => a.id !== hoveredAnnotation.id)
+          setAnnotations(newAnnotations)
+          pushToHistory(newAnnotations)
+          setHasUnsavedChanges(true)
+          setHoveredAnnotation(null)
+          return
+        }
         return
       }
 
@@ -315,6 +358,11 @@ export default function Moleskine({
       else if (key === 'c') setActiveTool(TOOLS.CIRCLE)
       else if (key === 'a') setActiveTool(TOOLS.ARROW)
       else if (key === 't') setActiveTool(TOOLS.TEXT)
+      else if (key === 'i') {
+        setActiveTool(TOOLS.IMAGE)
+        // Open file picker immediately
+        setTimeout(() => fileInputRef.current?.click(), 50)
+      }
       else if (key === 'e') setActiveTool(TOOLS.ERASER)
       // +/- for zoom
       else if (key === '+' || key === '=') setScale(s => Math.min(3, s + 0.15))
@@ -350,7 +398,7 @@ export default function Moleskine({
       window.removeEventListener('keydown', handleKeyDown)
       window.removeEventListener('keyup', handleKeyUp)
     }
-  }, [activeTool, isAddingText, isDrawing, isSpacePanning, previousTool, hasUnsavedChanges, hoveredAnnotation, annotations, historyIndex, history])
+  }, [activeTool, isAddingText, isDrawing, isSpacePanning, previousTool, hasUnsavedChanges, hoveredAnnotation, annotations, historyIndex, history, selectedAnnotation, isCropping])
 
   // =============================
   // NON-PASSIVE WHEEL HANDLER (fix preventDefault in passive listener)
@@ -382,24 +430,135 @@ export default function Moleskine({
   }, [scale, offset])
 
   // =============================
-  // NON-PASSIVE TOUCH HANDLERS (fix preventDefault warnings)
+  // POINTER EVENT HANDLERS (Apple Pencil + touch + palm rejection)
   // =============================
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
 
-    const onTouchStart = (e) => {
-      if (e.touches.length > 1) return // let multi-touch through for pinch
-      e.preventDefault()
-      handlePointerDown(e)
+    const onPointerDown = (e) => {
+      // Detect Apple Pencil
+      if (e.pointerType === 'pen') {
+        pencilModeRef.current = true
+        activePointerRef.current = e.pointerId
+        try { container.setPointerCapture(e.pointerId) } catch (_) {}
+      }
+
+      // Palm rejection: when Apple Pencil is the primary tool, finger → pan
+      if (e.pointerType === 'touch' && pencilModeRef.current) {
+        e.preventDefault()
+        setIsPanning(true)
+        setPanStart({ x: e.clientX - offset.x, y: e.clientY - offset.y })
+        return
+      }
+
+      // For pen and mouse, use normal handler
+      if (e.pointerType === 'pen' || e.pointerType === 'mouse') {
+        e.preventDefault()
+        handlePointerDown(e)
+        return
+      }
+
+      // For touch without pencil mode, use normal handler
+      if (e.pointerType === 'touch') {
+        e.preventDefault()
+        handlePointerDown(e)
+      }
     }
-    const onTouchMove = (e) => {
+
+    const onPointerMove = (e) => {
+      // Palm rejection: finger → pan when pencil active
+      if (e.pointerType === 'touch' && pencilModeRef.current && isPanning) {
+        e.preventDefault()
+        setOffset({ x: e.clientX - panStart.x, y: e.clientY - panStart.y })
+        return
+      }
+
       e.preventDefault()
       handlePointerMove(e)
     }
-    const onTouchEnd = (e) => {
-      e.preventDefault()
+
+    const onPointerUp = (e) => {
+      // Release pointer capture for pen
+      if (e.pointerType === 'pen' && activePointerRef.current === e.pointerId) {
+        try { container.releasePointerCapture(e.pointerId) } catch (_) {}
+        activePointerRef.current = null
+      }
+
       handlePointerUp()
+    }
+
+    const onPointerCancel = (e) => {
+      // Handle interrupted strokes (e.g., system alert)
+      if (activePointerRef.current === e.pointerId) {
+        activePointerRef.current = null
+      }
+      handlePointerUp()
+    }
+
+    container.addEventListener('pointerdown', onPointerDown, { passive: false })
+    container.addEventListener('pointermove', onPointerMove, { passive: false })
+    container.addEventListener('pointerup', onPointerUp, { passive: false })
+    container.addEventListener('pointercancel', onPointerCancel, { passive: false })
+
+    return () => {
+      container.removeEventListener('pointerdown', onPointerDown)
+      container.removeEventListener('pointermove', onPointerMove)
+      container.removeEventListener('pointerup', onPointerUp)
+      container.removeEventListener('pointercancel', onPointerCancel)
+    }
+  }, [imageLoaded, activeTool, isDrawing, isPanning, currentAnnotation, annotations, strokeColor, strokeWidth, scale, offset, panStart, selectedAnnotation, isDraggingAnnotation, resizeHandle, resizeStart, dragOffset])
+
+  // =============================
+  // PINCH-TO-ZOOM (multi-touch, works alongside pencil mode)
+  // =============================
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    let lastPinchDist = null
+    let lastPinchCenter = null
+
+    const onTouchStart = (e) => {
+      if (e.touches.length === 2) {
+        e.preventDefault()
+        const dx = e.touches[0].clientX - e.touches[1].clientX
+        const dy = e.touches[0].clientY - e.touches[1].clientY
+        lastPinchDist = Math.hypot(dx, dy)
+        lastPinchCenter = {
+          x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+          y: (e.touches[0].clientY + e.touches[1].clientY) / 2,
+        }
+      }
+    }
+
+    const onTouchMove = (e) => {
+      if (e.touches.length === 2 && lastPinchDist !== null) {
+        e.preventDefault()
+        const dx = e.touches[0].clientX - e.touches[1].clientX
+        const dy = e.touches[0].clientY - e.touches[1].clientY
+        const dist = Math.hypot(dx, dy)
+        const pinchDelta = dist / lastPinchDist
+        const newScale = Math.min(3, Math.max(0.1, scale * pinchDelta))
+
+        const rect = container.getBoundingClientRect()
+        const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left
+        const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top
+
+        setScale(newScale)
+        setOffset({
+          x: cx - (cx - offset.x) * (newScale / scale),
+          y: cy - (cy - offset.y) * (newScale / scale),
+        })
+        lastPinchDist = dist
+      }
+    }
+
+    const onTouchEnd = (e) => {
+      if (e.touches.length < 2) {
+        lastPinchDist = null
+        lastPinchCenter = null
+      }
     }
 
     container.addEventListener('touchstart', onTouchStart, { passive: false })
@@ -411,7 +570,63 @@ export default function Moleskine({
       container.removeEventListener('touchmove', onTouchMove)
       container.removeEventListener('touchend', onTouchEnd)
     }
-  }, [imageLoaded, activeTool, isDrawing, isPanning, currentAnnotation, annotations, strokeColor, strokeWidth, scale, offset, panStart])
+  }, [scale, offset])
+
+  // =============================
+  // CLIPBOARD PASTE (images)
+  // =============================
+  useEffect(() => {
+    const handlePaste = (e) => {
+      if (isCropping) return
+      const items = e.clipboardData?.items
+      if (!items) return
+
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          e.preventDefault()
+          const file = item.getAsFile()
+          if (file) handleImageFile(file)
+          break
+        }
+      }
+    }
+
+    window.addEventListener('paste', handlePaste)
+    return () => window.removeEventListener('paste', handlePaste)
+  }, [imageDimensions, scale, offset])
+
+  // =============================
+  // DRAG & DROP files
+  // =============================
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const handleDragOver = (e) => {
+      e.preventDefault()
+      e.dataTransfer.dropEffect = 'copy'
+    }
+
+    const handleDrop = (e) => {
+      e.preventDefault()
+      const files = e.dataTransfer?.files
+      if (files && files.length > 0) {
+        for (const file of files) {
+          if (file.type.startsWith('image/')) {
+            handleImageFile(file, e)
+            break
+          }
+        }
+      }
+    }
+
+    container.addEventListener('dragover', handleDragOver)
+    container.addEventListener('drop', handleDrop)
+    return () => {
+      container.removeEventListener('dragover', handleDragOver)
+      container.removeEventListener('drop', handleDrop)
+    }
+  }, [imageDimensions, scale, offset])
 
   // Save annotations to database
   const saveAnnotations = async () => {
@@ -471,6 +686,7 @@ export default function Moleskine({
       setHistoryIndex(historyIndex - 1)
       setAnnotations(history[historyIndex - 1])
       setHasUnsavedChanges(true)
+      setSelectedAnnotation(null)
     }
   }
 
@@ -480,6 +696,7 @@ export default function Moleskine({
       setHistoryIndex(historyIndex + 1)
       setAnnotations(history[historyIndex + 1])
       setHasUnsavedChanges(true)
+      setSelectedAnnotation(null)
     }
   }
 
@@ -490,6 +707,7 @@ export default function Moleskine({
     pushToHistory(newAnnotations)
     setHasUnsavedChanges(true)
     setShowConfirmClear(false)
+    setSelectedAnnotation(null)
   }
 
   // Close with unsaved warning
@@ -499,6 +717,91 @@ export default function Moleskine({
     } else {
       onClose()
     }
+  }
+
+  // =============================
+  // IMAGE FILE HANDLER
+  // =============================
+  const handleImageFile = (file, dropEvent) => {
+    if (!file || !file.type.startsWith('image/')) return
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      const img = new Image()
+      img.onload = () => {
+        // Resize to max 1200px for storage
+        const MAX = 1200
+        let w = img.width, h = img.height
+        if (w > MAX || h > MAX) {
+          const ratio = Math.min(MAX / w, MAX / h)
+          w = Math.round(w * ratio)
+          h = Math.round(h * ratio)
+        }
+
+        const canvas = document.createElement('canvas')
+        canvas.width = w
+        canvas.height = h
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(img, 0, 0, w, h)
+        // Use PNG for transparency support, JPEG for photos
+        const isPhoto = file.type === 'image/jpeg' || file.type === 'image/jpg'
+        const dataUrl = isPhoto
+          ? canvas.toDataURL('image/jpeg', 0.75)
+          : canvas.toDataURL('image/png')
+
+        // Scale to fit nicely on canvas (max 40% of canvas dimension)
+        const dims = imageDimensions
+        const maxW = dims.width * 0.4
+        const maxH = dims.height * 0.4
+        if (w > maxW || h > maxH) {
+          const ratio = Math.min(maxW / w, maxH / h)
+          w = Math.round(w * ratio)
+          h = Math.round(h * ratio)
+        }
+
+        // Position: at drop point or center of visible area
+        let posX, posY
+        if (dropEvent && containerRef.current) {
+          const rect = containerRef.current.getBoundingClientRect()
+          const clientX = dropEvent.clientX || 0
+          const clientY = dropEvent.clientY || 0
+          posX = (clientX - rect.left - offset.x) / scale - w / 2
+          posY = (clientY - rect.top - offset.y) / scale - h / 2
+        } else {
+          posX = (dims.width - w) / 2
+          posY = (dims.height - h) / 2
+        }
+
+        const newAnn = {
+          id: generateAnnotationId(),
+          type: 'image',
+          src: dataUrl,
+          x: posX,
+          y: posY,
+          width: w,
+          height: h,
+          createdBy: profile?.id,
+          createdAt: new Date().toISOString()
+        }
+
+        const currentAnns = annotationsRef.current
+        const newAnnotations = [...currentAnns, newAnn]
+        setAnnotations(newAnnotations)
+        pushToHistory(newAnnotations)
+        setHasUnsavedChanges(true)
+        setSelectedAnnotation(newAnn.id)
+        setActiveTool(TOOLS.SELECT)
+      }
+      img.src = reader.result
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleFileInputChange = (e) => {
+    const file = e.target.files?.[0]
+    if (file) handleImageFile(file)
+    // Reset so same file can be selected again
+    e.target.value = ''
   }
 
   // Get canvas coordinates from mouse/touch event
@@ -513,6 +816,92 @@ export default function Moleskine({
     const y = (clientY - rect.top - offset.y) / scale
 
     return { x, y }
+  }
+
+  // Find annotation at point (for eraser and select)
+  const findAnnotationAtPoint = (x, y) => {
+    const threshold = 10 / scale
+
+    for (let i = annotations.length - 1; i >= 0; i--) {
+      const ann = annotations[i]
+
+      if (ann.type === 'image') {
+        if (x >= ann.x && x <= ann.x + ann.width && y >= ann.y && y <= ann.y + ann.height) {
+          return ann
+        }
+        continue
+      }
+
+      if (ann.type === TOOLS.PEN || ann.type === TOOLS.HIGHLIGHTER) {
+        for (const [px, py] of ann.points) {
+          const dist = Math.sqrt((x - px) ** 2 + (y - py) ** 2)
+          if (dist < threshold + ann.width) return ann
+        }
+      } else if (ann.type === TOOLS.RECTANGLE) {
+        const minX = Math.min(ann.x1, ann.x2)
+        const maxX = Math.max(ann.x1, ann.x2)
+        const minY = Math.min(ann.y1, ann.y2)
+        const maxY = Math.max(ann.y1, ann.y2)
+
+        const nearEdge =
+          (x >= minX - threshold && x <= maxX + threshold && Math.abs(y - minY) < threshold) ||
+          (x >= minX - threshold && x <= maxX + threshold && Math.abs(y - maxY) < threshold) ||
+          (y >= minY - threshold && y <= maxY + threshold && Math.abs(x - minX) < threshold) ||
+          (y >= minY - threshold && y <= maxY + threshold && Math.abs(x - maxX) < threshold)
+
+        if (nearEdge) return ann
+      } else if (ann.type === TOOLS.CIRCLE) {
+        const cx = (ann.x1 + ann.x2) / 2
+        const cy = (ann.y1 + ann.y2) / 2
+        const rx = Math.abs(ann.x2 - ann.x1) / 2
+        const ry = Math.abs(ann.y2 - ann.y1) / 2
+        if (rx === 0 || ry === 0) continue
+        const dist = Math.sqrt(((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2)
+
+        if (Math.abs(dist - 1) < threshold / Math.max(rx, ry)) return ann
+      } else if (ann.type === TOOLS.ARROW) {
+        const lineLength = Math.sqrt((ann.x2 - ann.x1) ** 2 + (ann.y2 - ann.y1) ** 2)
+        if (lineLength > 0) {
+          const t = Math.max(0, Math.min(1,
+            ((x - ann.x1) * (ann.x2 - ann.x1) + (y - ann.y1) * (ann.y2 - ann.y1)) / (lineLength ** 2)
+          ))
+          const nearestX = ann.x1 + t * (ann.x2 - ann.x1)
+          const nearestY = ann.y1 + t * (ann.y2 - ann.y1)
+          const dist = Math.sqrt((x - nearestX) ** 2 + (y - nearestY) ** 2)
+          if (dist < threshold) return ann
+        }
+      } else if (ann.type === TOOLS.TEXT) {
+        const lines = ann.text.split('\n')
+        const textWidth = Math.max(...lines.map(l => l.length)) * ann.fontSize * 0.6
+        const textHeight = lines.length * ann.fontSize * 1.2
+        if (x >= ann.x && x <= ann.x + textWidth && y >= ann.y - ann.fontSize && y <= ann.y - ann.fontSize + textHeight) {
+          return ann
+        }
+      }
+    }
+
+    return null
+  }
+
+  // Check if point is on a resize handle of the selected image annotation
+  const getResizeHandle = (x, y) => {
+    const selAnn = annotations.find(a => a.id === selectedAnnotation)
+    if (!selAnn || selAnn.type !== 'image') return null
+
+    const handleThreshold = 12 / scale
+    const handles = {
+      nw: { x: selAnn.x, y: selAnn.y },
+      ne: { x: selAnn.x + selAnn.width, y: selAnn.y },
+      sw: { x: selAnn.x, y: selAnn.y + selAnn.height },
+      se: { x: selAnn.x + selAnn.width, y: selAnn.y + selAnn.height },
+    }
+
+    for (const [id, pos] of Object.entries(handles)) {
+      if (Math.abs(x - pos.x) < handleThreshold && Math.abs(y - pos.y) < handleThreshold) {
+        return id
+      }
+    }
+    return null
   }
 
   // Handle pointer down
@@ -535,6 +924,42 @@ export default function Moleskine({
     if (activeTool === TOOLS.PAN || (e.altKey && !isDrawing)) {
       setIsPanning(true)
       setPanStart({ x: clientX - offset.x, y: clientY - offset.y })
+      return
+    }
+
+    // =====================
+    // SELECT mode: drag & resize
+    // =====================
+    if (activeTool === TOOLS.SELECT) {
+      // Check resize handles first (on currently selected image)
+      const handle = getResizeHandle(x, y)
+      if (handle) {
+        const selAnn = annotations.find(a => a.id === selectedAnnotation)
+        setResizeHandle(handle)
+        setResizeStart({ x, y, ann: { ...selAnn } })
+        return
+      }
+
+      // Check if clicking on an annotation
+      const hitAnn = findAnnotationAtPoint(x, y)
+      if (hitAnn) {
+        setSelectedAnnotation(hitAnn.id)
+        setIsDraggingAnnotation(true)
+        // Store initial offset for drag
+        setDragOffset({ x, y })
+        return
+      }
+
+      // Clicked on empty space → deselect
+      setSelectedAnnotation(null)
+      return
+    }
+
+    // =====================
+    // IMAGE mode: open file picker
+    // =====================
+    if (activeTool === TOOLS.IMAGE) {
+      fileInputRef.current?.click()
       return
     }
 
@@ -602,6 +1027,75 @@ export default function Moleskine({
       return
     }
 
+    // =====================
+    // RESIZE handling (selected image)
+    // =====================
+    if (resizeHandle && resizeStart) {
+      const { x, y } = getCanvasCoords(e)
+      const orig = resizeStart.ann
+      const dx = x - resizeStart.x
+      const dy = y - resizeStart.y
+
+      let newX = orig.x, newY = orig.y, newW = orig.width, newH = orig.height
+      const aspectRatio = orig.width / orig.height
+
+      // Apply resize based on handle, maintaining aspect ratio
+      if (resizeHandle === 'se') {
+        newW = Math.max(30, orig.width + dx)
+        newH = newW / aspectRatio
+      } else if (resizeHandle === 'sw') {
+        newW = Math.max(30, orig.width - dx)
+        newH = newW / aspectRatio
+        newX = orig.x + orig.width - newW
+      } else if (resizeHandle === 'ne') {
+        newW = Math.max(30, orig.width + dx)
+        newH = newW / aspectRatio
+        newY = orig.y + orig.height - newH
+      } else if (resizeHandle === 'nw') {
+        newW = Math.max(30, orig.width - dx)
+        newH = newW / aspectRatio
+        newX = orig.x + orig.width - newW
+        newY = orig.y + orig.height - newH
+      }
+
+      const updated = annotations.map(a =>
+        a.id === selectedAnnotation
+          ? { ...a, x: newX, y: newY, width: newW, height: newH }
+          : a
+      )
+      setAnnotations(updated)
+      return
+    }
+
+    // =====================
+    // DRAG handling (selected annotation)
+    // =====================
+    if (isDraggingAnnotation && selectedAnnotation) {
+      const { x, y } = getCanvasCoords(e)
+      const dx = x - dragOffset.x
+      const dy = y - dragOffset.y
+
+      const updated = annotations.map(a => {
+        if (a.id !== selectedAnnotation) return a
+        if (a.type === 'image') {
+          return { ...a, x: a.x + dx, y: a.y + dy }
+        }
+        if (a.type === TOOLS.TEXT) {
+          return { ...a, x: a.x + dx, y: a.y + dy }
+        }
+        if (a.type === TOOLS.RECTANGLE || a.type === TOOLS.CIRCLE || a.type === TOOLS.ARROW) {
+          return { ...a, x1: a.x1 + dx, y1: a.y1 + dy, x2: a.x2 + dx, y2: a.y2 + dy }
+        }
+        if (a.type === TOOLS.PEN || a.type === TOOLS.HIGHLIGHTER) {
+          return { ...a, points: a.points.map(([px, py, p]) => [px + dx, py + dy, p]) }
+        }
+        return a
+      })
+      setAnnotations(updated)
+      setDragOffset({ x, y })
+      return
+    }
+
     // Eraser hover feedback
     if (activeTool === TOOLS.ERASER && !isDrawing) {
       const { x, y } = getCanvasCoords(e)
@@ -631,6 +1125,23 @@ export default function Moleskine({
   const handlePointerUp = () => {
     if (isPanning) {
       setIsPanning(false)
+      return
+    }
+
+    // End resize
+    if (resizeHandle) {
+      setResizeHandle(null)
+      setResizeStart(null)
+      pushToHistory(annotations)
+      setHasUnsavedChanges(true)
+      return
+    }
+
+    // End drag
+    if (isDraggingAnnotation) {
+      setIsDraggingAnnotation(false)
+      pushToHistory(annotations)
+      setHasUnsavedChanges(true)
       return
     }
 
@@ -689,63 +1200,6 @@ export default function Moleskine({
     setIsAddingText(false)
   }
 
-  // Find annotation at point (for eraser)
-  const findAnnotationAtPoint = (x, y) => {
-    const threshold = 10 / scale
-
-    for (let i = annotations.length - 1; i >= 0; i--) {
-      const ann = annotations[i]
-
-      if (ann.type === TOOLS.PEN || ann.type === TOOLS.HIGHLIGHTER) {
-        for (const [px, py] of ann.points) {
-          const dist = Math.sqrt((x - px) ** 2 + (y - py) ** 2)
-          if (dist < threshold + ann.width) return ann
-        }
-      } else if (ann.type === TOOLS.RECTANGLE) {
-        const minX = Math.min(ann.x1, ann.x2)
-        const maxX = Math.max(ann.x1, ann.x2)
-        const minY = Math.min(ann.y1, ann.y2)
-        const maxY = Math.max(ann.y1, ann.y2)
-
-        const nearEdge =
-          (x >= minX - threshold && x <= maxX + threshold && Math.abs(y - minY) < threshold) ||
-          (x >= minX - threshold && x <= maxX + threshold && Math.abs(y - maxY) < threshold) ||
-          (y >= minY - threshold && y <= maxY + threshold && Math.abs(x - minX) < threshold) ||
-          (y >= minY - threshold && y <= maxY + threshold && Math.abs(x - maxX) < threshold)
-
-        if (nearEdge) return ann
-      } else if (ann.type === TOOLS.CIRCLE) {
-        const cx = (ann.x1 + ann.x2) / 2
-        const cy = (ann.y1 + ann.y2) / 2
-        const rx = Math.abs(ann.x2 - ann.x1) / 2
-        const ry = Math.abs(ann.y2 - ann.y1) / 2
-        if (rx === 0 || ry === 0) continue
-        const dist = Math.sqrt(((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2)
-
-        if (Math.abs(dist - 1) < threshold / Math.max(rx, ry)) return ann
-      } else if (ann.type === TOOLS.ARROW) {
-        const lineLength = Math.sqrt((ann.x2 - ann.x1) ** 2 + (ann.y2 - ann.y1) ** 2)
-        if (lineLength > 0) {
-          const t = Math.max(0, Math.min(1,
-            ((x - ann.x1) * (ann.x2 - ann.x1) + (y - ann.y1) * (ann.y2 - ann.y1)) / (lineLength ** 2)
-          ))
-          const nearestX = ann.x1 + t * (ann.x2 - ann.x1)
-          const nearestY = ann.y1 + t * (ann.y2 - ann.y1)
-          const dist = Math.sqrt((x - nearestX) ** 2 + (y - nearestY) ** 2)
-          if (dist < threshold) return ann
-        }
-      } else if (ann.type === TOOLS.TEXT) {
-        const textWidth = ann.text.length * ann.fontSize * 0.6
-        const textHeight = ann.fontSize
-        if (x >= ann.x && x <= ann.x + textWidth && y >= ann.y - textHeight && y <= ann.y) {
-          return ann
-        }
-      }
-    }
-
-    return null
-  }
-
   // Export as PNG
   const handleExport = async () => {
     if (!imageRef.current) return
@@ -759,7 +1213,7 @@ export default function Moleskine({
     ctx.drawImage(imageRef.current, 0, 0)
 
     // Draw annotations
-    renderAnnotationsToCanvas(ctx, annotations)
+    await renderAnnotationsToCanvas(ctx, annotations)
 
     // Download
     const link = document.createElement('a')
@@ -769,15 +1223,26 @@ export default function Moleskine({
   }
 
   // Render annotations to canvas (for export)
-  const renderAnnotationsToCanvas = (ctx, anns) => {
-    anns.forEach(ann => {
+  const renderAnnotationsToCanvas = async (ctx, anns) => {
+    for (const ann of anns) {
       ctx.strokeStyle = ann.color
       ctx.fillStyle = ann.color
       ctx.lineWidth = ann.width
       ctx.lineCap = 'round'
       ctx.lineJoin = 'round'
 
-      if (ann.type === TOOLS.PEN) {
+      if (ann.type === 'image') {
+        // Load and draw the image
+        await new Promise((resolve) => {
+          const img = new Image()
+          img.onload = () => {
+            ctx.drawImage(img, ann.x, ann.y, ann.width, ann.height)
+            resolve()
+          }
+          img.onerror = resolve
+          img.src = ann.src
+        })
+      } else if (ann.type === TOOLS.PEN) {
         const stroke = getStroke(ann.points, getPenOptions(ann.width))
         const path = new Path2D(getSvgPathFromStroke(stroke))
         ctx.fill(path)
@@ -823,19 +1288,225 @@ export default function Moleskine({
         ctx.stroke()
       } else if (ann.type === TOOLS.TEXT) {
         ctx.font = `${ann.fontSize}px 'Quattrocento Sans', sans-serif`
-        // Handle multiline
         const lines = ann.text.split('\n')
         lines.forEach((line, i) => {
           ctx.fillText(line, ann.x, ann.y + i * ann.fontSize * 1.2)
         })
       }
-    })
+    }
   }
+
+  // =============================
+  // CROP HANDLERS
+  // =============================
+  const startCrop = () => {
+    const selAnn = annotations.find(a => a.id === selectedAnnotation)
+    if (!selAnn || selAnn.type !== 'image') return
+
+    setCropAnnotation({ ...selAnn })
+    // Initialize crop rect to cover full image
+    setCropRect({ x: 0, y: 0, w: 100, h: 100 })
+    setIsCropping(true)
+  }
+
+  const applyCrop = () => {
+    if (!cropAnnotation) return
+
+    // Calculate crop region in pixels based on percentage
+    const origW = cropAnnotation.width
+    const origH = cropAnnotation.height
+    const cropX = (cropRect.x / 100) * origW
+    const cropY = (cropRect.y / 100) * origH
+    const cropW = (cropRect.w / 100) * origW
+    const cropH = (cropRect.h / 100) * origH
+
+    if (cropW < 10 || cropH < 10) return
+
+    // Create cropped image
+    const img = new Image()
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      // Source coordinates in the original full image
+      const imgScaleX = img.naturalWidth / cropAnnotation.width
+      const imgScaleY = img.naturalHeight / cropAnnotation.height
+      canvas.width = Math.round(cropW * imgScaleX)
+      canvas.height = Math.round(cropH * imgScaleY)
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(
+        img,
+        Math.round(cropX * imgScaleX), Math.round(cropY * imgScaleY),
+        canvas.width, canvas.height,
+        0, 0,
+        canvas.width, canvas.height
+      )
+
+      const dataUrl = canvas.toDataURL('image/png')
+
+      // Update annotation with cropped image
+      const updated = annotations.map(a => {
+        if (a.id !== cropAnnotation.id) return a
+        return {
+          ...a,
+          src: dataUrl,
+          x: a.x + cropX,
+          y: a.y + cropY,
+          width: cropW,
+          height: cropH,
+        }
+      })
+      setAnnotations(updated)
+      pushToHistory(updated)
+      setHasUnsavedChanges(true)
+      setIsCropping(false)
+      setCropAnnotation(null)
+    }
+    img.src = cropAnnotation.src
+  }
+
+  const cancelCrop = () => {
+    setIsCropping(false)
+    setCropAnnotation(null)
+  }
+
+  // Crop modal mouse handlers
+  const handleCropMouseDown = (e, action) => {
+    e.stopPropagation()
+    e.preventDefault()
+    setCropDragging(action)
+    setCropDragStart({ x: e.clientX, y: e.clientY, rect: { ...cropRect } })
+  }
+
+  const handleCropMouseMove = useCallback((e) => {
+    if (!cropDragging || !cropDragStart.rect) return
+
+    const cropContainerEl = document.getElementById('crop-container')
+    if (!cropContainerEl) return
+
+    const containerRect = cropContainerEl.getBoundingClientRect()
+    const containerW = containerRect.width
+    const containerH = containerRect.height
+
+    const dx = ((e.clientX - cropDragStart.x) / containerW) * 100
+    const dy = ((e.clientY - cropDragStart.y) / containerH) * 100
+    const orig = cropDragStart.rect
+
+    let newRect = { ...orig }
+
+    if (cropDragging === 'move') {
+      newRect.x = Math.max(0, Math.min(100 - orig.w, orig.x + dx))
+      newRect.y = Math.max(0, Math.min(100 - orig.h, orig.y + dy))
+    } else if (cropDragging === 'se') {
+      newRect.w = Math.max(10, Math.min(100 - orig.x, orig.w + dx))
+      newRect.h = Math.max(10, Math.min(100 - orig.y, orig.h + dy))
+    } else if (cropDragging === 'sw') {
+      const newX = Math.max(0, orig.x + dx)
+      newRect.x = newX
+      newRect.w = Math.max(10, orig.x + orig.w - newX)
+      newRect.h = Math.max(10, Math.min(100 - orig.y, orig.h + dy))
+    } else if (cropDragging === 'ne') {
+      newRect.w = Math.max(10, Math.min(100 - orig.x, orig.w + dx))
+      const newY = Math.max(0, orig.y + dy)
+      newRect.y = newY
+      newRect.h = Math.max(10, orig.y + orig.h - newY)
+    } else if (cropDragging === 'nw') {
+      const newX = Math.max(0, orig.x + dx)
+      const newY = Math.max(0, orig.y + dy)
+      newRect.x = newX
+      newRect.y = newY
+      newRect.w = Math.max(10, orig.x + orig.w - newX)
+      newRect.h = Math.max(10, orig.y + orig.h - newY)
+    }
+
+    setCropRect(newRect)
+  }, [cropDragging, cropDragStart])
+
+  const handleCropMouseUp = useCallback(() => {
+    setCropDragging(null)
+  }, [])
+
+  useEffect(() => {
+    if (cropDragging) {
+      window.addEventListener('mousemove', handleCropMouseMove)
+      window.addEventListener('mouseup', handleCropMouseUp)
+      return () => {
+        window.removeEventListener('mousemove', handleCropMouseMove)
+        window.removeEventListener('mouseup', handleCropMouseUp)
+      }
+    }
+  }, [cropDragging, handleCropMouseMove, handleCropMouseUp])
 
   // Render single annotation to SVG (with optional highlight for eraser)
   const renderAnnotation = (ann) => {
     const key = ann.id
     const isHovered = hoveredAnnotation?.id === ann.id
+    const isSelected = selectedAnnotation === ann.id
+
+    // =====================
+    // IMAGE annotation
+    // =====================
+    if (ann.type === 'image') {
+      const handleSize = 10 / scale
+      return (
+        <g key={key}>
+          <image
+            href={ann.src}
+            x={ann.x}
+            y={ann.y}
+            width={ann.width}
+            height={ann.height}
+            preserveAspectRatio="none"
+            opacity={isHovered && activeTool === TOOLS.ERASER ? 0.5 : 1}
+          />
+          {/* Selection border */}
+          {isSelected && activeTool === TOOLS.SELECT && (
+            <>
+              <rect
+                x={ann.x - 1/scale}
+                y={ann.y - 1/scale}
+                width={ann.width + 2/scale}
+                height={ann.height + 2/scale}
+                fill="none"
+                stroke="#4338CA"
+                strokeWidth={2/scale}
+                strokeDasharray={`${8/scale} ${4/scale}`}
+              />
+              {/* Resize handles - 4 corners */}
+              {[
+                { id: 'nw', cx: ann.x, cy: ann.y },
+                { id: 'ne', cx: ann.x + ann.width, cy: ann.y },
+                { id: 'sw', cx: ann.x, cy: ann.y + ann.height },
+                { id: 'se', cx: ann.x + ann.width, cy: ann.y + ann.height },
+              ].map(h => (
+                <rect
+                  key={h.id}
+                  x={h.cx - handleSize/2}
+                  y={h.cy - handleSize/2}
+                  width={handleSize}
+                  height={handleSize}
+                  fill="#FFFFFF"
+                  stroke="#4338CA"
+                  strokeWidth={1.5/scale}
+                  rx={2/scale}
+                />
+              ))}
+            </>
+          )}
+          {/* Eraser hover */}
+          {isHovered && activeTool === TOOLS.ERASER && (
+            <rect
+              x={ann.x - 2/scale}
+              y={ann.y - 2/scale}
+              width={ann.width + 4/scale}
+              height={ann.height + 4/scale}
+              fill="rgba(255,68,68,0.1)"
+              stroke="#FF4444"
+              strokeWidth={2/scale}
+              strokeDasharray={`${6/scale} ${4/scale}`}
+            />
+          )}
+        </g>
+      )
+    }
 
     if (ann.type === TOOLS.PEN) {
       const stroke = getStroke(ann.points, getPenOptions(ann.width))
@@ -849,6 +1520,16 @@ export default function Moleskine({
               strokeWidth={3 / scale}
               strokeDasharray={`${6/scale} ${4/scale}`}
               opacity={0.8}
+            />
+          )}
+          {isSelected && activeTool === TOOLS.SELECT && (
+            <path
+              d={getSvgPathFromStroke(stroke)}
+              fill="none"
+              stroke="#4338CA"
+              strokeWidth={3 / scale}
+              strokeDasharray={`${8/scale} ${4/scale}`}
+              opacity={0.6}
             />
           )}
           <path
@@ -874,6 +1555,16 @@ export default function Moleskine({
               strokeWidth={3 / scale}
               strokeDasharray={`${6/scale} ${4/scale}`}
               opacity={0.8}
+            />
+          )}
+          {isSelected && activeTool === TOOLS.SELECT && (
+            <path
+              d={getSvgPathFromStroke(stroke)}
+              fill="none"
+              stroke="#4338CA"
+              strokeWidth={3 / scale}
+              strokeDasharray={`${8/scale} ${4/scale}`}
+              opacity={0.6}
             />
           )}
           <path
@@ -904,6 +1595,18 @@ export default function Moleskine({
               stroke="#FF4444"
               strokeWidth={2 / scale}
               strokeDasharray={`${6/scale} ${4/scale}`}
+            />
+          )}
+          {isSelected && activeTool === TOOLS.SELECT && (
+            <rect
+              x={x - 3/scale}
+              y={y - 3/scale}
+              width={w + 6/scale}
+              height={h + 6/scale}
+              fill="none"
+              stroke="#4338CA"
+              strokeWidth={2 / scale}
+              strokeDasharray={`${8/scale} ${4/scale}`}
             />
           )}
           <rect
@@ -941,6 +1644,18 @@ export default function Moleskine({
               strokeDasharray={`${6/scale} ${4/scale}`}
             />
           )}
+          {isSelected && activeTool === TOOLS.SELECT && (
+            <ellipse
+              cx={cx}
+              cy={cy}
+              rx={rx + 4/scale}
+              ry={ry + 4/scale}
+              fill="none"
+              stroke="#4338CA"
+              strokeWidth={2 / scale}
+              strokeDasharray={`${8/scale} ${4/scale}`}
+            />
+          )}
           <ellipse
             cx={cx}
             cy={cy}
@@ -970,6 +1685,19 @@ export default function Moleskine({
               strokeWidth={(ann.width + 6) / scale}
               strokeLinecap="round"
               opacity={0.3}
+            />
+          )}
+          {isSelected && activeTool === TOOLS.SELECT && (
+            <line
+              x1={ann.x1}
+              y1={ann.y1}
+              x2={ann.x2}
+              y2={ann.y2}
+              stroke="#4338CA"
+              strokeWidth={(ann.width + 8) / scale}
+              strokeLinecap="round"
+              opacity={0.3}
+              strokeDasharray={`${8/scale} ${4/scale}`}
             />
           )}
           <line
@@ -1019,6 +1747,18 @@ export default function Moleskine({
               strokeDasharray={`${6/scale} ${4/scale}`}
             />
           )}
+          {isSelected && activeTool === TOOLS.SELECT && (
+            <rect
+              x={ann.x - 4/scale}
+              y={ann.y - ann.fontSize - 2/scale}
+              width={Math.max(...lines.map(l => l.length)) * ann.fontSize * 0.6 + 8/scale}
+              height={lines.length * ann.fontSize * 1.2 + 4/scale}
+              fill="none"
+              stroke="#4338CA"
+              strokeWidth={2 / scale}
+              strokeDasharray={`${8/scale} ${4/scale}`}
+            />
+          )}
           {lines.map((line, i) => (
             <text
               key={i}
@@ -1040,11 +1780,16 @@ export default function Moleskine({
 
   // Get cursor for current tool
   const getCursor = () => {
-    if (isPanning) return 'grabbing'
+    if (isPanning || isDraggingAnnotation) return 'grabbing'
     if (activeTool === TOOLS.PAN || isSpacePanning) return 'grab'
     if (activeTool === TOOLS.ERASER) return hoveredAnnotation ? 'pointer' : 'crosshair'
     if (activeTool === TOOLS.TEXT) return 'text'
-    if (activeTool === TOOLS.SELECT) return 'default'
+    if (activeTool === TOOLS.IMAGE) return 'copy'
+    if (activeTool === TOOLS.SELECT) {
+      if (resizeHandle) return `${resizeHandle}-resize`
+      // Check if hovering over a resize handle
+      return 'default'
+    }
     return 'crosshair'
   }
 
@@ -1053,7 +1798,12 @@ export default function Moleskine({
     const info = TOOL_INFO[tool]
     return (
       <button
-        onClick={() => setActiveTool(tool)}
+        onClick={() => {
+          setActiveTool(tool)
+          if (tool === TOOLS.IMAGE) {
+            setTimeout(() => fileInputRef.current?.click(), 50)
+          }
+        }}
         title={`${info.label} (${info.shortcut})`}
         style={{
           width: 40,
@@ -1075,6 +1825,9 @@ export default function Moleskine({
     )
   }
 
+  // Selected annotation info for floating toolbar
+  const selectedAnn = annotations.find(a => a.id === selectedAnnotation)
+
   return (
     <div
       style={{
@@ -1086,6 +1839,15 @@ export default function Moleskine({
         flexDirection: 'column',
       }}
     >
+      {/* Hidden file input for image upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleFileInputChange}
+        style={{ display: 'none' }}
+      />
+
       {/* Header */}
       <div
         style={{
@@ -1246,6 +2008,7 @@ export default function Moleskine({
           <ToolButton tool={TOOLS.CIRCLE} icon={Circle} />
           <ToolButton tool={TOOLS.ARROW} icon={ArrowUpRight} />
           <ToolButton tool={TOOLS.TEXT} icon={Type} />
+          <ToolButton tool={TOOLS.IMAGE} icon={ImagePlus} />
           <ToolButton tool={TOOLS.ERASER} icon={Eraser} />
           <ToolButton tool={TOOLS.PAN} icon={Move} />
 
@@ -1374,10 +2137,7 @@ export default function Moleskine({
         {/* Canvas Area */}
         <div
           ref={containerRef}
-          onMouseDown={handlePointerDown}
-          onMouseMove={handlePointerMove}
-          onMouseUp={handlePointerUp}
-          onMouseLeave={() => {
+          onPointerLeave={() => {
             handlePointerUp()
             setHoveredAnnotation(null)
           }}
@@ -1387,6 +2147,12 @@ export default function Moleskine({
             overflow: 'hidden',
             background: '#1a1a1a',
             cursor: getCursor(),
+            // iPad + Apple Pencil: prevent browser gestures on canvas
+            touchAction: 'none',
+            WebkitUserSelect: 'none',
+            WebkitTapHighlightColor: 'transparent',
+            WebkitTouchCallout: 'none',
+            userSelect: 'none',
           }}
         >
           {!imageLoaded ? (
@@ -1439,6 +2205,70 @@ export default function Moleskine({
                 {annotations.map(renderAnnotation)}
                 {currentAnnotation && renderAnnotation(currentAnnotation)}
               </svg>
+            </div>
+          )}
+
+          {/* Floating toolbar for selected image */}
+          {selectedAnn && selectedAnn.type === 'image' && activeTool === TOOLS.SELECT && !isCropping && (
+            <div
+              style={{
+                position: 'absolute',
+                left: Math.max(10, selectedAnn.x * scale + offset.x + (selectedAnn.width * scale) / 2 - 80),
+                top: Math.max(10, selectedAnn.y * scale + offset.y - 48),
+                display: 'flex',
+                gap: 4,
+                background: 'rgba(30, 30, 30, 0.9)',
+                backdropFilter: 'blur(8px)',
+                padding: '6px 8px',
+                borderRadius: 8,
+                zIndex: 100,
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={startCrop}
+                title="Recortar imagem"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  padding: '4px 10px',
+                  borderRadius: 5,
+                  border: 'none',
+                  background: 'rgba(255,255,255,0.15)',
+                  color: '#FFFFFF',
+                  fontSize: 12,
+                  cursor: 'pointer',
+                }}
+              >
+                <Crop size={14} />
+                Recortar
+              </button>
+              <button
+                onClick={() => {
+                  const newAnnotations = annotations.filter(a => a.id !== selectedAnnotation)
+                  setAnnotations(newAnnotations)
+                  pushToHistory(newAnnotations)
+                  setHasUnsavedChanges(true)
+                  setSelectedAnnotation(null)
+                }}
+                title="Eliminar imagem (Del)"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  padding: '4px 10px',
+                  borderRadius: 5,
+                  border: 'none',
+                  background: 'rgba(220,38,38,0.3)',
+                  color: '#FF8888',
+                  fontSize: 12,
+                  cursor: 'pointer',
+                }}
+              >
+                <Trash2 size={14} />
+                Eliminar
+              </button>
             </div>
           )}
 
@@ -1593,6 +2423,14 @@ export default function Moleskine({
             </span>
             <span style={{ opacity: 0.4 }}>|</span>
             <span>{strokeWidth}px</span>
+            {selectedAnnotation && (
+              <>
+                <span style={{ opacity: 0.4 }}>|</span>
+                <span style={{ color: '#A5B4FC' }}>
+                  Selecionado
+                </span>
+              </>
+            )}
           </div>
 
           {/* Zoom Controls (bottom-right) */}
@@ -1825,6 +2663,215 @@ export default function Moleskine({
                 }}
               >
                 Guardar e fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Crop Modal */}
+      {isCropping && cropAnnotation && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.85)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10001,
+          }}
+          onClick={cancelCrop}
+        >
+          <div
+            style={{
+              background: '#2A2A2A',
+              borderRadius: 12,
+              padding: 24,
+              maxWidth: '80vw',
+              maxHeight: '80vh',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 16,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}>
+              <h3 style={{
+                fontSize: 16,
+                fontWeight: 600,
+                color: '#FFFFFF',
+                margin: 0,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+              }}>
+                <Crop size={18} />
+                Recortar Imagem
+              </h3>
+              <span style={{ fontSize: 12, color: '#999' }}>
+                Arraste os cantos para ajustar
+              </span>
+            </div>
+
+            {/* Crop canvas */}
+            <div
+              id="crop-container"
+              style={{
+                position: 'relative',
+                maxWidth: '70vw',
+                maxHeight: '60vh',
+                overflow: 'hidden',
+                borderRadius: 8,
+                userSelect: 'none',
+              }}
+            >
+              {/* Image */}
+              <img
+                src={cropAnnotation.src}
+                alt="Crop"
+                draggable={false}
+                style={{
+                  display: 'block',
+                  maxWidth: '70vw',
+                  maxHeight: '60vh',
+                  objectFit: 'contain',
+                }}
+              />
+
+              {/* Dark overlay outside crop */}
+              <div style={{
+                position: 'absolute',
+                inset: 0,
+                background: 'rgba(0,0,0,0.6)',
+                clipPath: `polygon(
+                  0% 0%, 100% 0%, 100% 100%, 0% 100%,
+                  0% ${cropRect.y}%,
+                  ${cropRect.x}% ${cropRect.y}%,
+                  ${cropRect.x}% ${cropRect.y + cropRect.h}%,
+                  ${cropRect.x + cropRect.w}% ${cropRect.y + cropRect.h}%,
+                  ${cropRect.x + cropRect.w}% ${cropRect.y}%,
+                  0% ${cropRect.y}%
+                )`,
+                pointerEvents: 'none',
+              }} />
+
+              {/* Crop region border */}
+              <div
+                style={{
+                  position: 'absolute',
+                  left: `${cropRect.x}%`,
+                  top: `${cropRect.y}%`,
+                  width: `${cropRect.w}%`,
+                  height: `${cropRect.h}%`,
+                  border: '2px solid #FFFFFF',
+                  boxShadow: '0 0 0 1px rgba(0,0,0,0.3)',
+                  cursor: 'move',
+                  boxSizing: 'border-box',
+                }}
+                onMouseDown={(e) => handleCropMouseDown(e, 'move')}
+              >
+                {/* Grid lines */}
+                <div style={{
+                  position: 'absolute',
+                  left: '33.33%',
+                  top: 0,
+                  bottom: 0,
+                  width: 1,
+                  background: 'rgba(255,255,255,0.3)',
+                  pointerEvents: 'none',
+                }} />
+                <div style={{
+                  position: 'absolute',
+                  left: '66.66%',
+                  top: 0,
+                  bottom: 0,
+                  width: 1,
+                  background: 'rgba(255,255,255,0.3)',
+                  pointerEvents: 'none',
+                }} />
+                <div style={{
+                  position: 'absolute',
+                  top: '33.33%',
+                  left: 0,
+                  right: 0,
+                  height: 1,
+                  background: 'rgba(255,255,255,0.3)',
+                  pointerEvents: 'none',
+                }} />
+                <div style={{
+                  position: 'absolute',
+                  top: '66.66%',
+                  left: 0,
+                  right: 0,
+                  height: 1,
+                  background: 'rgba(255,255,255,0.3)',
+                  pointerEvents: 'none',
+                }} />
+              </div>
+
+              {/* Corner handles */}
+              {[
+                { id: 'nw', style: { left: `${cropRect.x}%`, top: `${cropRect.y}%`, transform: 'translate(-50%, -50%)', cursor: 'nw-resize' } },
+                { id: 'ne', style: { left: `${cropRect.x + cropRect.w}%`, top: `${cropRect.y}%`, transform: 'translate(-50%, -50%)', cursor: 'ne-resize' } },
+                { id: 'sw', style: { left: `${cropRect.x}%`, top: `${cropRect.y + cropRect.h}%`, transform: 'translate(-50%, -50%)', cursor: 'sw-resize' } },
+                { id: 'se', style: { left: `${cropRect.x + cropRect.w}%`, top: `${cropRect.y + cropRect.h}%`, transform: 'translate(-50%, -50%)', cursor: 'se-resize' } },
+              ].map(h => (
+                <div
+                  key={h.id}
+                  onMouseDown={(e) => handleCropMouseDown(e, h.id)}
+                  style={{
+                    position: 'absolute',
+                    width: 14,
+                    height: 14,
+                    background: '#FFFFFF',
+                    border: '2px solid #4338CA',
+                    borderRadius: 2,
+                    ...h.style,
+                    zIndex: 10,
+                  }}
+                />
+              ))}
+            </div>
+
+            {/* Crop actions */}
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button
+                onClick={cancelCrop}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: 6,
+                  border: '1px solid #555',
+                  background: 'transparent',
+                  color: '#CCC',
+                  fontSize: 14,
+                  cursor: 'pointer',
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={applyCrop}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: 6,
+                  border: 'none',
+                  background: '#4338CA',
+                  color: '#FFFFFF',
+                  fontSize: 14,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+              >
+                <Check size={16} />
+                Aplicar Recorte
               </button>
             </div>
           </div>
