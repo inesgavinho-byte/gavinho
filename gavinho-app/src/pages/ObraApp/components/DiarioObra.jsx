@@ -736,7 +736,7 @@ export default function DiarioObra({ obra, user }) {
               >
                 <div style={diarioStyles.entryHeader}>
                   <span style={diarioStyles.entryDate}>
-                    {new Date(entry.data).toLocaleDateString('pt-PT', {
+                    {new Date(entry.data + 'T12:00:00').toLocaleDateString('pt-PT', {
                       weekday: 'long',
                       day: 'numeric',
                       month: 'short'

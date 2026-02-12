@@ -300,7 +300,9 @@ export default function Perfil() {
 
   const formatDate = (date) => {
     if (!date) return '-'
-    return new Date(date).toLocaleDateString('pt-PT')
+    // Append T12:00:00 to date-only strings to avoid UTC midnight timezone shift
+    const dateStr = typeof date === 'string' && date.length === 10 ? date + 'T12:00:00' : date
+    return new Date(dateStr).toLocaleDateString('pt-PT')
   }
 
   // Calcular resumo de férias
@@ -841,7 +843,7 @@ export default function Perfil() {
                   }}>
                     <span>{f.nome}</span>
                     <span style={{ color: 'var(--brown-light)' }}>
-                      {new Date(f.data).toLocaleDateString('pt-PT', { weekday: 'short', day: 'numeric', month: 'short' })}
+                      {new Date(f.data + 'T12:00:00').toLocaleDateString('pt-PT', { weekday: 'short', day: 'numeric', month: 'short' })}
                     </span>
                   </div>
                 ))}
@@ -886,7 +888,7 @@ export default function Perfil() {
                         )}
                       </div>
                       <span style={{ color: 'var(--brown-light)' }}>
-                        {new Date(e.data).toLocaleDateString('pt-PT', { day: 'numeric', month: 'short' })}
+                        {new Date(e.data + 'T12:00:00').toLocaleDateString('pt-PT', { day: 'numeric', month: 'short' })}
                       </span>
                     </div>
                   ))}

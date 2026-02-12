@@ -825,7 +825,7 @@ export default function Calendario() {
                   <div style={{ padding: '16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', fontSize: '13px' }}>
                       <Clock size={14} style={{ color: 'var(--brown-light)' }} />
-                      <span>{new Date(evento.data).toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+                      <span>{new Date(evento.data + 'T12:00:00').toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
                       {evento.hora_inicio && <span style={{ color: 'var(--brown-light)' }}>• {evento.hora_inicio} - {evento.hora_fim}</span>}
                     </div>
                     

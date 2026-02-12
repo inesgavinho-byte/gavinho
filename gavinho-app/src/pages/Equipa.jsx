@@ -1148,7 +1148,7 @@ export default function Equipa() {
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <span style={{ color: '#78716c' }}>
-                            {new Date(enc.data).toLocaleDateString('pt-PT', { weekday: 'short', day: 'numeric', month: 'short' })}
+                            {new Date(enc.data + 'T12:00:00').toLocaleDateString('pt-PT', { weekday: 'short', day: 'numeric', month: 'short' })}
                           </span>
                           <button
                             onClick={() => handleDeleteEncerramento(enc.id)}
@@ -1181,7 +1181,7 @@ export default function Equipa() {
                       }}>
                         <span style={{ fontWeight: 500 }}>{fer.nome}</span>
                         <span style={{ color: '#78716c' }}>
-                          {new Date(fer.data).toLocaleDateString('pt-PT', { weekday: 'short', day: 'numeric', month: 'short' })}
+                          {new Date(fer.data + 'T12:00:00').toLocaleDateString('pt-PT', { weekday: 'short', day: 'numeric', month: 'short' })}
                         </span>
                       </div>
                     ))}
@@ -1862,7 +1862,7 @@ export default function Equipa() {
                   {timesheets.map(t => (
                     <tr key={t.id}>
                       <td style={styles.td}>
-                        {new Date(t.data).toLocaleDateString('pt-PT', { weekday: 'short', day: '2-digit', month: 'short' })}
+                        {new Date(t.data + 'T12:00:00').toLocaleDateString('pt-PT', { weekday: 'short', day: '2-digit', month: 'short' })}
                       </td>
                       <td style={styles.td}>{t.horas}h</td>
                       <td style={styles.td}>{t.projetos?.codigo || '"”'}</td>
