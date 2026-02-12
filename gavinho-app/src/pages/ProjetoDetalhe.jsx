@@ -2088,7 +2088,7 @@ export default function ProjetoDetalhe() {
                 style={{
                   padding: '8px 16px',
                   background: activeFaseSection === section.id ? 'var(--brown)' : 'transparent',
-                  color: activeFaseSection === section.id ? 'white' : 'var(--brown-light)',
+                  color: activeFaseSection === section.id ? 'var(--off-white)' : 'var(--brown-light)',
                   border: activeFaseSection === section.id ? 'none' : '1px solid var(--stone)',
                   borderRadius: '20px',
                   fontSize: '12px',
@@ -2707,7 +2707,7 @@ export default function ProjetoDetalhe() {
                 style={{
                   padding: '8px 16px',
                   background: activeBriefingSection === section.id ? 'var(--brown)' : 'transparent',
-                  color: activeBriefingSection === section.id ? 'white' : 'var(--brown-light)',
+                  color: activeBriefingSection === section.id ? 'var(--off-white)' : 'var(--brown-light)',
                   border: activeBriefingSection === section.id ? 'none' : '1px solid var(--stone)',
                   borderRadius: '20px',
                   fontSize: '12px',
@@ -2775,7 +2775,7 @@ export default function ProjetoDetalhe() {
                 style={{
                   padding: '8px 16px',
                   background: activeArchvizSection === section.id ? 'var(--brown)' : 'transparent',
-                  color: activeArchvizSection === section.id ? 'white' : 'var(--brown-light)',
+                  color: activeArchvizSection === section.id ? 'var(--off-white)' : 'var(--brown-light)',
                   border: activeArchvizSection === section.id ? 'none' : '1px solid var(--stone)',
                   borderRadius: '20px',
                   fontSize: '12px',
@@ -3239,7 +3239,7 @@ export default function ProjetoDetalhe() {
                   style={{
                     padding: '8px 16px',
                     background: idx === 0 ? 'var(--brown)' : 'transparent',
-                    color: idx === 0 ? 'white' : 'var(--brown-light)',
+                    color: idx === 0 ? 'var(--off-white)' : 'var(--brown-light)',
                     border: idx === 0 ? 'none' : '1px solid var(--stone)',
                     borderRadius: '20px',
                     fontSize: '12px',
@@ -3289,7 +3289,7 @@ export default function ProjetoDetalhe() {
                 style={{
                   padding: '8px 16px',
                   background: activeGestaoSection === section.id ? 'var(--brown)' : 'transparent',
-                  color: activeGestaoSection === section.id ? 'white' : 'var(--brown-light)',
+                  color: activeGestaoSection === section.id ? 'var(--off-white)' : 'var(--brown-light)',
                   border: activeGestaoSection === section.id ? 'none' : '1px solid var(--stone)',
                   borderRadius: '20px',
                   fontSize: '12px',
@@ -3388,7 +3388,7 @@ export default function ProjetoDetalhe() {
                     style={{
                       padding: '8px 16px',
                       background: 'var(--brown)',
-                      color: 'white',
+                      color: 'var(--off-white)',
                       border: 'none',
                       borderRadius: '8px',
                       fontSize: '13px',
