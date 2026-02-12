@@ -11,7 +11,7 @@ import { useAuth } from '../contexts/AuthContext'
 // VAPID public key — the private key must be configured as
 // VAPID_PRIVATE_KEY secret in Supabase Edge Function environment
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY
-  || 'BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U'
+  || 'BFz6TO0qoTGjgsh_Me8K-oO-AbCmhwunac2wiHkluUTLTcNO32rZefeXIHZqkk7i_9Juh2ufLNKUQxpg4xO3XMI'
 
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - base64String.length % 4) % 4)
