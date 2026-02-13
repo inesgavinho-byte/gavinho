@@ -716,10 +716,16 @@ export default function ProjetoDetalhe() {
         .eq('projeto_id', projetoId)
         .order('compartimento')
         .order('vista')
-        .order('versao', { ascending: false })
 
       if (error) throw error
-      setRenders(data || [])
+
+      // Sort by versao in JS (column may or may not exist depending on schema)
+      const sorted = (data || []).sort((a, b) => {
+        if (a.compartimento !== b.compartimento) return a.compartimento.localeCompare(b.compartimento)
+        if ((a.vista || '') !== (b.vista || '')) return (a.vista || '').localeCompare(b.vista || '')
+        return (b.versao || 0) - (a.versao || 0)
+      })
+      setRenders(sorted)
 
       // Carregar compartimentos do projeto
       const { data: compartimentosData } = await supabase
@@ -746,7 +752,7 @@ export default function ProjetoDetalhe() {
         setRenderAnnotations(annotationsMap)
       }
     } catch (err) {
-      // Silent fail - renders will show as empty
+      console.error('Erro ao carregar renders:', err)
     }
   }
 
