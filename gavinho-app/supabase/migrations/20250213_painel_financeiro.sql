@@ -298,6 +298,9 @@ CREATE POLICY "projecoes_all"
 -- 5. VIEW: Financeiro por capítulo
 -- Aggregates PO + factura data per chapter
 -- ──────────────────────────────────────────────────
+
+-- Ensure orcamento_capitulos has the valor column (may be missing if table pre-existed)
+ALTER TABLE orcamento_capitulos ADD COLUMN IF NOT EXISTS valor DECIMAL(12,2) DEFAULT 0;
 CREATE OR REPLACE VIEW v_financeiro_capitulo AS
 SELECT
   p.id as projeto_id,
