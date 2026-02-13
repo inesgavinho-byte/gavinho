@@ -62,7 +62,8 @@ import {
   MessageSquare,
   Link2,
   Type,
-  Camera
+  Camera,
+  BarChart3
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -715,10 +716,16 @@ export default function ProjetoDetalhe() {
         .eq('projeto_id', projetoId)
         .order('compartimento')
         .order('vista')
-        .order('versao', { ascending: false })
 
       if (error) throw error
-      setRenders(data || [])
+
+      // Sort by versao in JS (column may or may not exist depending on schema)
+      const sorted = (data || []).sort((a, b) => {
+        if (a.compartimento !== b.compartimento) return a.compartimento.localeCompare(b.compartimento)
+        if ((a.vista || '') !== (b.vista || '')) return (a.vista || '').localeCompare(b.vista || '')
+        return (b.versao || 0) - (a.versao || 0)
+      })
+      setRenders(sorted)
 
       // Carregar compartimentos do projeto
       const { data: compartimentosData } = await supabase
@@ -745,7 +752,7 @@ export default function ProjetoDetalhe() {
         setRenderAnnotations(annotationsMap)
       }
     } catch (err) {
-      // Silent fail - renders will show as empty
+      console.error('Erro ao carregar renders:', err)
     }
   }
 
@@ -1810,6 +1817,7 @@ export default function ProjetoDetalhe() {
     { id: 'viabilidade', label: 'Viabilidade', icon: FileSearch },
     { id: 'contratos', label: 'Contratos', icon: FileText },
     { id: 'diario-projeto', label: 'Diário de Projeto', icon: BookOpen },
+    { id: 'painel-financeiro', label: 'Painel Financeiro', icon: BarChart3 },
     { id: 'faturacao', label: 'Faturação', icon: Euro },
     { id: 'ficha-cliente', label: 'Ficha de Cliente', icon: UserCircle }
   ]
@@ -3330,6 +3338,42 @@ export default function ProjetoDetalhe() {
           {activeGestaoSection === 'diario-projeto' && (
             <div className="card" style={{ padding: '20px' }}>
               <DiarioBordo projeto={project} />
+            </div>
+          )}
+
+          {/* Painel Financeiro */}
+          {activeGestaoSection === 'painel-financeiro' && (
+            <div className="card" style={{ padding: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <BarChart3 size={20} style={{ color: 'var(--verde)' }} />
+                  <h3 style={{ margin: 0, color: 'var(--brown)', fontFamily: 'Cormorant Garamond, serif' }}>Painel Financeiro</h3>
+                </div>
+                <button
+                  onClick={() => navigate(`/financeiro/projeto/${id}`)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '4px',
+                    padding: '6px 14px', borderRadius: '8px', border: '1px solid var(--verde)',
+                    background: 'transparent', color: 'var(--verde)', cursor: 'pointer',
+                    fontSize: '0.8rem', fontWeight: 600
+                  }}
+                >
+                  <ExternalLink size={14} /> Abrir painel completo
+                </button>
+              </div>
+              <p style={{ color: 'var(--brown-light)', margin: '0 0 12px', fontSize: '0.85rem' }}>
+                Dashboard financeiro em tempo real com orçamento por capítulo, alertas, extras e projecções.
+              </p>
+              <button
+                onClick={() => navigate(`/financeiro/projeto/${id}`)}
+                style={{
+                  padding: '10px 24px', borderRadius: '8px', border: 'none',
+                  background: 'var(--verde)', color: '#fff', cursor: 'pointer',
+                  fontSize: '0.85rem', fontWeight: 600
+                }}
+              >
+                Ver Painel Financeiro
+              </button>
             </div>
           )}
 

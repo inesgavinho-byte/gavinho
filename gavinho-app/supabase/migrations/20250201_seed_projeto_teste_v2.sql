@@ -128,10 +128,15 @@ BEGIN
   END IF;
 END $$;
 
--- Log seed execution
-INSERT INTO seeds_executados (nome, executed_at)
-VALUES ('20250201_seed_projeto_teste_v2', NOW())
-ON CONFLICT (nome) DO UPDATE SET executed_at = NOW();
+-- Log seed execution (guarded: table may not exist yet)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'seeds_executados') THEN
+    INSERT INTO seeds_executados (seed_key, nome, executado_em)
+    VALUES ('20250201_seed_projeto_teste_v2', '20250201_seed_projeto_teste_v2', NOW())
+    ON CONFLICT (seed_key) DO UPDATE SET executado_em = NOW();
+  END IF;
+END $$;
 
 -- Confirmacao
 DO $$

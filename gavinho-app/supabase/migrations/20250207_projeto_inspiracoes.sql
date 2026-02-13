@@ -85,9 +85,9 @@ COMMENT ON COLUMN projeto_inspiracoes.url IS 'Public URL to the image in storage
 -- Log migration execution (only if seeds_executados exists)
 DO $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'seeds_executados') THEN
-    INSERT INTO seeds_executados (nome, executed_at)
-    VALUES ('20250207_projeto_inspiracoes', NOW())
-    ON CONFLICT (nome) DO UPDATE SET executed_at = NOW();
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'seeds_executados') THEN
+    INSERT INTO seeds_executados (seed_key, nome, executado_em)
+    VALUES ('20250207_projeto_inspiracoes', '20250207_projeto_inspiracoes', NOW())
+    ON CONFLICT (seed_key) DO UPDATE SET executado_em = NOW();
   END IF;
 END $$;

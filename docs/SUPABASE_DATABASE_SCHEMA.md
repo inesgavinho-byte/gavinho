@@ -830,6 +830,16 @@ Documentos aprovados para execução na obra.
 - `ia_deve_processar()` - Verifica se deve executar processamento automático
 - `ia_atualizar_estado_cron(sucesso)` - Atualiza estado do CRON
 
+### GPS / Presenças
+- `calcular_distancia_gps(lat1, lon1, lat2, lon2)` - Distância em metros (Haversine)
+- `trigger_presencas_geofence()` - Auto-calcula distância e geofence em check-in/out
+
+### Push Notifications
+- `send_push_notification(user_id, title, body, url, tag)` - Chama edge function `send-push` via `pg_net`
+- `trigger_push_on_notificacao()` - Push automático para notificações workspace
+- `trigger_push_on_app_notificacao()` - Push automático para notificações app
+- `trigger_notificacao_on_chat_mensagem()` - Cria notificação de @mention em mensagens de chat
+
 ---
 
 ## Segurança (RLS)
@@ -847,19 +857,38 @@ CREATE POLICY "Allow all for authenticated users" ON [tabela] FOR ALL USING (tru
 
 ## Edge Functions
 
-As seguintes Edge Functions estão disponíveis em `supabase/functions/`:
+As seguintes Edge Functions estão disponíveis em `supabase/functions/` (30 total):
 
 | Função | Descrição |
 |--------|-----------|
+| `agent-execute` | Execução de agentes IA |
+| `agent-router` | Routing de agentes IA |
+| `analisar-escopo` | Análise de escopo de trabalho |
 | `analisar-mensagens` | Analisa mensagens com IA |
+| `analisar-viabilidade` | Análise de viabilidade urbanística |
+| `decisoes-detectar` | Deteção automática de decisões |
+| `decisoes-embedding` | Embeddings para decisões (OpenAI) |
+| `decisoes-search` | Pesquisa semântica de decisões |
+| `email-classify` | Classificação automática de emails |
+| `email-processar` | Processamento de emails |
 | `email-send` | Envia emails |
+| `email-suggest-reply` | Sugestões de resposta IA |
 | `email-webhook` | Webhook para receção de emails |
+| `garvis-chat` | GARVIS assistente IA |
+| `graph-webhook` | Microsoft Graph webhook |
+| `notification-digest` | Digest de notificações por email |
+| `notification-email` | Notificações por email |
 | `obra-acoes` | Gestão de ações operacionais |
 | `outlook-sync` | Sincronização com Outlook |
 | `processar-mensagens-cron` | Processamento automático de mensagens |
+| `projeto-chat` | Chat de projeto |
+| `renew-subscription` | Renovação de subscrições |
+| `send-push` | **NOVO** — Push notifications via web-push |
+| `telegram-webhook` | Webhook para Telegram |
 | `twilio-conversations` | Gestão de conversas Twilio |
 | `twilio-send` | Envio de mensagens WhatsApp |
 | `twilio-webhook` | Webhook para receção de WhatsApp |
+| `viabilidade-chat` | Chat IA para viabilidade |
 
 ---
 
@@ -881,7 +910,19 @@ Todos os ficheiros de migração SQL estão em:
 | `20250120_delivery_files.sql` | Central de Entregas |
 | `20250121_design_review.sql` | Design Review |
 | `20250121_design_review_drawings.sql` | Desenhos no Design Review |
+| `20250130_chat_teams_completo.sql` | Sistema de chat Teams-style |
+| `20250201_all_missing_tables.sql` | Tabelas em falta (dúvidas, comentários) |
+| `20250202_garvis_chat.sql` | GARVIS AI sistema |
+| `20250206_app_notificacoes.sql` | Notificações da app |
+| `20250207_notificacoes_consolidadas.sql` | Notificações consolidadas |
+| `20250210_presencas_gps_tracking.sql` | Presenças com GPS tracking |
+| `20250211_fiscalizacao_equipas_tables.sql` | HSO, ocorrências, subempreiteiros |
+| `20250211_fix_projetos_status_constraint.sql` | Fix constraint status projetos |
+| `20250212_push_notification_triggers.sql` | Triggers push notifications |
+| `20250212_chat_mensagens_notification_trigger.sql` | Chat @mention → notificação trigger |
+
+**Total: 82 ficheiros de migração SQL**
 
 ---
 
-*Última atualização: 2025-01-21*
+*Última atualização: 2025-02-12*

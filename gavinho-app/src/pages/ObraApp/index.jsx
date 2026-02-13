@@ -49,8 +49,8 @@ export default function ObraApp() {
   const [refreshingObras, setRefreshingObras] = useState(false)
   const avatarInputRef = useRef(null)
 
-  // Push notifications
-  const { permission, requestPermission, subscribe } = usePushNotifications()
+  // Push notifications (pass user.id so subscription persists to DB)
+  const { permission, requestPermission, subscribe } = usePushNotifications(user?.id)
 
   // Offline sync
   const { isOnline, pendingCount, syncing, processQueue } = useOfflineSync()

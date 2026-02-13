@@ -152,7 +152,12 @@ CREATE TRIGGER trigger_projeto_renders_updated_at
   FOR EACH ROW
   EXECUTE FUNCTION update_projeto_renders_updated_at();
 
--- Log migration execution
-INSERT INTO seeds_executados (nome, executed_at)
-VALUES ('20250201_projeto_renders_tables', NOW())
-ON CONFLICT (nome) DO UPDATE SET executed_at = NOW();
+-- Log migration execution (guarded: table may not exist yet)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'seeds_executados') THEN
+    INSERT INTO seeds_executados (seed_key, nome, executado_em)
+    VALUES ('20250201_projeto_renders_tables', '20250201_projeto_renders_tables', NOW())
+    ON CONFLICT (seed_key) DO UPDATE SET executado_em = NOW();
+  END IF;
+END $$;

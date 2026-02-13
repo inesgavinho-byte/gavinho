@@ -44,41 +44,43 @@ const resolveTheme = (theme) => {
 const ThemeContext = createContext(null)
 
 // CSS variable mappings for dark mode
+// Aligned with index.css warm GAVINHO palette for consistency
 const DARK_MODE_VARS = {
-  // Background colors
-  '--white': '#1a1a1a',
-  '--cream': '#242424',
-  '--stone': '#333333',
-  '--stone-dark': '#404040',
+  // Background colors - warm dark tones
+  '--white': '#2A2924',
+  '--cream': '#232220',
+  '--off-white': '#1E1D1B',
+  '--stone': '#3A3834',
+  '--stone-dark': '#4A4842',
 
-  // Text colors
-  '--brown': '#e5e5e5',
-  '--brown-light': '#a0a0a0',
-  '--brown-dark': '#ffffff',
+  // Text colors - warm, high-contrast for legibility
+  '--brown': '#E8E4DA',
+  '--brown-light': '#C4C0B4',
+  '--brown-dark': '#F2EFE6',
 
-  // Accent colors (keep similar but adjust for dark)
-  '--blush': '#4a3c36',
-  '--blush-dark': '#5d4d46',
-  '--blush-light': '#3d322d',
+  // Accent colors (warm olive, brighter for dark bg)
+  '--blush': '#7A7768',
+  '--blush-dark': '#6B6960',
+  '--blush-light': '#55534A',
 
-  '--accent-olive': '#8fb88f',
+  '--accent-olive': '#96B888',
   '--accent-olive-light': '#a5c9a5',
-  '--accent-olive-dark': '#6b946b',
+  '--accent-olive-dark': '#84A676',
 
-  // Status colors (slightly adjusted for dark)
-  '--success': '#4caf50',
-  '--warning': '#ffb74d',
-  '--error': '#f44336',
-  '--info': '#42a5f5',
+  // Status colors - brighter for dark backgrounds
+  '--success': '#96B888',
+  '--warning': '#D9C07E',
+  '--error': '#C49080',
+  '--info': '#96B0C4',
 
-  // Shadows (more subtle in dark mode)
-  '--shadow-sm': '0 1px 2px rgba(0,0,0,0.3)',
-  '--shadow-md': '0 2px 8px rgba(0,0,0,0.4)',
-  '--shadow-lg': '0 4px 16px rgba(0,0,0,0.5)',
+  // Shadows (deeper in dark mode)
+  '--shadow-sm': '0 2px 8px rgba(0,0,0,0.35)',
+  '--shadow-md': '0 4px 20px rgba(0,0,0,0.45)',
+  '--shadow-lg': '0 8px 40px rgba(0,0,0,0.55)',
 
   // Borders
-  '--border-color': '#404040',
-  '--border-light': '#333333'
+  '--border-color': '#3A3834',
+  '--border-light': '#3A3834'
 }
 
 // CSS variable mappings for light mode (reset to defaults)

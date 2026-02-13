@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../components/ui/Toast'
 import { 
@@ -47,6 +48,7 @@ const CAPITULOS_PADRAO = [
 
 export default function Finance() {
   const toast = useToast()
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [projectsFinance, setProjectsFinance] = useState([])
@@ -743,9 +745,19 @@ export default function Finance() {
                     </tfoot>
                   </table>
 
-                  {/* Button to add cost */}
-                  <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'flex-end' }}>
-                    <button 
+                  {/* Action buttons */}
+                  <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                    <button
+                      className="btn btn-outline"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        navigate(`/financeiro/projeto/${project.id}`)
+                      }}
+                    >
+                      <BarChart3 size={16} />
+                      Painel Financeiro
+                    </button>
+                    <button
                       className="btn btn-outline"
                       onClick={(e) => {
                         e.stopPropagation()
@@ -754,7 +766,7 @@ export default function Finance() {
                       }}
                     >
                       <Plus size={16} />
-                      Adicionar Custo a este Projeto
+                      Adicionar Custo
                     </button>
                   </div>
                 </div>

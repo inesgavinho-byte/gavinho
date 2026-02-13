@@ -125,7 +125,12 @@ COMMENT ON TABLE projeto_pagamentos IS 'Pagamentos/prestacoes do projeto';
 COMMENT ON TABLE projeto_servicos IS 'Servicos contratados para o projeto';
 COMMENT ON TABLE projeto_duvidas IS 'Duvidas e pedidos de definicao sobre renders/entregaveis';
 
--- Log migration
-INSERT INTO seeds_executados (nome, executed_at)
-VALUES ('20250201_projeto_tables_essential', NOW())
-ON CONFLICT (nome) DO UPDATE SET executed_at = NOW();
+-- Log migration (guarded: table may not exist yet)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'seeds_executados') THEN
+    INSERT INTO seeds_executados (seed_key, nome, executado_em)
+    VALUES ('20250201_projeto_tables_essential', '20250201_projeto_tables_essential', NOW())
+    ON CONFLICT (seed_key) DO UPDATE SET executado_em = NOW();
+  END IF;
+END $$;

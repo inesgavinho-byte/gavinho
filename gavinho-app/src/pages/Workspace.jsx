@@ -99,6 +99,7 @@ import {
 
 import { ConfirmModal, ToastContainer, ExportModal, CreatePrivateChannelModal, WebhookSettingsModal, ScheduleMessageModal, EmailSettingsModal } from './Workspace/components/Modals'
 import CentralEntregasChat from './Workspace/components/CentralEntregasChat'
+import { usePushNotifications } from '../hooks/usePushNotifications'
 
 export default function Workspace() {
   // Handle OAuth callback in popup
@@ -188,6 +189,14 @@ export default function Workspace() {
   const { toasts, success: toastSuccess, error: toastError, info: toastInfo, dismissToast } = useToast()
   const { confirmState, confirm, closeConfirm, confirmArchive } = useConfirm()
 
+  // Push Notifications Hook
+  const {
+    isSupported: pushSupported,
+    isSubscribed: pushSubscribed,
+    isGranted: pushGranted,
+    subscribe: pushSubscribe
+  } = usePushNotifications()
+
   // ========== REMAINING LOCAL STATE ==========
 
   // Search
@@ -264,8 +273,12 @@ export default function Workspace() {
   // Profile
   const [showProfileCard, setShowProfileCard] = useState(null)
   const [expandedProfile, setExpandedProfile] = useState(null)
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false)
-  const [notificationPermission, setNotificationPermission] = useState('default')
+  const [notificationsEnabled, setNotificationsEnabled] = useState(
+    () => 'Notification' in window && Notification.permission === 'granted'
+  )
+  const [notificationPermission, setNotificationPermission] = useState(
+    () => 'Notification' in window ? Notification.permission : 'denied'
+  )
 
   // Export
   const [showExportModal, setShowExportModal] = useState(false)
@@ -304,10 +317,25 @@ export default function Workspace() {
     updateMyPresence()
     presenceIntervalRef.current = setInterval(updateMyPresence, 60000) // A cada minuto
 
+    // Pedir permissão para notificações desktop
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().then(permission => {
+        setNotificationPermission(permission)
+        setNotificationsEnabled(permission === 'granted')
+      })
+    }
+
     return () => {
       clearInterval(presenceIntervalRef.current)
     }
   }, [])
+
+  // Auto-subscribe to push notifications when permission is granted
+  useEffect(() => {
+    if (pushSupported && pushGranted && !pushSubscribed && profile?.id) {
+      pushSubscribe()
+    }
+  }, [pushSupported, pushGranted, pushSubscribed, profile?.id, pushSubscribe])
 
   useEffect(() => {
     if (canalAtivo) {
@@ -370,12 +398,32 @@ export default function Workspace() {
                    profileName.split(' ')[0] === mentionName
           })
 
+          const autorNome = payload.new.autor?.nome || 'Alguém'
+          const msgPreview = (payload.new.conteudo || '').substring(0, 80)
+
           if (isMentioned) {
             playNotificationSound()
             toastInfo('Menção', `Foste mencionado(a) numa mensagem`)
+            // Desktop notification for mentions (always, even if tab visible)
+            if ('Notification' in window && Notification.permission === 'granted') {
+              new Notification(`💬 ${autorNome} mencionou-te`, {
+                body: msgPreview,
+                icon: '/favicon.ico',
+                tag: `mention-${payload.new.id}`,
+                silent: true
+              })
+            }
           } else if (document.hidden) {
-            // Only show toast for non-mention messages when tab is not focused
+            // Desktop notification + sound when tab not focused
             playNotificationSound()
+            if ('Notification' in window && Notification.permission === 'granted') {
+              new Notification(`💬 ${autorNome}`, {
+                body: msgPreview,
+                icon: '/favicon.ico',
+                tag: `msg-${payload.new.id}`,
+                silent: true
+              })
+            }
           }
         }
       })
