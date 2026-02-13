@@ -147,7 +147,7 @@ export function useFinanceiroDashboard(projetoId) {
         { data: facClData },
         { data: alertData }
       ] = await Promise.all([
-        supabase.from('projetos').select('id, codigo, nome, fase, estado, orcamento_atual').eq('id', projetoId).single(),
+        supabase.from('projetos').select('id, codigo, nome, fase, status, orcamento_atual').eq('id', projetoId).single(),
         supabase.from('orcamentos').select('*, orcamento_capitulos(*)').eq('projeto_id', projetoId).eq('status', 'aprovado').order('created_at', { ascending: false }).limit(1).single(),
         supabase.from('purchase_orders').select('*').eq('projeto_id', projetoId).neq('estado', 'cancelada'),
         supabase.from('procurement_facturas').select('*').eq('projeto_id', projetoId),

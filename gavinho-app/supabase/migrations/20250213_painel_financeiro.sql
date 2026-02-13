@@ -394,7 +394,7 @@ LEFT JOIN LATERAL (
   SELECT COUNT(*) as alertas_activos
   FROM alertas_financeiros WHERE projeto_id = p.id AND estado = 'activo'
 ) alert_agg ON true
-WHERE p.estado IN ('em_curso', 'em_projecto', 'em_construcao')
+WHERE p.status IN ('on_track', 'at_risk', 'delayed', 'on_hold', 'em_andamento')
 GROUP BY p.id, p.codigo, p.nome, p.fase, ext_agg.total_extras, alert_agg.alertas_activos;
 
 -- ──────────────────────────────────────────────────
