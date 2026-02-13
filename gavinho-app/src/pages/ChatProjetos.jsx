@@ -313,7 +313,7 @@ export default function ChatProjetos() {
           *,
           autor:autor_id(id, nome, avatar_url),
           reacoes:chat_reacoes(emoji, utilizador_id),
-          parent:parent_id(id, conteudo, autor:autor_id(nome))
+          parent:parent_id(id, conteudo, autor_id)
         `)
         .eq('topico_id', topicoId)
         .eq('eliminado', false)

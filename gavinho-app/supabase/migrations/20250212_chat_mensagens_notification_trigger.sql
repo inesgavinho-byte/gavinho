@@ -31,9 +31,11 @@ BEGIN
   SELECT nome INTO v_autor_nome FROM utilizadores WHERE id = NEW.autor_id;
   v_autor_nome := COALESCE(v_autor_nome, 'Alguém');
 
-  -- Get channel info
-  SELECT codigo, id INTO v_canal_codigo, v_canal_id
-  FROM chat_canais WHERE id = NEW.canal_id;
+  -- Get channel info (join through chat_topicos since mensagens link to topico, not canal)
+  SELECT c.codigo, c.id INTO v_canal_codigo, v_canal_id
+  FROM chat_canais c
+  JOIN chat_topicos t ON t.canal_id = c.id
+  WHERE t.id = NEW.topico_id;
 
   -- Preview of message content (max 80 chars)
   v_content_preview := left(NEW.conteudo, 80);

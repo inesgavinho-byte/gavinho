@@ -36,8 +36,12 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
-  // Never cache Supabase API or auth calls
   const url = event.request.url;
+
+  // Only cache http(s) requests — skip chrome-extension://, etc.
+  if (!url.startsWith('http://') && !url.startsWith('https://')) return;
+
+  // Never cache Supabase API or auth calls
   if (url.includes('supabase.co') || url.includes('/auth/')) return;
 
   event.respondWith(

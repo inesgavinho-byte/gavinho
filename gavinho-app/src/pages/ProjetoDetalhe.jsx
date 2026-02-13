@@ -63,7 +63,9 @@ import {
   Link2,
   Type,
   Camera,
-  BarChart3
+  BarChart3,
+  HardHat,
+  Ruler
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -84,6 +86,8 @@ import ProjetoAtas from '../components/ProjetoAtas'
 import ProjetoMoodboards from '../components/ProjetoMoodboards'
 import ProjetoLevantamento from '../components/ProjetoLevantamento'
 import ProjetoInspiracoes from '../components/ProjetoInspiracoes'
+import AcompanhamentoFotos from '../components/AcompanhamentoFotos'
+import DesenhosObra from '../components/DesenhosObra'
 
 // Importar constantes de ficheiros separados
 import {
@@ -179,6 +183,8 @@ export default function ProjetoDetalhe() {
 
   // Sub-tabs para Gestão de Projeto
   const [activeGestaoSection, setActiveGestaoSection] = useState(urlSubtab || 'decisoes')
+
+  const [activeAcompSection, setActiveAcompSection] = useState(urlSubtab || 'fotografias')
 
   // Ficha de Cliente inline editing
   const [editingCliente, setEditingCliente] = useState(false)
@@ -777,6 +783,8 @@ export default function ProjetoDetalhe() {
       setActiveGestaoSection(subtabId)
     } else if (tabType === 'briefing') {
       setActiveBriefingSection(subtabId)
+    } else if (tabType === 'acompanhamento') {
+      setActiveAcompSection(subtabId)
     }
   }
 
@@ -1784,6 +1792,7 @@ export default function ProjetoDetalhe() {
     { id: 'notebook', label: 'Notebook', icon: BookOpen },
     { id: 'chat-ia', label: 'Chat IA', icon: MessageSquare },
     { id: 'archviz', label: 'Archviz', icon: Image, hasSubtabs: true },
+    { id: 'acompanhamento', label: 'Acompanhamento', icon: HardHat, hasSubtabs: true },
     { id: 'biblioteca', label: 'Biblioteca', icon: Library },
     { id: 'gestao', label: 'Gestão de Projeto', icon: Settings, hasSubtabs: true }
   ]
@@ -1809,6 +1818,12 @@ export default function ProjetoDetalhe() {
     { id: 'processo', label: 'Imagens Processo', icon: ImagePlus },
     { id: 'finais', label: 'Imagens Finais', icon: CheckCircle },
     { id: 'moleskine', label: 'Moleskine', icon: Pencil }
+  ]
+
+  // Secções dentro de Acompanhamento
+  const acompSections = [
+    { id: 'fotografias', label: 'Fotografias', icon: Camera },
+    { id: 'desenhos-obra', label: 'Desenhos em Uso Obra', icon: Ruler }
   ]
 
   // Secções dentro de Gestão de Projeto
@@ -3195,6 +3210,62 @@ export default function ProjetoDetalhe() {
               projectId={project?.id}
               projectName={project?.nome}
               onClose={() => setActiveArchvizSection('processo')}
+            />
+          )}
+        </div>
+      )}
+
+      {/* Tab Acompanhamento com subtabs */}
+      {activeTab === 'acompanhamento' && (
+        <div>
+          {/* Section navigation */}
+          <div style={{
+            display: 'flex',
+            gap: '8px',
+            marginBottom: '20px',
+            borderBottom: '1px solid var(--stone)',
+            paddingBottom: '12px'
+          }}>
+            {acompSections.map(section => (
+              <button
+                key={section.id}
+                onClick={() => handleSubtabChange(section.id, 'acompanhamento')}
+                style={{
+                  padding: '8px 16px',
+                  background: activeAcompSection === section.id ? 'var(--brown)' : 'transparent',
+                  color: activeAcompSection === section.id ? 'var(--off-white)' : 'var(--brown-light)',
+                  border: activeAcompSection === section.id ? 'none' : '1px solid var(--stone)',
+                  borderRadius: '20px',
+                  fontSize: '12px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <section.icon size={14} />
+                {section.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Fotografias de Acompanhamento */}
+          {activeAcompSection === 'fotografias' && (
+            <AcompanhamentoFotos
+              projeto={project}
+              userId={user?.id}
+              userName={user?.email?.split('@')[0] || 'Utilizador'}
+            />
+          )}
+
+          {/* Desenhos em Uso Obra */}
+          {activeAcompSection === 'desenhos-obra' && (
+            <DesenhosObra
+              projeto={project}
+              userId={user?.id}
+              userName={user?.email?.split('@')[0] || 'Utilizador'}
             />
           )}
         </div>
