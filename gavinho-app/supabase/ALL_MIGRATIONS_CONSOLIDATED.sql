@@ -8940,10 +8940,15 @@ CREATE TRIGGER trigger_projeto_renders_updated_at
   FOR EACH ROW
   EXECUTE FUNCTION update_projeto_renders_updated_at();
 
--- Log migration execution
-INSERT INTO seeds_executados (nome, executed_at)
-VALUES ('20250201_projeto_renders_tables', NOW())
-ON CONFLICT (nome) DO UPDATE SET executed_at = NOW();
+-- Log migration execution (guarded: table may not exist yet)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'seeds_executados') THEN
+    INSERT INTO seeds_executados (seed_key, nome, executado_em)
+    VALUES ('20250201_projeto_renders_tables', '20250201_projeto_renders_tables', NOW())
+    ON CONFLICT (seed_key) DO UPDATE SET executado_em = NOW();
+  END IF;
+END $$;
 -- =====================================================
 -- TABELAS ESSENCIAIS DE PROJETO
 -- Tabelas que dependem apenas de 'projetos' e 'clientes'
@@ -9071,10 +9076,15 @@ COMMENT ON TABLE projeto_pagamentos IS 'Pagamentos/prestacoes do projeto';
 COMMENT ON TABLE projeto_servicos IS 'Servicos contratados para o projeto';
 COMMENT ON TABLE projeto_duvidas IS 'Duvidas e pedidos de definicao sobre renders/entregaveis';
 
--- Log migration
-INSERT INTO seeds_executados (nome, executed_at)
-VALUES ('20250201_projeto_tables_essential', NOW())
-ON CONFLICT (nome) DO UPDATE SET executed_at = NOW();
+-- Log migration (guarded: table may not exist yet)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'seeds_executados') THEN
+    INSERT INTO seeds_executados (seed_key, nome, executado_em)
+    VALUES ('20250201_projeto_tables_essential', '20250201_projeto_tables_essential', NOW())
+    ON CONFLICT (seed_key) DO UPDATE SET executado_em = NOW();
+  END IF;
+END $$;
 -- =====================================================
 -- MIGRAÇÃO: Renomear project_decisions para projeto_duvidas
 -- Clarificar a diferença entre:
@@ -9373,10 +9383,15 @@ ON CONFLICT (id) DO UPDATE SET
   titulo = EXCLUDED.titulo,
   status = EXCLUDED.status;
 
--- Log seed execution
-INSERT INTO seeds_executados (nome, executed_at)
-VALUES ('20250201_seed_projeto_teste', NOW())
-ON CONFLICT (nome) DO UPDATE SET executed_at = NOW();
+-- Log seed execution (guarded: table may not exist yet)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'seeds_executados') THEN
+    INSERT INTO seeds_executados (seed_key, nome, executado_em)
+    VALUES ('20250201_seed_projeto_teste', '20250201_seed_projeto_teste', NOW())
+    ON CONFLICT (seed_key) DO UPDATE SET executado_em = NOW();
+  END IF;
+END $$;
 
 -- Output confirmation
 DO $$
@@ -9525,10 +9540,15 @@ BEGIN
   END IF;
 END $$;
 
--- Log seed execution
-INSERT INTO seeds_executados (nome, executed_at)
-VALUES ('20250201_seed_projeto_teste_v2', NOW())
-ON CONFLICT (nome) DO UPDATE SET executed_at = NOW();
+-- Log seed execution (guarded: table may not exist yet)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'seeds_executados') THEN
+    INSERT INTO seeds_executados (seed_key, nome, executado_em)
+    VALUES ('20250201_seed_projeto_teste_v2', '20250201_seed_projeto_teste_v2', NOW())
+    ON CONFLICT (seed_key) DO UPDATE SET executado_em = NOW();
+  END IF;
+END $$;
 
 -- Confirmacao
 DO $$

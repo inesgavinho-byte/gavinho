@@ -9,7 +9,12 @@ ALTER TABLE projeto_renders ADD COLUMN IF NOT EXISTS is_final BOOLEAN DEFAULT FA
 ALTER TABLE projeto_renders ADD COLUMN IF NOT EXISTS descricao TEXT;
 ALTER TABLE projeto_renders ADD COLUMN IF NOT EXISTS data_upload DATE;
 
--- Log migration
-INSERT INTO seeds_executados (nome, executed_at)
-VALUES ('20250213_fix_projeto_renders_columns', NOW())
-ON CONFLICT (nome) DO UPDATE SET executed_at = NOW();
+-- Log migration (guarded: table may not exist yet)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'seeds_executados') THEN
+    INSERT INTO seeds_executados (seed_key, nome, executado_em)
+    VALUES ('20250213_fix_projeto_renders_columns', '20250213_fix_projeto_renders_columns', NOW())
+    ON CONFLICT (seed_key) DO UPDATE SET executado_em = NOW();
+  END IF;
+END $$;
