@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react'
 import { urlBase64ToUint8Array } from '../utils'
 
 // VAPID public key - should be moved to environment variable
-const VAPID_PUBLIC_KEY = 'BFz6TO0qoTGjgsh_Me8K-oO-AbCmhwunac2wiHkluUTLTcNO32rZefeXIHZqkk7i_9Juh2ufLNKUQxpg4xO3XMI'
+const VAPID_PUBLIC_KEY = 'BEWvOiZUhXGyjJHW3Wg89oq0o1CKOub482PHXxik6SMYZry4MKU-95y3ALE7xSGp-DolVlUfrWIkXAq07KX3GfU'
 
 export function usePushNotifications() {
   const [permission, setPermission] = useState('default')
