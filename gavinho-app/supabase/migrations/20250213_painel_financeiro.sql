@@ -5,6 +5,112 @@
 -- ══════════════════════════════════════════════════════════════════
 
 -- ──────────────────────────────────────────────────
+-- 0. PREREQUISITES: purchase_orders & procurement_facturas stubs
+--    (full schema from procurement_pipeline, minus FK refs to
+--     email_processing_queue & cotacoes which are not yet deployed)
+--    Safe: CREATE TABLE/SEQUENCE IF NOT EXISTS — no-op if already present
+-- ──────────────────────────────────────────────────
+CREATE SEQUENCE IF NOT EXISTS po_seq START 1;
+CREATE SEQUENCE IF NOT EXISTS fat_proc_seq START 1;
+
+CREATE TABLE IF NOT EXISTS purchase_orders (
+  id TEXT PRIMARY KEY DEFAULT 'PO-' || to_char(now(), 'YYYY') || '-' || lpad(nextval('po_seq')::text, 4, '0'),
+  created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+
+  requisicao_id TEXT,
+  cotacao_id TEXT,
+  fornecedor_id UUID REFERENCES fornecedores(id) ON DELETE SET NULL,
+  projeto_id UUID REFERENCES projetos(id) ON DELETE SET NULL,
+  obra_id UUID REFERENCES obras(id) ON DELETE SET NULL,
+  capitulo_orcamento TEXT,
+
+  data_emissao DATE DEFAULT CURRENT_DATE,
+  referencia_cotacao TEXT,
+
+  subtotal DECIMAL(12,2) NOT NULL DEFAULT 0,
+  iva_percentagem DECIMAL(5,2) DEFAULT 23,
+  iva_valor DECIMAL(12,2),
+  total DECIMAL(12,2) NOT NULL DEFAULT 0,
+  condicoes_pagamento TEXT,
+
+  prazo_entrega_dias INTEGER,
+  data_entrega_prevista DATE,
+  data_entrega_real DATE,
+  local_entrega TEXT DEFAULT 'Obra',
+  morada_entrega TEXT,
+
+  estado TEXT NOT NULL DEFAULT 'rascunho' CHECK (
+    estado IN ('rascunho', 'aprovada', 'enviada', 'confirmada',
+               'em_producao', 'expedida', 'entregue_parcial',
+               'entregue', 'concluida', 'cancelada')
+  ),
+
+  aprovada_por UUID REFERENCES utilizadores(id) ON DELETE SET NULL,
+  aprovada_em TIMESTAMPTZ,
+  enviada_por UUID REFERENCES utilizadores(id) ON DELETE SET NULL,
+  enviada_em TIMESTAMPTZ,
+
+  confirmada_em TIMESTAMPTZ,
+  confirmacao_email_id UUID,
+
+  documento_url TEXT,
+
+  valor_facturado DECIMAL(12,2) DEFAULT 0,
+  valor_pago DECIMAL(12,2) DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_po_projeto ON purchase_orders(projeto_id, estado);
+CREATE INDEX IF NOT EXISTS idx_po_obra ON purchase_orders(obra_id, estado);
+CREATE INDEX IF NOT EXISTS idx_po_fornecedor ON purchase_orders(fornecedor_id);
+CREATE INDEX IF NOT EXISTS idx_po_estado ON purchase_orders(estado);
+
+ALTER TABLE purchase_orders ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "po_all" ON purchase_orders;
+CREATE POLICY "po_all" ON purchase_orders FOR ALL USING (true) WITH CHECK (true);
+
+CREATE TABLE IF NOT EXISTS procurement_facturas (
+  id TEXT PRIMARY KEY DEFAULT 'PFAT-' || to_char(now(), 'YYYY') || '-' || lpad(nextval('fat_proc_seq')::text, 4, '0'),
+  created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+
+  po_id TEXT REFERENCES purchase_orders(id) ON DELETE SET NULL,
+  fornecedor_id UUID REFERENCES fornecedores(id) ON DELETE SET NULL,
+  projeto_id UUID REFERENCES projetos(id) ON DELETE SET NULL,
+  email_id UUID,
+
+  numero_fatura TEXT NOT NULL DEFAULT '',
+  data_emissao DATE,
+  data_vencimento DATE,
+
+  subtotal DECIMAL(12,2),
+  iva_percentagem DECIMAL(5,2),
+  iva_valor DECIMAL(12,2),
+  total DECIMAL(12,2) NOT NULL DEFAULT 0,
+
+  desvio_valor DECIMAL(12,2),
+  desvio_percentual DECIMAL(8,2),
+  motivo_desvio TEXT,
+
+  estado TEXT DEFAULT 'pendente' CHECK (
+    estado IN ('pendente', 'verificada', 'aprovada',
+               'em_pagamento', 'paga', 'contestada')
+  ),
+
+  ficheiro_url TEXT,
+
+  confianca_match DECIMAL(5,4),
+  dados_brutos_ia JSONB
+);
+
+CREATE INDEX IF NOT EXISTS idx_pfat_po ON procurement_facturas(po_id);
+CREATE INDEX IF NOT EXISTS idx_pfat_projeto ON procurement_facturas(projeto_id);
+CREATE INDEX IF NOT EXISTS idx_pfat_estado ON procurement_facturas(estado);
+
+ALTER TABLE procurement_facturas ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "pfat_all" ON procurement_facturas;
+CREATE POLICY "pfat_all" ON procurement_facturas FOR ALL USING (true) WITH CHECK (true);
+
+-- ──────────────────────────────────────────────────
 -- 1. FACTURAÇÃO AO CLIENTE (milestones de pagamento)
 -- ──────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS facturacao_cliente (
@@ -77,7 +183,7 @@ CREATE TABLE IF NOT EXISTS extras (
   -- Origem
   decisao_id UUID REFERENCES decisoes(id) ON DELETE SET NULL,
   reuniao_id UUID REFERENCES projeto_atas(id) ON DELETE SET NULL,
-  email_id UUID REFERENCES email_processing_queue(id) ON DELETE SET NULL,
+  email_id UUID, -- FK to email_processing_queue deferred until agent_system migration is applied
 
   -- Facturação
   facturado BOOLEAN DEFAULT false,
@@ -121,8 +227,8 @@ CREATE TABLE IF NOT EXISTS alertas_financeiros (
 
   -- Referências
   capitulo TEXT,
-  po_id TEXT REFERENCES purchase_orders(id) ON DELETE SET NULL,
-  factura_id TEXT REFERENCES procurement_facturas(id) ON DELETE SET NULL,
+  po_id TEXT,       -- FK to purchase_orders deferred until procurement_pipeline migration is applied
+  factura_id TEXT,  -- FK to procurement_facturas deferred until procurement_pipeline migration is applied
   extra_id UUID REFERENCES extras(id) ON DELETE SET NULL,
 
   -- Valores
