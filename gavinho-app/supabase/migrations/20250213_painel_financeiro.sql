@@ -147,6 +147,7 @@ CREATE INDEX IF NOT EXISTS idx_facturacao_cliente_projeto
   ON facturacao_cliente(projeto_id, estado);
 
 ALTER TABLE facturacao_cliente ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "facturacao_cliente_all" ON facturacao_cliente;
 CREATE POLICY "facturacao_cliente_all"
   ON facturacao_cliente FOR ALL USING (true) WITH CHECK (true);
 
@@ -195,6 +196,7 @@ CREATE TABLE IF NOT EXISTS extras (
 CREATE INDEX IF NOT EXISTS idx_extras_projeto ON extras(projeto_id, estado);
 
 ALTER TABLE extras ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "extras_all" ON extras;
 CREATE POLICY "extras_all"
   ON extras FOR ALL USING (true) WITH CHECK (true);
 
@@ -251,6 +253,7 @@ CREATE INDEX IF NOT EXISTS idx_alertas_fin_projeto
   ON alertas_financeiros(projeto_id, estado) WHERE estado = 'activo';
 
 ALTER TABLE alertas_financeiros ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "alertas_fin_all" ON alertas_financeiros;
 CREATE POLICY "alertas_fin_all"
   ON alertas_financeiros FOR ALL USING (true) WITH CHECK (true);
 
@@ -291,6 +294,7 @@ CREATE INDEX IF NOT EXISTS idx_projecoes_projeto
   ON projecoes_financeiras(projeto_id, data_projecao DESC);
 
 ALTER TABLE projecoes_financeiras ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "projecoes_all" ON projecoes_financeiras;
 CREATE POLICY "projecoes_all"
   ON projecoes_financeiras FOR ALL USING (true) WITH CHECK (true);
 
