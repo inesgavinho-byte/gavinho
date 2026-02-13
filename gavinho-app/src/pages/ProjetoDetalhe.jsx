@@ -88,6 +88,8 @@ import ProjetoLevantamento from '../components/ProjetoLevantamento'
 import ProjetoInspiracoes from '../components/ProjetoInspiracoes'
 import AcompanhamentoFotos from '../components/AcompanhamentoFotos'
 import DesenhosObra from '../components/DesenhosObra'
+import SubTabNav from '../components/projeto/SubTabNav'
+import styles from './ProjetoDetalhe.module.css'
 
 // Importar constantes de ficheiros separados
 import {
@@ -1348,18 +1350,10 @@ export default function ProjetoDetalhe() {
   // Loading state
   if (loading) {
     return (
-      <div className="fade-in" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ 
-            width: '48px', 
-            height: '48px', 
-            border: '3px solid var(--stone)', 
-            borderTopColor: 'var(--gold)', 
-            borderRadius: '50%', 
-            animation: 'spin 1s linear infinite',
-            margin: '0 auto 16px'
-          }}></div>
-          <p style={{ color: 'var(--text-secondary)' }}>A carregar projeto...</p>
+      <div className={`fade-in ${styles.loadingContainer}`}>
+        <div className={styles.loadingInner}>
+          <div className={styles.spinner}></div>
+          <p className={styles.loadingText}>A carregar projeto...</p>
         </div>
       </div>
     )
@@ -1368,7 +1362,7 @@ export default function ProjetoDetalhe() {
   // Projeto não encontrado
   if (!project) {
     return (
-      <div className="fade-in" style={{ padding: '48px', textAlign: 'center' }}>
+      <div className={`fade-in ${styles.notFound}`}>
         <h2>Projeto não encontrado</h2>
         <button className="btn btn-secondary mt-lg" onClick={() => navigate('/projetos')}>
           Voltar aos Projetos
@@ -1841,207 +1835,96 @@ export default function ProjetoDetalhe() {
 
   return (
     <div className="fade-in">
-      {/* Header - Single line layout */}
-      <div style={{ marginBottom: '16px' }}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-md" style={{ flexWrap: 'wrap' }}>
-            {/* Back button */}
-            <button
-              onClick={() => navigate(-1)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                background: 'none',
-                border: 'none',
-                color: 'var(--brown-light)',
-                fontSize: '13px',
-                cursor: 'pointer',
-                padding: 0
-              }}
-            >
+      {/* Header */}
+      <div className={styles.header}>
+        <div className={styles.headerLeft}>
+          <div className={styles.headerTopRow}>
+            <button onClick={() => navigate(-1)} className={styles.backButton}>
               <ArrowLeft size={16} />
             </button>
 
-            {/* Separator */}
-            <div style={{ width: '1px', height: '20px', background: 'var(--stone)' }} />
+            <h1 className={styles.projectTitle}>{project.nome}</h1>
 
-            {/* Project Name */}
-            <h1 style={{
-              fontSize: '18px',
-              fontWeight: 700,
-              color: 'var(--brown)',
-              margin: 0
-            }}>
-              {project.nome}
-            </h1>
-
-            {/* Separator */}
-            <div style={{ width: '1px', height: '20px', background: 'var(--stone)' }} />
-
-            {/* Project Codes */}
-            <span style={{
-              fontSize: '12px',
-              fontWeight: 600,
-              color: 'var(--blush-dark)',
-              letterSpacing: '0.5px'
-            }}>
-              {project.codigo}
-            </span>
+            <span className={styles.projectCode}>{project.codigo}</span>
             {project.codigo_interno && (
-              <span style={{
-                fontSize: '11px',
-                fontWeight: 600,
-                color: 'var(--info)',
-                background: 'rgba(59, 130, 246, 0.1)',
-                padding: '2px 6px',
-                borderRadius: '4px',
-                fontFamily: 'monospace'
-              }}>
-                {project.codigo_interno}
-              </span>
+              <span className={styles.internalCode}>{project.codigo_interno}</span>
             )}
+          </div>
 
-            {/* Phase Badge */}
-            <span className="badge badge-gold" style={{ fontSize: '11px', padding: '3px 8px' }}>{project.fase}</span>
+          <div className={styles.headerMetaRow}>
+            <span className={styles.phaseBadge}>{project.fase}</span>
 
-            {/* Status Badge */}
             <div
+              className={styles.statusBadge}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '3px 8px',
-                borderRadius: '12px',
-                background: `${getStatusColor(project.status)}15`,
-                color: getStatusColor(project.status),
-                fontSize: '11px',
-                fontWeight: 600
+                background: `${getStatusColor(project.status)}12`,
+                color: getStatusColor(project.status)
               }}
             >
-              <div style={{
-                width: '5px',
-                height: '5px',
-                borderRadius: '50%',
-                background: getStatusColor(project.status)
-              }} />
+              <div className={styles.statusDot} style={{ background: getStatusColor(project.status) }} />
               {getStatusLabel(project.status)}
             </div>
 
-            {/* Separator */}
-            <div style={{ width: '1px', height: '20px', background: 'var(--stone)' }} />
+            <div className={styles.separator} />
 
-            {/* Project Info */}
-            <div className="flex items-center gap-md text-muted" style={{ fontSize: '12px' }}>
-              <span className="flex items-center gap-xs">
-                <Building2 size={13} />
-                {project.tipologia} • {project.subtipo}
-              </span>
-              <span className="flex items-center gap-xs">
-                <MapPin size={13} />
-                {project.localizacao.cidade}, {project.localizacao.pais}
-              </span>
-              <span className="flex items-center gap-xs">
-                <Layers size={13} />
-                {project.area_bruta} {project.unidade_area}
-              </span>
-            </div>
+            <span className={styles.metaItem}>
+              <Building2 size={13} />
+              {project.tipologia} · {project.subtipo}
+            </span>
+            <span className={styles.metaItem}>
+              <MapPin size={13} />
+              {project.localizacao.cidade}, {project.localizacao.pais}
+            </span>
+            <span className={styles.metaItem}>
+              <Layers size={13} />
+              {project.area_bruta} {project.unidade_area}
+            </span>
           </div>
+        </div>
 
-          <div className="flex items-center gap-sm">
-            <button className="btn btn-secondary" onClick={openEditModal}>
-              <Edit size={16} />
-              Editar
+        <div className={styles.headerActions}>
+          <button className="btn btn-secondary" onClick={openEditModal}>
+            <Edit size={16} />
+            Editar
+          </button>
+          <div className={styles.actionsDropdown}>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setShowActions(!showActions)}
+              style={{ padding: '10px' }}
+            >
+              <MoreVertical size={18} />
             </button>
-            <div style={{ position: 'relative' }}>
-              <button 
-                className="btn btn-secondary"
-                onClick={() => setShowActions(!showActions)}
-                style={{ padding: '10px' }}
-              >
-                <MoreVertical size={18} />
-              </button>
-              {showActions && (
-                <div 
-                  style={{
-                    position: 'absolute',
-                    top: '100%',
-                    right: 0,
-                    marginTop: '8px',
-                    background: 'var(--white)',
-                    borderRadius: '12px',
-                    boxShadow: 'var(--shadow-lg)',
-                    border: '1px solid var(--stone)',
-                    minWidth: '180px',
-                    zIndex: 100,
-                    overflow: 'hidden'
-                  }}
-                >
-                  {[
-                    { icon: Copy, label: 'Duplicar Projeto', onClick: handleDuplicate },
-                    { icon: Share, label: 'Partilhar', onClick: handleShare },
-                    { icon: Download, label: 'Exportar PDF', onClick: handleExportPDF },
-                    { icon: Trash2, label: 'Eliminar', danger: true, onClick: handleDelete }
-                  ].map((action, i) => (
-                    <button
-                      key={i}
-                      onClick={action.onClick}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        width: '100%',
-                        padding: '12px 16px',
-                        background: 'none',
-                        border: 'none',
-                        fontSize: '13px',
-                        color: action.danger ? 'var(--error)' : 'var(--brown)',
-                        cursor: 'pointer',
-                        textAlign: 'left'
-                      }}
-                    >
-                      <action.icon size={16} />
-                      {action.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            {showActions && (
+              <div className={styles.actionsMenu}>
+                {[
+                  { icon: Copy, label: 'Duplicar Projeto', onClick: handleDuplicate },
+                  { icon: Share, label: 'Partilhar', onClick: handleShare },
+                  { icon: Download, label: 'Exportar PDF', onClick: handleExportPDF },
+                  { icon: Trash2, label: 'Eliminar', danger: true, onClick: handleDelete }
+                ].map((action, i) => (
+                  <button
+                    key={i}
+                    onClick={action.onClick}
+                    className={action.danger ? styles.actionsMenuItemDanger : styles.actionsMenuItem}
+                  >
+                    <action.icon size={16} />
+                    {action.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div
-        style={{
-          display: 'flex',
-          gap: '4px',
-          marginBottom: '16px',
-          background: 'var(--cream)',
-          padding: '4px',
-          borderRadius: '12px',
-          width: 'fit-content'
-        }}
-      >
+      <div className={styles.tabsContainer}>
         {tabs.map(tab => (
           <button
             key={tab.id}
             onClick={() => handleTabChange(tab.id)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '10px 16px',
-              borderRadius: '8px',
-              border: 'none',
-              background: activeTab === tab.id ? 'var(--white)' : 'transparent',
-              boxShadow: activeTab === tab.id ? 'var(--shadow-sm)' : 'none',
-              color: activeTab === tab.id ? 'var(--brown)' : 'var(--brown-light)',
-              fontSize: '13px',
-              fontWeight: activeTab === tab.id ? 600 : 500,
-              cursor: 'pointer',
-              transition: 'all 0.2s ease'
-            }}
+            className={activeTab === tab.id ? styles.tabActive : styles.tab}
           >
             <tab.icon size={16} />
             {tab.label}
@@ -2096,55 +1979,16 @@ export default function ProjetoDetalhe() {
       {/* Tab Fases & Entregas */}
       {activeTab === 'fases' && (
         <div>
-          {/* Section navigation */}
-          <div style={{
-            display: 'flex',
-            gap: '8px',
-            marginBottom: '20px',
-            borderBottom: '1px solid var(--stone)',
-            paddingBottom: '12px'
-          }}>
-            {faseSections.map(section => (
-              <button
-                key={section.id}
-                onClick={() => handleSubtabChange(section.id)}
-                style={{
-                  padding: '8px 16px',
-                  background: activeFaseSection === section.id ? 'var(--brown)' : 'transparent',
-                  color: activeFaseSection === section.id ? 'var(--off-white)' : 'var(--brown-light)',
-                  border: activeFaseSection === section.id ? 'none' : '1px solid var(--stone)',
-                  borderRadius: '20px',
-                  fontSize: '12px',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-              >
-                <section.icon size={14} />
-                {section.label}
-              </button>
-            ))}
-          </div>
+          <SubTabNav sections={faseSections} activeSection={activeFaseSection} onSectionChange={(id) => handleSubtabChange(id)} />
 
           {/* Content based on active section */}
           <div className="card">
-            <h3 style={{
-              fontSize: '16px',
-              fontWeight: 600,
-              color: 'var(--brown)',
-              marginBottom: '20px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px'
-            }}>
-              {faseSections.find(s => s.id === activeFaseSection)?.label}
-              <span className="badge badge-gold" style={{ fontSize: '11px' }}>
-                {project.fase || 'Fase não definida'}
-              </span>
-            </h3>
+            <div className={styles.sectionHeader}>
+              <h3 className={styles.sectionTitle}>
+                {faseSections.find(s => s.id === activeFaseSection)?.label}
+              </h3>
+              <span className={styles.phaseBadge}>{project.fase || 'Fase não definida'}</span>
+            </div>
 
             {/* Prazo Contratual */}
             {activeFaseSection === 'prazo' && (
@@ -2715,38 +2559,7 @@ export default function ProjetoDetalhe() {
       {/* Tab Briefing & Conceito com subtabs */}
       {activeTab === 'briefing' && (
         <div>
-          {/* Section navigation */}
-          <div style={{
-            display: 'flex',
-            gap: '8px',
-            marginBottom: '20px',
-            borderBottom: '1px solid var(--stone)',
-            paddingBottom: '12px'
-          }}>
-            {briefingSections.map(section => (
-              <button
-                key={section.id}
-                onClick={() => handleSubtabChange(section.id, 'briefing')}
-                style={{
-                  padding: '8px 16px',
-                  background: activeBriefingSection === section.id ? 'var(--brown)' : 'transparent',
-                  color: activeBriefingSection === section.id ? 'var(--off-white)' : 'var(--brown-light)',
-                  border: activeBriefingSection === section.id ? 'none' : '1px solid var(--stone)',
-                  borderRadius: '20px',
-                  fontSize: '12px',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-              >
-                <section.icon size={14} />
-                {section.label}
-              </button>
-            ))}
-          </div>
+          <SubTabNav sections={briefingSections} activeSection={activeBriefingSection} onSectionChange={(id) => handleSubtabChange(id, 'briefing')} />
 
           {/* Inspirações & Referências */}
           {activeBriefingSection === 'inspiracoes' && (
@@ -2783,90 +2596,26 @@ export default function ProjetoDetalhe() {
       {/* Tab Archviz com subtabs */}
       {activeTab === 'archviz' && (
         <div>
-          {/* Section navigation */}
-          <div style={{
-            display: 'flex',
-            gap: '8px',
-            marginBottom: '20px',
-            borderBottom: '1px solid var(--stone)',
-            paddingBottom: '12px'
-          }}>
-            {archvizSections.map(section => (
-              <button
-                key={section.id}
-                onClick={() => handleSubtabChange(section.id, 'archviz')}
-                style={{
-                  padding: '8px 16px',
-                  background: activeArchvizSection === section.id ? 'var(--brown)' : 'transparent',
-                  color: activeArchvizSection === section.id ? 'var(--off-white)' : 'var(--brown-light)',
-                  border: activeArchvizSection === section.id ? 'none' : '1px solid var(--stone)',
-                  borderRadius: '20px',
-                  fontSize: '12px',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-              >
-                <section.icon size={14} />
-                {section.label}
-              </button>
-            ))}
-          </div>
+          <SubTabNav sections={archvizSections} activeSection={activeArchvizSection} onSectionChange={(id) => handleSubtabChange(id, 'archviz')} />
 
           {/* Imagens Processo */}
           {activeArchvizSection === 'processo' && (
             <div className="card">
-          <div className="flex items-center justify-between" style={{ marginBottom: '24px' }}>
+          <div className={styles.archvizHeader}>
             <div>
-              <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
-                Visualizações 3D & Renders
-              </h3>
-              <p style={{ fontSize: '13px', color: 'var(--brown-light)', marginTop: '4px' }}>
-                {renders.length} render{renders.length !== 1 ? 's' : ''} • {imagensFinais.length} {imagensFinais.length !== 1 ? 'imagens finais' : 'imagem final'}
+              <h3 className={styles.archvizTitle}>Visualizações 3D & Renders</h3>
+              <p className={styles.archvizSubtitle}>
+                {renders.length} render{renders.length !== 1 ? 's' : ''} · {imagensFinais.length} {imagensFinais.length !== 1 ? 'imagens finais' : 'imagem final'}
               </p>
             </div>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              {/* Botões Colapsar/Expandir Tudo */}
+            <div className={styles.archvizActions}>
               {Object.keys(rendersByCompartimento).length > 1 && (
                 <>
-                  <button
-                    onClick={() => toggleAllCompartimentos(true)}
-                    style={{
-                      padding: '6px 12px',
-                      background: 'transparent',
-                      color: 'var(--brown-light)',
-                      border: '1px solid var(--stone)',
-                      borderRadius: '6px',
-                      fontSize: '11px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                    title="Colapsar todos os compartimentos"
-                  >
+                  <button onClick={() => toggleAllCompartimentos(true)} className={styles.collapseBtn} title="Colapsar todos">
                     <ChevronUp size={14} />
                     Colapsar
                   </button>
-                  <button
-                    onClick={() => toggleAllCompartimentos(false)}
-                    style={{
-                      padding: '6px 12px',
-                      background: 'transparent',
-                      color: 'var(--brown-light)',
-                      border: '1px solid var(--stone)',
-                      borderRadius: '6px',
-                      fontSize: '11px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                    title="Expandir todos os compartimentos"
-                  >
+                  <button onClick={() => toggleAllCompartimentos(false)} className={styles.collapseBtn} title="Expandir todos">
                     <ChevronDown size={14} />
                     Expandir
                   </button>
@@ -3218,38 +2967,7 @@ export default function ProjetoDetalhe() {
       {/* Tab Acompanhamento com subtabs */}
       {activeTab === 'acompanhamento' && (
         <div>
-          {/* Section navigation */}
-          <div style={{
-            display: 'flex',
-            gap: '8px',
-            marginBottom: '20px',
-            borderBottom: '1px solid var(--stone)',
-            paddingBottom: '12px'
-          }}>
-            {acompSections.map(section => (
-              <button
-                key={section.id}
-                onClick={() => handleSubtabChange(section.id, 'acompanhamento')}
-                style={{
-                  padding: '8px 16px',
-                  background: activeAcompSection === section.id ? 'var(--brown)' : 'transparent',
-                  color: activeAcompSection === section.id ? 'var(--off-white)' : 'var(--brown-light)',
-                  border: activeAcompSection === section.id ? 'none' : '1px solid var(--stone)',
-                  borderRadius: '20px',
-                  fontSize: '12px',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-              >
-                <section.icon size={14} />
-                {section.label}
-              </button>
-            ))}
-          </div>
+          <SubTabNav sections={acompSections} activeSection={activeAcompSection} onSectionChange={(id) => handleSubtabChange(id, 'acompanhamento')} />
 
           {/* Fotografias de Acompanhamento */}
           {activeAcompSection === 'fotografias' && (
@@ -3274,71 +2992,42 @@ export default function ProjetoDetalhe() {
       {/* Tab Biblioteca do Projeto */}
       {activeTab === 'biblioteca' && (
         <div>
-          <div className="grid grid-3" style={{ gap: '16px', marginBottom: '24px' }}>
-            {/* KPI Cards - showing project-specific counts (0 when empty) */}
+          <div className={styles.kpiGrid}>
             {[
               { label: 'Materiais', count: 0 },
               { label: 'Objetos 3D', count: 0 },
               { label: 'Texturas', count: 0 }
             ].map((item, idx) => (
-              <div key={idx} className="card" style={{ padding: '20px' }}>
-                <div>
-                  <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--brown)' }}>
-                    {item.count}
-                  </div>
-                  <div style={{ fontSize: '13px', color: 'var(--brown-light)' }}>
-                    {item.label}
-                  </div>
-                </div>
+              <div key={idx} className={`card ${styles.kpiCard}`}>
+                <div className={styles.kpiValue}>{item.count}</div>
+                <div className={styles.kpiLabel}>{item.label}</div>
               </div>
             ))}
           </div>
 
           <div className="card">
-            <div className="flex items-center justify-between" style={{ marginBottom: '24px' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
-                Biblioteca do Projeto
-              </h3>
+            <div className={styles.archvizHeader}>
+              <h3 className={styles.sectionTitle}>Biblioteca do Projeto</h3>
               <div className="flex gap-sm">
-                <button className="btn btn-secondary" style={{ padding: '8px 14px' }}>
-                  Importar da Biblioteca Global
-                </button>
-                <button className="btn btn-primary" style={{ padding: '8px 14px' }}>
+                <button className="btn btn-secondary">Importar da Biblioteca Global</button>
+                <button className="btn btn-primary">
                   <Plus size={16} style={{ marginRight: '8px' }} />
                   Adicionar Item
                 </button>
               </div>
             </div>
 
-            {/* Tabs de categorias */}
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+            <div className={styles.subTabNav} style={{ borderBottom: 'none', marginBottom: '16px' }}>
               {['Todos', 'Materiais', 'Objetos 3D', 'Texturas'].map((cat, idx) => (
-                <button
-                  key={idx}
-                  style={{
-                    padding: '8px 16px',
-                    background: idx === 0 ? 'var(--brown)' : 'transparent',
-                    color: idx === 0 ? 'var(--off-white)' : 'var(--brown-light)',
-                    border: idx === 0 ? 'none' : '1px solid var(--stone)',
-                    borderRadius: '20px',
-                    fontSize: '12px',
-                    cursor: 'pointer'
-                  }}
-                >
+                <button key={idx} className={idx === 0 ? styles.subTabActive : styles.subTab}>
                   {cat}
                 </button>
               ))}
             </div>
 
-            <div style={{
-              padding: '48px',
-              background: 'var(--cream)',
-              borderRadius: '12px',
-              textAlign: 'center',
-              color: 'var(--brown-light)'
-            }}>
-              <Library size={48} style={{ opacity: 0.3, marginBottom: '16px' }} />
-              <h4 style={{ color: 'var(--brown)', marginBottom: '8px' }}>Biblioteca Vazia</h4>
+            <div className={styles.emptyState}>
+              <Library size={48} className={styles.emptyStateIcon} />
+              <h4>Biblioteca Vazia</h4>
               <p>Adicione materiais, objetos 3D e texturas específicos deste projeto.</p>
             </div>
           </div>
@@ -3353,38 +3042,7 @@ export default function ProjetoDetalhe() {
       {/* Tab Gestão de Projeto com subtabs */}
       {activeTab === 'gestao' && (
         <div>
-          {/* Section navigation */}
-          <div style={{
-            display: 'flex',
-            gap: '8px',
-            marginBottom: '20px',
-            borderBottom: '1px solid var(--stone)',
-            paddingBottom: '12px'
-          }}>
-            {gestaoSections.map(section => (
-              <button
-                key={section.id}
-                onClick={() => handleSubtabChange(section.id, 'gestao')}
-                style={{
-                  padding: '8px 16px',
-                  background: activeGestaoSection === section.id ? 'var(--brown)' : 'transparent',
-                  color: activeGestaoSection === section.id ? 'var(--off-white)' : 'var(--brown-light)',
-                  border: activeGestaoSection === section.id ? 'none' : '1px solid var(--stone)',
-                  borderRadius: '20px',
-                  fontSize: '12px',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-              >
-                <section.icon size={14} />
-                {section.label}
-              </button>
-            ))}
-          </div>
+          <SubTabNav sections={gestaoSections} activeSection={activeGestaoSection} onSectionChange={(id) => handleSubtabChange(id, 'gestao')} />
 
           {/* Decisões */}
           {activeGestaoSection === 'decisoes' && (
@@ -3696,132 +3354,43 @@ export default function ProjetoDetalhe() {
 
       {/* Modal de Upload */}
       {showUploadModal && (
-        <div 
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}
-          onClick={() => {
-            setShowUploadModal(false)
-            setUploadingDoc(null)
-          }}
-        >
-          <div 
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: 'var(--white)',
-              borderRadius: '20px',
-              padding: '32px',
-              width: '100%',
-              maxWidth: '480px',
-              boxShadow: 'var(--shadow-lg)'
-            }}
-          >
+        <div className={styles.modalOverlay} onClick={() => { setShowUploadModal(false); setUploadingDoc(null) }}>
+          <div className={styles.modalCard} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-lg">
-              <h3 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--brown)' }}>
+              <h3 className={styles.modalTitle}>
                 {uploadingDoc ? 'Anexar Proposta Assinada' : 'Adicionar Documento'}
               </h3>
-              <button 
-                onClick={() => {
-                  setShowUploadModal(false)
-                  setUploadingDoc(null)
-                }}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--brown-light)',
-                  cursor: 'pointer',
-                  padding: '4px'
-                }}
-              >
+              <button className={styles.modalClose} onClick={() => { setShowUploadModal(false); setUploadingDoc(null) }}>
                 <X size={20} />
               </button>
             </div>
 
             {uploadingDoc && (
-              <div style={{
-                padding: '16px',
-                background: 'var(--cream)',
-                borderRadius: '12px',
-                marginBottom: '20px'
-              }}>
-                <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginBottom: '4px' }}>
-                  Documento original:
-                </div>
-                <div style={{ fontWeight: 500, color: 'var(--brown)' }}>
-                  {uploadingDoc.nome}
-                </div>
+              <div className={styles.docInfo}>
+                <div className={styles.docInfoLabel}>Documento original:</div>
+                <div className={styles.docInfoName}>{uploadingDoc.nome}</div>
               </div>
             )}
 
-            <div 
+            <div
+              className={dragOver ? styles.dropZoneActive : styles.dropZone}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
-              style={{
-                padding: '48px 32px',
-                border: `2px dashed ${dragOver ? 'var(--blush)' : 'var(--stone)'}`,
-                borderRadius: '16px',
-                background: dragOver ? 'rgba(195, 186, 175, 0.1)' : 'var(--cream)',
-                textAlign: 'center',
-                transition: 'all 0.2s ease',
-                position: 'relative',
-                cursor: 'pointer'
-              }}
             >
-              <input
-                type="file"
-                accept=".pdf,application/pdf"
-                onChange={handleFileSelect}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '100%',
-                  opacity: 0,
-                  cursor: 'pointer'
-                }}
-              />
-              <div style={{
-                width: '64px',
-                height: '64px',
-                borderRadius: '50%',
-                background: 'var(--white)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 16px'
-              }}>
-                <File size={28} style={{ color: 'var(--blush-dark)' }} />
+              <input type="file" accept=".pdf,application/pdf" onChange={handleFileSelect} className={styles.dropZoneInput} />
+              <div className={styles.dropZoneIcon}>
+                <File size={24} style={{ color: 'var(--blush-dark)' }} />
               </div>
-              <div style={{ fontSize: '15px', fontWeight: 500, color: 'var(--brown)', marginBottom: '8px' }}>
+              <div className={styles.dropZoneTitle}>
                 {uploadingDoc ? 'Selecione o PDF assinado' : 'Selecione um ficheiro PDF'}
               </div>
-              <div style={{ fontSize: '13px', color: 'var(--brown-light)' }}>
-                Arraste o ficheiro para aqui ou clique para selecionar
-              </div>
-              <div style={{ fontSize: '11px', color: 'var(--brown-light)', marginTop: '8px' }}>
-                Apenas ficheiros PDF
-              </div>
+              <div className={styles.dropZoneSubtitle}>Arraste o ficheiro para aqui ou clique para selecionar</div>
+              <div className={styles.dropZoneHint}>Apenas ficheiros PDF</div>
             </div>
 
             <div className="flex items-center justify-end gap-sm" style={{ marginTop: '24px' }}>
-              <button 
-                className="btn btn-secondary"
-                onClick={() => {
-                  setShowUploadModal(false)
-                  setUploadingDoc(null)
-                }}
-              >
+              <button className="btn btn-secondary" onClick={() => { setShowUploadModal(false); setUploadingDoc(null) }}>
                 Cancelar
               </button>
             </div>
