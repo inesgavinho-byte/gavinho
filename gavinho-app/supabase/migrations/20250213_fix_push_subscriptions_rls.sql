@@ -8,6 +8,7 @@
 DROP POLICY IF EXISTS "chat_push_subscriptions_all" ON chat_push_subscriptions;
 
 -- Users can read/manage only their own subscriptions
+DROP POLICY IF EXISTS "chat_push_subscriptions_own" ON chat_push_subscriptions;
 CREATE POLICY "chat_push_subscriptions_own"
   ON chat_push_subscriptions
   FOR ALL
