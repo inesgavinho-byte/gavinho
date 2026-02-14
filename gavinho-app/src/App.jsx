@@ -72,6 +72,7 @@ const Faturacao = lazy(() => import('./pages/Faturacao'))
 const ComprasFinanceiro = lazy(() => import('./pages/ComprasFinanceiro'))
 const ProcurementDashboard = lazy(() => import('./pages/ProcurementDashboard'))
 const FinanceiroDashboard = lazy(() => import('./pages/FinanceiroDashboard'))
+const FinanceiroPortfolio = lazy(() => import('./pages/FinanceiroPortfolio'))
 
 // Portal Cliente - separate chunk
 const PortalLayout = lazy(() => import('./portal/PortalLayout'))
@@ -546,6 +547,11 @@ function App() {
                   <Route path="financeiro/projeto/:id" element={
                     <Suspense fallback={<PageLoader />}>
                       <FinanceiroDashboard />
+                    </Suspense>
+                  } />
+                  <Route path="financeiro/portfolio" element={
+                    <Suspense fallback={<PageLoader />}>
+                      <FinanceiroPortfolio />
                     </Suspense>
                   } />
                 </Route>

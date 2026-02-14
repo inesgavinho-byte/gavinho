@@ -1,16 +1,11 @@
-import { useState, useEffect, useRef, lazy, Suspense } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 // react-router-dom navigate comes from useProjetoNavigation hook
 import {
   ArrowLeft,
   MapPin,
-  Calendar,
-  User,
   Building2,
   FileText,
-  Euro,
-  CheckCircle,
   Download,
-  ExternalLink,
   Layers,
   Target,
   MoreVertical,
@@ -18,9 +13,7 @@ import {
   Trash2,
   Copy,
   Share,
-  Upload,
   X,
-  Plus,
   File,
   ListChecks,
   Image,
@@ -29,52 +22,30 @@ import {
   Eye,
   BookOpen,
   Package,
-  ClipboardList,
   Lightbulb,
-  Palette,
-  ImagePlus,
-  UserCircle,
-  Inbox,
-  FileSearch,
-  List,
-  ChevronDown,
-  ChevronUp,
-  Pencil,
   MessageSquare,
-  Camera,
-  BarChart3,
   HardHat,
-  Ruler
+  Calendar
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { jsPDF } from 'jspdf'
 import ProjetoEntregaveis from '../components/ProjetoEntregaveis'
-import ProjetoDocumentos from '../components/ProjetoDocumentos'
 import CentralEntregas from '../components/CentralEntregas'
-import DiarioBordo from '../components/DiarioBordo'
-import DuvidasLog from '../components/DuvidasLog'
-import ProjetoDecisoes from '../components/decisoes/ProjetoDecisoes'
-// DesignReview lazy-loaded above
 import RecebidosEspecialidades from '../components/RecebidosEspecialidades'
-import ViabilidadeModule from '../components/viabilidade/ViabilidadeModule'
-import Moleskine from '../components/Moleskine'
-// MoleskineDigital & ProjetoChatIA lazy-loaded above
 import ProjetoAtas from '../components/ProjetoAtas'
-import ProjetoMoodboards from '../components/ProjetoMoodboards'
-import ProjetoLevantamento from '../components/ProjetoLevantamento'
-import ProjetoInspiracoes from '../components/ProjetoInspiracoes'
-import AcompanhamentoFotos from '../components/AcompanhamentoFotos'
-import DesenhosObra from '../components/DesenhosObra'
 import SubTabNav from '../components/projeto/SubTabNav'
 import useProjetoNavigation from '../hooks/useProjetoNavigation'
 import ProjetoFasesPrazo from '../components/projeto/tabs/ProjetoFasesPrazo'
-import ProjetoFichaCliente from '../components/projeto/tabs/ProjetoFichaCliente'
+import ProjetoArchviz from '../components/projeto/tabs/ProjetoArchviz'
+import ProjetoBriefing from '../components/projeto/tabs/ProjetoBriefing'
+import ProjetoGestao from '../components/projeto/tabs/ProjetoGestao'
+import ProjetoAcompanhamento from '../components/projeto/tabs/ProjetoAcompanhamento'
+import ProjetoBiblioteca from '../components/projeto/tabs/ProjetoBiblioteca'
 import styles from './ProjetoDetalhe.module.css'
 
 // Lazy-loaded heavy components
 const DesignReview = lazy(() => import('../components/DesignReview'))
-const MoleskineDigital = lazy(() => import('../components/MoleskineDigital'))
 const ProjetoChatIA = lazy(() => import('../components/projeto/ProjetoChatIA'))
 
 // Importar constantes de ficheiros separados
@@ -165,35 +136,7 @@ export default function ProjetoDetalhe() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   // Escopo/Cliente state moved to extracted components (ProjetoFasesPrazo, ProjetoFichaCliente)
-
-  // Gestão de Renders/Archviz
-  const [renders, setRenders] = useState([])
-  const [showRenderModal, setShowRenderModal] = useState(false)
-  const [editingRender, setEditingRender] = useState(null)
-  const [lightboxImage, setLightboxImage] = useState(null) // Para lightbox
-  const [lightboxImages, setLightboxImages] = useState([]) // Array de imagens para navegação no lightbox
-  const [lightboxIndex, setLightboxIndex] = useState(0) // Índice atual no lightbox
-  const [collapsedCompartimentos, setCollapsedCompartimentos] = useState({}) // Compartimentos colapsados
-  const [moleskineRender, setMoleskineRender] = useState(null) // Para Moleskine (anotação de renders)
-  const [renderAnnotations, setRenderAnnotations] = useState({}) // Mapa de render_id -> annotation count
-  const [isDragging, setIsDragging] = useState(false) // Para drag & drop
-  const [projetoCompartimentos, setProjetoCompartimentos] = useState([]) // Compartimentos do projeto
-  const [renderForm, setRenderForm] = useState({
-    compartimento: '',
-    vista: '',
-    versao: 1,
-    descricao: '',
-    is_final: false,
-    imagem_url: '',
-    data_upload: new Date().toISOString().split('T')[0]
-  })
-
-  // Imagens finais do projeto com suporte para drag-and-drop reordering
-  const [finalImageOrder, setFinalImageOrder] = useState([])
-  const [draggedImage, setDraggedImage] = useState(null)
-
-  // CONSTANTES agora importadas de ../constants/projectConstants.js:
-  // COMPARTIMENTOS, TIPOLOGIAS, SUBTIPOS, FASES, STATUS_OPTIONS
+  // Archviz/Render state moved to useArchvizRenders hook (ProjetoArchviz component)
 
   // Abrir modal de edição
   const openEditModal = () => {
@@ -557,57 +500,9 @@ export default function ProjetoDetalhe() {
 
   // Escopo handlers moved to ProjetoFasesPrazo component
 
-  // Carregar renders do projeto
-  const fetchRenders = async (projetoId) => {
-    try {
-      const { data, error } = await supabase
-        .from('projeto_renders')
-        .select('*')
-        .eq('projeto_id', projetoId)
-        .order('compartimento')
-        .order('vista')
-
-      if (error) throw error
-
-      // Sort by versao in JS (column may or may not exist depending on schema)
-      const sorted = (data || []).sort((a, b) => {
-        if (a.compartimento !== b.compartimento) return a.compartimento.localeCompare(b.compartimento)
-        if ((a.vista || '') !== (b.vista || '')) return (a.vista || '').localeCompare(b.vista || '')
-        return (b.versao || 0) - (a.versao || 0)
-      })
-      setRenders(sorted)
-
-      // Carregar compartimentos do projeto
-      const { data: compartimentosData } = await supabase
-        .from('projeto_compartimentos')
-        .select('nome')
-        .eq('projeto_id', projetoId)
-        .order('nome')
-
-      if (compartimentosData) {
-        setProjetoCompartimentos(compartimentosData.map(c => c.nome))
-      }
-
-      // Carregar anotações existentes
-      const { data: annotationsData } = await supabase
-        .from('render_annotations')
-        .select('render_id, annotations')
-        .eq('projeto_id', projetoId)
-
-      if (annotationsData) {
-        const annotationsMap = {}
-        annotationsData.forEach(a => {
-          annotationsMap[a.render_id] = a.annotations?.length || 0
-        })
-        setRenderAnnotations(annotationsMap)
-      }
-    } catch (err) {
-      console.error('Erro ao carregar renders:', err)
-    }
-  }
-
   // Navigation handlers moved to useProjetoNavigation hook
   // Ficha de cliente moved to ProjetoFichaCliente component
+  // Render handlers moved to useArchvizRenders hook
 
   // Duplicar projeto
   const handleDuplicate = async () => {
@@ -1069,13 +964,11 @@ export default function ProjetoDetalhe() {
         }
 
         setProject(fullProject)
-        setEscopoTrabalho(projetoData.escopo_trabalho || '')
 
-        // Carregar equipa, intervenientes, fases e renders
+        // Carregar equipa, intervenientes e fases (renders handled by ProjetoArchviz)
         fetchEquipaProjeto(projetoData.id)
         fetchIntervenientes(projetoData.id)
         fetchFasesContratuais(projetoData.id)
-        fetchRenders(projetoData.id)
 
       } catch (err) {
         console.error('Erro ao buscar projeto:', err)
@@ -1106,20 +999,6 @@ export default function ProjetoDetalhe() {
       supabase.removeChannel(channel)
     }
   }, [id])
-
-  // Load final image order from localStorage
-  useEffect(() => {
-    if (project?.id) {
-      const stored = localStorage.getItem(`gavinho_final_images_order_${project.id}`)
-      if (stored) {
-        try {
-          setFinalImageOrder(JSON.parse(stored))
-        } catch {
-          setFinalImageOrder([])
-        }
-      }
-    }
-  }, [project?.id])
 
   // Loading state
   if (loading) {
@@ -1261,297 +1140,6 @@ export default function ProjetoDetalhe() {
     handleFileUpload(file)
   }
 
-  // Funções de gestão de renders
-  const getNextVersion = (compartimento, vista = '') => {
-    // Filtrar renders pelo compartimento e vista
-    const matchingRenders = renders.filter(r =>
-      r.compartimento === compartimento &&
-      (r.vista || '') === (vista || '')
-    )
-    return matchingRenders.length + 1
-  }
-
-  const openAddRenderModal = (compartimento = '', vista = '') => {
-    setEditingRender(null)
-    const versao = compartimento ? getNextVersion(compartimento, vista) : 1
-    setRenderForm({
-      compartimento: compartimento,
-      vista: vista,
-      versao: versao,
-      descricao: '',
-      is_final: false,
-      imagem_url: '',
-      data_upload: new Date().toISOString().split('T')[0]
-    })
-    setShowRenderModal(true)
-  }
-
-  const openEditRenderModal = (render) => {
-    setEditingRender(render)
-    setRenderForm({
-      compartimento: render.compartimento,
-      vista: render.vista || '',
-      versao: render.versao,
-      descricao: render.descricao || '',
-      is_final: render.is_final || false,
-      imagem_url: render.imagem_url || '',
-      data_upload: render.data_upload || render.created_at?.split('T')[0] || new Date().toISOString().split('T')[0]
-    })
-    setShowRenderModal(true)
-  }
-
-  const handleRenderCompartimentoChange = (compartimento) => {
-    const versao = getNextVersion(compartimento, renderForm.vista)
-    setRenderForm(prev => ({ ...prev, compartimento, versao }))
-  }
-
-  const handleSaveRender = async () => {
-    if (!renderForm.compartimento) {
-      alert('Por favor selecione um compartimento')
-      return
-    }
-
-    try {
-      // Guardar compartimento do projeto se for novo
-      const compartimentoNome = renderForm.compartimento.trim()
-      if (compartimentoNome && !projetoCompartimentos.includes(compartimentoNome)) {
-        const { error: compError } = await supabase
-          .from('projeto_compartimentos')
-          .insert([{
-            projeto_id: project.id,
-            nome: compartimentoNome,
-            created_by: user?.id,
-            created_by_name: user?.email?.split('@')[0] || 'Utilizador'
-          }])
-          .select()
-
-        if (!compError) {
-          setProjetoCompartimentos(prev => [...prev, compartimentoNome].sort())
-        }
-      }
-
-      const renderData = {
-        projeto_id: project.id,
-        compartimento: compartimentoNome,
-        vista: renderForm.vista || null,
-        versao: editingRender ? renderForm.versao : getNextVersion(compartimentoNome, renderForm.vista),
-        descricao: renderForm.descricao,
-        is_final: renderForm.is_final,
-        imagem_url: renderForm.imagem_url,
-        created_at: new Date().toISOString()
-      }
-
-      if (editingRender) {
-        // Atualizar render existente
-        const { error } = await supabase
-          .from('projeto_renders')
-          .update(renderData)
-          .eq('id', editingRender.id)
-
-        if (error) throw error
-
-        setRenders(prev => prev.map(r =>
-          r.id === editingRender.id ? { ...r, ...renderData } : r
-        ))
-      } else {
-        // Criar novo render
-        const { data, error } = await supabase
-          .from('projeto_renders')
-          .insert([renderData])
-          .select()
-          .single()
-
-        if (error) {
-          alert('Erro ao guardar render: ' + error.message)
-          return
-        }
-        setRenders(prev => [...prev, data])
-      }
-
-      setShowRenderModal(false)
-      setEditingRender(null)
-    } catch (err) {
-      alert('Erro ao guardar render: ' + err.message)
-    }
-  }
-
-  const handleDeleteRender = async (render) => {
-    if (!confirm('Tem certeza que deseja eliminar este render?')) return
-
-    try {
-      const { error } = await supabase
-        .from('projeto_renders')
-        .delete()
-        .eq('id', render.id)
-
-      if (error) throw error
-      setRenders(prev => prev.filter(r => r.id !== render.id))
-    } catch (err) {
-      alert('Erro ao eliminar: ' + err.message)
-    }
-  }
-
-  const toggleFinalImage = async (render) => {
-    const newIsFinal = !render.is_final
-
-    try {
-      const { error } = await supabase
-        .from('projeto_renders')
-        .update({ is_final: newIsFinal })
-        .eq('id', render.id)
-
-      if (error) throw error
-      setRenders(prev => prev.map(r =>
-        r.id === render.id ? { ...r, is_final: newIsFinal } : r
-      ))
-    } catch (err) {
-      alert('Erro ao atualizar: ' + err.message)
-    }
-  }
-
-  const handleRenderImageUpload = (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    processImageFile(file)
-  }
-
-  const processImageFile = (file) => {
-    if (!file.type.startsWith('image/')) {
-      alert('Por favor selecione um ficheiro de imagem válido')
-      return
-    }
-    // Simular upload - em produção, fazer upload para Supabase Storage
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      setRenderForm(prev => ({ ...prev, imagem_url: event.target?.result }))
-    }
-    reader.readAsDataURL(file)
-  }
-
-  // Drag & Drop handlers para Archviz
-  const handleRenderDragOver = (e) => {
-    e.preventDefault()
-    setIsDragging(true)
-  }
-
-  const handleRenderDragLeave = (e) => {
-    e.preventDefault()
-    setIsDragging(false)
-  }
-
-  const handleRenderDrop = (e) => {
-    e.preventDefault()
-    setIsDragging(false)
-    const file = e.dataTransfer.files?.[0]
-    if (file) processImageFile(file)
-  }
-
-  // Abrir lightbox com navegação
-  const openLightbox = (render, imageArray = null) => {
-    if (render.imagem_url) {
-      setLightboxImage(render)
-      if (imageArray && imageArray.length > 0) {
-        // Filtrar apenas imagens com URL
-        const imagesWithUrl = imageArray.filter(r => r.imagem_url)
-        setLightboxImages(imagesWithUrl)
-        const index = imagesWithUrl.findIndex(r => r.id === render.id)
-        setLightboxIndex(index >= 0 ? index : 0)
-      } else {
-        setLightboxImages([render])
-        setLightboxIndex(0)
-      }
-    }
-  }
-
-  // Navegar no lightbox
-  const navigateLightbox = (direction) => {
-    const newIndex = lightboxIndex + direction
-    if (newIndex >= 0 && newIndex < lightboxImages.length) {
-      setLightboxIndex(newIndex)
-      setLightboxImage(lightboxImages[newIndex])
-    }
-  }
-
-  // Toggle colapsar compartimento
-  const toggleCompartimentoCollapse = (compartimento) => {
-    setCollapsedCompartimentos(prev => ({
-      ...prev,
-      [compartimento]: !prev[compartimento]
-    }))
-  }
-
-  // Renders agrupados por compartimento
-  const rendersByCompartimento = renders.reduce((acc, render) => {
-    if (!acc[render.compartimento]) {
-      acc[render.compartimento] = []
-    }
-    acc[render.compartimento].push(render)
-    return acc
-  }, {})
-
-  // Colapsar/Expandir todos os compartimentos
-  const toggleAllCompartimentos = (collapse) => {
-    const newState = {}
-    Object.keys(rendersByCompartimento).forEach(comp => {
-      newState[comp] = collapse
-    })
-    setCollapsedCompartimentos(newState)
-  }
-
-  // Get final images sorted by custom order
-  const imagensFinais = (() => {
-    const finals = renders.filter(r => r.is_final)
-    if (finalImageOrder.length === 0) return finals
-
-    // Sort by custom order, new images go to the end
-    return finals.sort((a, b) => {
-      const indexA = finalImageOrder.indexOf(a.id)
-      const indexB = finalImageOrder.indexOf(b.id)
-      if (indexA === -1 && indexB === -1) return 0
-      if (indexA === -1) return 1
-      if (indexB === -1) return -1
-      return indexA - indexB
-    })
-  })()
-
-  // Handle drag start for final images
-  const handleFinalImageDragStart = (e, render) => {
-    setDraggedImage(render)
-    e.dataTransfer.effectAllowed = 'move'
-  }
-
-  // Handle drag over for final images
-  const handleFinalImageDragOver = (e) => {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
-  }
-
-  // Handle drop for final images
-  const handleFinalImageDrop = (e, targetRender) => {
-    e.preventDefault()
-    if (!draggedImage || draggedImage.id === targetRender.id) {
-      setDraggedImage(null)
-      return
-    }
-
-    const currentOrder = imagensFinais.map(r => r.id)
-    const draggedIndex = currentOrder.indexOf(draggedImage.id)
-    const targetIndex = currentOrder.indexOf(targetRender.id)
-
-    // Remove dragged item and insert at new position
-    currentOrder.splice(draggedIndex, 1)
-    currentOrder.splice(targetIndex, 0, draggedImage.id)
-
-    setFinalImageOrder(currentOrder)
-    localStorage.setItem(`gavinho_final_images_order_${project.id}`, JSON.stringify(currentOrder))
-    setDraggedImage(null)
-  }
-
-  // Handle drag end
-  const handleFinalImageDragEnd = () => {
-    setDraggedImage(null)
-  }
-
   // Tabs principais
   const allTabs = [
     { id: 'dashboard', label: 'Dashboard', icon: Layers },
@@ -1565,13 +1153,6 @@ export default function ProjetoDetalhe() {
     { id: 'gestao', label: 'Gestão de Projeto', icon: Settings, hasSubtabs: true }
   ]
 
-  // Secções dentro de Briefing & Conceito
-  const briefingSections = [
-    { id: 'inspiracoes', label: 'Inspirações & Referências', icon: Palette },
-    { id: 'moodboards', label: 'Moodboards', icon: Lightbulb },
-    { id: 'levantamento', label: 'Levantamento Fotografico', icon: Camera }
-  ]
-
   // Secções dentro de Fases & Entregas
   const faseSections = [
     { id: 'prazo', label: 'Prazo Contratual & Escopo', icon: Calendar },
@@ -1581,30 +1162,7 @@ export default function ProjetoDetalhe() {
     { id: 'design-review', label: 'Design Review', icon: Eye }
   ]
 
-  // Secções dentro de Archviz
-  const archvizSections = [
-    { id: 'processo', label: 'Imagens Processo', icon: ImagePlus },
-    { id: 'finais', label: 'Imagens Finais', icon: CheckCircle },
-    { id: 'moleskine', label: 'Moleskine', icon: Pencil }
-  ]
-
-  // Secções dentro de Acompanhamento
-  const acompSections = [
-    { id: 'fotografias', label: 'Fotografias', icon: Camera },
-    { id: 'desenhos-obra', label: 'Desenhos em Uso Obra', icon: Ruler }
-  ]
-
-  // Secções dentro de Gestão de Projeto
-  const gestaoSections = [
-    { id: 'decisoes', label: 'Decisões', icon: ClipboardList },
-    { id: 'viabilidade', label: 'Viabilidade', icon: FileSearch },
-    { id: 'contratos', label: 'Contratos', icon: FileText },
-    { id: 'diario-projeto', label: 'Diário de Projeto', icon: BookOpen },
-    { id: 'painel-financeiro', label: 'Painel Financeiro', icon: BarChart3 },
-    { id: 'faturacao', label: 'Faturação', icon: Euro },
-    { id: 'ficha-cliente', label: 'Ficha de Cliente', icon: UserCircle }
-  ]
-
+  // Section definitions moved to extracted tab components
   const tabs = allTabs.filter(tab => !tab.adminOnly || isAdmin())
 
   return (
@@ -1819,484 +1377,39 @@ export default function ProjetoDetalhe() {
         <ProjetoAtas projeto={project} />
       )}
 
-      {/* Tab Briefing & Conceito com subtabs */}
+      {/* Tab Briefing & Conceito */}
       {activeTab === 'briefing' && (
-        <div>
-          <SubTabNav sections={briefingSections} activeSection={activeBriefingSection} onSectionChange={(id) => handleSubtabChange(id, 'briefing')} />
-
-          {/* Inspirações & Referências */}
-          {activeBriefingSection === 'inspiracoes' && (
-            <div className="card">
-              <ProjetoInspiracoes
-                projeto={project}
-                userId={user?.id}
-                userName={user?.nome || user?.email}
-                compartimentosProjeto={projetoCompartimentos}
-              />
-            </div>
-          )}
-
-          {/* Moodboards */}
-          {activeBriefingSection === 'moodboards' && (
-            <ProjetoMoodboards
-              projeto={project}
-              userId={user?.id}
-              userName={user?.email?.split('@')[0] || 'Utilizador'}
-            />
-          )}
-
-          {/* Levantamento Fotografico */}
-          {activeBriefingSection === 'levantamento' && (
-            <ProjetoLevantamento
-              projeto={project}
-              userId={user?.id}
-              userName={user?.email?.split('@')[0] || 'Utilizador'}
-            />
-          )}
-        </div>
+        <ProjetoBriefing
+          project={project}
+          user={user}
+          activeBriefingSection={activeBriefingSection}
+          onSectionChange={(id) => handleSubtabChange(id, 'briefing')}
+        />
       )}
 
-      {/* Tab Archviz com subtabs */}
+      {/* Tab Archviz */}
       {activeTab === 'archviz' && (
-        <div>
-          <SubTabNav sections={archvizSections} activeSection={activeArchvizSection} onSectionChange={(id) => handleSubtabChange(id, 'archviz')} />
-
-          {/* Imagens Processo */}
-          {activeArchvizSection === 'processo' && (
-            <div className="card">
-          <div className={styles.archvizHeader}>
-            <div>
-              <h3 className={styles.archvizTitle}>Visualizações 3D & Renders</h3>
-              <p className={styles.archvizSubtitle}>
-                {renders.length} render{renders.length !== 1 ? 's' : ''} · {imagensFinais.length} {imagensFinais.length !== 1 ? 'imagens finais' : 'imagem final'}
-              </p>
-            </div>
-            <div className={styles.archvizActions}>
-              {Object.keys(rendersByCompartimento).length > 1 && (
-                <>
-                  <button onClick={() => toggleAllCompartimentos(true)} className={styles.collapseBtn} title="Colapsar todos">
-                    <ChevronUp size={14} />
-                    Colapsar
-                  </button>
-                  <button onClick={() => toggleAllCompartimentos(false)} className={styles.collapseBtn} title="Expandir todos">
-                    <ChevronDown size={14} />
-                    Expandir
-                  </button>
-                </>
-              )}
-              <button onClick={openAddRenderModal} className="btn btn-primary" style={{ padding: '10px 16px' }}>
-                <Plus size={16} style={{ marginRight: '8px' }} />
-                Adicionar Render
-              </button>
-            </div>
-          </div>
-
-          {/* Renders por Compartimento e Vista */}
-          {Object.keys(rendersByCompartimento).length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-              {Object.entries(rendersByCompartimento).map(([compartimento, compartimentoRenders]) => {
-                // Agrupar renders por vista dentro do compartimento
-                const rendersByVista = compartimentoRenders.reduce((acc, render) => {
-                  const vista = render.vista || 'Vista Principal'
-                  if (!acc[vista]) acc[vista] = []
-                  acc[vista].push(render)
-                  return acc
-                }, {})
-
-                const totalVersoes = compartimentoRenders.length
-                const totalVistas = Object.keys(rendersByVista).length
-
-                const isCollapsed = collapsedCompartimentos[compartimento]
-
-                return (
-                  <div key={compartimento} style={{
-                    background: 'var(--white)',
-                    border: '1px solid var(--stone)',
-                    borderRadius: '12px',
-                    padding: isCollapsed ? '12px 16px' : '16px',
-                    transition: 'padding 0.2s ease'
-                  }}>
-                    {/* Cabeçalho do Compartimento */}
-                    <div
-                      className="flex items-center justify-between"
-                      style={{
-                        marginBottom: isCollapsed ? 0 : '16px',
-                        cursor: 'pointer'
-                      }}
-                      onClick={() => toggleCompartimentoCollapse(compartimento)}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); toggleCompartimentoCollapse(compartimento) }}
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
-                            padding: '4px',
-                            cursor: 'pointer',
-                            color: 'var(--brown-light)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            transition: 'transform 0.2s ease',
-                            transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)'
-                          }}
-                          title={isCollapsed ? 'Expandir' : 'Colapsar'}
-                        >
-                          <ChevronDown size={18} />
-                        </button>
-                        <h4 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--brown)', margin: 0 }}>
-                          {compartimento}
-                          <span style={{ fontWeight: 400, color: 'var(--brown-light)', marginLeft: '8px', fontSize: '13px' }}>
-                            ({totalVistas} {totalVistas !== 1 ? 'vistas' : 'vista'} • {totalVersoes} {totalVersoes !== 1 ? 'versões' : 'versão'})
-                          </span>
-                        </h4>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        {/* Preview de imagens quando colapsado */}
-                        {isCollapsed && compartimentoRenders.filter(r => r.imagem_url).slice(0, 4).map((render, idx) => (
-                          <div
-                            key={render.id}
-                            style={{
-                              width: '32px',
-                              height: '32px',
-                              borderRadius: '4px',
-                              background: `url(${render.imagem_url}) center/cover`,
-                              border: render.is_final ? '2px solid var(--success)' : '1px solid var(--stone)',
-                              marginLeft: idx > 0 ? '-8px' : 0
-                            }}
-                            onClick={(e) => { e.stopPropagation(); openLightbox(render, compartimentoRenders) }}
-                          />
-                        ))}
-                        <button
-                          onClick={(e) => { e.stopPropagation(); openAddRenderModal(compartimento) }}
-                          className="btn btn-secondary"
-                          style={{ padding: '6px 12px', fontSize: '12px' }}
-                        >
-                          <Plus size={14} style={{ marginRight: '6px' }} />
-                          Nova Vista
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Vistas dentro do Compartimento - só mostra se não colapsado */}
-                    {!isCollapsed && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                      {Object.entries(rendersByVista).map(([vista, vistaRenders]) => (
-                        <div key={vista} style={{
-                          background: 'var(--cream)',
-                          borderRadius: '8px',
-                          padding: '12px'
-                        }}>
-                          {/* Cabeçalho da Vista */}
-                          <div className="flex items-center justify-between" style={{ marginBottom: '10px' }}>
-                            <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--brown)' }}>
-                              {vista}
-                              <span style={{ fontWeight: 400, color: 'var(--brown-light)', marginLeft: '6px' }}>
-                                ({vistaRenders.length} {vistaRenders.length !== 1 ? 'versões' : 'versão'})
-                              </span>
-                            </span>
-                            <button
-                              onClick={() => openAddRenderModal(compartimento, vista)}
-                              style={{
-                                padding: '4px 8px',
-                                background: 'transparent',
-                                color: 'var(--brown)',
-                                border: '1px solid var(--stone)',
-                                borderRadius: '4px',
-                                fontSize: '11px',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px'
-                              }}
-                            >
-                              <Plus size={12} />
-                              Versão
-                            </button>
-                          </div>
-
-                          {/* Grid de Renders da Vista - Masonry Pinterest Style */}
-                          <div className="masonry-grid">
-                            {vistaRenders
-                              .sort((a, b) => (b.versao || 0) - (a.versao || 0))
-                              .map((render) => (
-                              <div
-                                key={render.id}
-                                className={`masonry-card ${render.is_final ? 'is-final' : ''}`}
-                                style={{ cursor: render.imagem_url ? 'pointer' : 'default' }}
-                                onClick={() => openLightbox(render, compartimentoRenders)}
-                              >
-                                {render.imagem_url ? (
-                                  <img
-                                    src={render.imagem_url}
-                                    alt={`${render.compartimento} - v${render.versao}`}
-                                    className="masonry-card-image"
-                                  />
-                                ) : (
-                                  <div className="masonry-placeholder">
-                                    <Image size={24} />
-                                  </div>
-                                )}
-
-                                {/* Versão Badge */}
-                                <div className="masonry-badge dark">
-                                  v{render.versao}
-                                </div>
-
-                                {/* Final Badge */}
-                                {render.is_final && (
-                                  <div className="masonry-badge success" style={{ left: 'auto', right: '50px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    <CheckCircle size={10} />
-                                    FINAL
-                                  </div>
-                                )}
-
-                                {/* Actions */}
-                                <div className="masonry-card-actions">
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); setMoleskineRender(render) }}
-                                    className="masonry-action-btn"
-                                    title="Moleskine"
-                                  >
-                                    <Pencil size={14} />
-                                  </button>
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); openEditRenderModal(render) }}
-                                    className="masonry-action-btn"
-                                    title="Editar"
-                                  >
-                                    <Edit size={14} />
-                                  </button>
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); handleDeleteRender(render) }}
-                                    className="masonry-action-btn danger"
-                                    title="Eliminar"
-                                  >
-                                    <Trash2 size={14} />
-                                  </button>
-                                </div>
-
-                                {/* Info Footer */}
-                                <div className="masonry-card-info">
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <span className="masonry-card-info-subtitle">{render.vista || 'Vista Principal'}</span>
-                                    <button
-                                      onClick={(e) => { e.stopPropagation(); toggleFinalImage(render) }}
-                                      className={`masonry-action-btn ${render.is_final ? '' : 'success'}`}
-                                      style={{
-                                        padding: '4px 10px',
-                                        borderRadius: '12px',
-                                        fontSize: '10px',
-                                        fontWeight: 500,
-                                        background: render.is_final ? 'var(--error)' : 'var(--success)',
-                                        color: 'white'
-                                      }}
-                                      title={render.is_final ? 'Remover Final' : 'Marcar Final'}
-                                    >
-                                      {render.is_final ? 'Remover' : 'Final'}
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            <div style={{
-              padding: '48px',
-              background: 'var(--cream)',
-              borderRadius: '12px',
-              textAlign: 'center'
-            }}>
-              <Image size={48} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '16px' }} />
-              <h4 style={{ color: 'var(--brown)', marginBottom: '8px' }}>Galeria Archviz Vazia</h4>
-              <p style={{ color: 'var(--brown-light)', fontSize: '13px', marginBottom: '16px' }}>
-                Adicione renders e visualizações 3D organizados por compartimento.
-              </p>
-              <button onClick={openAddRenderModal} className="btn btn-secondary">
-                <Plus size={16} style={{ marginRight: '8px' }} />
-                Adicionar Primeiro Render
-              </button>
-            </div>
-          )}
-        </div>
-          )}
-
-          {/* Imagens Finais */}
-          {activeArchvizSection === 'finais' && (
-            <div className="card">
-              <div className="flex items-center justify-between" style={{ marginBottom: '24px' }}>
-                <div>
-                  <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
-                    Imagens Finais do Projeto
-                  </h3>
-                  <p style={{ fontSize: '13px', color: 'var(--brown-light)', marginTop: '4px' }}>
-                    Imagens aprovadas para entrega ao cliente
-                  </p>
-                </div>
-            <span style={{
-              padding: '8px 16px',
-              background: 'var(--success)',
-              color: 'white',
-              borderRadius: '20px',
-              fontSize: '13px',
-              fontWeight: 600
-            }}>
-              {imagensFinais.length} {imagensFinais.length !== 1 ? 'imagens' : 'imagem'}
-            </span>
-          </div>
-
-          {imagensFinais.length > 0 ? (
-            <div className="masonry-grid">
-              {imagensFinais.map((render) => (
-                <div
-                  key={render.id}
-                  className={`masonry-card ${draggedImage?.id === render.id ? 'dragging' : ''}`}
-                  draggable
-                  onDragStart={(e) => handleFinalImageDragStart(e, render)}
-                  onDragOver={handleFinalImageDragOver}
-                  onDrop={(e) => handleFinalImageDrop(e, render)}
-                  onDragEnd={handleFinalImageDragEnd}
-                  style={{
-                    cursor: 'grab',
-                    opacity: draggedImage?.id === render.id ? 0.5 : 1,
-                    transition: 'opacity 0.2s'
-                  }}
-                  onClick={() => render.imagem_url && openLightbox(render, imagensFinais)}
-                >
-                  {render.imagem_url ? (
-                    <img
-                      src={render.imagem_url}
-                      alt={render.compartimento}
-                      style={{
-                        width: '100%',
-                        height: 'auto',
-                        display: 'block'
-                      }}
-                    />
-                  ) : (
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      height: '200px',
-                      background: 'var(--cream)'
-                    }}>
-                      <Image size={32} style={{ color: 'var(--brown-light)', opacity: 0.4 }} />
-                    </div>
-                  )}
-
-                  <div className="masonry-card-info">
-                    <div style={{ fontSize: '13px', fontWeight: 600 }}>{render.compartimento}</div>
-                    <div style={{ fontSize: '11px', opacity: 0.8 }}>Versão {render.versao}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div style={{
-              padding: '48px',
-              background: 'var(--cream)',
-              borderRadius: '12px',
-              textAlign: 'center'
-            }}>
-              <CheckCircle size={48} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '16px' }} />
-              <h4 style={{ color: 'var(--brown)', marginBottom: '8px' }}>Nenhuma Imagem Final</h4>
-              <p style={{ color: 'var(--brown-light)', fontSize: '13px' }}>
-                Vá a "Imagens Processo" e marque as imagens que devem aparecer nas entregas ao cliente.
-              </p>
-            </div>
-          )}
-            </div>
-          )}
-
-          {/* Sub-tab Moleskine - Abre diretamente o caderno */}
-          {activeArchvizSection === 'moleskine' && (
-            <Suspense fallback={<LazyFallback />}>
-              <MoleskineDigital
-                projectId={project?.id}
-                projectName={project?.nome}
-                onClose={() => setActiveArchvizSection('processo')}
-              />
-            </Suspense>
-          )}
-        </div>
+        <ProjetoArchviz
+          project={project}
+          user={user}
+          activeArchvizSection={activeArchvizSection}
+          onSectionChange={(id) => handleSubtabChange(id, 'archviz')}
+        />
       )}
 
-      {/* Tab Acompanhamento com subtabs */}
+      {/* Tab Acompanhamento */}
       {activeTab === 'acompanhamento' && (
-        <div>
-          <SubTabNav sections={acompSections} activeSection={activeAcompSection} onSectionChange={(id) => handleSubtabChange(id, 'acompanhamento')} />
-
-          {/* Fotografias de Acompanhamento */}
-          {activeAcompSection === 'fotografias' && (
-            <AcompanhamentoFotos
-              projeto={project}
-              userId={user?.id}
-              userName={user?.email?.split('@')[0] || 'Utilizador'}
-            />
-          )}
-
-          {/* Desenhos em Uso Obra */}
-          {activeAcompSection === 'desenhos-obra' && (
-            <DesenhosObra
-              projeto={project}
-              userId={user?.id}
-              userName={user?.email?.split('@')[0] || 'Utilizador'}
-            />
-          )}
-        </div>
+        <ProjetoAcompanhamento
+          project={project}
+          user={user}
+          activeAcompSection={activeAcompSection}
+          onSectionChange={(id) => handleSubtabChange(id, 'acompanhamento')}
+        />
       )}
 
       {/* Tab Biblioteca do Projeto */}
       {activeTab === 'biblioteca' && (
-        <div>
-          <div className={styles.kpiGrid}>
-            {[
-              { label: 'Materiais', count: 0 },
-              { label: 'Objetos 3D', count: 0 },
-              { label: 'Texturas', count: 0 }
-            ].map((item, idx) => (
-              <div key={idx} className={`card ${styles.kpiCard}`}>
-                <div className={styles.kpiValue}>{item.count}</div>
-                <div className={styles.kpiLabel}>{item.label}</div>
-              </div>
-            ))}
-          </div>
-
-          <div className="card">
-            <div className={styles.archvizHeader}>
-              <h3 className={styles.sectionTitle}>Biblioteca do Projeto</h3>
-              <div className="flex gap-sm">
-                <button className="btn btn-secondary">Importar da Biblioteca Global</button>
-                <button className="btn btn-primary">
-                  <Plus size={16} style={{ marginRight: '8px' }} />
-                  Adicionar Item
-                </button>
-              </div>
-            </div>
-
-            <div className={styles.subTabNav} style={{ borderBottom: 'none', marginBottom: '16px' }}>
-              {['Todos', 'Materiais', 'Objetos 3D', 'Texturas'].map((cat, idx) => (
-                <button key={idx} className={idx === 0 ? styles.subTabActive : styles.subTab}>
-                  {cat}
-                </button>
-              ))}
-            </div>
-
-            <div className={styles.emptyState}>
-              <Library size={48} className={styles.emptyStateIcon} />
-              <h4>Biblioteca Vazia</h4>
-              <p>Adicione materiais, objetos 3D e texturas específicos deste projeto.</p>
-            </div>
-          </div>
-        </div>
+        <ProjetoBiblioteca />
       )}
 
       {/* Tab Chat IA */}
@@ -2306,87 +1419,15 @@ export default function ProjetoDetalhe() {
         </Suspense>
       )}
 
-      {/* Tab Gestão de Projeto com subtabs */}
+      {/* Tab Gestão de Projeto */}
       {activeTab === 'gestao' && (
-        <div>
-          <SubTabNav sections={gestaoSections} activeSection={activeGestaoSection} onSectionChange={(id) => handleSubtabChange(id, 'gestao')} />
-
-          {/* Decisões */}
-          {activeGestaoSection === 'decisoes' && (
-            <ProjetoDecisoes projetoId={project?.id} />
-          )}
-
-          {/* Viabilidade Urbanística */}
-          {activeGestaoSection === 'viabilidade' && (
-            <ViabilidadeModule projetoId={project?.id} projeto={project} />
-          )}
-
-          {/* Contratos */}
-          {activeGestaoSection === 'contratos' && (
-            <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
-              <FileText size={48} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '16px' }} />
-              <h3 style={{ margin: '0 0 8px', color: 'var(--brown)' }}>Contratos & Documentos</h3>
-              <p style={{ color: 'var(--brown-light)', margin: 0 }}>Propostas, contratos e documentação legal</p>
-            </div>
-          )}
-
-          {/* Diário de Projeto */}
-          {activeGestaoSection === 'diario-projeto' && (
-            <div className="card" style={{ padding: '20px' }}>
-              <DiarioBordo projeto={project} />
-            </div>
-          )}
-
-          {/* Painel Financeiro */}
-          {activeGestaoSection === 'painel-financeiro' && (
-            <div className="card" style={{ padding: '20px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <BarChart3 size={20} style={{ color: 'var(--verde)' }} />
-                  <h3 style={{ margin: 0, color: 'var(--brown)', fontFamily: 'Cormorant Garamond, serif' }}>Painel Financeiro</h3>
-                </div>
-                <button
-                  onClick={() => navigate(`/financeiro/projeto/${id}`)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '4px',
-                    padding: '6px 14px', borderRadius: '8px', border: '1px solid var(--verde)',
-                    background: 'transparent', color: 'var(--verde)', cursor: 'pointer',
-                    fontSize: '0.8rem', fontWeight: 600
-                  }}
-                >
-                  <ExternalLink size={14} /> Abrir painel completo
-                </button>
-              </div>
-              <p style={{ color: 'var(--brown-light)', margin: '0 0 12px', fontSize: '0.85rem' }}>
-                Dashboard financeiro em tempo real com orçamento por capítulo, alertas, extras e projecções.
-              </p>
-              <button
-                onClick={() => navigate(`/financeiro/projeto/${id}`)}
-                style={{
-                  padding: '10px 24px', borderRadius: '8px', border: 'none',
-                  background: 'var(--verde)', color: '#fff', cursor: 'pointer',
-                  fontSize: '0.85rem', fontWeight: 600
-                }}
-              >
-                Ver Painel Financeiro
-              </button>
-            </div>
-          )}
-
-          {/* Faturação */}
-          {activeGestaoSection === 'faturacao' && (
-            <div className="card" style={{ padding: '48px', textAlign: 'center' }}>
-              <Euro size={48} style={{ color: 'var(--brown-light)', opacity: 0.3, marginBottom: '16px' }} />
-              <h3 style={{ margin: '0 0 8px', color: 'var(--brown)' }}>Faturação</h3>
-              <p style={{ color: 'var(--brown-light)', margin: 0 }}>Gestão de faturação e pagamentos</p>
-            </div>
-          )}
-
-          {/* Ficha de Cliente */}
-          {activeGestaoSection === 'ficha-cliente' && (
-            <ProjetoFichaCliente project={project} setProject={setProject} />
-          )}
-        </div>
+        <ProjetoGestao
+          project={project}
+          setProject={setProject}
+          activeGestaoSection={activeGestaoSection}
+          onSectionChange={(id) => handleSubtabChange(id, 'gestao')}
+          projectId={id}
+        />
       )}
 
 
@@ -2436,24 +1477,6 @@ export default function ProjetoDetalhe() {
         </div>
       )}
 
-      {/* MODAL: Adicionar/Editar Render */}
-      <RenderModal
-        isOpen={showRenderModal}
-        onClose={() => setShowRenderModal(false)}
-        onSave={handleSaveRender}
-        renderForm={renderForm}
-        setRenderForm={setRenderForm}
-        editingRender={editingRender}
-        isDragging={isDragging}
-        getNextVersion={getNextVersion}
-        onCompartimentoChange={handleRenderCompartimentoChange}
-        onDragOver={handleRenderDragOver}
-        onDragLeave={handleRenderDragLeave}
-        onDrop={handleRenderDrop}
-        onImageUpload={handleRenderImageUpload}
-        projetoCompartimentos={projetoCompartimentos}
-      />
-
       {/* MODAL: Editar Projeto */}
       <EditProjectModal
         isOpen={showEditModal}
@@ -2484,44 +1507,6 @@ export default function ProjetoDetalhe() {
         onConfirm={confirmDelete}
         projectName={project?.nome}
       />
-
-      {/* Lightbox para visualizar imagens em grande */}
-      <ImageLightbox
-        image={lightboxImage}
-        images={lightboxImages}
-        currentIndex={lightboxIndex}
-        onClose={() => { setLightboxImage(null); setLightboxImages([]); setLightboxIndex(0) }}
-        onNavigate={navigateLightbox}
-        onEditRender={(img) => { openEditRenderModal(img); setLightboxImage(null); setLightboxImages([]); setLightboxIndex(0) }}
-        onOpenMoleskine={(img) => { setMoleskineRender(img); setLightboxImage(null); setLightboxImages([]); setLightboxIndex(0) }}
-      />
-
-      {/* Moleskine - Ferramenta de anotação de renders */}
-      {moleskineRender && (
-        <Moleskine
-          projectId={project?.id}
-          renderId={moleskineRender.id}
-          renderImageUrl={moleskineRender.imagem_url}
-          renderName={`${moleskineRender.compartimento} v${moleskineRender.versao}`}
-          onClose={() => setMoleskineRender(null)}
-          onSave={async () => {
-            // Atualizar contagem de anotações
-            if (project?.id) {
-              const { data: annotationsData } = await supabase
-                .from('render_annotations')
-                .select('render_id, annotations')
-                .eq('projeto_id', project.id)
-              if (annotationsData) {
-                const annotationsMap = {}
-                annotationsData.forEach(a => {
-                  annotationsMap[a.render_id] = a.annotations?.length || 0
-                })
-                setRenderAnnotations(annotationsMap)
-              }
-            }
-          }}
-        />
-      )}
 
     </div>
   )

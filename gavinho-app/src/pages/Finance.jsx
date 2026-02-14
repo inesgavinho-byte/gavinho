@@ -381,6 +381,10 @@ export default function Finance() {
           <p className="page-subtitle">Controlo de custos e margens por projeto</p>
         </div>
         <div className="flex gap-sm">
+          <button className="btn btn-secondary" onClick={() => navigate('/financeiro/portfolio')}>
+            <BarChart3 size={18} />
+            Portfolio
+          </button>
           <button className="btn btn-secondary">
             <Download size={18} />
             Exportar
