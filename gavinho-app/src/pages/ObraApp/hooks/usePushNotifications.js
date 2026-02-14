@@ -9,7 +9,7 @@ import { supabase } from '../../../lib/supabase'
 import { urlBase64ToUint8Array } from '../utils'
 
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY
-  || 'BEWvOiZUhXGyjJHW3Wg89oq0o1CKOub482PHXxik6SMYZry4MKU-95y3ALE7xSGp-DolVlUfrWIkXAq07KX3GfU'
+  || 'BPkKiHHAbgn22NzEo3ZH-JviNtGe0f8Mtr8FPNp07eveAkFmUnZ0v_y_h1evJqfPukW4FgkCX0kQfFkDU5NCsj4'
 
 export function usePushNotifications(userId) {
   const [permission, setPermission] = useState('default')

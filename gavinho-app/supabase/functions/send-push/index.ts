@@ -34,7 +34,7 @@ serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const vapidPublicKey = Deno.env.get('VAPID_PUBLIC_KEY')
-      || 'BFz6TO0qoTGjgsh_Me8K-oO-AbCmhwunac2wiHkluUTLTcNO32rZefeXIHZqkk7i_9Juh2ufLNKUQxpg4xO3XMI'
+      || 'BPkKiHHAbgn22NzEo3ZH-JviNtGe0f8Mtr8FPNp07eveAkFmUnZ0v_y_h1evJqfPukW4FgkCX0kQfFkDU5NCsj4'
     const vapidPrivateKey = Deno.env.get('VAPID_PRIVATE_KEY')
     const vapidSubject = Deno.env.get('VAPID_SUBJECT') || 'mailto:suporte@gavinhogroup.com'
 
