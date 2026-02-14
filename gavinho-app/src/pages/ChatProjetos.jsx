@@ -98,6 +98,7 @@ export default function ChatProjetos() {
   const [unreadCounts, setUnreadCounts] = useState({}) // {topicoId: count}
   const [topicoLeituras, setTopicoLeituras] = useState([]) // [{utilizador_id, ultima_leitura_at}]
   const [typingUsers, setTypingUsers] = useState([]) // Quem está a escrever
+  const [garvisProcessing, setGarvisProcessing] = useState(false) // GARVIS is thinking
   const [presencaMap, setPresencaMap] = useState({}) // {utilizadorId: 'online'|'away'|'offline'}
   const typingTimeoutRef = useRef(null)
   const presenceIntervalRef = useRef(null)
@@ -799,6 +800,8 @@ export default function ChatProjetos() {
 
       // If GARVIS was mentioned, call the edge function
       if (garvisMentioned && projetoAtivo) {
+        setGarvisProcessing(true)
+
         try {
           const response = await supabase.functions.invoke('garvis-chat', {
             body: {
@@ -812,12 +815,16 @@ export default function ChatProjetos() {
 
           if (response.error) {
             console.error('GARVIS error:', response.error)
-          } else {
-            // Reload messages to show GARVIS response
-            setTimeout(() => loadMensagens(topicoAtivo.id), 500)
+            toast.warning('G.A.R.V.I.S.', 'Erro ao processar o pedido. Tenta novamente.')
           }
+          // Realtime subscription will pick up the new GARVIS message automatically.
+          // Reload as fallback in case realtime is slow.
+          setTimeout(() => loadMensagens(topicoAtivo.id), 2000)
         } catch (garvisErr) {
           console.error('Erro ao chamar GARVIS:', garvisErr)
+          toast.error('G.A.R.V.I.S.', 'Não foi possível contactar o assistente. Verifica a ligação.')
+        } finally {
+          setGarvisProcessing(false)
         }
       }
     } catch (err) {
@@ -1665,6 +1672,28 @@ export default function ChatProjetos() {
           {topicoAtivo && (
             <div style={{ padding: '12px 20px', borderTop: '1px solid var(--stone)', position: 'relative' }}>
               {/* Typing indicator */}
+              {/* GARVIS processing indicator */}
+              {garvisProcessing && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '6px 12px',
+                  marginBottom: '6px',
+                  fontSize: '12px',
+                  color: '#6366f1',
+                  background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.06) 0%, rgba(139, 92, 246, 0.06) 100%)',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(99, 102, 241, 0.15)'
+                }}>
+                  <span style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#6366f1', animation: 'typingBounce 1s infinite' }} />
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#6366f1', animation: 'typingBounce 1s infinite 0.2s' }} />
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#6366f1', animation: 'typingBounce 1s infinite 0.4s' }} />
+                  </span>
+                  <span style={{ fontWeight: 600 }}>G.A.R.V.I.S.</span> a processar...
+                </div>
+              )}
               {typingUsers.length > 0 && (
                 <div style={{
                   display: 'flex',

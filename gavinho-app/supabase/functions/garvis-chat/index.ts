@@ -6,7 +6,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import Anthropic from 'https://esm.sh/@anthropic-ai/sdk@0.24.3'
 
-const GARVIS_USER_ID = 'garvis-bot-001'
+const GARVIS_USER_ID = '00000000-0000-0000-0000-000000000001'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -140,8 +140,35 @@ serve(async (req) => {
       .map(block => (block as { type: 'text', text: string }).text)
       .join('\n')
 
-    // 9. Insert GARVIS response into chat
-    const { data: garvisMessage, error: insertError } = await supabase
+    // 9. Ensure GARVIS bot user exists in utilizadores (for FK constraint)
+    const { data: existingBot } = await supabase
+      .from('utilizadores')
+      .select('id')
+      .eq('id', GARVIS_USER_ID)
+      .maybeSingle()
+
+    if (!existingBot) {
+      // Insert GARVIS bot user - service role bypasses RLS
+      const { error: botError } = await supabase
+        .from('utilizadores')
+        .insert({
+          id: GARVIS_USER_ID,
+          nome: 'G.A.R.V.I.S.',
+          cargo: 'Assistente IA',
+          is_bot: true,
+          equipa: 'sistema',
+          status: 'ativo'
+        })
+
+      if (botError) {
+        console.warn('Could not create GARVIS bot user:', botError.message)
+        // Continue anyway - try inserting message with null autor_id as fallback
+      }
+    }
+
+    // 10. Insert GARVIS response into chat
+    let garvisMessage = null
+    const { data: msgData, error: insertError } = await supabase
       .from('chat_mensagens')
       .insert({
         topico_id: topicoId,
@@ -154,18 +181,36 @@ serve(async (req) => {
       .single()
 
     if (insertError) {
-      console.error('Erro ao inserir resposta GARVIS:', insertError)
-      throw new Error('Erro ao guardar resposta')
+      console.warn('Insert with GARVIS autor_id failed, retrying without FK:', insertError.message)
+      // Fallback: insert without autor_id (null) and mark as system message
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from('chat_mensagens')
+        .insert({
+          topico_id: topicoId,
+          parent_id: mensagemId || null,
+          conteudo: `**G.A.R.V.I.S.:**\n\n${respostaContent}`,
+          tipo: 'sistema'
+        })
+        .select()
+        .single()
+
+      if (fallbackError) {
+        console.error('Erro ao inserir resposta GARVIS (fallback):', fallbackError)
+        throw new Error('Erro ao guardar resposta')
+      }
+      garvisMessage = fallbackData
+    } else {
+      garvisMessage = msgData
     }
 
-    // 10. Update topic timestamp
+    // 11. Update topic timestamp
     await supabase
       .from('chat_topicos')
       .update({ updated_at: new Date().toISOString() })
       .eq('id', topicoId)
 
-    // 11. Log the interaction
-    await supabase
+    // 12. Log the interaction (non-blocking)
+    supabase
       .from('garvis_chat_logs')
       .insert({
         projeto_id: projetoId,
@@ -180,8 +225,11 @@ serve(async (req) => {
         tokens_output: response.usage.output_tokens,
         tempo_resposta_ms: tempoResposta
       })
+      .then(({ error: logError }) => {
+        if (logError) console.warn('GARVIS log insert failed:', logError.message)
+      })
 
-    // 12. Return response
+    // 13. Return response
     return new Response(
       JSON.stringify({
         success: true,
