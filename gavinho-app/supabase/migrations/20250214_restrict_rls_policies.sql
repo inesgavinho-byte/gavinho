@@ -84,6 +84,16 @@ RETURNS BOOLEAN AS $$
     );
 $$ LANGUAGE sql SECURITY DEFINER STABLE;
 
+-- 2c-text. TEXT overload for tables where projeto_id is TEXT instead of UUID
+--          (acompanhamento, projecoes_cenarios, analises_viabilidade)
+--          Uses plpgsql so body is validated at call-time, not create-time.
+CREATE OR REPLACE FUNCTION gavinho_can_access_project(p_projeto_id TEXT)
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN gavinho_can_access_project(p_projeto_id::UUID);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
+
 -- 2d. Can the current user access a specific obra?
 --     TRUE if: admin/gestor OR member of the project the obra belongs to
 CREATE OR REPLACE FUNCTION gavinho_can_access_obra(p_obra_id UUID)
@@ -547,7 +557,7 @@ CREATE POLICY "design_review_versions_delete" ON design_review_versions FOR DELE
   USING (gavinho_is_gestor_or_above());
 
 
--- ── 4o. design_review_annotations (via review_id → design_reviews) ──
+-- ── 4o. design_review_annotations (via version_id → design_review_versions → design_reviews) ──
 DROP POLICY IF EXISTS "Allow all for authenticated users" ON design_review_annotations;
 DROP POLICY IF EXISTS "design_review_annotations_select" ON design_review_annotations;
 DROP POLICY IF EXISTS "design_review_annotations_insert" ON design_review_annotations;
@@ -556,28 +566,31 @@ DROP POLICY IF EXISTS "design_review_annotations_delete" ON design_review_annota
 
 CREATE POLICY "design_review_annotations_select" ON design_review_annotations FOR SELECT
   USING (EXISTS (
-    SELECT 1 FROM design_reviews dr
-    WHERE dr.id = design_review_annotations.review_id
+    SELECT 1 FROM design_review_versions drv
+    JOIN design_reviews dr ON dr.id = drv.review_id
+    WHERE drv.id = design_review_annotations.version_id
       AND gavinho_can_access_project(dr.projeto_id)
   ));
 
 CREATE POLICY "design_review_annotations_insert" ON design_review_annotations FOR INSERT
   WITH CHECK (EXISTS (
-    SELECT 1 FROM design_reviews dr
-    WHERE dr.id = design_review_annotations.review_id
+    SELECT 1 FROM design_review_versions drv
+    JOIN design_reviews dr ON dr.id = drv.review_id
+    WHERE drv.id = design_review_annotations.version_id
       AND gavinho_can_access_project(dr.projeto_id)
   ));
 
 CREATE POLICY "design_review_annotations_update" ON design_review_annotations FOR UPDATE
   USING (EXISTS (
-    SELECT 1 FROM design_reviews dr
-    WHERE dr.id = design_review_annotations.review_id
+    SELECT 1 FROM design_review_versions drv
+    JOIN design_reviews dr ON dr.id = drv.review_id
+    WHERE drv.id = design_review_annotations.version_id
       AND gavinho_can_access_project(dr.projeto_id)
   ));
 
 CREATE POLICY "design_review_annotations_delete" ON design_review_annotations FOR DELETE
   USING (
-    auth.uid() = criado_por  -- author can delete own
+    auth.uid() = autor_id  -- author can delete own
     OR gavinho_is_gestor_or_above()
   );
 
