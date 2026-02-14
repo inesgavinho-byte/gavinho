@@ -1,5 +1,5 @@
 -- ============================================================
--- RESTRICT RLS POLICIES BY USER ROLE / TEAM — PART 1 of 2
+-- RESTRICT RLS POLICIES BY USER ROLE / TEAM -- PART 1 of 2
 -- 2026-02-14
 --
 -- Part 1: Prerequisites, helper functions, core tables,
