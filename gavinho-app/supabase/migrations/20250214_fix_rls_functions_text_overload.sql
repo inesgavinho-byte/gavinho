@@ -64,10 +64,13 @@ RETURNS BOOLEAN AS $$
 $$ LANGUAGE sql SECURITY DEFINER STABLE;
 
 -- TEXT overload: casts to UUID and delegates
+-- Uses plpgsql so body is validated at call-time, not create-time.
 CREATE OR REPLACE FUNCTION gavinho_can_access_project(p_projeto_id TEXT)
 RETURNS BOOLEAN AS $$
-  SELECT gavinho_can_access_project(p_projeto_id::UUID);
-$$ LANGUAGE sql SECURITY DEFINER STABLE;
+BEGIN
+  RETURN gavinho_can_access_project(p_projeto_id::UUID);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
 
 CREATE OR REPLACE FUNCTION gavinho_can_access_obra(p_obra_id UUID)
 RETURNS BOOLEAN AS $$

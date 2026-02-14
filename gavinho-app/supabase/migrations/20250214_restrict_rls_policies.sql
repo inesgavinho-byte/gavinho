@@ -86,10 +86,13 @@ $$ LANGUAGE sql SECURITY DEFINER STABLE;
 
 -- 2c-text. TEXT overload for tables where projeto_id is TEXT instead of UUID
 --          (acompanhamento, projecoes_cenarios, analises_viabilidade)
+--          Uses plpgsql so body is validated at call-time, not create-time.
 CREATE OR REPLACE FUNCTION gavinho_can_access_project(p_projeto_id TEXT)
 RETURNS BOOLEAN AS $$
-  SELECT gavinho_can_access_project(p_projeto_id::UUID);
-$$ LANGUAGE sql SECURITY DEFINER STABLE;
+BEGIN
+  RETURN gavinho_can_access_project(p_projeto_id::UUID);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
 
 -- 2d. Can the current user access a specific obra?
 --     TRUE if: admin/gestor OR member of the project the obra belongs to
