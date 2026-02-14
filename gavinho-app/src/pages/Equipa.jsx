@@ -158,7 +158,7 @@ export default function Equipa() {
 
       const [projetosRes, equipaRes] = await Promise.all([
         supabase.from('projetos').select('id, codigo, nome').eq('arquivado', false).order('codigo'),
-        supabase.from('projeto_equipa').select('utilizador_id, funcao, projetos:projeto_id(codigo, nome)').catch(() => ({ data: [] }))
+        supabase.from('projeto_equipa').select('utilizador_id, funcao, projetos:projeto_id(codigo, nome)').then(res => res, () => ({ data: [] }))
       ]);
       setProjetos(projetosRes.data || []);
 

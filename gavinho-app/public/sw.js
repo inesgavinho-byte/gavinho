@@ -131,6 +131,13 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
+// Message handler — respond to postMessage from clients
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
 // Background sync (for offline messages)
 self.addEventListener('sync', (event) => {
   if (event.tag === 'send-messages') {
