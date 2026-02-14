@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useState, useEffect, useRef, lazy, Suspense } from 'react'
+// react-router-dom navigate comes from useProjetoNavigation hook
 import {
   ArrowLeft,
   MapPin,
@@ -9,19 +9,10 @@ import {
   FileText,
   Euro,
   CheckCircle,
-  Clock,
-  AlertCircle,
-  ChevronRight,
   Download,
   ExternalLink,
-  Phone,
-  Mail,
-  Globe,
   Layers,
   Target,
-  TrendingUp,
-  Receipt,
-  CreditCard,
   MoreVertical,
   Edit,
   Trash2,
@@ -32,36 +23,24 @@ import {
   Plus,
   File,
   ListChecks,
-  FileCheck,
-  Lock,
   Image,
   Library,
   Settings,
   Eye,
   BookOpen,
   Package,
-  Send,
-  Users,
   ClipboardList,
   Lightbulb,
   Palette,
   ImagePlus,
-  FolderOpen,
   UserCircle,
   Inbox,
   FileSearch,
-  Bold,
-  Italic,
-  Underline,
   List,
-  Sparkles,
-  Loader2,
   ChevronDown,
   ChevronUp,
   Pencil,
   MessageSquare,
-  Link2,
-  Type,
   Camera,
   BarChart3,
   HardHat,
@@ -76,12 +55,11 @@ import CentralEntregas from '../components/CentralEntregas'
 import DiarioBordo from '../components/DiarioBordo'
 import DuvidasLog from '../components/DuvidasLog'
 import ProjetoDecisoes from '../components/decisoes/ProjetoDecisoes'
-import DesignReview from '../components/DesignReview'
+// DesignReview lazy-loaded above
 import RecebidosEspecialidades from '../components/RecebidosEspecialidades'
 import ViabilidadeModule from '../components/viabilidade/ViabilidadeModule'
 import Moleskine from '../components/Moleskine'
-import MoleskineDigital from '../components/MoleskineDigital'
-import ProjetoChatIA from '../components/projeto/ProjetoChatIA'
+// MoleskineDigital & ProjetoChatIA lazy-loaded above
 import ProjetoAtas from '../components/ProjetoAtas'
 import ProjetoMoodboards from '../components/ProjetoMoodboards'
 import ProjetoLevantamento from '../components/ProjetoLevantamento'
@@ -89,7 +67,15 @@ import ProjetoInspiracoes from '../components/ProjetoInspiracoes'
 import AcompanhamentoFotos from '../components/AcompanhamentoFotos'
 import DesenhosObra from '../components/DesenhosObra'
 import SubTabNav from '../components/projeto/SubTabNav'
+import useProjetoNavigation from '../hooks/useProjetoNavigation'
+import ProjetoFasesPrazo from '../components/projeto/tabs/ProjetoFasesPrazo'
+import ProjetoFichaCliente from '../components/projeto/tabs/ProjetoFichaCliente'
 import styles from './ProjetoDetalhe.module.css'
+
+// Lazy-loaded heavy components
+const DesignReview = lazy(() => import('../components/DesignReview'))
+const MoleskineDigital = lazy(() => import('../components/MoleskineDigital'))
+const ProjetoChatIA = lazy(() => import('../components/projeto/ProjetoChatIA'))
 
 // Importar constantes de ficheiros separados
 import {
@@ -115,11 +101,23 @@ import {
 // Importar componentes do dashboard
 import { DashboardTab } from '../components/projeto/dashboard'
 
+// Lazy loading fallback
+const LazyFallback = () => (
+  <div className={styles.loadingContainer}>
+    <div className={styles.loadingInner}>
+      <div className={styles.spinner}></div>
+      <p className={styles.loadingText}>A carregar...</p>
+    </div>
+  </div>
+)
+
 export default function ProjetoDetalhe() {
-  const { id, tab: urlTab, subtab: urlSubtab } = useParams()
-  const navigate = useNavigate()
+  const {
+    id, activeTab, activeFaseSection, activeArchvizSection,
+    activeGestaoSection, activeAcompSection, activeBriefingSection,
+    setActiveArchvizSection, handleTabChange, handleSubtabChange, navigate
+  } = useProjetoNavigation()
   const { isAdmin, user } = useAuth()
-  const [activeTab, setActiveTab] = useState(urlTab || 'dashboard')
   const [showActions, setShowActions] = useState(false)
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [uploadingDoc, setUploadingDoc] = useState(null)
@@ -166,35 +164,7 @@ export default function ProjetoDetalhe() {
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
-  // Escopo de Trabalho
-  const [escopoTrabalho, setEscopoTrabalho] = useState('')
-  const [editingEscopo, setEditingEscopo] = useState(false)
-  const [savingEscopo, setSavingEscopo] = useState(false)
-  const escopoEditorRef = useRef(null)
-
-  // Sugestões IA do Escopo
-  const [analisandoEscopo, setAnalisandoEscopo] = useState(false)
-  const [sugestoesEscopo, setSugestoesEscopo] = useState(null)
-  const [showSugestoesPanel, setShowSugestoesPanel] = useState(false)
-
-  // Sub-tabs para Fases & Entregas
-  const [activeFaseSection, setActiveFaseSection] = useState(urlSubtab || 'entregaveis')
-
-  // Sub-tabs para Archviz
-  const [activeArchvizSection, setActiveArchvizSection] = useState(urlSubtab || 'processo')
-
-  // Sub-tabs para Gestão de Projeto
-  const [activeGestaoSection, setActiveGestaoSection] = useState(urlSubtab || 'decisoes')
-
-  const [activeAcompSection, setActiveAcompSection] = useState(urlSubtab || 'fotografias')
-
-  // Ficha de Cliente inline editing
-  const [editingCliente, setEditingCliente] = useState(false)
-  const [clienteForm, setClienteForm] = useState({})
-  const [savingCliente, setSavingCliente] = useState(false)
-
-  // Sub-tabs para Briefing & Conceito
-  const [activeBriefingSection, setActiveBriefingSection] = useState(urlSubtab || 'inspiracoes')
+  // Escopo/Cliente state moved to extracted components (ProjetoFasesPrazo, ProjetoFichaCliente)
 
   // Gestão de Renders/Archviz
   const [renders, setRenders] = useState([])
@@ -327,24 +297,7 @@ export default function ProjetoDetalhe() {
     setSaving(false)
   }
 
-  // Sincronizar tab e subtab da URL com estado
-  useEffect(() => {
-    if (urlTab) {
-      setActiveTab(urlTab)
-    }
-    if (urlSubtab) {
-      // Definir o subtab correto baseado no tab ativo
-      if (urlTab === 'fases') {
-        setActiveFaseSection(urlSubtab)
-      } else if (urlTab === 'archviz') {
-        setActiveArchvizSection(urlSubtab)
-      } else if (urlTab === 'gestao') {
-        setActiveGestaoSection(urlSubtab)
-      } else if (urlTab === 'briefing') {
-        setActiveBriefingSection(urlSubtab)
-      }
-    }
-  }, [urlTab, urlSubtab])
+  // URL sync moved to useProjetoNavigation hook
 
   // Carregar clientes e utilizadores para edição
   useEffect(() => {
@@ -585,33 +538,7 @@ export default function ProjetoDetalhe() {
     setShowFaseModal(true)
   }
 
-  // Atualizar estado da fase inline
-  const handleUpdateFaseEstado = async (faseId, novoEstado) => {
-    try {
-      const { error } = await supabase
-        .from('projeto_fases_contratuais')
-        .update({ estado: novoEstado })
-        .eq('id', faseId)
-      if (error) throw error
-      fetchFasesContratuais(project.id)
-    } catch (err) {
-      console.error('Erro ao atualizar estado:', err)
-    }
-  }
-
-  // Atualizar avaliação inline
-  const handleUpdateFaseAvaliacao = async (faseId, novaAvaliacao) => {
-    try {
-      const { error } = await supabase
-        .from('projeto_fases_contratuais')
-        .update({ avaliacao: novaAvaliacao })
-        .eq('id', faseId)
-      if (error) throw error
-      fetchFasesContratuais(project.id)
-    } catch (err) {
-      console.error('Erro ao atualizar avaliação:', err)
-    }
-  }
+  // handleUpdateFaseEstado/Avaliacao moved to ProjetoFasesPrazo
 
   // Remover fase
   const handleRemoveFase = async (id) => {
@@ -628,92 +555,7 @@ export default function ProjetoDetalhe() {
     }
   }
 
-  // Guardar escopo de trabalho
-  const handleSaveEscopo = async () => {
-    if (!project?.id) return
-    setSavingEscopo(true)
-    try {
-      const content = escopoEditorRef.current?.innerHTML || escopoTrabalho
-      const { error } = await supabase
-        .from('projetos')
-        .update({ escopo_trabalho: content })
-        .eq('id', project.id)
-      if (error) throw error
-      setEscopoTrabalho(content)
-      setProject(prev => ({ ...prev, escopo_trabalho: content }))
-      setEditingEscopo(false)
-    } catch (err) {
-      console.error('Erro ao guardar escopo:', err)
-      alert('Erro ao guardar escopo: ' + err.message)
-    } finally {
-      setSavingEscopo(false)
-    }
-  }
-
-  // Funções de formatação do editor de escopo
-  const formatEscopo = (command, value = null) => {
-    document.execCommand(command, false, value)
-    escopoEditorRef.current?.focus()
-  }
-
-  // Analisar escopo com IA
-  const handleAnalisarEscopo = async () => {
-    if (!escopoTrabalho || analisandoEscopo) return
-    setAnalisandoEscopo(true)
-    setSugestoesEscopo(null)
-
-    try {
-      // Extrair texto puro do HTML
-      const tempDiv = document.createElement('div')
-      tempDiv.innerHTML = escopoTrabalho
-      const textoPlano = tempDiv.textContent || tempDiv.innerText || ''
-
-      const { data, error } = await supabase.functions.invoke('analisar-escopo', {
-        body: {
-          escopo_texto: textoPlano,
-          projeto_nome: project?.nome || project?.codigo
-        }
-      })
-
-      if (error) throw error
-
-      if (data?.success && data?.sugestoes) {
-        setSugestoesEscopo(data.sugestoes)
-        setShowSugestoesPanel(true)
-      } else {
-        throw new Error(data?.error || 'Erro ao analisar escopo')
-      }
-    } catch (err) {
-      console.error('Erro ao analisar escopo:', err)
-      alert('Erro ao analisar escopo: ' + err.message)
-    } finally {
-      setAnalisandoEscopo(false)
-    }
-  }
-
-  // Adicionar fase sugerida
-  const handleAddSuggestedFase = async (fase) => {
-    try {
-      const { error } = await supabase
-        .from('projeto_fases_contratuais')
-        .insert({
-          projeto_id: project.id,
-          numero: fase.numero?.toString() || (fasesContratuais.length + 1).toString(),
-          nome: fase.nome,
-          estado: fase.estado_sugerido || 'nao_iniciado'
-        })
-      if (error) throw error
-      fetchFasesContratuais(project.id)
-      // Remover da lista de sugestões
-      setSugestoesEscopo(prev => ({
-        ...prev,
-        fases: prev.fases.filter(f => f.nome !== fase.nome)
-      }))
-    } catch (err) {
-      console.error('Erro ao adicionar fase:', err)
-      alert('Erro ao adicionar fase: ' + err.message)
-    }
-  }
+  // Escopo handlers moved to ProjetoFasesPrazo component
 
   // Carregar renders do projeto
   const fetchRenders = async (projetoId) => {
@@ -764,76 +606,8 @@ export default function ProjetoDetalhe() {
     }
   }
 
-  // Navegar para tab
-  const handleTabChange = (tabId, subtab = null) => {
-    const path = subtab ? `/projetos/${id}/${tabId}/${subtab}` : `/projetos/${id}/${tabId}`
-    navigate(path)
-    setActiveTab(tabId)
-    if (subtab) {
-      setActiveFaseSection(subtab)
-    }
-  }
-
-  // Navegar para sub-tab (genérico para todos os tabs com subtabs)
-  const handleSubtabChange = (subtabId, tabType = activeTab) => {
-    navigate(`/projetos/${id}/${tabType}/${subtabId}`)
-    if (tabType === 'fases') {
-      setActiveFaseSection(subtabId)
-    } else if (tabType === 'archviz') {
-      setActiveArchvizSection(subtabId)
-    } else if (tabType === 'gestao') {
-      setActiveGestaoSection(subtabId)
-    } else if (tabType === 'briefing') {
-      setActiveBriefingSection(subtabId)
-    } else if (tabType === 'acompanhamento') {
-      setActiveAcompSection(subtabId)
-    }
-  }
-
-  // Guardar ficha de cliente inline
-  const handleSaveCliente = async () => {
-    if (!project.cliente_id) return
-    setSavingCliente(true)
-    try {
-      const { error } = await supabase
-        .from('clientes')
-        .update({
-          nome: clienteForm.nome,
-          tipo: clienteForm.tipo,
-          empresa: clienteForm.empresa,
-          email: clienteForm.email,
-          telefone: clienteForm.telefone,
-          nif: clienteForm.nif,
-          morada: clienteForm.morada,
-          codigo_postal: clienteForm.codigo_postal,
-          cidade: clienteForm.cidade,
-          notas: clienteForm.notas,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', project.cliente_id)
-      if (error) throw error
-      // Update local project state
-      setProject(prev => ({
-        ...prev,
-        cliente_nome: clienteForm.nome,
-        cliente: {
-          ...prev.cliente,
-          nome: clienteForm.nome,
-          tipo: clienteForm.tipo,
-          email: clienteForm.email,
-          telefone: clienteForm.telefone,
-          documento: clienteForm.nif ? `NIF: ${clienteForm.nif}` : '',
-          morada: `${clienteForm.morada || ''}, ${clienteForm.codigo_postal || ''} ${clienteForm.cidade || ''}`.replace(/^, |, $/g, '')
-        }
-      }))
-      setEditingCliente(false)
-    } catch (err) {
-      console.error('Erro ao guardar cliente:', err)
-      alert('Erro ao guardar dados do cliente')
-    } finally {
-      setSavingCliente(false)
-    }
-  }
+  // Navigation handlers moved to useProjetoNavigation hook
+  // Ficha de cliente moved to ProjetoFichaCliente component
 
   // Duplicar projeto
   const handleDuplicate = async () => {
@@ -1992,539 +1766,26 @@ export default function ProjetoDetalhe() {
 
             {/* Prazo Contratual */}
             {activeFaseSection === 'prazo' && (
-              <div>
-                {/* Resumo do projeto */}
-                <div className="grid grid-3" style={{ gap: '16px', marginBottom: '24px' }}>
-                  <div style={{ padding: '16px', background: 'var(--cream)', borderRadius: '12px' }}>
-                    <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginBottom: '4px' }}>Data Início Projeto</div>
-                    <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
-                      {project.data_inicio ? new Date(project.data_inicio).toLocaleDateString('pt-PT') : 'A definir'}
-                    </div>
-                  </div>
-                  <div style={{ padding: '16px', background: 'var(--cream)', borderRadius: '12px' }}>
-                    <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginBottom: '4px' }}>Data Fim Prevista</div>
-                    <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
-                      {project.data_fim_prevista ? new Date(project.data_fim_prevista).toLocaleDateString('pt-PT') : 'A definir'}
-                    </div>
-                  </div>
-                  <div style={{ padding: '16px', background: 'var(--cream)', borderRadius: '12px' }}>
-                    <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginBottom: '4px' }}>Duração Total</div>
-                    <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)' }}>
-                      {project.prazo_execucao || '—'} {project.prazo_execucao ? 'dias' : ''}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Tabela de Fases */}
-                <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h4 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--brown)' }}>Fases e Prazos Contratuais</h4>
-                  <button
-                    className="btn btn-primary"
-                    style={{ padding: '6px 12px', fontSize: '12px' }}
-                    onClick={() => {
-                      setEditingFase(null)
-                      setFaseForm({
-                        numero: (fasesContratuais.length + 1).toString(),
-                        nome: '',
-                        data_inicio: '',
-                        num_dias: '',
-                        conclusao_prevista: '',
-                        data_entrega: '',
-                        estado: 'nao_iniciado',
-                        avaliacao: ''
-                      })
-                      setShowFaseModal(true)
-                    }}
-                  >
-                    <Plus size={14} /> Adicionar Fase
-                  </button>
-                </div>
-
-                {fasesContratuais.length === 0 ? (
-                  <div style={{
-                    padding: '32px',
-                    background: 'var(--cream)',
-                    borderRadius: '12px',
-                    textAlign: 'center',
-                    color: 'var(--brown-light)'
-                  }}>
-                    <Calendar size={32} style={{ opacity: 0.3, marginBottom: '12px' }} />
-                    <p>Nenhuma fase contratual definida.</p>
-                  </div>
-                ) : (
-                  <div style={{ overflowX: 'auto', border: '1px solid var(--stone)', borderRadius: '12px' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-                      <thead>
-                        <tr style={{ background: 'var(--cream)' }}>
-                          <th style={{ textAlign: 'left', padding: '12px 10px', color: 'var(--brown)', fontWeight: 600, borderBottom: '2px solid var(--stone)' }}>FASE</th>
-                          <th style={{ textAlign: 'center', padding: '12px 10px', color: 'var(--brown)', fontWeight: 600, borderBottom: '2px solid var(--stone)', width: '100px' }}>INÍCIO</th>
-                          <th style={{ textAlign: 'center', padding: '12px 10px', color: 'var(--brown)', fontWeight: 600, borderBottom: '2px solid var(--stone)', width: '100px' }}>Nº DIAS FASE</th>
-                          <th style={{ textAlign: 'center', padding: '12px 10px', color: 'var(--brown)', fontWeight: 600, borderBottom: '2px solid var(--stone)', width: '120px' }}>CONCLUSÃO PREVISTA</th>
-                          <th style={{ textAlign: 'center', padding: '12px 10px', color: 'var(--brown)', fontWeight: 600, borderBottom: '2px solid var(--stone)', width: '100px' }}>DATA ENTREGA</th>
-                          <th style={{ textAlign: 'center', padding: '12px 10px', color: 'var(--brown)', fontWeight: 600, borderBottom: '2px solid var(--stone)', width: '120px' }}>ESTADO</th>
-                          <th style={{ textAlign: 'center', padding: '12px 10px', color: 'var(--brown)', fontWeight: 600, borderBottom: '2px solid var(--stone)', width: '120px' }}>AVALIAÇÃO PERFORMANCE</th>
-                          <th style={{ width: '50px', borderBottom: '2px solid var(--stone)' }}></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {fasesContratuais.map((fase) => (
-                          <tr key={fase.id} style={{ borderBottom: '1px solid var(--cream)' }}>
-                            <td style={{ padding: '12px 10px', color: 'var(--brown)' }}>
-                              <span style={{ fontWeight: 500 }}>{fase.numero}ª Fase – </span>
-                              {fase.nome}
-                            </td>
-                            <td style={{ padding: '12px 10px', textAlign: 'center', color: 'var(--brown-light)' }}>
-                              {fase.data_inicio ? new Date(fase.data_inicio).toLocaleDateString('pt-PT') : '—'}
-                            </td>
-                            <td style={{ padding: '12px 10px', textAlign: 'center', color: 'var(--brown-light)' }}>
-                              {fase.num_dias || '—'}
-                            </td>
-                            <td style={{ padding: '12px 10px', textAlign: 'center', color: 'var(--brown-light)' }}>
-                              {fase.conclusao_prevista || '—'}
-                            </td>
-                            <td style={{ padding: '12px 10px', textAlign: 'center', color: 'var(--brown-light)' }}>
-                              {fase.data_entrega ? new Date(fase.data_entrega).toLocaleDateString('pt-PT') : '—'}
-                            </td>
-                            <td style={{ padding: '12px 10px', textAlign: 'center' }}>
-                              <select
-                                value={fase.estado}
-                                onChange={(e) => handleUpdateFaseEstado(fase.id, e.target.value)}
-                                style={{
-                                  padding: '4px 8px',
-                                  borderRadius: '12px',
-                                  border: 'none',
-                                  fontSize: '11px',
-                                  fontWeight: 500,
-                                  cursor: 'pointer',
-                                  background: fase.estado === 'concluido' ? '#dcfce7' :
-                                              fase.estado === 'em_curso' ? '#fef9c3' : '#f3f4f6',
-                                  color: fase.estado === 'concluido' ? '#166534' :
-                                         fase.estado === 'em_curso' ? '#854d0e' : '#6b7280'
-                                }}
-                              >
-                                <option value="nao_iniciado">Não iniciado</option>
-                                <option value="em_curso">Em curso</option>
-                                <option value="concluido">Concluído</option>
-                              </select>
-                            </td>
-                            <td style={{ padding: '12px 10px', textAlign: 'center' }}>
-                              <select
-                                value={fase.avaliacao || ''}
-                                onChange={(e) => handleUpdateFaseAvaliacao(fase.id, e.target.value)}
-                                style={{
-                                  padding: '4px 8px',
-                                  borderRadius: '12px',
-                                  border: 'none',
-                                  fontSize: '11px',
-                                  fontWeight: 500,
-                                  cursor: 'pointer',
-                                  background: fase.avaliacao === 'on_time' ? '#dcfce7' :
-                                              fase.avaliacao === 'delayed' ? '#fee2e2' : '#f3f4f6',
-                                  color: fase.avaliacao === 'on_time' ? '#166534' :
-                                         fase.avaliacao === 'delayed' ? '#dc2626' : '#6b7280'
-                                }}
-                              >
-                                <option value="">—</option>
-                                <option value="on_time">On Time</option>
-                                <option value="delayed">Delayed</option>
-                              </select>
-                            </td>
-                            <td style={{ padding: '12px 10px' }}>
-                              <div style={{ display: 'flex', gap: '4px' }}>
-                                <button
-                                  onClick={() => handleEditFase(fase)}
-                                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--brown-light)' }}
-                                >
-                                  <Edit size={14} />
-                                </button>
-                                <button
-                                  onClick={() => handleRemoveFase(fase.id)}
-                                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--danger)' }}
-                                >
-                                  <Trash2 size={14} />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-
-                {/* Escopo de Trabalho */}
-                <div style={{ marginTop: '32px' }}>
-                  <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h4 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--brown)' }}>Escopo de Trabalho</h4>
-                    {!editingEscopo ? (
-                      <button
-                        className="btn btn-secondary"
-                        style={{ padding: '6px 12px', fontSize: '12px' }}
-                        onClick={() => setEditingEscopo(true)}
-                      >
-                        <Edit size={14} style={{ marginRight: '4px' }} /> Editar
-                      </button>
-                    ) : (
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button
-                          className="btn btn-secondary"
-                          style={{ padding: '6px 12px', fontSize: '12px' }}
-                          onClick={() => {
-                            setEditingEscopo(false)
-                            setEscopoTrabalho(project?.escopo_trabalho || '')
-                          }}
-                          disabled={savingEscopo}
-                        >
-                          Cancelar
-                        </button>
-                        <button
-                          className="btn btn-primary"
-                          style={{ padding: '6px 12px', fontSize: '12px' }}
-                          onClick={handleSaveEscopo}
-                          disabled={savingEscopo}
-                        >
-                          {savingEscopo ? 'A guardar...' : 'Guardar'}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  {editingEscopo ? (
-                    <div style={{ border: '1px solid var(--stone)', borderRadius: '12px', overflow: 'hidden' }}>
-                      {/* Toolbar de formatação */}
-                      <div style={{
-                        display: 'flex',
-                        gap: '4px',
-                        padding: '8px 12px',
-                        background: 'var(--cream)',
-                        borderBottom: '1px solid var(--stone)'
-                      }}>
-                        <button
-                          type="button"
-                          onClick={() => formatEscopo('bold')}
-                          title="Negrito (Ctrl+B)"
-                          style={{
-                            width: '32px',
-                            height: '32px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            border: '1px solid var(--stone)',
-                            borderRadius: '6px',
-                            background: 'var(--white)',
-                            cursor: 'pointer',
-                            color: 'var(--brown)'
-                          }}
-                        >
-                          <Bold size={16} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => formatEscopo('italic')}
-                          title="Itálico (Ctrl+I)"
-                          style={{
-                            width: '32px',
-                            height: '32px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            border: '1px solid var(--stone)',
-                            borderRadius: '6px',
-                            background: 'var(--white)',
-                            cursor: 'pointer',
-                            color: 'var(--brown)'
-                          }}
-                        >
-                          <Italic size={16} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => formatEscopo('underline')}
-                          title="Sublinhado (Ctrl+U)"
-                          style={{
-                            width: '32px',
-                            height: '32px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            border: '1px solid var(--stone)',
-                            borderRadius: '6px',
-                            background: 'var(--white)',
-                            cursor: 'pointer',
-                            color: 'var(--brown)'
-                          }}
-                        >
-                          <Underline size={16} />
-                        </button>
-                        <div style={{ width: '1px', background: 'var(--stone)', margin: '0 4px' }} />
-                        <button
-                          type="button"
-                          onClick={() => formatEscopo('insertUnorderedList')}
-                          title="Lista com marcadores"
-                          style={{
-                            width: '32px',
-                            height: '32px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            border: '1px solid var(--stone)',
-                            borderRadius: '6px',
-                            background: 'var(--white)',
-                            cursor: 'pointer',
-                            color: 'var(--brown)'
-                          }}
-                        >
-                          <List size={16} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => formatEscopo('insertOrderedList')}
-                          title="Lista numerada"
-                          style={{
-                            width: '32px',
-                            height: '32px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            border: '1px solid var(--stone)',
-                            borderRadius: '6px',
-                            background: 'var(--white)',
-                            cursor: 'pointer',
-                            color: 'var(--brown)',
-                            fontSize: '12px',
-                            fontWeight: 600
-                          }}
-                        >
-                          1.
-                        </button>
-                      </div>
-                      {/* Editor contentEditable */}
-                      <div
-                        ref={escopoEditorRef}
-                        contentEditable
-                        suppressContentEditableWarning
-                        dangerouslySetInnerHTML={{ __html: escopoTrabalho }}
-                        style={{
-                          minHeight: '400px',
-                          padding: '16px',
-                          fontSize: '13px',
-                          lineHeight: '1.8',
-                          outline: 'none',
-                          color: 'var(--brown)',
-                          background: 'var(--white)'
-                        }}
-                      />
-                    </div>
-                  ) : escopoTrabalho ? (
-                    <div
-                      style={{
-                        padding: '20px',
-                        background: 'var(--cream)',
-                        borderRadius: '12px',
-                        fontSize: '13px',
-                        lineHeight: '1.8',
-                        color: 'var(--brown)'
-                      }}
-                      dangerouslySetInnerHTML={{ __html: escopoTrabalho }}
-                    />
-                  ) : (
-                    <div style={{
-                      padding: '32px',
-                      background: 'var(--cream)',
-                      borderRadius: '12px',
-                      textAlign: 'center',
-                      color: 'var(--brown-light)'
-                    }}>
-                      <FileText size={32} style={{ opacity: 0.3, marginBottom: '12px' }} />
-                      <p>Nenhum escopo de trabalho definido.</p>
-                      <button
-                        className="btn btn-primary"
-                        style={{ marginTop: '12px', padding: '8px 16px', fontSize: '12px' }}
-                        onClick={() => setEditingEscopo(true)}
-                      >
-                        Adicionar Escopo
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Botão Analisar com IA */}
-                  {escopoTrabalho && !editingEscopo && (
-                    <div style={{ marginTop: '16px', display: 'flex', gap: '12px', alignItems: 'center' }}>
-                      <button
-                        className="btn btn-secondary"
-                        style={{
-                          padding: '10px 16px',
-                          fontSize: '13px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px'
-                        }}
-                        onClick={handleAnalisarEscopo}
-                        disabled={analisandoEscopo}
-                      >
-                        {analisandoEscopo ? (
-                          <>
-                            <Loader2 size={16} className="animate-spin" style={{ animation: 'spin 1s linear infinite' }} />
-                            A analisar...
-                          </>
-                        ) : (
-                          <>
-                            <Sparkles size={16} />
-                            Analisar com IA
-                          </>
-                        )}
-                      </button>
-                      {sugestoesEscopo && (
-                        <button
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: 'var(--brown)',
-                            cursor: 'pointer',
-                            fontSize: '13px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px'
-                          }}
-                          onClick={() => setShowSugestoesPanel(!showSugestoesPanel)}
-                        >
-                          {showSugestoesPanel ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                          {showSugestoesPanel ? 'Ocultar sugestões' : 'Ver sugestões'}
-                        </button>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Painel de Sugestões IA */}
-                  {showSugestoesPanel && sugestoesEscopo && (
-                    <div style={{
-                      marginTop: '20px',
-                      padding: '20px',
-                      background: 'linear-gradient(135deg, #f8f6f3 0%, #f0ede8 100%)',
-                      borderRadius: '12px',
-                      border: '1px solid var(--stone)'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                        <Sparkles size={18} style={{ color: 'var(--gold)' }} />
-                        <h5 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: 'var(--brown)' }}>
-                          Sugestões da IA
-                        </h5>
-                      </div>
-
-                      {/* Fases Sugeridas */}
-                      {sugestoesEscopo.fases?.length > 0 && (
-                        <div style={{ marginBottom: '20px' }}>
-                          <h6 style={{ fontSize: '12px', fontWeight: 600, color: 'var(--brown)', marginBottom: '10px', textTransform: 'uppercase' }}>
-                            Fases Contratuais ({sugestoesEscopo.fases.length})
-                          </h6>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            {sugestoesEscopo.fases.map((fase, idx) => (
-                              <div
-                                key={idx}
-                                style={{
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                  alignItems: 'center',
-                                  padding: '12px',
-                                  background: 'var(--white)',
-                                  borderRadius: '8px',
-                                  border: '1px solid var(--stone)'
-                                }}
-                              >
-                                <div style={{ flex: 1 }}>
-                                  <div style={{ fontWeight: 500, fontSize: '13px', color: 'var(--brown)' }}>
-                                    {fase.numero}ª Fase – {fase.nome}
-                                  </div>
-                                  {fase.descricao && (
-                                    <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginTop: '4px' }}>
-                                      {fase.descricao}
-                                    </div>
-                                  )}
-                                  <div style={{ display: 'flex', gap: '12px', marginTop: '6px' }}>
-                                    {fase.duracao_estimada && (
-                                      <span style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
-                                        ⏱ {fase.duracao_estimada}
-                                      </span>
-                                    )}
-                                    {fase.estado_sugerido && (
-                                      <span style={{
-                                        fontSize: '11px',
-                                        padding: '2px 8px',
-                                        borderRadius: '10px',
-                                        background: fase.estado_sugerido === 'concluido' ? '#dcfce7' :
-                                                    fase.estado_sugerido === 'em_curso' ? '#fef9c3' : '#f3f4f6',
-                                        color: fase.estado_sugerido === 'concluido' ? '#166534' :
-                                               fase.estado_sugerido === 'em_curso' ? '#854d0e' : '#6b7280'
-                                      }}>
-                                        {fase.estado_sugerido === 'concluido' ? 'Concluído' :
-                                         fase.estado_sugerido === 'em_curso' ? 'Em curso' : 'Não iniciado'}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                                <button
-                                  className="btn btn-primary"
-                                  style={{ padding: '6px 12px', fontSize: '11px' }}
-                                  onClick={() => handleAddSuggestedFase(fase)}
-                                >
-                                  <Plus size={14} style={{ marginRight: '4px' }} />
-                                  Adicionar
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Entregáveis Sugeridos */}
-                      {sugestoesEscopo.entregaveis?.length > 0 && (
-                        <div style={{ marginBottom: '20px' }}>
-                          <h6 style={{ fontSize: '12px', fontWeight: 600, color: 'var(--brown)', marginBottom: '10px', textTransform: 'uppercase' }}>
-                            Entregáveis ({sugestoesEscopo.entregaveis.length})
-                          </h6>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                            {sugestoesEscopo.entregaveis.map((entregavel, idx) => (
-                              <div
-                                key={idx}
-                                style={{
-                                  padding: '8px 12px',
-                                  background: 'var(--white)',
-                                  borderRadius: '8px',
-                                  border: '1px solid var(--stone)',
-                                  fontSize: '12px'
-                                }}
-                              >
-                                <div style={{ fontWeight: 500, color: 'var(--brown)' }}>
-                                  {entregavel.descricao}
-                                </div>
-                                {entregavel.fase && (
-                                  <div style={{ fontSize: '11px', color: 'var(--brown-light)', marginTop: '2px' }}>
-                                    Fase: {entregavel.fase}
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Notas */}
-                      {sugestoesEscopo.notas?.length > 0 && (
-                        <div>
-                          <h6 style={{ fontSize: '12px', fontWeight: 600, color: 'var(--brown)', marginBottom: '10px', textTransform: 'uppercase' }}>
-                            Notas
-                          </h6>
-                          <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '12px', color: 'var(--brown-light)' }}>
-                            {sugestoesEscopo.notas.map((nota, idx) => (
-                              <li key={idx} style={{ marginBottom: '4px' }}>{nota}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
+              <ProjetoFasesPrazo
+                project={project}
+                setProject={setProject}
+                fasesContratuais={fasesContratuais}
+                refreshFases={() => fetchFasesContratuais(project.id)}
+                onEditFase={handleEditFase}
+                onRemoveFase={handleRemoveFase}
+                onOpenFaseModal={() => {
+                  setEditingFase(null)
+                  setFaseForm({
+                    nome: '',
+                    descricao: '',
+                    numero: (fasesContratuais.length + 1).toString(),
+                    data_inicio: '',
+                    data_fim: '',
+                    estado: 'pendente'
+                  })
+                  setShowFaseModal(true)
+                }}
+              />
             )}
 
             {/* Entregáveis */}
@@ -2544,7 +1805,9 @@ export default function ProjetoDetalhe() {
 
             {/* Design Review */}
             {activeFaseSection === 'design-review' && (
-              <DesignReview projeto={project} />
+              <Suspense fallback={<LazyFallback />}>
+                <DesignReview projeto={project} />
+              </Suspense>
             )}
 
           </div>
@@ -2955,11 +2218,13 @@ export default function ProjetoDetalhe() {
 
           {/* Sub-tab Moleskine - Abre diretamente o caderno */}
           {activeArchvizSection === 'moleskine' && (
-            <MoleskineDigital
-              projectId={project?.id}
-              projectName={project?.nome}
-              onClose={() => setActiveArchvizSection('processo')}
-            />
+            <Suspense fallback={<LazyFallback />}>
+              <MoleskineDigital
+                projectId={project?.id}
+                projectName={project?.nome}
+                onClose={() => setActiveArchvizSection('processo')}
+              />
+            </Suspense>
           )}
         </div>
       )}
@@ -3036,7 +2301,9 @@ export default function ProjetoDetalhe() {
 
       {/* Tab Chat IA */}
       {activeTab === 'chat-ia' && (
-        <ProjetoChatIA projetoId={project?.id} projeto={project} />
+        <Suspense fallback={<LazyFallback />}>
+          <ProjetoChatIA projetoId={project?.id} projeto={project} />
+        </Suspense>
       )}
 
       {/* Tab Gestão de Projeto com subtabs */}
@@ -3117,236 +2384,7 @@ export default function ProjetoDetalhe() {
 
           {/* Ficha de Cliente */}
           {activeGestaoSection === 'ficha-cliente' && (
-            <div className="card">
-              <div className="flex items-center justify-between" style={{ marginBottom: '24px' }}>
-                <div className="flex items-center gap-md">
-                  <div style={{
-                    width: '48px',
-                    height: '48px',
-                    borderRadius: '12px',
-                    background: 'var(--cream)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    <UserCircle size={24} style={{ color: 'var(--brown)' }} />
-                  </div>
-                  <div>
-                    <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--brown)', margin: 0 }}>
-                      {project.cliente?.nome || project.cliente_nome || 'Cliente'}
-                    </h3>
-                    <p style={{ fontSize: '13px', color: 'var(--brown-light)', margin: 0 }}>
-                      {project.cliente?.codigo || ''} {project.cliente?.tipo ? `• ${project.cliente.tipo}` : ''}
-                    </p>
-                  </div>
-                </div>
-                {!editingCliente ? (
-                  <button
-                    onClick={() => {
-                      const c = project.cliente || {}
-                      setClienteForm({
-                        nome: c.nome || project.cliente_nome || '',
-                        tipo: c.tipo || 'Particular',
-                        empresa: c.empresa || '',
-                        email: c.email || '',
-                        telefone: c.telefone || '',
-                        nif: c.nif || (c.documento || '').replace('NIF: ', ''),
-                        morada: c.morada_raw || '',
-                        codigo_postal: c.codigo_postal || '',
-                        cidade: c.cidade || '',
-                        notas: c.notas || ''
-                      })
-                      setEditingCliente(true)
-                    }}
-                    style={{
-                      padding: '8px 16px',
-                      background: 'var(--brown)',
-                      color: 'var(--off-white)',
-                      border: 'none',
-                      borderRadius: '8px',
-                      fontSize: '13px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px'
-                    }}
-                  >
-                    <Edit size={14} />
-                    Editar
-                  </button>
-                ) : (
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button
-                      onClick={() => setEditingCliente(false)}
-                      style={{
-                        padding: '8px 16px',
-                        background: 'transparent',
-                        color: 'var(--brown-light)',
-                        border: '1px solid var(--stone)',
-                        borderRadius: '8px',
-                        fontSize: '13px',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      onClick={handleSaveCliente}
-                      disabled={savingCliente}
-                      style={{
-                        padding: '8px 16px',
-                        background: 'var(--accent-olive)',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '8px',
-                        fontSize: '13px',
-                        cursor: savingCliente ? 'wait' : 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        opacity: savingCliente ? 0.7 : 1
-                      }}
-                    >
-                      {savingCliente ? <Loader2 size={14} className="spin" /> : <CheckCircle size={14} />}
-                      Guardar
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {!editingCliente ? (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  <div style={{ padding: '16px', background: 'var(--cream)', borderRadius: '8px' }}>
-                    <p style={{ fontSize: '11px', color: 'var(--brown-light)', margin: '0 0 4px', textTransform: 'uppercase', fontWeight: 600 }}>Nome</p>
-                    <p style={{ fontSize: '14px', color: 'var(--brown)', margin: 0 }}>{project.cliente?.nome || project.cliente_nome || '-'}</p>
-                  </div>
-                  <div style={{ padding: '16px', background: 'var(--cream)', borderRadius: '8px' }}>
-                    <p style={{ fontSize: '11px', color: 'var(--brown-light)', margin: '0 0 4px', textTransform: 'uppercase', fontWeight: 600 }}>Tipo</p>
-                    <p style={{ fontSize: '14px', color: 'var(--brown)', margin: 0 }}>{project.cliente?.tipo || 'Particular'}</p>
-                  </div>
-                  <div style={{ padding: '16px', background: 'var(--cream)', borderRadius: '8px' }}>
-                    <p style={{ fontSize: '11px', color: 'var(--brown-light)', margin: '0 0 4px', textTransform: 'uppercase', fontWeight: 600 }}>Email</p>
-                    <p style={{ fontSize: '14px', color: 'var(--brown)', margin: 0 }}>{project.cliente?.email || '-'}</p>
-                  </div>
-                  <div style={{ padding: '16px', background: 'var(--cream)', borderRadius: '8px' }}>
-                    <p style={{ fontSize: '11px', color: 'var(--brown-light)', margin: '0 0 4px', textTransform: 'uppercase', fontWeight: 600 }}>Telefone</p>
-                    <p style={{ fontSize: '14px', color: 'var(--brown)', margin: 0 }}>{project.cliente?.telefone || '-'}</p>
-                  </div>
-                  <div style={{ padding: '16px', background: 'var(--cream)', borderRadius: '8px' }}>
-                    <p style={{ fontSize: '11px', color: 'var(--brown-light)', margin: '0 0 4px', textTransform: 'uppercase', fontWeight: 600 }}>NIF</p>
-                    <p style={{ fontSize: '14px', color: 'var(--brown)', margin: 0 }}>{project.cliente?.documento || '-'}</p>
-                  </div>
-                  <div style={{ padding: '16px', background: 'var(--cream)', borderRadius: '8px' }}>
-                    <p style={{ fontSize: '11px', color: 'var(--brown-light)', margin: '0 0 4px', textTransform: 'uppercase', fontWeight: 600 }}>Morada</p>
-                    <p style={{ fontSize: '14px', color: 'var(--brown)', margin: 0 }}>{project.cliente?.morada || '-'}</p>
-                  </div>
-                  {project.cliente?.notas && (
-                    <div style={{ padding: '16px', background: 'var(--cream)', borderRadius: '8px', gridColumn: '1 / -1' }}>
-                      <p style={{ fontSize: '11px', color: 'var(--brown-light)', margin: '0 0 4px', textTransform: 'uppercase', fontWeight: 600 }}>Notas</p>
-                      <p style={{ fontSize: '14px', color: 'var(--brown)', margin: 0, whiteSpace: 'pre-wrap' }}>{project.cliente.notas}</p>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  <div>
-                    <label style={{ fontSize: '12px', color: 'var(--brown-light)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Nome *</label>
-                    <input
-                      type="text"
-                      value={clienteForm.nome}
-                      onChange={e => setClienteForm(f => ({ ...f, nome: e.target.value }))}
-                      style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '14px', background: 'white', color: 'var(--brown)' }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '12px', color: 'var(--brown-light)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Tipo</label>
-                    <select
-                      value={clienteForm.tipo}
-                      onChange={e => setClienteForm(f => ({ ...f, tipo: e.target.value }))}
-                      style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '14px', background: 'white', color: 'var(--brown)' }}
-                    >
-                      <option value="Particular">Particular</option>
-                      <option value="Empresa">Empresa</option>
-                      <option value="Investidor">Investidor</option>
-                    </select>
-                  </div>
-                  {clienteForm.tipo !== 'Particular' && (
-                    <div style={{ gridColumn: '1 / -1' }}>
-                      <label style={{ fontSize: '12px', color: 'var(--brown-light)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Empresa</label>
-                      <input
-                        type="text"
-                        value={clienteForm.empresa}
-                        onChange={e => setClienteForm(f => ({ ...f, empresa: e.target.value }))}
-                        style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '14px', background: 'white', color: 'var(--brown)' }}
-                      />
-                    </div>
-                  )}
-                  <div>
-                    <label style={{ fontSize: '12px', color: 'var(--brown-light)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Email</label>
-                    <input
-                      type="email"
-                      value={clienteForm.email}
-                      onChange={e => setClienteForm(f => ({ ...f, email: e.target.value }))}
-                      style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '14px', background: 'white', color: 'var(--brown)' }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '12px', color: 'var(--brown-light)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Telefone</label>
-                    <input
-                      type="tel"
-                      value={clienteForm.telefone}
-                      onChange={e => setClienteForm(f => ({ ...f, telefone: e.target.value }))}
-                      style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '14px', background: 'white', color: 'var(--brown)' }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '12px', color: 'var(--brown-light)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>NIF</label>
-                    <input
-                      type="text"
-                      value={clienteForm.nif}
-                      onChange={e => setClienteForm(f => ({ ...f, nif: e.target.value }))}
-                      style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '14px', background: 'white', color: 'var(--brown)' }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '12px', color: 'var(--brown-light)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Morada</label>
-                    <input
-                      type="text"
-                      value={clienteForm.morada}
-                      onChange={e => setClienteForm(f => ({ ...f, morada: e.target.value }))}
-                      style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '14px', background: 'white', color: 'var(--brown)' }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '12px', color: 'var(--brown-light)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Código Postal</label>
-                    <input
-                      type="text"
-                      value={clienteForm.codigo_postal}
-                      onChange={e => setClienteForm(f => ({ ...f, codigo_postal: e.target.value }))}
-                      style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '14px', background: 'white', color: 'var(--brown)' }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '12px', color: 'var(--brown-light)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Cidade</label>
-                    <input
-                      type="text"
-                      value={clienteForm.cidade}
-                      onChange={e => setClienteForm(f => ({ ...f, cidade: e.target.value }))}
-                      style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '14px', background: 'white', color: 'var(--brown)' }}
-                    />
-                  </div>
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <label style={{ fontSize: '12px', color: 'var(--brown-light)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Notas</label>
-                    <textarea
-                      value={clienteForm.notas}
-                      onChange={e => setClienteForm(f => ({ ...f, notas: e.target.value }))}
-                      rows={3}
-                      style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '14px', background: 'white', color: 'var(--brown)', resize: 'vertical' }}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
+            <ProjetoFichaCliente project={project} setProject={setProject} />
           )}
         </div>
       )}
