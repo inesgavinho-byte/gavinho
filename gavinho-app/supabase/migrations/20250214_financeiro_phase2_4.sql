@@ -168,8 +168,8 @@ END $$;
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'seeds_executados') THEN
-    INSERT INTO seeds_executados (seed_key, executado_em)
-    VALUES ('20250214_financeiro_phase2_4', now())
+    INSERT INTO seeds_executados (seed_key, nome, executado_em)
+    VALUES ('20250214_financeiro_phase2_4', '20250214_financeiro_phase2_4', now())
     ON CONFLICT DO NOTHING;
   END IF;
 END $$;
