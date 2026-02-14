@@ -1,0 +1,388 @@
+/* =====================================================
+   LEADS PIPELINE - Kanban board page
+   ===================================================== */
+
+.page {
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 24px;
+  min-height: 100%;
+}
+
+/* Header */
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.headerLeft h1 {
+  margin: 0;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.6rem;
+  color: var(--brown);
+  font-weight: 600;
+}
+
+.headerLeft p {
+  margin: 4px 0 0;
+  font-size: 0.8rem;
+  color: var(--brown-light);
+}
+
+.novoBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border: none;
+  background: #4a5d4a;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.novoBtn:hover {
+  background: #3d4f3d;
+}
+
+/* KPI Row */
+.kpiRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.kpiCard {
+  background: var(--sandy-beach, #fff);
+  border: 1px solid var(--stone);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.kpiIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.kpiLabel {
+  font-size: 0.68rem;
+  color: var(--brown-light);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.kpiValue {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+/* Filters */
+.filters {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.searchWrapper {
+  position: relative;
+  flex: 1 1 220px;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--brown-light);
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 8px 12px 8px 36px;
+  border: 1px solid var(--stone);
+  border-radius: 10px;
+  font-size: 0.82rem;
+  background: var(--sandy-beach, #fff);
+  color: var(--brown);
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.searchInput:focus {
+  outline: none;
+  border-color: #4a5d4a;
+}
+
+.filterSelect {
+  padding: 8px 12px;
+  border: 1px solid var(--stone);
+  border-radius: 10px;
+  font-size: 0.78rem;
+  background: var(--sandy-beach, #fff);
+  color: var(--brown);
+  font-family: inherit;
+  min-width: 130px;
+}
+
+.filterSelect:focus {
+  outline: none;
+  border-color: #4a5d4a;
+}
+
+.viewToggle {
+  display: flex;
+  border: 1px solid var(--stone);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.viewBtn {
+  padding: 7px 14px;
+  border: none;
+  background: transparent;
+  color: var(--brown-light);
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 600;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.viewBtn:not(:last-child) {
+  border-right: 1px solid var(--stone);
+}
+
+.viewBtn.active {
+  background: #4a5d4a;
+  color: #fff;
+}
+
+/* Kanban Board */
+.kanban {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 20px;
+  min-height: 400px;
+}
+
+.kanbanColumn {
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  background: var(--cream);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.columnHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid transparent;
+}
+
+.columnTitle {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.columnCount {
+  min-width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.columnCards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.emptyColumn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 12px;
+  color: var(--brown-light);
+  font-size: 0.75rem;
+  text-align: center;
+  opacity: 0.6;
+  min-height: 80px;
+}
+
+/* List View */
+.listView {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.listItem {
+  background: var(--sandy-beach, #fff);
+  border: 1px solid var(--stone);
+  border-radius: 10px;
+  padding: 14px 18px;
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr auto;
+  gap: 12px;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.listItem:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.listNome {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--brown);
+}
+
+.listEmpresa {
+  font-size: 0.72rem;
+  color: var(--brown-light);
+}
+
+.listCell {
+  font-size: 0.78rem;
+  color: var(--brown);
+}
+
+.faseBadge {
+  display: inline-flex;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.prioridadeDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 6px;
+}
+
+/* Loading */
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 60vh;
+  gap: 16px;
+  color: var(--brown-light);
+}
+
+/* Empty state */
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 24px;
+  color: var(--brown-light);
+  text-align: center;
+}
+
+.emptyState h3 {
+  margin: 16px 0 8px;
+  color: var(--brown);
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.2rem;
+}
+
+.emptyState p {
+  font-size: 0.85rem;
+  max-width: 400px;
+  line-height: 1.5;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .kanban {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .page {
+    padding: 16px;
+  }
+
+  .header {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .novoBtn {
+    align-self: flex-start;
+  }
+
+  .kpiRow {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .kanban {
+    grid-template-columns: 1fr;
+  }
+
+  .kanbanColumn {
+    min-width: unset;
+  }
+
+  .listItem {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .filters {
+    flex-direction: column;
+  }
+
+  .searchWrapper {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+}
