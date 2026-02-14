@@ -84,6 +84,13 @@ RETURNS BOOLEAN AS $$
     );
 $$ LANGUAGE sql SECURITY DEFINER STABLE;
 
+-- 2c-text. TEXT overload for tables where projeto_id is TEXT instead of UUID
+--          (acompanhamento, projecoes_cenarios, analises_viabilidade)
+CREATE OR REPLACE FUNCTION gavinho_can_access_project(p_projeto_id TEXT)
+RETURNS BOOLEAN AS $$
+  SELECT gavinho_can_access_project(p_projeto_id::UUID);
+$$ LANGUAGE sql SECURITY DEFINER STABLE;
+
 -- 2d. Can the current user access a specific obra?
 --     TRUE if: admin/gestor OR member of the project the obra belongs to
 CREATE OR REPLACE FUNCTION gavinho_can_access_obra(p_obra_id UUID)
