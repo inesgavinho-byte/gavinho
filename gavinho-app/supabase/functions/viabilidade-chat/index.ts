@@ -68,7 +68,6 @@ serve(async (req) => {
       throw new Error('message é obrigatória')
     }
 
-    console.log(`Chat viabilidade: ${analise_id}`)
 
     // 1. Carregar contexto da análise
     const { data: analise, error: analiseError } = await supabase

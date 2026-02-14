@@ -92,7 +92,6 @@ serve(async (req) => {
       throw new Error('Content-Type não suportado')
     }
 
-    console.log('Email recebido:', emailData.subject, 'de', emailData.from)
 
     // Parse endereços
     const remetente = parseEmailAddress(emailData.from)
@@ -199,7 +198,6 @@ serve(async (req) => {
     if (insertError) {
       // Verificar se é duplicado (message_id já existe)
       if (insertError.code === '23505') {
-        console.log('Email duplicado ignorado:', messageId)
         return new Response(
           JSON.stringify({ success: true, message: 'Email já processado' }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -216,11 +214,9 @@ serve(async (req) => {
         .eq('id', emailSalvo.id)
     }
 
-    console.log('Email guardado:', emailSalvo?.id, 'Obra:', obra_id, 'Projeto:', projeto_id)
 
     // Se obra/projeto não foram encontrados, tentar notificar para classificação manual
     if (!obra_id && !projeto_id && emailSalvo) {
-      console.log('Email sem obra associada - requer classificação manual')
       // Aqui pode-se adicionar notificação ou criar entrada numa fila de classificação
     }
 

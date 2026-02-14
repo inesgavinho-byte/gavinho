@@ -146,5 +146,4 @@ self.addEventListener('sync', (event) => {
 });
 
 async function syncMessages() {
-  console.log('[SW] Syncing pending messages...');
 }

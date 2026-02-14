@@ -75,7 +75,6 @@ serve(async (req) => {
       throw new Error('escopo_texto é obrigatório')
     }
 
-    console.log(`Analisando escopo do projeto: ${projeto_nome || 'N/A'}`)
 
     // Chamar Claude API
     const response = await fetch('https://api.anthropic.com/v1/messages', {

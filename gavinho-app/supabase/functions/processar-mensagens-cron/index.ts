@@ -119,14 +119,12 @@ serve(async (req) => {
     }
 
     // 1. Processar mensagens WhatsApp
-    console.log('Iniciando processamento de mensagens WhatsApp...')
     const whatsappResult = await processarMensagensWhatsApp(
       supabase, anthropicApiKey, openaiApiKey
     )
     result.whatsapp = whatsappResult
 
     // 2. Processar emails
-    console.log('Iniciando processamento de emails...')
     const emailResult = await processarEmails(
       supabase, anthropicApiKey, openaiApiKey
     )
@@ -137,7 +135,6 @@ serve(async (req) => {
     // 3. Registar execução no log
     await registarExecucao(supabase, result)
 
-    console.log('Processamento concluído:', result)
 
     return new Response(
       JSON.stringify({
@@ -179,11 +176,9 @@ async function processarMensagensWhatsApp(
   }
 
   if (!mensagens || mensagens.length === 0) {
-    console.log('Nenhuma mensagem WhatsApp para processar')
     return result
   }
 
-  console.log(`Processando ${mensagens.length} mensagens WhatsApp`)
 
   for (const mensagem of mensagens) {
     try {
@@ -252,11 +247,9 @@ async function processarEmails(
   }
 
   if (!emails || emails.length === 0) {
-    console.log('Nenhum email para processar')
     return result
   }
 
-  console.log(`Processando ${emails.length} emails`)
 
   for (const email of emails) {
     try {

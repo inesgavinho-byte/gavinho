@@ -16,7 +16,6 @@ const employeeDates = [
 ]
 
 export async function updateEmployeeDates() {
-  console.log('Atualizando datas de entrada dos colaboradores...')
 
   for (const employee of employeeDates) {
     try {
@@ -29,7 +28,6 @@ export async function updateEmployeeDates() {
       if (error) {
         console.error(`Erro ao atualizar ${employee.nome}:`, error)
       } else if (data && data.length > 0) {
-        console.log(`✓ ${employee.nome} atualizado para ${employee.data_entrada}`)
       } else {
         console.warn(`⚠ ${employee.nome} não encontrado`)
       }
@@ -38,7 +36,6 @@ export async function updateEmployeeDates() {
     }
   }
 
-  console.log('Atualização concluída!')
 }
 
 // Para executar diretamente

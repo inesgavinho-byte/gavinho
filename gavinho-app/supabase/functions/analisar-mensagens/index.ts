@@ -91,7 +91,6 @@ serve(async (req) => {
       )
     }
 
-    console.log(`Processando ${mensagens.length} mensagens`)
 
     let totalSugestoes = 0
 

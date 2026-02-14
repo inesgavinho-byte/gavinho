@@ -36,7 +36,6 @@ serve(async (req: Request) => {
     // que deve ser respondido em <10 segundos com o validationToken em texto simples
     const validationToken = url.searchParams.get('validationToken')
     if (validationToken) {
-      console.log('Graph webhook validation handshake received')
       return new Response(validationToken, {
         status: 200,
         headers: { 'Content-Type': 'text/plain' },
@@ -78,7 +77,6 @@ serve(async (req: Request) => {
           .single()
 
         if (existing) {
-          console.log(`Email ${graphMessageId} already in queue, skipping`)
           return
         }
 
@@ -94,7 +92,6 @@ serve(async (req: Request) => {
         if (error) {
           console.error(`Error queuing email ${graphMessageId}:`, error.message)
         } else {
-          console.log(`Email ${graphMessageId} queued for processing`)
         }
       })
 

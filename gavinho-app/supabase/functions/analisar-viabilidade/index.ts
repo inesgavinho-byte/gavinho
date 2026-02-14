@@ -78,7 +78,6 @@ serve(async (req) => {
       throw new Error('analise_id é obrigatório')
     }
 
-    console.log(`Analisando viabilidade: ${analise_id}, modo: ${modo}`)
 
     // 1. Carregar dados da análise
     const { data: analise, error: analiseError } = await supabase

@@ -4,7 +4,6 @@
 import { supabase } from '../lib/supabase'
 
 export async function seedMariaResidences() {
-  console.log('🚀 Iniciando seed do projeto Maria Residences...')
 
   try {
     // 1. CRIAR/ATUALIZAR PROJETO
@@ -47,7 +46,6 @@ export async function seedMariaResidences() {
 
       if (error) throw error
       projetoId = data.id
-      console.log('✅ Projeto atualizado:', projetoData.codigo)
     } else {
       // Criar novo projeto
       const { data, error } = await supabase
@@ -58,7 +56,6 @@ export async function seedMariaResidences() {
 
       if (error) throw error
       projetoId = data.id
-      console.log('✅ Projeto criado:', projetoData.codigo)
     }
 
     // 2. CRIAR UTILIZADORES (se não existirem)
@@ -88,7 +85,6 @@ export async function seedMariaResidences() {
 
         if (!error && data) {
           utilizadorIds[util.nome] = data.id
-          console.log('✅ Utilizador criado:', util.nome)
         }
       }
     }
@@ -120,7 +116,6 @@ export async function seedMariaResidences() {
         }])
 
       if (!error) {
-        console.log('✅ Tarefa concluída criada:', tarefa.titulo)
       }
     }
 
@@ -148,7 +143,6 @@ export async function seedMariaResidences() {
         }])
 
       if (!error) {
-        console.log('✅ Tarefa em progresso criada:', tarefa.titulo)
       }
     }
 
@@ -182,7 +176,6 @@ export async function seedMariaResidences() {
         }])
 
       if (!error) {
-        console.log('✅ Bloqueio criado:', bloqueio.titulo)
       }
     }
 
@@ -202,7 +195,6 @@ export async function seedMariaResidences() {
       }])
 
     if (!eventoError) {
-      console.log('✅ Evento criado: Visita obra 03/12')
     }
 
     // 7. CRIAR ITENS DE PROCUREMENT (usando notas do projeto ou tabela específica)
@@ -226,11 +218,9 @@ export async function seedMariaResidences() {
         }])
 
       if (!error) {
-        console.log('✅ Procurement criado:', item.item)
       }
     }
 
-    console.log('🎉 Seed do projeto Maria Residences concluído!')
     return { success: true, projetoId }
 
   } catch (error) {

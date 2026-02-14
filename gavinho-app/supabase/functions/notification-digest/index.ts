@@ -295,7 +295,6 @@ serve(async (req) => {
           })
           sendSuccess = response.ok
         } else {
-          console.log(`[DEV] Digest simulado para ${user.email}: ${subject}`)
           sendSuccess = true
         }
 

@@ -231,7 +231,6 @@ export default function DiarioObra({ obra, user }) {
         updated_at: new Date().toISOString()
       }
 
-      console.log('Saving diario entry:', entryData)
 
       if (diarioId) {
         const { error } = await supabase

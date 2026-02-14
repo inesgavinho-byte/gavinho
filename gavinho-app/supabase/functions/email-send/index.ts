@@ -164,11 +164,9 @@ serve(async (req) => {
       sendResult = { id: messageId }
     } else {
       // Sem provedor de email configurado - simular envio para desenvolvimento
-      console.log('AVISO: Nenhum provedor de email configurado - simulando envio')
       sendResult = { id: messageId, simulated: true }
     }
 
-    console.log('Email enviado:', messageId)
 
     // Guardar email enviado na base de dados
     const { data: emailSalvo, error: insertError } = await supabase

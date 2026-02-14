@@ -335,7 +335,6 @@ export default function PedirMateriais({ obra, user }) {
         .eq('ativo', true)
 
       if (!usersToNotify || usersToNotify.length === 0) {
-        console.log('Nenhum utilizador encontrado para notificar')
         return
       }
 

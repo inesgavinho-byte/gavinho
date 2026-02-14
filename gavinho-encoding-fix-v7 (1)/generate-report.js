@@ -524,7 +524,6 @@ const data = JSON.parse(fs.readFileSync(dataFile, 'utf8'));
 generateReport(data)
   .then(buffer => {
     fs.writeFileSync(outputFile, buffer);
-    console.log(`Report generated: ${outputFile}`);
   })
   .catch(err => {
     console.error('Error generating report:', err);
