@@ -369,7 +369,6 @@ export default function ObraOrcamentacao({ obra, activeSubTab = 'custo' }) {
       // Mapear propostas únicas (coluna 1)
       const propostasUnicas = [...new Set(dataRows.map(r => String(r[1] || '').trim()).filter(Boolean))]
       
-      console.log('Propostas encontradas:', propostasUnicas)
       
       // Criar propostas que não existem
       for (const codigo of propostasUnicas) {

@@ -135,7 +135,6 @@ serve(async (req: Request) => {
         .from('chat_push_subscriptions')
         .update({ activo: false })
         .in('id', expiredIds)
-      console.log(`Deactivated ${expiredIds.length} expired subscriptions`)
     }
 
     return new Response(

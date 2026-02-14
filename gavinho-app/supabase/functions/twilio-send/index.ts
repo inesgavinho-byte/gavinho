@@ -88,7 +88,6 @@ serve(async (req) => {
       throw new Error(twilioData.message || 'Erro ao enviar mensagem')
     }
 
-    console.log('Mensagem enviada:', twilioData.sid)
 
     // Guardar mensagem enviada na base de dados
     const { data: mensagem, error: insertError } = await supabase

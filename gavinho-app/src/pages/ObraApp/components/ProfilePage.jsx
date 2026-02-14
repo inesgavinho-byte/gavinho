@@ -215,7 +215,6 @@ export default function ProfilePage({ user, onBack, onUpdateUser }) {
 
         // Se nenhuma tabela funcionou, guardar apenas localmente
         if (!success) {
-          console.log('Guardado apenas localmente (sem acesso à BD)')
         }
       }
 

@@ -235,7 +235,6 @@ export default function useNotifications(profile) {
           console.error('[Mention] Insert failed:', error.message, error.details, error.hint)
           throw error
         }
-        console.log('[Mention] Created', data?.length, 'notification(s) for users:', mentionedUserIds.filter(id => id !== profile.id))
       }
 
       // Also insert into chat_mencoes for mention tracking

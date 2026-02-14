@@ -86,7 +86,6 @@ serve(async (req) => {
       // ═══════════════════════════════════════
       // RENOVAR subscrição existente
       // ═══════════════════════════════════════
-      console.log(`Renewing subscription ${existingSub.subscription_id}`)
 
       const renewResponse = await fetch(
         `https://graph.microsoft.com/v1.0/subscriptions/${existingSub.subscription_id}`,
@@ -159,7 +158,6 @@ async function createNewSubscription(
   notificationUrl: string,
   expirationDate: Date
 ) {
-  console.log('Creating new Graph subscription')
 
   const createResponse = await fetch('https://graph.microsoft.com/v1.0/subscriptions', {
     method: 'POST',

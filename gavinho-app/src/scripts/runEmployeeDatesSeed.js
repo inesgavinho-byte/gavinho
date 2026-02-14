@@ -22,7 +22,6 @@ const employeeDates = [
 ]
 
 async function updateEmployeeDates() {
-  console.log('🚀 Atualizando datas de entrada dos colaboradores...\n')
 
   let updated = 0
   let notFound = 0
@@ -35,17 +34,13 @@ async function updateEmployeeDates() {
       .select('id, nome')
 
     if (error) {
-      console.log(`❌ Erro ao atualizar ${employee.nome}: ${error.message}`)
     } else if (data && data.length > 0) {
-      console.log(`✅ ${employee.nome} → ${employee.data_entrada}`)
       updated++
     } else {
-      console.log(`⚠️  ${employee.nome} não encontrado`)
       notFound++
     }
   }
 
-  console.log(`\n📊 Resumo: ${updated} atualizados, ${notFound} não encontrados`)
 }
 
 updateEmployeeDates()

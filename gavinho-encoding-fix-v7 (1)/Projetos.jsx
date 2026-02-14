@@ -154,7 +154,6 @@ export default function Projetos() {
         updated_at: new Date().toISOString()
       }
 
-      console.log('A guardar projeto:', projectData)
 
       if (editingProject) {
         // Atualizar
@@ -168,11 +167,9 @@ export default function Projetos() {
           console.error('Erro Supabase:', error)
           throw error
         }
-        console.log('Projeto atualizado:', data)
       } else {
         // Criar novo
         const codigo = await generateProjectCode()
-        console.log('Código gerado:', codigo)
         
         const { data, error } = await supabase
           .from('projetos')
@@ -183,7 +180,6 @@ export default function Projetos() {
           console.error('Erro Supabase:', error)
           throw error
         }
-        console.log('Projeto criado:', data)
       }
 
       setShowModal(false)

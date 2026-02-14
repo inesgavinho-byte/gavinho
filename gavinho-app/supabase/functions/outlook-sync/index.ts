@@ -152,14 +152,12 @@ serve(async (req) => {
         : new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000).toISOString()
     }
 
-    console.log(`Fetching emails since: ${sinceDate} (full_sync: ${forceFullSync}, days_back: ${daysBack})`)
 
     // Obter token e emails
     const accessToken = await getAccessToken()
     const emailLimit = forceFullSync ? 200 : 50
     const emails = await fetchRecentEmails(accessToken, sinceDate, emailLimit)
 
-    console.log(`Found ${emails.length} emails from Outlook`)
 
     // Buscar projetos e obras para mapear códigos
     const [projetosRes, obrasRes] = await Promise.all([
@@ -199,14 +197,11 @@ serve(async (req) => {
         if (projectCode.startsWith('OB') || projectCode.startsWith('GB')) {
           obraId = obraMap.get(projectCode) || null
           if (!obraId) {
-            console.log(`Email "${email.subject}" has obra code ${projectCode} but not found in database`)
           }
         } else if (projectCode.startsWith('GA')) {
           projetoId = projetoMap.get(projectCode) || null
           if (projetoId) {
-            console.log(`Email "${email.subject}" linked to projeto ${projectCode}`)
           } else {
-            console.log(`Email "${email.subject}" has projeto code ${projectCode} but not found in database`)
           }
         }
       } else {
@@ -234,13 +229,11 @@ serve(async (req) => {
             if (recentLinked) {
               obraId = recentLinked.obra_id
               projetoId = recentLinked.projeto_id
-              console.log(`Email "${email.subject}" - matched by sender ${senderEmail} to previous project/obra`)
             }
           }
         }
 
         if (!obraId && !projetoId) {
-          console.log(`Email "${email.subject}" - no project code detected, importing anyway`)
         }
       }
 

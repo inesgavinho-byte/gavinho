@@ -293,7 +293,6 @@ export default function Chat() {
         .order('fixada_at', { ascending: false })
       
       if (error) throw error
-      console.log('Mensagens fixadas (projeto):', data)
       setMensagensFixadas(data || [])
     } catch (err) {
       console.error('Erro ao carregar mensagens fixadas:', err)
@@ -461,7 +460,6 @@ export default function Chat() {
     
     try {
       const mensagem = showCriarTarefa
-      console.log('Criando tarefa para mensagem:', mensagem.id)
       
       // Criar tarefa (codigo é gerado automaticamente pelo trigger)
       const { data: tarefa, error: tarefaError } = await supabase
@@ -477,7 +475,6 @@ export default function Chat() {
         .select()
         .single()
       
-      console.log('Resultado insert tarefa:', tarefa, tarefaError)
       if (tarefaError) throw tarefaError
       
       // Atualizar mensagem
@@ -577,23 +574,13 @@ export default function Chat() {
   }
 
   const handleSendMessage = async () => {
-    console.log('handleSendMessage called', { 
-      newMessage, 
-      activeMode, 
-      selectedTopico: selectedTopico?.id, 
-      selectedCanal: selectedCanal?.id,
-      selectedFotos: selectedFotos.length
-    })
     if (!newMessage.trim() && selectedFotos.length === 0) {
-      console.log('Blocked: empty message')
       return
     }
     if (activeMode === 'project' && !selectedTopico) {
-      console.log('Blocked: no topico in project mode')
       return
     }
     if (activeMode === 'site' && !selectedCanal) {
-      console.log('Blocked: no canal in site mode')
       return
     }
     

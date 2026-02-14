@@ -151,7 +151,6 @@ export default function Obras() {
 
   const handleDeleteObra = async (obra) => {
     try {
-      console.log('Eliminando obra:', obra.id)
       const { error } = await supabase
         .from('obras')
         .delete()
@@ -170,9 +169,6 @@ export default function Obras() {
   }
 
   const handleStatusChange = async (obra, newStatus) => {
-    console.log('=== INICIO handleStatusChange ===')
-    console.log('Obra ID:', obra.id)
-    console.log('Novo Status:', newStatus)
     
     try {
       const { data, error } = await supabase
@@ -181,8 +177,6 @@ export default function Obras() {
         .eq('id', obra.id)
         .select()
 
-      console.log('Resposta Supabase - data:', data)
-      console.log('Resposta Supabase - error:', error)
 
       if (error) {
         throw error

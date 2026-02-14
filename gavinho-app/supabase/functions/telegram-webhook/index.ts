@@ -51,7 +51,6 @@ serve(async (req) => {
   try {
     const update: TelegramUpdate = await req.json()
 
-    console.log('Telegram update recebido:', JSON.stringify(update, null, 2))
 
     // Ignorar updates sem mensagem
     if (!update.message) {
@@ -76,7 +75,6 @@ serve(async (req) => {
     const chatTitle = message.chat.title || 'Chat Privado'
     const chatType = message.chat.type
 
-    console.log(`Mensagem de ${autorNome} no chat "${chatTitle}" (${chatType}):`, message.text)
 
     // Procurar grupo/chat associado a uma obra
     const { data: grupoConfig } = await supabase
@@ -89,7 +87,6 @@ serve(async (req) => {
     // Se não encontrou grupo configurado, verificar se é comando /start ou /registar
     if (!grupoConfig) {
       if (message.text?.startsWith('/start') || message.text?.startsWith('/registar')) {
-        console.log('Grupo não registado. Chat ID:', chatId)
         // Não responder automaticamente para evitar spam
         // O admin pode registar o grupo manualmente na plataforma
       }
@@ -194,7 +191,6 @@ serve(async (req) => {
       throw insertError
     }
 
-    console.log('Mensagem guardada:', mensagem?.id)
 
     return new Response(JSON.stringify({ ok: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

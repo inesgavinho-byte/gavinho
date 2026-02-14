@@ -125,7 +125,6 @@ export default function WorkerLogin({ onLogin }) {
 
       if (obrasError) throw obrasError
 
-      console.log(`[Login] User role: ${utilizador?.role}, Obras loaded: ${obrasData?.length}`)
 
       const user = {
         id: authData.user.id,

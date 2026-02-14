@@ -83,7 +83,6 @@ export default function ObraApp() {
     if ('serviceWorker' in navigator) {
       try {
         const registration = await navigator.serviceWorker.register('/sw.js')
-        console.log('Service Worker registado:', registration)
       } catch (err) {
         console.error('Erro ao registar SW:', err)
       }
@@ -170,7 +169,6 @@ export default function ObraApp() {
         obrasData = data?.map(o => o.obras).filter(Boolean) || []
       }
 
-      console.log(`[Refresh] Loaded ${obrasData.length} obras for user type: ${user.tipo}`)
       setObras(obrasData)
       localStorage.setItem(STORAGE_KEYS.OBRAS, JSON.stringify(obrasData))
 

@@ -101,7 +101,6 @@ serve(async (req) => {
       MediaContentType0: formData.get('MediaContentType0') as string || undefined,
     }
 
-    console.log('Mensagem recebida do WhatsApp:', message)
 
     // Extrair número de telefone (formato: whatsapp:+351912345678)
     const telefone = message.From.replace('whatsapp:', '')
@@ -150,7 +149,6 @@ serve(async (req) => {
       throw insertError
     }
 
-    console.log('Mensagem guardada:', mensagem)
 
     // Responder ao Twilio com TwiML vazio (sem resposta automática)
     const twiml = `<?xml version="1.0" encoding="UTF-8"?><Response></Response>`

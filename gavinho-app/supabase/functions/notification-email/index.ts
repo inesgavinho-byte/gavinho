@@ -316,7 +316,6 @@ serve(async (req) => {
           }
         } else {
           // Sem provedor - simular para desenvolvimento
-          console.log(`[DEV] Email simulado para ${userEmail}: ${subject}`)
           sendSuccess = true
         }
 
