@@ -106,15 +106,15 @@ LEFT JOIN LATERAL (
   LIMIT 1
 ) o ON true
 LEFT JOIN (
-  SELECT projeto_id, SUM(valor_total) AS total_comprometido
+  SELECT projeto_id, SUM(total) AS total_comprometido
   FROM purchase_orders
-  WHERE estado IN ('aprovada', 'paga', 'parcial')
+  WHERE estado NOT IN ('rascunho', 'cancelada')
   GROUP BY projeto_id
 ) po_agg ON po_agg.projeto_id = p.id
 LEFT JOIN (
-  SELECT projeto_id, SUM(valor_total) AS total_facturado
+  SELECT projeto_id, SUM(total) AS total_facturado
   FROM procurement_facturas
-  WHERE estado IN ('validada', 'paga')
+  WHERE estado IN ('verificada', 'aprovada', 'em_pagamento', 'paga')
   GROUP BY projeto_id
 ) f_agg ON f_agg.projeto_id = p.id
 LEFT JOIN (
