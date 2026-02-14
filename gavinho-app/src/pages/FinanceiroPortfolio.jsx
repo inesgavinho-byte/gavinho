@@ -37,9 +37,10 @@ export default function FinanceiroPortfolio() {
         // Fetch orcamentos
         const { data: orcamentos } = await supabase
           .from('orcamentos')
-          .select('id, valor_total, margem_global')
+          .select('id, total, margem_percentagem')
           .eq('projeto_id', proj.id)
-          .eq('is_active', true)
+          .eq('status', 'aprovado')
+          .order('created_at', { ascending: false })
           .limit(1)
           .single()
 
@@ -64,8 +65,8 @@ export default function FinanceiroPortfolio() {
           .eq('projeto_id', proj.id)
           .eq('estado', 'activo')
 
-        const orcamentoRevisto = orcamentos?.valor_total || 0
-        const margemGlobal = orcamentos?.margem_global || 25
+        const orcamentoRevisto = orcamentos?.total || 0
+        const margemGlobal = orcamentos?.margem_percentagem || 25
         const orcCusto = orcamentoRevisto * (1 - margemGlobal / 100)
         const comprometido = (pos || []).reduce((s, p) => s + (p.valor_total || 0), 0)
         const facturado = (facturas || []).reduce((s, f) => s + (f.valor_total || 0), 0)
