@@ -25,7 +25,8 @@ import {
   Lightbulb,
   MessageSquare,
   HardHat,
-  Calendar
+  Calendar,
+  Inbox
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
