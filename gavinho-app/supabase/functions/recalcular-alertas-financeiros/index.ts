@@ -67,7 +67,7 @@ Deno.serve(async (req: Request) => {
       // Purchase orders
       supabase
         .from("purchase_orders")
-        .select("id, capitulo, valor_total, estado")
+        .select("id, capitulo_orcamento, total, estado")
         .eq("projeto_id", projeto_id),
 
       // Facturas (invoices)
@@ -108,9 +108,9 @@ Deno.serve(async (req: Request) => {
     // Index POs by capitulo
     const posByCapitulo: Record<string, typeof purchaseOrders> = {};
     for (const po of purchaseOrders) {
-      if (po.capitulo) {
-        if (!posByCapitulo[po.capitulo]) posByCapitulo[po.capitulo] = [];
-        posByCapitulo[po.capitulo].push(po);
+      if (po.capitulo_orcamento) {
+        if (!posByCapitulo[po.capitulo_orcamento]) posByCapitulo[po.capitulo_orcamento] = [];
+        posByCapitulo[po.capitulo_orcamento].push(po);
       }
     }
 
@@ -139,7 +139,7 @@ Deno.serve(async (req: Request) => {
     for (const cap of chapters) {
       const orcamentoCusto = cap.valor * (1 - (cap.margem || 0) / 100);
       const capPOs = posByCapitulo[cap.nome] || [];
-      const comprometido = capPOs.reduce((sum, po) => sum + (po.valor_total || 0), 0);
+      const comprometido = capPOs.reduce((sum, po) => sum + (po.total || 0), 0);
 
       // Facturado: sum of validated facturas linked to this chapter's POs
       let facturado = 0;

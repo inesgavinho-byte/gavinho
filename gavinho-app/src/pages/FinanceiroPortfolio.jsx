@@ -47,16 +47,16 @@ export default function FinanceiroPortfolio() {
         // Fetch POs
         const { data: pos } = await supabase
           .from('purchase_orders')
-          .select('valor_total, estado')
+          .select('total, estado')
           .eq('projeto_id', proj.id)
-          .in('estado', ['aprovada', 'paga', 'parcial'])
+          .not('estado', 'in', '("rascunho","cancelada")')
 
         // Fetch facturas
         const { data: facturas } = await supabase
           .from('procurement_facturas')
-          .select('valor_total, estado')
+          .select('total, estado')
           .eq('projeto_id', proj.id)
-          .in('estado', ['validada', 'paga'])
+          .in('estado', ['verificada', 'aprovada', 'em_pagamento', 'paga'])
 
         // Fetch active alerts
         const { data: alertas } = await supabase
@@ -68,8 +68,8 @@ export default function FinanceiroPortfolio() {
         const orcamentoRevisto = orcamentos?.total || 0
         const margemGlobal = orcamentos?.margem_percentagem || 25
         const orcCusto = orcamentoRevisto * (1 - margemGlobal / 100)
-        const comprometido = (pos || []).reduce((s, p) => s + (p.valor_total || 0), 0)
-        const facturado = (facturas || []).reduce((s, f) => s + (f.valor_total || 0), 0)
+        const comprometido = (pos || []).reduce((s, p) => s + (p.total || 0), 0)
+        const facturado = (facturas || []).reduce((s, f) => s + (f.total || 0), 0)
         const margemActual = orcamentoRevisto > 0 ? ((orcamentoRevisto - comprometido) / orcamentoRevisto) * 100 : 0
         const desvio = orcCusto > 0 ? ((comprometido - orcCusto) / orcCusto) * 100 : 0
         const alertasUrgentes = (alertas || []).filter(a => a.gravidade === 'urgente').length

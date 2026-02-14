@@ -105,39 +105,44 @@ LEFT JOIN LATERAL (
   ORDER BY created_at DESC
   LIMIT 1
 ) o ON true
-LEFT JOIN LATERAL (
-  SELECT SUM(valor_total) AS total_comprometido
+LEFT JOIN (
+  SELECT projeto_id, SUM(total) AS total_comprometido
   FROM purchase_orders
-  WHERE projeto_id = p.id AND estado IN ('aprovada', 'paga', 'parcial')
-) po_agg ON true
-LEFT JOIN LATERAL (
-  SELECT SUM(valor_total) AS total_facturado
+  WHERE estado NOT IN ('rascunho', 'cancelada')
+  GROUP BY projeto_id
+) po_agg ON po_agg.projeto_id = p.id
+LEFT JOIN (
+  SELECT projeto_id, SUM(total) AS total_facturado
   FROM procurement_facturas
-  WHERE projeto_id = p.id AND estado IN ('validada', 'paga')
-) f_agg ON true
-LEFT JOIN LATERAL (
+  WHERE estado IN ('verificada', 'aprovada', 'em_pagamento', 'paga')
+  GROUP BY projeto_id
+) f_agg ON f_agg.projeto_id = p.id
+LEFT JOIN (
   SELECT
+    projeto_id,
     COUNT(*) FILTER (WHERE estado = 'activo') AS alertas_activos,
     COUNT(*) FILTER (WHERE estado = 'activo' AND gravidade = 'urgente') AS alertas_urgentes,
     COUNT(*) FILTER (WHERE estado = 'activo' AND gravidade = 'critico') AS alertas_criticos
   FROM alertas_financeiros
-  WHERE projeto_id = p.id
-) a_agg ON true
-LEFT JOIN LATERAL (
+  GROUP BY projeto_id
+) a_agg ON a_agg.projeto_id = p.id
+LEFT JOIN (
   SELECT
+    projeto_id,
     COUNT(*) FILTER (WHERE estado = 'pendente') AS extras_pendentes,
     SUM(preco_cliente) FILTER (WHERE estado = 'pendente') AS extras_valor
   FROM extras
-  WHERE projeto_id = p.id
-) ext_agg ON true
-LEFT JOIN LATERAL (
+  GROUP BY projeto_id
+) ext_agg ON ext_agg.projeto_id = p.id
+LEFT JOIN (
   SELECT
+    projeto_id,
     SUM(valor) FILTER (WHERE estado = 'paga') AS total_recebido,
     SUM(valor) FILTER (WHERE estado = 'facturada') AS total_facturado,
     MIN(data_prevista) FILTER (WHERE estado NOT IN ('paga')) AS proximo_vencimento
   FROM facturacao_cliente
-  WHERE projeto_id = p.id
-) fc_agg ON true
+  GROUP BY projeto_id
+) fc_agg ON fc_agg.projeto_id = p.id
 WHERE p.status IN ('ativo', 'em_curso', 'em_progresso', 'active');
 
 
