@@ -64,7 +64,7 @@ const EquipaMembro = lazy(() => import('./pages/EquipaMembro'))
 
 // New module pages
 const ObrasLista = lazy(() => import('./pages/ObrasLista'))
-const Leads = lazy(() => import('./pages/Leads'))
+const LeadsPipeline = lazy(() => import('./pages/LeadsPipeline'))
 const ProjetosGestaoPage = lazy(() => import('./pages/ProjetosGestaoPage'))
 const GestaoIntegrada = lazy(() => import('./pages/GestaoIntegrada'))
 const CustosFixos = lazy(() => import('./pages/CustosFixos'))
@@ -521,10 +521,10 @@ function App() {
                     </Suspense>
                   } />
 
-                  {/* Gestão Projeto - Leads */}
+                  {/* Gestão Projeto - Leads Pipeline */}
                   <Route path="leads" element={
                     <Suspense fallback={<PageLoader />}>
-                      <Leads />
+                      <LeadsPipeline />
                     </Suspense>
                   } />
 
