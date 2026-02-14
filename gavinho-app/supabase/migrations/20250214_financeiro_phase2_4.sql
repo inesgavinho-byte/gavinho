@@ -99,9 +99,9 @@ SELECT
   fc_agg.proximo_vencimento
 FROM projetos p
 LEFT JOIN LATERAL (
-  SELECT valor_total, margem_global
+  SELECT total AS valor_total, margem_percentagem AS margem_global
   FROM orcamentos
-  WHERE projeto_id = p.id AND is_active = true
+  WHERE projeto_id = p.id AND status = 'aprovado'
   ORDER BY created_at DESC
   LIMIT 1
 ) o ON true
