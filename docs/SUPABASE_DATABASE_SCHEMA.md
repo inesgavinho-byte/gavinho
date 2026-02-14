@@ -15,6 +15,10 @@ A plataforma Gavin Ho é um sistema integrado que combina:
 5. **Diário de Bordo** - Registo cronológico de todas as atividades e comunicações do projeto
 6. **Decision Log** - Sistema de registo e resposta a dúvidas técnicas do projeto
 7. **Design Review** - Revisão colaborativa de desenhos técnicos (PDFs) com anotações e desenho livre
+8. **Painel Financeiro** - Dashboard financeiro em tempo real com KPIs, alertas, extras e projeções ETC/EAC
+9. **Acompanhamento de Projeto** - Visitas de obra, fotografias geolocalizadas, desenhos em uso obra com anotações
+10. **Push Notifications** - Notificações push via web-push com auto-subscribe e triggers automáticos
+11. **PWA** - Progressive Web App com service worker, push support e install prompt
 
 ---
 
@@ -791,6 +795,175 @@ Sugestões geradas automaticamente pela IA a partir de mensagens WhatsApp e emai
 
 ---
 
+## Painel Financeiro Tempo Real
+
+### `facturacao_cliente` - Milestones de Facturação
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| `id` | UUID | Chave primária |
+| `projeto_id` | UUID | FK → projetos.id |
+| `descricao` | TEXT | Descrição do milestone |
+| `valor` | NUMERIC | Valor a facturar |
+| `data_prevista` | DATE | Data prevista de facturação |
+| `data_emissao` | DATE | Data de emissão da factura |
+| `data_recebimento` | DATE | Data de recebimento |
+| `status` | TEXT | Estado: `previsto`, `emitido`, `recebido`, `em_atraso` |
+| `numero_factura` | TEXT | Número da factura |
+| `notas` | TEXT | Notas |
+| `created_at` | TIMESTAMPTZ | Data de criação |
+| `updated_at` | TIMESTAMPTZ | Data de última atualização |
+
+---
+
+### `extras` - Change Orders
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| `id` | UUID | Chave primária |
+| `projeto_id` | UUID | FK → projetos.id |
+| `codigo` | TEXT | Código (EXT-001, etc.) |
+| `descricao` | TEXT | Descrição do extra |
+| `valor` | NUMERIC | Valor do extra |
+| `status` | TEXT | Estado: `proposto`, `aprovado`, `rejeitado`, `executado` |
+| `data_proposta` | DATE | Data da proposta |
+| `data_aprovacao` | DATE | Data de aprovação |
+| `aprovado_por` | TEXT | Quem aprovou |
+| `capitulo_id` | UUID | FK → orcamento_capitulos.id |
+| `notas` | TEXT | Notas |
+| `created_at` | TIMESTAMPTZ | Data de criação |
+| `updated_at` | TIMESTAMPTZ | Data de última atualização |
+
+---
+
+### `alertas_financeiros` - Regras de Alertas
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| `id` | UUID | Chave primária |
+| `projeto_id` | UUID | FK → projetos.id |
+| `tipo` | TEXT | Tipo de alerta (11 tipos disponíveis) |
+| `severidade` | TEXT | `info`, `warning`, `critical`, `danger` |
+| `mensagem` | TEXT | Mensagem do alerta |
+| `dados` | JSONB | Dados contextuais |
+| `resolvido` | BOOLEAN | Se foi resolvido |
+| `resolvido_em` | TIMESTAMPTZ | Data de resolução |
+| `resolvido_por` | UUID | Quem resolveu |
+| `created_at` | TIMESTAMPTZ | Data de criação |
+
+---
+
+### `projecoes_financeiras` - Snapshots ETC/EAC
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| `id` | UUID | Chave primária |
+| `projeto_id` | UUID | FK → projetos.id |
+| `data_snapshot` | DATE | Data do snapshot |
+| `etc_valor` | NUMERIC | Estimate to Complete |
+| `eac_valor` | NUMERIC | Estimate at Completion |
+| `spi` | NUMERIC | Schedule Performance Index |
+| `cpi` | NUMERIC | Cost Performance Index |
+| `dados` | JSONB | Dados detalhados |
+| `created_at` | TIMESTAMPTZ | Data de criação |
+
+---
+
+## Acompanhamento de Projeto
+
+### `projeto_acompanhamento_visitas` - Visitas de Obra
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| `id` | UUID | Chave primária |
+| `projeto_id` | UUID | FK → projetos.id |
+| `data_visita` | DATE | Data da visita |
+| `notas` | TEXT | Notas da visita |
+| `responsavel_id` | UUID | FK → utilizadores.id |
+| `responsavel_nome` | TEXT | Nome do responsável |
+| `created_at` | TIMESTAMPTZ | Data de criação |
+| `updated_at` | TIMESTAMPTZ | Data de última atualização |
+
+---
+
+### `projeto_acompanhamento_fotos` - Fotografias de Acompanhamento
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| `id` | UUID | Chave primária |
+| `visita_id` | UUID | FK → projeto_acompanhamento_visitas.id |
+| `projeto_id` | UUID | FK → projetos.id |
+| `foto_url` | TEXT | URL da foto no Storage |
+| `legenda` | TEXT | Legenda da foto |
+| `localizacao` | TEXT | Localização/zona na obra |
+| `gps_lat` | NUMERIC | Latitude GPS |
+| `gps_lng` | NUMERIC | Longitude GPS |
+| `created_at` | TIMESTAMPTZ | Data de criação |
+
+---
+
+### `projeto_desenhos_obra` - Desenhos em Uso na Obra
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| `id` | UUID | Chave primária |
+| `projeto_id` | UUID | FK → projetos.id |
+| `nome` | TEXT | Nome do desenho |
+| `file_url` | TEXT | URL do ficheiro |
+| `versao` | INTEGER | Número da versão |
+| `created_at` | TIMESTAMPTZ | Data de criação |
+| `updated_at` | TIMESTAMPTZ | Data de última atualização |
+
+---
+
+### `projeto_desenho_anotacoes` - Anotações nos Desenhos de Obra
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| `id` | UUID | Chave primária |
+| `desenho_id` | UUID | FK → projeto_desenhos_obra.id |
+| `tipo` | TEXT | Tipo: `pin`, `area`, `linha` |
+| `dados` | JSONB | Coordenadas e dados visuais |
+| `comentario` | TEXT | Comentário |
+| `autor_id` | UUID | FK → utilizadores.id |
+| `autor_nome` | TEXT | Nome do autor |
+| `created_at` | TIMESTAMPTZ | Data de criação |
+
+---
+
+### `projeto_desenho_pins` - Pins nos Desenhos de Obra
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| `id` | UUID | Chave primária |
+| `desenho_id` | UUID | FK → projeto_desenhos_obra.id |
+| `pos_x` | NUMERIC | Posição X (%) |
+| `pos_y` | NUMERIC | Posição Y (%) |
+| `titulo` | TEXT | Título do pin |
+| `descricao` | TEXT | Descrição |
+| `cor` | TEXT | Cor hex |
+| `autor_id` | UUID | FK → utilizadores.id |
+| `created_at` | TIMESTAMPTZ | Data de criação |
+
+---
+
+## Push Notifications
+
+### `chat_push_subscriptions` - Subscrições Push
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| `id` | UUID | Chave primária |
+| `utilizador_id` | UUID | FK → utilizadores.id |
+| `endpoint` | TEXT | URL do endpoint push |
+| `p256dh` | TEXT | Chave pública p256dh |
+| `auth` | TEXT | Chave de autenticação |
+| `created_at` | TIMESTAMPTZ | Data de criação |
+
+**RLS:** `auth.uid() = utilizador_id`
+
+---
+
 ## Views
 
 ### `v_obra_timeline_completa`
@@ -810,6 +983,12 @@ Contagem de mensagens aguardando processamento de IA.
 
 ### `obra_documentos_execucao`
 Documentos aprovados para execução na obra.
+
+### `v_financeiro_capitulo`
+Agregação por capítulo de orçamento: POs, facturas, percentagem executada.
+
+### `v_financeiro_portfolio`
+Vista multi-projeto para administração: orçamento, executado, faturado, margem.
 
 ---
 
@@ -920,9 +1099,14 @@ Todos os ficheiros de migração SQL estão em:
 | `20250211_fix_projetos_status_constraint.sql` | Fix constraint status projetos |
 | `20250212_push_notification_triggers.sql` | Triggers push notifications |
 | `20250212_chat_mensagens_notification_trigger.sql` | Chat @mention → notificação trigger |
+| `20250213_fix_seeds_executados.sql` | Fix seeds_executados: tabela + coluna compat |
+| `20250213_painel_financeiro.sql` | Painel Financeiro: 4 tabelas + 2 views + triggers |
+| `20250213_acompanhamento_projeto.sql` | Acompanhamento: 5 tabelas + RLS + triggers |
+| `20250213_fix_push_subscriptions_rls.sql` | RLS fix para push subscriptions |
+| `20250213_fix_projeto_renders_columns.sql` | Fix colunas renders |
 
-**Total: 82 ficheiros de migração SQL**
+**Total: 86 ficheiros de migração SQL**
 
 ---
 
-*Última atualização: 2025-02-12*
+*Última atualização: 2026-02-14*
