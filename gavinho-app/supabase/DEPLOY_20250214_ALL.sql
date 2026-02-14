@@ -262,17 +262,13 @@ WHERE p.status IN ('ativo', 'em_curso', 'em_progresso', 'active');
 -- SEED TRACKING
 -- ════════════════════════════════════════════════════════════════════════════
 
-DO $$
-BEGIN
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'seeds_executados') THEN
-    INSERT INTO seeds_executados (seed_key, executado_em)
-    VALUES
-      ('20250214_fix_orcamentos_columns', now()),
-      ('20250214_financeiro_phase2_4', now()),
-      ('20250214_fix_portfolio_view_columns', now())
-    ON CONFLICT DO NOTHING;
-  END IF;
-END $$;
+INSERT INTO seeds_executados (seed_key, nome, executado_em)
+VALUES
+  ('20250214_fix_orcamentos_columns', '20250214_fix_orcamentos_columns', now()),
+  ('20250214_financeiro_phase2_4', '20250214_financeiro_phase2_4', now()),
+  ('20250214_fix_portfolio_view_columns', '20250214_fix_portfolio_view_columns', now()),
+  ('20250214_deploy_all', '20250214_deploy_all', now())
+ON CONFLICT (seed_key) DO NOTHING;
 
 
 -- ============================================================================
