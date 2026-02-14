@@ -14,6 +14,8 @@ import {
   X, Loader2, RefreshCw, CircleDot, ArrowLeft, Info
 } from 'lucide-react'
 import { useFinanceiroDashboard } from '../hooks/useFinanceiroDashboard'
+import SimuladorCenarios from '../components/financeiro/SimuladorCenarios'
+import CashFlowChart from '../components/financeiro/CashFlowChart'
 
 // ── Formatters ───────────────────────────────────────
 const fmt = (v) => {
@@ -242,7 +244,7 @@ export default function FinanceiroDashboard() {
   } = useFinanceiroDashboard(projetoId)
 
   const [expandedCaps, setExpandedCaps] = useState({})
-  const [activeSection, setActiveSection] = useState('resumo') // resumo | alertas | extras | cashflow
+  const [activeSection, setActiveSection] = useState('resumo') // resumo | alertas | extras | cashflow | simulador
   const [showExtraModal, setShowExtraModal] = useState(false)
 
   // Extra form state
@@ -258,7 +260,8 @@ export default function FinanceiroDashboard() {
     { id: 'resumo', label: 'Resumo', icon: BarChart3 },
     { id: 'alertas', label: `Alertas (${alertas.length})`, icon: AlertTriangle },
     { id: 'extras', label: `Extras (${extras.length})`, icon: FileText },
-    { id: 'cashflow', label: 'Cash Flow', icon: Wallet }
+    { id: 'cashflow', label: 'Cash Flow', icon: Wallet },
+    { id: 'simulador', label: 'Simulador', icon: RefreshCw }
   ]
 
   // ── Margem trend ──
@@ -738,8 +741,16 @@ export default function FinanceiroDashboard() {
       {/* ═══ CASH FLOW SECTION ═══ */}
       {activeSection === 'cashflow' && (
         <div>
+          {/* Enhanced Cash Flow Chart */}
+          <CashFlowChart
+            capitulos={capitulos}
+            extras={extras}
+            facturacaoCliente={facturacaoCliente}
+            totais={totais}
+          />
+
           {/* Upcoming payments */}
-          <h3 style={{ margin: '0 0 12px', fontSize: '0.95rem', fontFamily: 'Cormorant Garamond, serif' }}>
+          <h3 style={{ margin: '24px 0 12px', fontSize: '0.95rem', fontFamily: 'Cormorant Garamond, serif' }}>
             <CreditCard size={16} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
             Próximos Pagamentos Previstos
           </h3>
@@ -818,6 +829,15 @@ export default function FinanceiroDashboard() {
             </div>
           )}
         </div>
+      )}
+
+      {/* ═══ SIMULADOR CENÁRIOS ═══ */}
+      {activeSection === 'simulador' && (
+        <SimuladorCenarios
+          capitulos={capitulos}
+          totais={totais}
+          orcamentoRevisto={totais.orcamentoRevisto}
+        />
       )}
 
       {/* ═══ NOVO EXTRA MODAL ═══ */}
