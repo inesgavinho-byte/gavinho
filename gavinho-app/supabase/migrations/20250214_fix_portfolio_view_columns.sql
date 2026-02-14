@@ -103,8 +103,8 @@ WHERE p.status IN ('ativo', 'em_curso', 'em_progresso', 'active');
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'seeds_executados') THEN
-    INSERT INTO seeds_executados (seed_key, executado_em)
-    VALUES ('20250214_fix_portfolio_view_columns', now())
+    INSERT INTO seeds_executados (seed_key, nome, executado_em)
+    VALUES ('20250214_fix_portfolio_view_columns', '20250214_fix_portfolio_view_columns', now())
     ON CONFLICT DO NOTHING;
   END IF;
 END $$;
