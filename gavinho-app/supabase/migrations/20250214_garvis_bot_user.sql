@@ -26,20 +26,31 @@ EXCEPTION
   WHEN OTHERS THEN NULL;
 END $$;
 
--- 3. Insert GARVIS bot user (idempotent)
-INSERT INTO utilizadores (id, nome, cargo, is_bot, status)
+-- 3. Temporarily allow NULL email for bot user
+DO $$
+BEGIN
+  -- Drop NOT NULL on email if it exists (needed for bot user)
+  ALTER TABLE utilizadores ALTER COLUMN email DROP NOT NULL;
+EXCEPTION
+  WHEN OTHERS THEN NULL;
+END $$;
+
+-- 4. Insert GARVIS bot user (idempotent)
+INSERT INTO utilizadores (id, email, nome, cargo, is_bot, status)
 VALUES (
   '00000000-0000-0000-0000-000000000001',
+  'garvis@gavinho.internal',
   'G.A.R.V.I.S.',
   'Assistente IA',
   TRUE,
   'ativo'
 )
 ON CONFLICT (id) DO UPDATE SET
+  email = EXCLUDED.email,
   nome = 'G.A.R.V.I.S.',
   is_bot = TRUE;
 
--- 4. Verify insertion
+-- 5. Verify insertion
 DO $$
 BEGIN
   IF NOT EXISTS (
