@@ -1,0 +1,740 @@
+/* ═══════════════════════════════════════════════════════
+   ProjetoDetalhe — CSS Module
+   Design system: GAVINHO brand (verde, beige, cream, gold)
+   ═══════════════════════════════════════════════════════ */
+
+/* ── LOADING & EMPTY ────────────────────────────────── */
+
+.loadingContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+}
+
+.loadingInner {
+  text-align: center;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--stone);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 16px;
+}
+
+.loadingText {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.notFound {
+  padding: 64px 24px;
+  text-align: center;
+}
+
+.notFound h2 {
+  font-family: 'Cormorant Garamond', serif;
+  color: var(--brown);
+  font-size: 24px;
+  margin-bottom: 16px;
+}
+
+/* ── HEADER ─────────────────────────────────────────── */
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 20px 24px;
+  margin: -20px -24px 20px;
+  background: linear-gradient(135deg, var(--white) 0%, var(--cream) 100%);
+  border-bottom: 1px solid var(--stone);
+  gap: 16px;
+}
+
+.headerLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.headerTopRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.backButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: var(--white);
+  border: 1px solid var(--stone);
+  border-radius: 8px;
+  color: var(--brown-light);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.backButton:hover {
+  color: var(--brown);
+  border-color: var(--brown-light);
+  background: var(--cream);
+}
+
+.projectTitle {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--brown);
+  margin: 0;
+  line-height: 1.2;
+}
+
+.projectCode {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gold);
+  letter-spacing: 0.5px;
+  font-family: 'Quattrocento Sans', sans-serif;
+}
+
+.internalCode {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--info);
+  background: rgba(59, 130, 246, 0.08);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-family: monospace;
+}
+
+.headerMetaRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-left: 44px;
+}
+
+.phaseBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(201, 168, 130, 0.15);
+  color: var(--gold);
+  letter-spacing: 0.3px;
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.statusDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.separator {
+  width: 1px;
+  height: 16px;
+  background: var(--stone);
+  flex-shrink: 0;
+}
+
+.metaItem {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--brown-light);
+}
+
+.metaItem svg {
+  opacity: 0.6;
+}
+
+/* ── HEADER ACTIONS ─────────────────────────────────── */
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.actionsDropdown {
+  position: relative;
+}
+
+.actionsMenu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  background: var(--white);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--stone);
+  min-width: 200px;
+  z-index: 100;
+  overflow: hidden;
+  animation: fadeIn 0.15s ease;
+}
+
+.actionsMenuItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 16px;
+  background: none;
+  border: none;
+  font-size: 13px;
+  color: var(--brown);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease;
+}
+
+.actionsMenuItem:hover {
+  background: var(--cream);
+}
+
+.actionsMenuItemDanger {
+  composes: actionsMenuItem;
+  color: var(--error);
+}
+
+.actionsMenuItemDanger:hover {
+  background: rgba(239, 68, 68, 0.06);
+}
+
+/* ── MAIN TABS ──────────────────────────────────────── */
+
+.tabsContainer {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 20px;
+  background: var(--cream);
+  padding: 4px;
+  border-radius: 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tabsContainer::-webkit-scrollbar {
+  display: none;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 16px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--brown-light);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.tab:hover {
+  color: var(--brown);
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.tabActive {
+  composes: tab;
+  background: var(--white);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  color: var(--brown);
+  font-weight: 600;
+}
+
+/* ── SUB-TAB NAVIGATION ─────────────────────────────── */
+
+.subTabNav {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--stone);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.subTabNav::-webkit-scrollbar {
+  display: none;
+}
+
+.subTab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--stone);
+  background: transparent;
+  color: var(--brown-light);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.subTab:hover {
+  border-color: var(--brown-light);
+  color: var(--brown);
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.subTabActive {
+  composes: subTab;
+  background: var(--brown);
+  color: var(--off-white);
+  border-color: var(--brown);
+  font-weight: 600;
+}
+
+.subTabActive:hover {
+  background: var(--brown);
+  color: var(--off-white);
+  border-color: var(--brown);
+}
+
+/* ── SECTION TITLES ─────────────────────────────────── */
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.sectionTitle {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--brown);
+  margin: 0;
+}
+
+/* ── EMPTY STATES ───────────────────────────────────── */
+
+.emptyState {
+  padding: 56px 24px;
+  background: var(--cream);
+  border-radius: 12px;
+  text-align: center;
+  color: var(--brown-light);
+}
+
+.emptyStateIcon {
+  opacity: 0.25;
+  margin-bottom: 16px;
+}
+
+.emptyState h4 {
+  color: var(--brown);
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.emptyState p {
+  font-size: 13px;
+  max-width: 360px;
+  margin: 0 auto;
+  line-height: 1.5;
+}
+
+/* ── UPLOAD MODAL ───────────────────────────────────── */
+
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease;
+}
+
+.modalCard {
+  background: var(--white);
+  border-radius: 20px;
+  padding: 28px;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: var(--shadow-lg);
+  animation: slideUp 0.25s ease;
+}
+
+.modalTitle {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--brown);
+  margin: 0;
+}
+
+.modalClose {
+  background: none;
+  border: none;
+  color: var(--brown-light);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.modalClose:hover {
+  color: var(--brown);
+  background: var(--cream);
+}
+
+.docInfo {
+  padding: 14px 16px;
+  background: var(--cream);
+  border-radius: 10px;
+  margin-bottom: 20px;
+}
+
+.docInfoLabel {
+  font-size: 12px;
+  color: var(--brown-light);
+  margin-bottom: 2px;
+}
+
+.docInfoName {
+  font-weight: 500;
+  color: var(--brown);
+  font-size: 14px;
+}
+
+.dropZone {
+  padding: 44px 28px;
+  border: 2px dashed var(--stone);
+  border-radius: 16px;
+  background: var(--cream);
+  text-align: center;
+  transition: all 0.2s ease;
+  position: relative;
+  cursor: pointer;
+}
+
+.dropZoneActive {
+  composes: dropZone;
+  border-color: var(--gold);
+  background: rgba(201, 168, 130, 0.08);
+}
+
+.dropZoneInput {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.dropZoneIcon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 14px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.dropZoneTitle {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--brown);
+  margin-bottom: 6px;
+}
+
+.dropZoneSubtitle {
+  font-size: 13px;
+  color: var(--brown-light);
+}
+
+.dropZoneHint {
+  font-size: 11px;
+  color: var(--brown-light);
+  margin-top: 8px;
+  opacity: 0.7;
+}
+
+/* ── BIBLIOTECA ─────────────────────────────────────── */
+
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.kpiCard {
+  padding: 20px;
+}
+
+.kpiValue {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--brown);
+  line-height: 1.2;
+}
+
+.kpiLabel {
+  font-size: 13px;
+  color: var(--brown-light);
+  margin-top: 2px;
+}
+
+/* ── ARCHVIZ ────────────────────────────────────────── */
+
+.archvizHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.archvizTitle {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--brown);
+}
+
+.archvizSubtitle {
+  font-size: 13px;
+  color: var(--brown-light);
+  margin-top: 4px;
+}
+
+.archvizActions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.collapseBtn {
+  padding: 6px 12px;
+  background: transparent;
+  color: var(--brown-light);
+  border: 1px solid var(--stone);
+  border-radius: 6px;
+  font-size: 11px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+
+.collapseBtn:hover {
+  border-color: var(--brown-light);
+  color: var(--brown);
+}
+
+/* ── ANIMATIONS ─────────────────────────────────────── */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── RESPONSIVE ─────────────────────────────────────── */
+
+@media (max-width: 1024px) {
+  .header {
+    flex-direction: column;
+    padding: 16px 20px;
+    margin: -16px -20px 16px;
+  }
+
+  .headerMetaRow {
+    padding-left: 0;
+  }
+
+  .headerActions {
+    align-self: flex-end;
+  }
+
+  .kpiGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .header {
+    padding: 12px 16px;
+    margin: -12px -16px 12px;
+  }
+
+  .projectTitle {
+    font-size: 18px;
+  }
+
+  .tabsContainer {
+    padding: 3px;
+    border-radius: 10px;
+  }
+
+  .tab, .tabActive {
+    padding: 8px 12px;
+    font-size: 12px;
+    gap: 5px;
+  }
+
+  .subTab, .subTabActive {
+    padding: 6px 12px;
+    font-size: 11px;
+  }
+
+  .kpiGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── DARK MODE ──────────────────────────────────────── */
+
+[data-theme="dark"] .header {
+  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+  border-bottom-color: var(--border-color);
+}
+
+[data-theme="dark"] .backButton {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+  color: var(--text-secondary);
+}
+
+[data-theme="dark"] .backButton:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .tabsContainer {
+  background: var(--bg-secondary);
+}
+
+[data-theme="dark"] .tab {
+  color: var(--text-secondary);
+}
+
+[data-theme="dark"] .tab:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .tabActive {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="dark"] .subTab {
+  border-color: var(--border-color);
+  color: var(--text-secondary);
+}
+
+[data-theme="dark"] .subTab:hover {
+  border-color: var(--text-secondary);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .subTabActive {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: var(--brown);
+}
+
+[data-theme="dark"] .subTabActive:hover {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: var(--brown);
+}
+
+[data-theme="dark"] .actionsMenu {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .actionsMenuItem {
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .actionsMenuItem:hover {
+  background: var(--bg-tertiary);
+}
+
+[data-theme="dark"] .emptyState {
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+}
+
+[data-theme="dark"] .emptyState h4 {
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .modalCard {
+  background: var(--bg-secondary);
+}
+
+[data-theme="dark"] .dropZone {
+  background: var(--bg-tertiary);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .phaseBadge {
+  background: rgba(201, 168, 130, 0.1);
+}
+
+[data-theme="dark"] .projectTitle {
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .projectCode {
+  color: var(--gold);
+}
