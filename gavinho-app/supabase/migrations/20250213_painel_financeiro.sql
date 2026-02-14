@@ -305,6 +305,11 @@ CREATE POLICY "projecoes_all"
 
 -- Ensure orcamento_capitulos has the valor column (may be missing if table pre-existed)
 ALTER TABLE orcamento_capitulos ADD COLUMN IF NOT EXISTS valor DECIMAL(12,2) DEFAULT 0;
+
+-- Drop views first (portfolio depends on capitulo, so drop portfolio first)
+DROP VIEW IF EXISTS v_financeiro_portfolio;
+DROP VIEW IF EXISTS v_financeiro_capitulo;
+
 CREATE OR REPLACE VIEW v_financeiro_capitulo AS
 SELECT
   p.id as projeto_id,
