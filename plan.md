@@ -1,93 +1,121 @@
-# Plano: Componente FotoComparador
+# Plano: Timeline Fotográfico no Acompanhamento
 
 ## Contexto
 
-O módulo Acompanhamento (`ProjetoAcompanhamento.jsx`) já tem 2 sub-tabs: "Fotografias" e "Desenhos em Uso Obra". As fotografias são organizadas por visitas (tabela `projeto_acompanhamento_fotos`), cada uma com `data_visita`, `url`, `projeto_id`, `visita_id`, etc. Já existe a constante `COMPARTIMENTOS` em `projectConstants.js`.
+O subtab "Fotografias" em `AcompanhamentoTab.jsx` (linha 390-534) mostra atualmente uma **grelha plana** de fotos com filtros de zona e especialidade. Vamos transformá-lo numa **timeline vertical** com fotos agrupadas por data de visita, filtro por zona/compartimento, e lightbox com navegação.
 
-A base de dados **não tem** coluna `compartimento` na tabela `projeto_acompanhamento_fotos` — será necessário adicioná-la via migração.
+**Tabela existente:** `obra_fotografias` — já tem `data_fotografia`, `zona_id` (FK → `obra_zonas`), `especialidade_id`. Não é necessária nenhuma migração SQL.
 
-## Plano de Implementação
+**Ficheiro único a alterar:** `gavinho-app/src/pages/ObraDetalhe/AcompanhamentoTab.jsx`
 
-### 1. Migração SQL — adicionar coluna `compartimento`
+---
 
-**Ficheiro:** `gavinho-app/supabase/migrations/20260215_foto_comparador.sql`
+## Passos de Implementação
 
-```sql
-ALTER TABLE projeto_acompanhamento_fotos
-  ADD COLUMN IF NOT EXISTS compartimento VARCHAR(100);
+### 1. Adicionar estado para lightbox navegável
 
-CREATE INDEX IF NOT EXISTS idx_acomp_fotos_compartimento
-  ON projeto_acompanhamento_fotos(compartimento);
+Substituir o `fotoPreview` (foto única, sem navegação) por:
+- `lightboxIndex` (number | null) — índice na lista `filteredFotos`, `null` = fechado
+
+Adicionar `useEffect` para keyboard listener (ArrowLeft, ArrowRight, Escape).
+
+### 2. Agrupar fotos por data no render
+
+Criar helper `groupByDate(filteredFotos)` que agrupa fotos por `data_fotografia` e retorna array de `{ date, fotos }` ordenado do mais recente para o mais antigo.
+
+### 3. Redesenhar layout como timeline vertical
+
+Substituir a grelha plana (linhas 428-451) por:
+- Para cada grupo de data:
+  - **Header de data:** linha horizontal com dot (●), label de data ("14 Fev 2026"), contagem de fotos
+  - **Linha vertical** do lado esquerdo (2px, `colors.border`)
+  - **Grelha de thumbnails** à direita: `grid-template-columns: repeat(auto-fill, minmax(160px, 1fr))`, gap 8px
+  - Thumbnails com aspecto 4:3, object-fit cover, border-radius 8, hover overlay
+
+### 4. Filtro por zona/compartimento (já existe)
+
+Manter os dois selects existentes (zona + especialidade). Estes filtram as fotos antes do agrupamento por data, pelo que o timeline só mostra datas que têm fotos na zona/especialidade selecionada.
+
+### 5. Lightbox com navegação
+
+Substituir o lightbox atual (linhas 454-480) por:
+- Overlay fullscreen escuro (`rgba(0,0,0,0.9)`)
+- Imagem central (`max-height: 80vh`, object-fit contain)
+- Setas de navegação (ChevronLeft / ChevronRight do lucide-react)
+- Contador "N de M" no topo
+- Metadados: título, data, zona, especialidade
+- Botão Eliminar + Fechar
+- Teclado: Escape fecha, ← → navega
+- Setas disabled nos limites
+
+### 6. Upload modal — sem alterações
+
+O modal de upload existente (linhas 483-532) funciona corretamente e não precisa de mudanças.
+
+---
+
+## Design Visual
+
+```
+[Filtros: Zona ▼ | Especialidade ▼]                [Upload Fotos]
+ N fotografias
+
+ ● 14 Fev 2026 · 8 fotos ─────────────────────────────────────
+ │
+ │   ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐
+ │   │ foto │ │ foto │ │ foto │ │ foto │ │ foto │
+ │   └──────┘ └──────┘ └──────┘ └──────┘ └──────┘
+ │   ┌──────┐ ┌──────┐ ┌──────┐
+ │   │ foto │ │ foto │ │ foto │
+ │   └──────┘ └──────┘ └──────┘
+ │
+ ● 10 Fev 2026 · 3 fotos ─────────────────────────────────────
+ │
+ │   ┌──────┐ ┌──────┐ ┌──────┐
+ │   │ foto │ │ foto │ │ foto │
+ │   └──────┘ └──────┘ └──────┘
+ │
+ ● 5 Fev 2026 · 5 fotos ──────────────────────────────────────
+ │
+ │   ...
 ```
 
-Isto permite que cada foto tenha um compartimento associado (ex: "Cozinha", "Suite Principal"), usado pelo comparador para filtrar fotos do mesmo espaço.
+### Especificações visuais
+- **Dot (●):** 12px círculo, `background: colors.primary`
+- **Linha vertical:** 2px, `colors.border`, ligação entre grupos
+- **Data label:** font-weight 700, `colors.text`, formato "dd Mmm yyyy" (pt-PT)
+- **Thumbnails:** minmax(160px, 1fr) grid, aspect-ratio 4:3 via padding-bottom 75%, object-fit cover, border-radius 8
+- **Hover:** leve scale(1.02) + sombra, cursor pointer
+- **Especialidade badge:** mantido no canto superior esquerdo do thumbnail
 
-### 2. Atualizar `AcompanhamentoFotos.jsx` — campo compartimento no upload
+---
 
-Adicionar selector de compartimento ao upload de fotos (dropdown com `COMPARTIMENTOS`), para que as fotos passem a ter contexto de divisão. Também mostrar badge de compartimento na grid de fotos.
+## Lightbox
 
-**Alterações em `AcompanhamentoFotos.jsx`:**
-- Importar `COMPARTIMENTOS` de `projectConstants`
-- No `handleUploadFotos`, adicionar modal/estado para escolher compartimento antes do upload
-- No insert do Supabase, incluir `compartimento`
-- Na grid de fotos, mostrar badge de compartimento (se existir)
-
-### 3. Criar componente `FotoComparador.jsx`
-
-**Ficheiro:** `gavinho-app/src/components/FotoComparador.jsx`
-
-**Funcionalidades:**
-- **Slider before/after horizontal** — duas imagens sobrepostas, com clip-path controlado por drag/touch
-- **Selector de datas** — dois dropdowns ("Antes" e "Depois") que listam datas de visitas com fotos
-- **Filtro por compartimento** — dropdown com compartimentos disponíveis (que tenham fotos)
-- **Grid de fotos** — ao selecionar compartimento + duas datas, mostra thumbnails disponíveis em cada data; o utilizador clica numa foto de cada lado para comparar
-
-**Estrutura do componente:**
 ```
-FotoComparador
-├── Header (título + descrição)
-├── Filtros (compartimento + data "antes" + data "depois")
-├── Seleção de fotos (thumbnails da data "antes" | thumbnails da data "depois")
-└── Comparador slider (before/after com drag handle)
+┌─────────────────────────────────────────────────┐
+│                                    3 de 15  [X] │
+│                                                 │
+│   ◀      ┌──────────────────────┐      ▶        │
+│          │                      │               │
+│          │    foto em grande    │               │
+│          │                      │               │
+│          └──────────────────────┘               │
+│                                                 │
+│   Título da foto                                │
+│   14/02/2026 · Cozinha · Elétrico               │
+│                                    [Eliminar]   │
+└─────────────────────────────────────────────────┘
 ```
 
-**Implementação do slider:**
-- Container com `position: relative`, `overflow: hidden`
-- Imagem "depois" como fundo (100% width)
-- Imagem "antes" com `clip-path: inset(0 {100 - position}% 0 0)` ou `width: {position}%` com `overflow: hidden`
-- Handle vertical arrastável (onMouseDown/onTouchStart + onMouseMove/onTouchMove)
-- Labels "Antes" / "Depois" nos cantos
+---
 
-**Dados:** Busca fotos de `projeto_acompanhamento_fotos` JOIN `projeto_acompanhamento_visitas` para obter datas, filtradas por `projeto_id` e opcionalmente `compartimento`.
+## Resumo de Alterações
 
-### 4. Adicionar sub-tab "Comparador" no ProjetoAcompanhamento
+| Localização no ficheiro | Alteração |
+|------------------------|-----------|
+| Estado (linhas 14-24) | Substituir `fotoPreview` por `lightboxIndex` |
+| Imports (linha 4) | Adicionar `ChevronLeft`, `ChevronRight` do lucide-react |
+| `renderFotografiasTab()` (linhas 390-534) | Reescrever grelha → timeline + novo lightbox |
 
-**Ficheiro:** `gavinho-app/src/components/projeto/tabs/ProjetoAcompanhamento.jsx`
-
-**Alterações:**
-- Importar `FotoComparador`
-- Importar ícone `GitCompareArrows` (ou `SplitSquareHorizontal`) do lucide-react
-- Adicionar `{ id: 'comparador', label: 'Comparador', icon: SplitSquareHorizontal }` ao array `acompSections`
-- Renderizar `<FotoComparador>` quando `activeAcompSection === 'comparador'`
-
-### 5. CSS Module (opcional)
-
-Se necessário para animações/estilos complexos do slider, criar `FotoComparador.module.css`. Caso contrário, seguir o padrão inline styles usado em `AcompanhamentoFotos.jsx`.
-
-**Decisão:** Usar CSS Module apenas para o slider (`:hover`, `cursor: col-resize`, transições), restante inline como no padrão existente.
-
-**Ficheiro:** `gavinho-app/src/components/FotoComparador.module.css`
-
-## Ficheiros Afetados
-
-| Ficheiro | Ação |
-|----------|------|
-| `supabase/migrations/20260215_foto_comparador.sql` | **Novo** — migração BD |
-| `src/components/FotoComparador.jsx` | **Novo** — componente principal |
-| `src/components/FotoComparador.module.css` | **Novo** — estilos do slider |
-| `src/components/AcompanhamentoFotos.jsx` | **Editar** — adicionar campo compartimento |
-| `src/components/projeto/tabs/ProjetoAcompanhamento.jsx` | **Editar** — nova sub-tab |
-
-## Sem Dependências Externas
-
-Slider implementado com CSS puro (`clip-path`) + event handlers nativos. Não requer bibliotecas adicionais.
+Nenhum ficheiro novo. Nenhuma migração SQL. Nenhuma dependência externa nova.
