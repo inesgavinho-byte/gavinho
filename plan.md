@@ -1,156 +1,155 @@
-# Plano: Módulo de Faturação Completo
+# Plano: Robustecer Offline Sync na PWA Obra App
 
-## Análise do Estado Atual
+## Diagnóstico Atual
 
-### O que existe:
-- **`facturacao_cliente`** (BD): Tabela de milestones de pagamento ligada a `projetos`. Campos: `id`, `projeto_id`, `descricao`, `percentagem_contrato`, `valor`, `estado` (prevista/facturada/paga/em_atraso), `data_prevista`, `data_facturada`, `data_vencimento`, `data_recebimento`, `numero_factura`, `documento_url`, `condicoes_pagamento_dias`.
-- **`Faturacao.jsx`** (Página): Página básica que consulta tabela `faturas` (que **não existe** na BD). Tem modal "Nova Fatura" apenas com insert, sem edição, sem anulação, sem ligação a projetos/capítulos reais.
-- **`useFinanceiroDashboard.js`** (Hook): Já faz fetch de `facturacao_cliente` e guarda em `facturacaoCliente`.
+### O que existe
+- `useOfflineSync.js` (228 linhas) — fila de ações offline com **localStorage** (`obra_app_offline_queue`)
+- 6 tipos de ação: `SEND_MESSAGE`, `CREATE_PRESENCA`, `UPDATE_PRESENCA`, `CREATE_REQUISICAO`, `UPDATE_TAREFA`, `CREATE_DIARIO`
+- Retry até 3 tentativas, auto-sync ao voltar online
+- Service worker (`sw.js`) com network-first caching e `syncMessages()` **vazia**
+- Banner offline simples (amarelo) e banner de sync pendente (azul)
 
-### O que falta:
-- Tabela `facturacao_cliente` não tem campos de IVA (`subtotal`, `iva_percentagem`, `iva_valor`, `total`)
-- Estados atuais (`prevista`, `facturada`, `paga`, `em_atraso`) não correspondem ao pedido (`rascunho`, `emitida`, `paga`, `anulada`)
-- Sem ligação a `orcamento_capitulos`
-- Sem numeração automática de faturas
-- Sem campos de anulação (`data_anulacao`, `motivo_anulacao`)
-- Página não tem edição, anulação, export CSV, nem ligação a projetos/capítulos reais
+### Limitações identificadas
+1. **localStorage** — limite ~5-10MB, não suporta dados binários, não é transacional
+2. **Sem conflict resolution** — ações com retry simples, sem verificação de timestamps do servidor
+3. **Background sync vazio** — `syncMessages()` é um stub no service worker
+4. **Componentes não usam `queueAction`** — ObraChat, Tarefas, etc. fazem chamadas Supabase diretas
+5. **Sem indicador visual granular** — não há feedback por item sobre estado de sync
 
 ---
 
 ## Plano de Implementação
 
-### 1. Migration SQL Idempotente
-**Ficheiro:** `gavinho-app/supabase/migrations/20250215_faturacao_completa.sql`
+### Fase 1: Camada IndexedDB (`offlineDb.js`)
 
-Alterações à tabela `facturacao_cliente`:
-```sql
--- Novos campos IVA
-ADD COLUMN IF NOT EXISTS subtotal DECIMAL(12,2)
-ADD COLUMN IF NOT EXISTS iva_percentagem DECIMAL(5,2) DEFAULT 23
-ADD COLUMN IF NOT EXISTS iva_valor DECIMAL(12,2)
-ADD COLUMN IF NOT EXISTS total DECIMAL(12,2)
+**Ficheiro novo:** `src/pages/ObraApp/lib/offlineDb.js`
 
--- Ligação a capítulos do orçamento
-ADD COLUMN IF NOT EXISTS capitulo_id UUID REFERENCES orcamento_capitulos(id) ON DELETE SET NULL
+Criar wrapper leve para IndexedDB (sem dependência externa):
 
--- Campos de anulação
-ADD COLUMN IF NOT EXISTS data_anulacao DATE
-ADD COLUMN IF NOT EXISTS motivo_anulacao TEXT
-
--- Notas e auditoria
-ADD COLUMN IF NOT EXISTS notas TEXT
-ADD COLUMN IF NOT EXISTS criado_por UUID REFERENCES utilizadores(id) ON DELETE SET NULL
-
--- Sequência para numeração automática (FAT-YYYY-NNNN)
-CREATE SEQUENCE IF NOT EXISTS fatura_cliente_seq START 1;
+```
+DB: 'gavinho_offline', versão 1
+Object Stores:
+  - offline_queue: { id, type, payload, metadata, createdAt, retries, status }
+    keyPath: 'id'
+    index: 'by_createdAt' em createdAt
+  - sync_metadata: { key, value }
+    keyPath: 'key'
 ```
 
-Atualizar CHECK do `estado` para aceitar os novos valores:
-- `rascunho`, `emitida`, `paga`, `anulada` (novos)
-- Manter compatibilidade com `prevista`, `facturada`, `em_atraso` (existentes, para não quebrar dados)
+API exposta:
+- `openDb()` — abre/cria DB com upgrade handler
+- `addToQueue(action)` — insere na fila
+- `getQueue()` — retorna todas as ações pendentes, ordenadas por createdAt
+- `removeFromQueue(id)` — remove ação processada
+- `updateRetries(id, retries)` — incrementa retry counter
+- `clearQueue()` — limpa tudo
+- `getQueueCount()` — conta pendentes
+- `getSyncMeta(key)` / `setSyncMeta(key, value)` — metadata de sync
 
-Criar view `v_faturacao_lista` que junta `facturacao_cliente` com `projetos` e `orcamento_capitulos` para facilitar queries na UI.
-
----
-
-### 2. Hook `useFaturacao`
-**Ficheiro:** `gavinho-app/src/hooks/useFaturacao.js`
-
-Custom hook dedicado ao módulo de faturação:
-- `fetchFaturas()` — lista todas as faturas com join a projetos e capítulos
-- `createFatura(data)` — criar nova fatura (gera número automático FAT-YYYY-NNNN)
-- `updateFatura(id, data)` — editar fatura (só permitido se estado = `rascunho`)
-- `emitirFatura(id)` — transição rascunho → emitida (valida campos obrigatórios)
-- `marcarPaga(id, dataRecebimento)` — transição emitida → paga
-- `anularFatura(id, motivo)` — transição qualquer → anulada (regista motivo + data)
-- `totais` — computed: total faturado, pago, pendente, vencido, anulado
-- `projetos` — lista de projetos para dropdown no formulário
-- `capitulos` — capítulos do orçamento por projeto selecionado
-
-State machine dos estados:
-```
-rascunho → emitida → paga
-    ↓          ↓        ↓
-  anulada   anulada   anulada
-```
+Inclui **migração automática** do localStorage: ao iniciar, se `obra_app_offline_queue` existir no localStorage, lê, insere no IndexedDB, apaga do localStorage.
 
 ---
 
-### 3. Reescrever `Faturacao.jsx`
-**Ficheiro:** `gavinho-app/src/pages/Faturacao.jsx`
+### Fase 2: Refactor `useOfflineSync.js` — IndexedDB + Conflict Resolution
 
-Reescrever a página completa com:
+**Ficheiro:** `src/pages/ObraApp/hooks/useOfflineSync.js`
 
-**a) Header + KPI Cards:**
-- Total Faturado (emitida + paga, s/ anuladas)
-- Total Pago
-- Total Pendente (emitida, não paga)
-- Total Vencido (emitida + data_vencimento < hoje)
-
-**b) Filtros:**
-- Pesquisa por número, projeto, descrição
-- Filtro por estado (Todos, Rascunho, Emitida, Paga, Anulada)
-- Filtro por projeto (dropdown)
-
-**c) Tabela com colunas:**
-- N.º Fatura
-- Projeto
-- Capítulo
-- Descrição
-- Data Emissão
-- Data Vencimento
-- Subtotal / IVA / Total
-- Estado (badge colorido)
-- Ações (editar, emitir, pagar, anular)
-
-**d) Modal Criar/Editar:**
-- Seleção de projeto (dropdown de projetos reais da BD)
-- Seleção de capítulo do orçamento (dropdown dinâmico com base no projeto)
-- Descrição
-- Subtotal (valor sem IVA)
-- Taxa IVA (0%, 6%, 13%, 23%)
-- IVA e Total calculados automaticamente
-- Data emissão, data vencimento
-- Condições de pagamento (dias)
-- Notas
-- Se for edição: pré-preenche campos, só editável se `rascunho`
-
-**e) Modal Anular:**
-- Campo para motivo de anulação (obrigatório)
-- Confirmação antes de anular
-
-**f) Export CSV:**
-- Botão que exporta faturas filtradas para CSV
-- Colunas: N.º, Projeto, Capítulo, Descrição, Subtotal, IVA%, IVA Valor, Total, Estado, Data Emissão, Data Vencimento
+Alterações:
+1. Substituir `localStorage.getItem/setItem` por chamadas a `offlineDb`
+2. **Manter a mesma API pública** — sem breaking changes
+3. Adicionar **last-write-wins** conflict resolution nos handlers de UPDATE:
+   - `UPDATE_PRESENCA`: antes de `update()`, faz `select('updated_at')` → se `updated_at` do servidor > `createdAt` da ação local → descarta (servidor ganha)
+   - `UPDATE_TAREFA`: mesma lógica
+   - `CREATE_DIARIO`: já faz upsert por `(obra_id, data)` — adiciona mesma verificação de `updated_at`
+   - Os INSERTs (`SEND_MESSAGE`, `CREATE_PRESENCA`, `CREATE_REQUISICAO`) não têm conflito possível
+4. Novo estado no hook: `conflictsResolved` (array de conflitos detetados no último sync)
+5. Guardar `lastSyncAt` no `sync_metadata` do IndexedDB
+6. Registar `navigator.serviceWorker.ready.then(reg => reg.sync.register('sync-offline-queue'))` como fallback ao fazer `queueAction`
 
 ---
 
-### 4. Integração com Financeiro Dashboard
-**Ficheiro:** `gavinho-app/src/hooks/useFinanceiroDashboard.js`
+### Fase 3: Background Sync no Service Worker
 
-Ajuste mínimo: o hook já faz fetch de `facturacao_cliente`. Os novos campos (`subtotal`, `iva_valor`, `total`) ficam disponíveis automaticamente. Nenhuma alteração necessária a menos que os totais precisem usar `total` em vez de `valor`.
+**Ficheiro:** `public/sw.js`
+
+Implementar o handler `sync` que já existe como stub:
+
+1. Renomear tag de `send-messages` para `sync-offline-queue`
+2. Em `syncMessages()` (renomeada para `syncOfflineQueue()`):
+   - Abrir IndexedDB `gavinho_offline` diretamente (API nativa, sem wrapper React)
+   - Ler itens da store `offline_queue`
+   - Para cada item, executar `fetch()` ao Supabase REST API (inserir/atualizar)
+   - Remover da fila os itens processados com sucesso
+   - Se falhar, incrementar retries; desistir após 3
+3. Isto garante sync mesmo que a app esteja fechada quando volta a ligação
 
 ---
 
-## Ficheiros a Criar/Modificar
+### Fase 4: Indicador Visual de Estado Offline
 
-| Ação | Ficheiro |
-|------|----------|
-| **Criar** | `gavinho-app/supabase/migrations/20250215_faturacao_completa.sql` |
-| **Criar** | `gavinho-app/src/hooks/useFaturacao.js` |
-| **Reescrever** | `gavinho-app/src/pages/Faturacao.jsx` |
+**Ficheiro novo:** `src/pages/ObraApp/components/OfflineIndicator.jsx`
 
-## Ficheiros NÃO alterados
-- `App.jsx` — A rota `financeiro/faturacao` já existe e aponta para `Faturacao.jsx`
-- `useFinanceiroDashboard.js` — Já faz fetch de `facturacao_cliente`, compatível com novos campos
-- Nenhum componente novo separado — tudo dentro de `Faturacao.jsx` (modal inline, seguindo padrão existente)
+Componente que centraliza toda a UI de estado de conectividade:
+
+| Estado | Visual |
+|---|---|
+| Online, tudo sync | Sem indicador visível |
+| Online, sync pendente | Banner azul: "X ações pendentes — toca para sincronizar" |
+| A sincronizar | Banner azul com spinner: "A sincronizar..." |
+| Sync completa | Toast verde (3s): "Tudo sincronizado ✓" |
+| Conflito resolvido | Toast laranja (5s): "Algumas alterações foram atualizadas pelo servidor" |
+| Offline | Banner amarelo fixo: "Sem ligação — alterações guardadas localmente" |
+| Erro de sync | Banner vermelho: "Falha ao sincronizar — toca para tentar" |
+
+Também adiciona um **ponto colorido no header** junto ao nome da obra:
+- Verde = online + sync completo
+- Amarelo/pulsante = online + sync pendente
+- Vermelho = offline
+
+Props: `{ isOnline, pendingCount, syncing, lastSyncError, conflictsResolved, onRetry }`
+
+**Ficheiro:** `src/pages/ObraApp/index.jsx`
+- Remover os banners inline (`offlineBanner`, `syncBanner`)
+- Substituir por `<OfflineIndicator />`
+- Passar `queueAction` e `isOnline` como props para os componentes tab
+
+---
+
+### Fase 5: Integração nos Componentes Filhos
+
+**Ficheiros:** ObraChat.jsx, Tarefas.jsx, RegistoPresenca.jsx, PedirMateriais.jsx, DiarioObra.jsx
+
+Em cada componente, nas funções de submit:
+- Receber `queueAction` e `isOnline` via props
+- Se `!isOnline`: chamar `queueAction(ACTION_TYPE, payload)` + otimistic update no state local
+- Se online: manter comportamento atual (Supabase direto) para menor latência
+- Adicionar indicador visual inline para itens enviados offline (ícone de relógio/cloud)
+
+---
+
+## Ficheiros a criar/modificar
+
+| Ficheiro | Ação | Descrição |
+|---|---|---|
+| `src/pages/ObraApp/lib/offlineDb.js` | **CRIAR** | Wrapper IndexedDB |
+| `src/pages/ObraApp/hooks/useOfflineSync.js` | **MODIFICAR** | IndexedDB + conflict resolution |
+| `public/sw.js` | **MODIFICAR** | Implementar background sync |
+| `src/pages/ObraApp/components/OfflineIndicator.jsx` | **CRIAR** | Componente visual de estado offline |
+| `src/pages/ObraApp/index.jsx` | **MODIFICAR** | Integrar OfflineIndicator, props aos tabs |
+| `src/pages/ObraApp/components/ObraChat.jsx` | **MODIFICAR** | queueAction quando offline |
+| `src/pages/ObraApp/components/Tarefas.jsx` | **MODIFICAR** | queueAction quando offline |
+| `src/pages/ObraApp/components/RegistoPresenca.jsx` | **MODIFICAR** | queueAction quando offline |
+| `src/pages/ObraApp/components/PedirMateriais.jsx` | **MODIFICAR** | queueAction quando offline |
+| `src/pages/ObraApp/components/DiarioObra.jsx` | **MODIFICAR** | queueAction quando offline |
 
 ---
 
 ## Notas Técnicas
-- CSS: inline styles seguindo padrão existente no codebase (sem CSS Modules para esta página, tal como a atual)
-- Ícones: lucide-react
-- Datas: formato PT (DD/MM/YYYY) na UI, ISO na BD
-- Moeda: `Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' })`
-- Supabase client: `import { supabase } from '../lib/supabase'`
-- Migration idempotente: `ADD COLUMN IF NOT EXISTS`, `CREATE SEQUENCE IF NOT EXISTS`, `DROP POLICY IF EXISTS` + `CREATE POLICY`
+
+- **Zero dependências externas** — IndexedDB wrapper vanilla JS
+- **Migração transparente** — localStorage → IndexedDB automática, com limpeza
+- **API do hook inalterada** — `queueAction`, `processQueue`, `isOnline`, `pendingCount` mantêm-se
+- **Last-write-wins** — timestamp do servidor ganha nos UPDATEs; INSERTs sem conflito
+- **Background sync** — complementar; sync principal continua pelo hook React
+- **Sem alteração de schema SQL** — usa campos `updated_at` já existentes nas tabelas
+- **Inline styles** — seguindo padrão existente do ObraApp (sem CSS Modules)
