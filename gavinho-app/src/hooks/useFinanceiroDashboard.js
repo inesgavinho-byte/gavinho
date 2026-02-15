@@ -38,8 +38,37 @@ function calcularProjecao(cap) {
 }
 
 // ── Alert rules engine ───────────────────────────────
-function gerarAlertas(capitulos, extras, facturas, pos) {
+function gerarAlertas(capitulos, extras, facturas, pos, obrasData) {
   const alertas = []
+
+  // Physical vs financial progress alert
+  const obrasActivas = (obrasData || []).filter(o => o.status !== 'suspensa')
+  const progressoFisico = obrasActivas.length > 0
+    ? Math.round(obrasActivas.reduce((s, o) => s + (o.progresso || 0), 0) / obrasActivas.length)
+    : 0
+
+  for (const cap of capitulos) {
+    const pctFinanceiro = cap.percentagem_comprometido || 0
+    const gap = pctFinanceiro - progressoFisico
+
+    if (gap > 30) {
+      alertas.push({
+        tipo: 'financeiro_adianta_fisico', gravidade: 'critico',
+        titulo: `${cap.capitulo}: financeiro ${gap.toFixed(0)}pp à frente do físico`,
+        descricao: `Comprometido a ${pctFinanceiro.toFixed(0)}% mas obra a ${progressoFisico}% — risco de sobrecusto`,
+        capitulo: cap.capitulo, valor_referencia: progressoFisico, valor_actual: pctFinanceiro,
+        desvio_percentual: gap
+      })
+    } else if (gap > 15) {
+      alertas.push({
+        tipo: 'financeiro_adianta_fisico', gravidade: 'atencao',
+        titulo: `${cap.capitulo}: financeiro ${gap.toFixed(0)}pp à frente do físico`,
+        descricao: `Comprometido a ${pctFinanceiro.toFixed(0)}% mas obra a ${progressoFisico}% — monitorizar`,
+        capitulo: cap.capitulo, valor_referencia: progressoFisico, valor_actual: pctFinanceiro,
+        desvio_percentual: gap
+      })
+    }
+  }
 
   // Per-chapter alerts
   for (const cap of capitulos) {
@@ -130,6 +159,7 @@ export function useFinanceiroDashboard(projetoId) {
   const [extras, setExtras] = useState([])
   const [facturacaoCliente, setFacturacaoCliente] = useState([])
   const [alertasDb, setAlertasDb] = useState([])
+  const [obras, setObras] = useState([])
 
   // ── Fetch all data ──
   const fetchAll = useCallback(async () => {
@@ -145,7 +175,8 @@ export function useFinanceiroDashboard(projetoId) {
         { data: fatData },
         { data: extData },
         { data: facClData },
-        { data: alertData }
+        { data: alertData },
+        { data: obrasData }
       ] = await Promise.all([
         supabase.from('projetos').select('id, codigo, nome, fase, status, orcamento_atual').eq('id', projetoId).single(),
         supabase.from('orcamentos').select('*, orcamento_capitulos(*)').eq('projeto_id', projetoId).eq('status', 'aprovado').order('created_at', { ascending: false }).limit(1).single(),
@@ -153,7 +184,8 @@ export function useFinanceiroDashboard(projetoId) {
         supabase.from('procurement_facturas').select('*').eq('projeto_id', projetoId),
         supabase.from('extras').select('*').eq('projeto_id', projetoId).order('created_at', { ascending: false }),
         supabase.from('facturacao_cliente').select('*').eq('projeto_id', projetoId).order('data_prevista'),
-        supabase.from('alertas_financeiros').select('*').eq('projeto_id', projetoId).eq('estado', 'activo').order('created_at', { ascending: false })
+        supabase.from('alertas_financeiros').select('*').eq('projeto_id', projetoId).eq('estado', 'activo').order('created_at', { ascending: false }),
+        supabase.from('obras').select('id, nome, progresso, status').eq('projeto_id', projetoId)
       ])
 
       setProjeto(proj)
@@ -163,6 +195,13 @@ export function useFinanceiroDashboard(projetoId) {
       setExtras(extData || [])
       setFacturacaoCliente(facClData || [])
       setAlertasDb(alertData || [])
+      setObras(obrasData || [])
+
+      // Compute average physical progress from obras (active ones)
+      const obrasActivas = (obrasData || []).filter(o => o.status !== 'suspensa')
+      const progressoFisicoMedio = obrasActivas.length > 0
+        ? Math.round(obrasActivas.reduce((s, o) => s + (o.progresso || 0), 0) / obrasActivas.length)
+        : 0
 
       // Build chapter-level aggregation client-side
       if (orc?.orcamento_capitulos) {
@@ -196,7 +235,7 @@ export function useFinanceiroDashboard(projetoId) {
             num_facturas: capFats.length,
             pos: capPOs,
             facturas: capFats,
-            progresso: 0 // TODO: link to physical progress from obras
+            progresso: progressoFisicoMedio
           }
         }).sort((a, b) => (a.ordem || 0) - (b.ordem || 0))
 
@@ -235,6 +274,15 @@ export function useFinanceiroDashboard(projetoId) {
       ? Math.round((orcamentoRevisto - eacTotal) / orcamentoRevisto * 1000) / 10
       : 0
 
+    // Physical vs financial progress
+    const obrasActivas = obras.filter(o => o.status !== 'suspensa')
+    const progressoFisicoMedio = obrasActivas.length > 0
+      ? Math.round(obrasActivas.reduce((s, o) => s + (o.progresso || 0), 0) / obrasActivas.length)
+      : 0
+    const progressoFinanceiro = orcCustoTotal > 0
+      ? Math.round(comprometido / orcCustoTotal * 1000) / 10
+      : 0
+
     return {
       orcamentoOriginal,
       orcamentoRevisto,
@@ -248,13 +296,15 @@ export function useFinanceiroDashboard(projetoId) {
       etcTotal,
       desvioProjectado,
       margemProjectada,
-      projecoes
+      projecoes,
+      progressoFisicoMedio,
+      progressoFinanceiro
     }
-  }, [capitulos, extras])
+  }, [capitulos, extras, obras])
 
   // ── Alertas (merge DB + computed) ──
   const alertas = useMemo(() => {
-    const computed = gerarAlertas(capitulos, extras, facturas, pos)
+    const computed = gerarAlertas(capitulos, extras, facturas, pos, obras)
     // Merge: prefer DB alertas (they may have analise_ia), add computed ones not in DB
     const dbTipos = new Set(alertasDb.map(a => `${a.tipo}:${a.capitulo || a.po_id || a.factura_id || ''}`))
     const merged = [...alertasDb]
@@ -265,7 +315,7 @@ export function useFinanceiroDashboard(projetoId) {
     const gravOrder = { urgente: 0, critico: 1, atencao: 2, info: 3 }
     merged.sort((a, b) => (gravOrder[a.gravidade] ?? 9) - (gravOrder[b.gravidade] ?? 9))
     return merged
-  }, [capitulos, extras, facturas, pos, alertasDb])
+  }, [capitulos, extras, facturas, pos, alertasDb, obras])
 
   // ── Extras helpers ──
   const createExtra = useCallback(async (extraData) => {
@@ -307,7 +357,7 @@ export function useFinanceiroDashboard(projetoId) {
 
   return {
     loading, error,
-    projeto, orcamento, capitulos, pos, facturas, extras,
+    projeto, orcamento, capitulos, pos, facturas, extras, obras,
     facturacaoCliente, alertas, totais,
     fetchAll, createExtra, updateExtra, dismissAlerta, resolveAlerta
   }
