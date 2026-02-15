@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import {
   Plus, X, Camera, BookOpen, FileText, AlertTriangle,
-  Upload, Trash2, Edit, Send, FileCheck, ChevronDown
+  Upload, Trash2, Edit, Send, FileCheck, ChevronDown,
+  ChevronLeft, ChevronRight
 } from 'lucide-react'
 import { colors } from './constants'
 import { formatDate } from './utils'
@@ -20,7 +21,7 @@ export default function AcompanhamentoTab({ obraId, activeSubtab, currentUser })
   const [showFotoModal, setShowFotoModal] = useState(false)
   const [fotoUploading, setFotoUploading] = useState(false)
   const [fotoForm, setFotoForm] = useState({ titulo: '', descricao: '', zona_id: '', especialidade_id: '', files: [] })
-  const [fotoPreview, setFotoPreview] = useState(null) // for lightbox
+  const [lightboxIndex, setLightboxIndex] = useState(null)
   const fotoInputRef = useRef(null)
 
   // ============================================
@@ -96,6 +97,37 @@ export default function AcompanhamentoTab({ obraId, activeSubtab, currentUser })
     if (fotoFiltroEspec && f.especialidade_id !== fotoFiltroEspec) return false
     return true
   })
+
+  // Group filtered photos by date for timeline
+  const groupedByDate = (() => {
+    const groups = {}
+    filteredFotos.forEach(f => {
+      const key = f.data_fotografia || 'sem-data'
+      if (!groups[key]) groups[key] = []
+      groups[key].push(f)
+    })
+    return Object.entries(groups)
+      .sort(([a], [b]) => b.localeCompare(a))
+      .map(([date, fotos]) => ({ date, fotos }))
+  })()
+
+  // Lightbox keyboard navigation
+  useEffect(() => {
+    if (lightboxIndex === null) return
+    const handleKey = (e) => {
+      if (e.key === 'Escape') setLightboxIndex(null)
+      if (e.key === 'ArrowRight' && lightboxIndex < filteredFotos.length - 1) setLightboxIndex(i => i + 1)
+      if (e.key === 'ArrowLeft' && lightboxIndex > 0) setLightboxIndex(i => i - 1)
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [lightboxIndex, filteredFotos.length])
+
+  // Get the flat index of a photo in filteredFotos
+  const openLightbox = (foto) => {
+    const idx = filteredFotos.findIndex(f => f.id === foto.id)
+    if (idx !== -1) setLightboxIndex(idx)
+  }
 
   // ============================================
   // DIARIO DE PROJETO: STATE
@@ -385,8 +417,15 @@ export default function AcompanhamentoTab({ obraId, activeSubtab, currentUser })
   }
 
   // ============================================
-  // RENDER: FOTOGRAFIAS
+  // RENDER: FOTOGRAFIAS (Timeline)
   // ============================================
+  const formatDateLabel = (dateStr) => {
+    if (!dateStr || dateStr === 'sem-data') return 'Sem data'
+    return new Date(dateStr + 'T00:00:00').toLocaleDateString('pt-PT', { day: 'numeric', month: 'short', year: 'numeric' })
+  }
+
+  const lightboxFoto = lightboxIndex !== null ? filteredFotos[lightboxIndex] : null
+
   const renderFotografiasTab = () => (
     <div>
       {/* Header */}
@@ -410,10 +449,11 @@ export default function AcompanhamentoTab({ obraId, activeSubtab, currentUser })
       <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
         <span style={{ padding: '6px 14px', background: colors.background, borderRadius: 8, fontSize: 13, color: colors.textMuted }}>
           {filteredFotos.length} fotografia{filteredFotos.length !== 1 ? 's' : ''}
+          {groupedByDate.length > 0 && <> &middot; {groupedByDate.length} data{groupedByDate.length !== 1 ? 's' : ''}</>}
         </span>
       </div>
 
-      {/* Gallery Grid */}
+      {/* Timeline */}
       {fotosLoading ? (
         <div style={{ textAlign: 'center', padding: 48, color: colors.textMuted }}>A carregar...</div>
       ) : filteredFotos.length === 0 ? (
@@ -425,56 +465,113 @@ export default function AcompanhamentoTab({ obraId, activeSubtab, currentUser })
           </button>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
-          {filteredFotos.map(foto => (
-            <div key={foto.id} style={{ background: colors.white, borderRadius: 10, overflow: 'hidden', border: `1px solid ${colors.border}`, cursor: 'pointer' }} onClick={() => setFotoPreview(foto)}>
-              <div style={{ position: 'relative', paddingBottom: '75%', background: '#f0ede8' }}>
-                <img src={foto.url} alt={foto.titulo || foto.filename} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
-                {foto.especialidades && (
-                  <span style={{ position: 'absolute', top: 8, left: 8, padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600, background: foto.especialidades.cor || colors.primary, color: '#fff' }}>
-                    {foto.especialidades.nome}
-                  </span>
-                )}
+        <div style={{ position: 'relative', paddingLeft: 28 }}>
+          {/* Vertical line */}
+          <div style={{ position: 'absolute', left: 5, top: 6, bottom: 0, width: 2, background: colors.border }} />
+
+          {groupedByDate.map((group, gi) => (
+            <div key={group.date} style={{ marginBottom: gi < groupedByDate.length - 1 ? 24 : 0 }}>
+              {/* Date header with dot */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, position: 'relative' }}>
+                {/* Dot */}
+                <div style={{ position: 'absolute', left: -28, top: 1, width: 12, height: 12, borderRadius: '50%', background: colors.primary, border: `2px solid ${colors.white}`, boxShadow: `0 0 0 2px ${colors.border}`, zIndex: 1 }} />
+                {/* Date label */}
+                <span style={{ fontSize: 14, fontWeight: 700, color: colors.text }}>{formatDateLabel(group.date)}</span>
+                <span style={{ fontSize: 12, color: colors.textMuted }}>{group.fotos.length} foto{group.fotos.length !== 1 ? 's' : ''}</span>
+                <div style={{ flex: 1, height: 1, background: colors.border }} />
               </div>
-              <div style={{ padding: '10px 12px' }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: colors.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {foto.titulo || foto.filename}
-                </div>
-                <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>
-                  {new Date(foto.data_fotografia).toLocaleDateString('pt-PT')}
-                  {foto.obra_zonas && <> · {foto.obra_zonas.nome}</>}
-                </div>
+
+              {/* Photo grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 }}>
+                {group.fotos.map(foto => (
+                  <div key={foto.id} onClick={() => openLightbox(foto)} style={{ background: colors.white, borderRadius: 8, overflow: 'hidden', border: `1px solid ${colors.border}`, cursor: 'pointer', transition: 'transform 0.15s, box-shadow 0.15s' }}
+                    onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.02)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)' }}
+                    onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = 'none' }}
+                  >
+                    <div style={{ position: 'relative', paddingBottom: '75%', background: '#f0ede8' }}>
+                      <img src={foto.url} alt={foto.titulo || foto.filename} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
+                      {foto.especialidades && (
+                        <span style={{ position: 'absolute', top: 6, left: 6, padding: '2px 7px', borderRadius: 5, fontSize: 9, fontWeight: 600, background: foto.especialidades.cor || colors.primary, color: '#fff' }}>
+                          {foto.especialidades.nome}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ padding: '8px 10px' }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: colors.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {foto.titulo || foto.filename}
+                      </div>
+                      {foto.obra_zonas && (
+                        <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>{foto.obra_zonas.nome}</div>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* Lightbox */}
-      {fotoPreview && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }} onClick={() => setFotoPreview(null)}>
-          <div style={{ maxWidth: 900, width: '100%', background: colors.white, borderRadius: 16, overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
-            <img src={fotoPreview.url} alt={fotoPreview.titulo || ''} style={{ width: '100%', maxHeight: '70vh', objectFit: 'contain', background: '#000' }} />
-            <div style={{ padding: 20 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div>
-                  <h3 style={{ margin: '0 0 4px', color: colors.text }}>{fotoPreview.titulo || fotoPreview.filename}</h3>
-                  <p style={{ margin: 0, fontSize: 13, color: colors.textMuted }}>
-                    {new Date(fotoPreview.data_fotografia).toLocaleDateString('pt-PT')}
-                    {fotoPreview.autor && <> · {fotoPreview.autor}</>}
-                    {fotoPreview.obra_zonas && <> · {fotoPreview.obra_zonas.nome}</>}
-                    {fotoPreview.especialidades && <> · {fotoPreview.especialidades.nome}</>}
-                  </p>
-                  {fotoPreview.descricao && <p style={{ margin: '8px 0 0', fontSize: 13, color: colors.text }}>{fotoPreview.descricao}</p>}
-                </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button onClick={() => handleDeleteFoto(fotoPreview).then(() => setFotoPreview(null))} style={{ padding: '8px 14px', background: '#FFEBEE', color: '#F44336', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                    <Trash2 size={14} style={{ verticalAlign: -2, marginRight: 4 }} />Eliminar
-                  </button>
-                  <button onClick={() => setFotoPreview(null)} style={{ padding: '8px 14px', background: colors.background, color: colors.text, border: 'none', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Fechar</button>
-                </div>
-              </div>
+      {/* Lightbox with navigation */}
+      {lightboxFoto && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)', zIndex: 2000, display: 'flex', flexDirection: 'column' }} onClick={() => setLightboxIndex(null)}>
+          {/* Top bar */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>
+              {lightboxIndex + 1} de {filteredFotos.length}
             </div>
+            <button onClick={() => setLightboxIndex(null)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8, padding: 8, cursor: 'pointer', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <X size={20} />
+            </button>
+          </div>
+
+          {/* Image area with arrows */}
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 24px', gap: 16, minHeight: 0 }} onClick={e => e.stopPropagation()}>
+            {/* Left arrow */}
+            <button
+              onClick={() => lightboxIndex > 0 && setLightboxIndex(lightboxIndex - 1)}
+              disabled={lightboxIndex === 0}
+              style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%', width: 44, height: 44, cursor: lightboxIndex === 0 ? 'default' : 'pointer', color: lightboxIndex === 0 ? 'rgba(255,255,255,0.2)' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+            >
+              <ChevronLeft size={24} />
+            </button>
+
+            {/* Image */}
+            <img
+              src={lightboxFoto.url}
+              alt={lightboxFoto.titulo || ''}
+              style={{ maxWidth: '100%', maxHeight: '75vh', objectFit: 'contain', borderRadius: 8 }}
+            />
+
+            {/* Right arrow */}
+            <button
+              onClick={() => lightboxIndex < filteredFotos.length - 1 && setLightboxIndex(lightboxIndex + 1)}
+              disabled={lightboxIndex === filteredFotos.length - 1}
+              style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%', width: 44, height: 44, cursor: lightboxIndex === filteredFotos.length - 1 ? 'default' : 'pointer', color: lightboxIndex === filteredFotos.length - 1 ? 'rgba(255,255,255,0.2)' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+            >
+              <ChevronRight size={24} />
+            </button>
+          </div>
+
+          {/* Bottom info bar */}
+          <div style={{ padding: '16px 24px', flexShrink: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }} onClick={e => e.stopPropagation()}>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: '#fff', marginBottom: 4 }}>
+                {lightboxFoto.titulo || lightboxFoto.filename}
+              </div>
+              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>
+                {new Date(lightboxFoto.data_fotografia).toLocaleDateString('pt-PT')}
+                {lightboxFoto.obra_zonas && <> &middot; {lightboxFoto.obra_zonas.nome}</>}
+                {lightboxFoto.especialidades && <> &middot; {lightboxFoto.especialidades.nome}</>}
+                {lightboxFoto.autor && <> &middot; {lightboxFoto.autor}</>}
+              </div>
+              {lightboxFoto.descricao && (
+                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>{lightboxFoto.descricao}</div>
+              )}
+            </div>
+            <button onClick={() => { const idx = lightboxIndex; handleDeleteFoto(filteredFotos[idx]).then(() => { if (filteredFotos.length <= 1) setLightboxIndex(null); else if (idx >= filteredFotos.length - 1) setLightboxIndex(idx - 1) }) }} style={{ padding: '8px 14px', background: 'rgba(244,67,54,0.15)', color: '#F44336', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
+              <Trash2 size={14} style={{ verticalAlign: -2, marginRight: 4 }} />Eliminar
+            </button>
           </div>
         </div>
       )}
