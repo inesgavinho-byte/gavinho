@@ -22,7 +22,9 @@ import {
   Tarefas,
   Galeria,
   DiarioObra,
-  ProfilePage
+  ProfilePage,
+  OfflineIndicator,
+  ConnectionDot
 } from './components'
 
 // Import hooks
@@ -53,7 +55,10 @@ export default function ObraApp() {
   const { permission, requestPermission, subscribe } = usePushNotifications(user?.id)
 
   // Offline sync
-  const { isOnline, pendingCount, syncing, processQueue } = useOfflineSync()
+  const {
+    isOnline, pendingCount, syncing, lastSyncError,
+    conflictsResolved, queueAction, processQueue, dismissConflicts
+  } = useOfflineSync()
 
   // In-app notifications
   const {
@@ -283,28 +288,6 @@ export default function ObraApp() {
 
   // Local styles
   const localStyles = {
-    offlineBanner: {
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
-      padding: '8px 16px',
-      background: '#fef3c7',
-      color: '#92400e',
-      fontSize: 13,
-      fontWeight: 500
-    },
-    syncBanner: {
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
-      padding: '6px 16px',
-      background: '#dbeafe',
-      color: '#1e40af',
-      fontSize: 12,
-      cursor: 'pointer'
-    },
     notificationBell: {
       position: 'relative'
     },
@@ -595,21 +578,16 @@ export default function ObraApp() {
 
   return (
     <div style={styles.container}>
-      {/* Offline Banner */}
-      {!isOnline && (
-        <div style={localStyles.offlineBanner}>
-          <WifiOff size={16} />
-          Sem ligação à internet
-        </div>
-      )}
-
-      {/* Pending Sync Banner */}
-      {isOnline && pendingCount > 0 && (
-        <div style={localStyles.syncBanner} onClick={processQueue}>
-          <RefreshCw size={14} style={syncing ? { animation: 'spin 1s linear infinite' } : {}} />
-          {syncing ? 'A sincronizar...' : `${pendingCount} ações pendentes - toca para sincronizar`}
-        </div>
-      )}
+      {/* Offline / Sync Indicator */}
+      <OfflineIndicator
+        isOnline={isOnline}
+        pendingCount={pendingCount}
+        syncing={syncing}
+        lastSyncError={lastSyncError}
+        conflictsResolved={conflictsResolved}
+        onRetry={processQueue}
+        onDismissConflicts={dismissConflicts}
+      />
 
       {/* Header - hide when in profile page */}
       {!showProfilePage && (
@@ -627,7 +605,10 @@ export default function ObraApp() {
             <div style={styles.headerTitle}>
               {obra ? (
                 <>
-                  <h1 style={styles.obraCode}>{obra.codigo}</h1>
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <h1 style={styles.obraCode}>{obra.codigo}</h1>
+                    <ConnectionDot isOnline={isOnline} pendingCount={pendingCount} syncing={syncing} />
+                  </div>
                   <p style={styles.obraNome}>{obra.nome}</p>
                 </>
               ) : (
@@ -891,12 +872,12 @@ export default function ObraApp() {
             renderWelcomeScreen()
           ) : (
             <>
-              {activeTab === 'chat' && <ObraChat obra={obra} user={user} />}
-              {activeTab === 'tarefas' && <Tarefas obra={obra} user={user} />}
-              {activeTab === 'diario' && <DiarioObra obra={obra} user={user} />}
-              {activeTab === 'materiais' && <PedirMateriais obra={obra} user={user} />}
+              {activeTab === 'chat' && <ObraChat obra={obra} user={user} isOnline={isOnline} queueAction={queueAction} />}
+              {activeTab === 'tarefas' && <Tarefas obra={obra} user={user} isOnline={isOnline} queueAction={queueAction} />}
+              {activeTab === 'diario' && <DiarioObra obra={obra} user={user} isOnline={isOnline} queueAction={queueAction} />}
+              {activeTab === 'materiais' && <PedirMateriais obra={obra} user={user} isOnline={isOnline} queueAction={queueAction} />}
               {activeTab === 'galeria' && <Galeria obra={obra} user={user} />}
-              {activeTab === 'presencas' && <RegistoPresenca obra={obra} user={user} />}
+              {activeTab === 'presencas' && <RegistoPresenca obra={obra} user={user} isOnline={isOnline} queueAction={queueAction} />}
               {activeTab === 'equipa' && <Equipa obra={obra} />}
             </>
           )}
@@ -1095,6 +1076,10 @@ export default function ObraApp() {
         @keyframes menuOverlayIn {
           from { opacity: 0; }
           to { opacity: 1; }
+        }
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.4; }
         }
       `}</style>
 

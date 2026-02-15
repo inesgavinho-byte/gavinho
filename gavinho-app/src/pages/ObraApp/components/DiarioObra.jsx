@@ -23,7 +23,7 @@ const WEATHER_OPTIONS = [
   { key: 'vento', label: 'Vento', icon: Wind, color: '#8b5cf6' }
 ]
 
-export default function DiarioObra({ obra, user }) {
+export default function DiarioObra({ obra, user, isOnline, queueAction }) {
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedDate, setSelectedDate] = useState(new Date())
@@ -204,17 +204,9 @@ export default function DiarioObra({ obra, user }) {
   const handleSubmit = async () => {
     setSaving(true)
     try {
-      let photoUrls = [...formData.fotos]
-      if (photoFiles.length > 0) {
-        const newUrls = await uploadPhotos()
-        photoUrls = [...photoUrls, ...newUrls]
-      }
-
       const today = new Date().toISOString().split('T')[0]
 
       // Build entry data using correct column names from schema
-      // Note: trabalhadores_gavinho → mao_obra_propria
-      //       trabalhadores_subempreiteiros → mao_obra_subempreiteiro
       const entryData = {
         obra_id: obra.id,
         data: today,
@@ -225,12 +217,27 @@ export default function DiarioObra({ obra, user }) {
         mao_obra_subempreiteiro: parseInt(formData.trabalhadores_subempreiteiros) || 0,
         tarefas: formData.tarefas || [],
         ocorrencias: formData.ocorrencias || [],
-        fotos: photoUrls,
+        fotos: [...formData.fotos],
         proximos_passos: formData.proximos_passos || [],
         status: 'rascunho',
         updated_at: new Date().toISOString()
       }
 
+      // Offline: queue diary entry (photos not uploaded offline)
+      if (!isOnline && queueAction) {
+        await queueAction('CREATE_DIARIO', entryData)
+        setPhotoFiles([])
+        setPhotoPreviews([])
+        setShowForm(false)
+        setSaving(false)
+        return
+      }
+
+      // Online: upload photos first
+      if (photoFiles.length > 0) {
+        const newUrls = await uploadPhotos()
+        entryData.fotos = [...entryData.fotos, ...newUrls]
+      }
 
       if (diarioId) {
         const { error } = await supabase

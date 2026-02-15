@@ -46,7 +46,7 @@ const getAvatarColor = (userId) => {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
 }
 
-export default function ObraChat({ obra, user }) {
+export default function ObraChat({ obra, user, isOnline, queueAction }) {
   const [messages, setMessages] = useState([])
   const [newMessage, setNewMessage] = useState('')
   const [sending, setSending] = useState(false)
@@ -322,6 +322,23 @@ export default function ObraChat({ obra, user }) {
 
     const photoToUpload = selectedPhoto
     cancelPhoto()
+
+    // Offline: queue the message for later sync (no photo upload when offline)
+    if (!isOnline && queueAction && !photoToUpload) {
+      await queueAction('SEND_MESSAGE', {
+        obra_id: obra.id,
+        autor_id: user.id,
+        autor_nome: user.nome,
+        conteudo: messageText,
+        tipo: 'texto',
+        anexos: null
+      })
+      setMessages(prev => prev.map(m =>
+        m.id === tempId ? { ...m, pending: false, queued: true } : m
+      ))
+      setSending(false)
+      return
+    }
 
     try {
       let photoUrl = null
@@ -713,7 +730,9 @@ export default function ObraChat({ obra, user }) {
                   <span style={styles.messageTime}>
                     {formatTime(msg.created_at)}
                     {msg.autor_id === user.id && (
-                      msg.pending ? (
+                      msg.queued ? (
+                        <Clock size={12} style={{ color: '#f59e0b' }} title="Guardado offline" />
+                      ) : msg.pending ? (
                         <Clock size={12} />
                       ) : msg.failed ? (
                         <X size={12} style={{ color: '#ef4444' }} />

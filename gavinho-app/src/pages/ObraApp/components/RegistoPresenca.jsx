@@ -402,7 +402,7 @@ function calculateGpsDistance(lat1, lon1, lat2, lon2) {
   return R * c
 }
 
-export default function RegistoPresenca({ obra, user }) {
+export default function RegistoPresenca({ obra, user, isOnline, queueAction }) {
   const [presencaHoje, setPresencaHoje] = useState(null)
   const [historico, setHistorico] = useState([])
   const [loading, setLoading] = useState(true)
@@ -646,6 +646,15 @@ export default function RegistoPresenca({ obra, user }) {
         insertData.dentro_geofence_entrada = isWithinGeofence
       }
 
+      // Offline: queue check-in
+      if (!isOnline && queueAction) {
+        await queueAction('CREATE_PRESENCA', insertData)
+        setPresencaHoje({ ...insertData, id: `temp_${Date.now()}`, queued: true })
+        setNotas('')
+        setActionLoading(false)
+        return
+      }
+
       const { data, error } = await supabase
         .from('presencas')
         .insert(insertData)
@@ -699,6 +708,15 @@ export default function RegistoPresenca({ obra, user }) {
         updateData.precisao_saida = userLocation.accuracy
         updateData.distancia_saida = distance
         updateData.dentro_geofence_saida = isWithinGeofence
+      }
+
+      // Offline: queue check-out
+      if (!isOnline && queueAction && presencaHoje.id) {
+        await queueAction('UPDATE_PRESENCA', { id: presencaHoje.id, ...updateData })
+        setPresencaHoje({ ...presencaHoje, ...updateData, queued: true })
+        setNotas('')
+        setActionLoading(false)
+        return
       }
 
       const { error } = await supabase

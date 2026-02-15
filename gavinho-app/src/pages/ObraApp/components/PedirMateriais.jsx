@@ -220,7 +220,7 @@ const getStatusInfo = (status) => {
   }
 }
 
-export default function PedirMateriais({ obra, user }) {
+export default function PedirMateriais({ obra, user, isOnline, queueAction }) {
   const [material, setMaterial] = useState('')
   const [quantidade, setQuantidade] = useState('')
   const [unidade, setUnidade] = useState('un')
@@ -404,20 +404,42 @@ export default function PedirMateriais({ obra, user }) {
     if (!material.trim() || !quantidade) return
 
     setSending(true)
+
+    const reqPayload = {
+      obra_id: obra.id,
+      pedido_por_id: user.id,
+      pedido_por_nome: user.nome,
+      pedido_por_tipo: user.tipo || 'trabalhador',
+      material: material.trim(),
+      quantidade: parseFloat(quantidade),
+      unidade,
+      notas: notas || null,
+      urgente,
+      status: 'pendente'
+    }
+
+    // Offline: queue the requisition
+    if (!isOnline && queueAction) {
+      await queueAction('CREATE_REQUISICAO', reqPayload)
+      saveRecentMaterial(material.trim(), unidade)
+      setSuccess(true)
+      setMaterial('')
+      setQuantidade('')
+      setNotas('')
+      setUrgente(false)
+      setShowForm(false)
+      setSending(false)
+      setTimeout(() => setSuccess(false), 3000)
+      return
+    }
+
     try {
       // Save to requisitions table and get the ID
-      const { data: insertedReq, error } = await supabase.from('requisicoes_materiais').insert({
-        obra_id: obra.id,
-        pedido_por_id: user.id,
-        pedido_por_nome: user.nome,
-        pedido_por_tipo: user.tipo || 'trabalhador',
-        material: material.trim(),
-        quantidade: parseFloat(quantidade),
-        unidade,
-        notas: notas || null,
-        urgente,
-        status: 'pendente'
-      }).select('id').single()
+      const { data: insertedReq, error } = await supabase
+        .from('requisicoes_materiais')
+        .insert(reqPayload)
+        .select('id')
+        .single()
 
       if (error) throw error
 

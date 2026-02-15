@@ -41,7 +41,7 @@ const getDueSoonStatus = (tarefa) => {
   return null
 }
 
-export default function Tarefas({ obra, user }) {
+export default function Tarefas({ obra, user, isOnline, queueAction }) {
   const [tarefas, setTarefas] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('todas') // todas, minhas, pendentes, urgentes
@@ -213,6 +213,19 @@ export default function Tarefas({ obra, user }) {
       // If completing, add completion date
       if (newStatus === 'concluida') {
         updates.data_conclusao = new Date().toISOString()
+      }
+
+      // Offline: queue the update
+      if (!isOnline && queueAction) {
+        await queueAction('UPDATE_TAREFA', { id: tarefa.id, ...updates })
+        setTarefas(prev => prev.map(t =>
+          t.id === tarefa.id ? { ...t, ...updates } : t
+        ))
+        if (selectedTarefa?.id === tarefa.id) {
+          setSelectedTarefa({ ...selectedTarefa, ...updates })
+        }
+        setUpdating(false)
+        return
       }
 
       const { error } = await supabase
