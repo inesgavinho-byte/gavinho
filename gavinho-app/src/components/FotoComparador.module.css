@@ -1,0 +1,315 @@
+/* =====================================================
+   FOTO COMPARADOR - Before/After Slider
+   ===================================================== */
+
+.container {
+  padding: 24px;
+}
+
+.header {
+  margin-bottom: 24px;
+}
+
+.title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 4px 0;
+}
+
+.subtitle {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* ---- Filters ---- */
+
+.filters {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.filterGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 180px;
+}
+
+.filterLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.filterSelect {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.filterSelect:hover {
+  border-color: var(--brown-light);
+}
+
+.filterSelect:focus {
+  outline: none;
+  border-color: var(--brown);
+  box-shadow: 0 0 0 2px var(--brown-alpha-10, rgba(139, 119, 101, 0.1));
+}
+
+/* ---- Photo Selection ---- */
+
+.selectionArea {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.selectionColumn {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.selectionColumnBefore {
+  composes: selectionColumn;
+  border-top: 3px solid var(--warning, #F59E0B);
+}
+
+.selectionColumnAfter {
+  composes: selectionColumn;
+  border-top: 3px solid var(--success, #10B981);
+}
+
+.columnTitle {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0 0 12px 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.columnTitleBefore {
+  color: var(--warning, #F59E0B);
+}
+
+.columnTitleAfter {
+  color: var(--success, #10B981);
+}
+
+.thumbGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 8px;
+}
+
+.thumb {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: border-color 0.2s, transform 0.15s;
+}
+
+.thumb:hover {
+  transform: scale(1.05);
+}
+
+.thumbSelected {
+  composes: thumb;
+  border-color: var(--brown);
+  box-shadow: 0 0 0 2px var(--brown-alpha-10, rgba(139, 119, 101, 0.15));
+}
+
+.thumbImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.thumbDate {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 2px 4px;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  font-size: 0.6rem;
+  text-align: center;
+}
+
+.noPhotos {
+  text-align: center;
+  padding: 24px;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+/* ---- Comparator Slider ---- */
+
+.comparatorWrapper {
+  position: relative;
+  max-width: 900px;
+  margin: 0 auto;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.comparator {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  cursor: col-resize;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+.comparatorImgAfter {
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+}
+
+.comparatorBefore {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.comparatorImgBefore {
+  display: block;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: white;
+  cursor: col-resize;
+  z-index: 10;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.4);
+  transform: translateX(-50%);
+}
+
+.handleCircle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+}
+
+.labelBefore,
+.labelAfter {
+  position: absolute;
+  top: 12px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.labelBefore {
+  left: 12px;
+  background: rgba(245, 158, 11, 0.85);
+  color: white;
+}
+
+.labelAfter {
+  right: 12px;
+  background: rgba(16, 185, 129, 0.85);
+  color: white;
+}
+
+/* ---- Empty state ---- */
+
+.emptyState {
+  text-align: center;
+  padding: 60px 24px;
+  background: var(--bg-card);
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+}
+
+.emptyIcon {
+  color: var(--text-secondary);
+  opacity: 0.4;
+  margin-bottom: 16px;
+}
+
+.emptyTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 8px 0;
+}
+
+.emptyText {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin: 0;
+  max-width: 360px;
+  margin: 0 auto;
+}
+
+/* ---- Responsive ---- */
+
+@media (max-width: 640px) {
+  .selectionArea {
+    grid-template-columns: 1fr;
+  }
+
+  .filters {
+    flex-direction: column;
+  }
+
+  .filterGroup {
+    min-width: 100%;
+  }
+
+  .handleCircle {
+    width: 32px;
+    height: 32px;
+  }
+}

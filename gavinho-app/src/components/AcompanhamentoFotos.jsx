@@ -5,8 +5,9 @@ import ConfirmModal from './ui/ConfirmModal'
 import {
   Plus, Upload, Image, X, ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
   Star, Trash2, Edit, Loader2, Calendar, Camera, MapPin,
-  AlertCircle, RefreshCw, Eye, MoreVertical, Users, FolderPlus
+  AlertCircle, RefreshCw, Eye, MoreVertical, Users, FolderPlus, Home
 } from 'lucide-react'
+import { COMPARTIMENTOS } from '../constants/projectConstants'
 
 // Generate optimized thumbnail URL
 const getThumbnailUrl = (url, width = 400) => {
@@ -282,6 +283,27 @@ export default function AcompanhamentoFotos({ projeto, userId, userName }) {
           f.id === foto.id ? { ...f, destaque: !f.destaque } : f
         )
       }))
+    } catch (err) {
+      toast.error('Erro', err.message)
+    }
+  }
+
+  const [editingCompartimento, setEditingCompartimento] = useState(null) // foto.id being edited
+
+  const handleSetCompartimento = async (foto, compartimento) => {
+    try {
+      const { error } = await supabase
+        .from('projeto_acompanhamento_fotos')
+        .update({ compartimento: compartimento || null })
+        .eq('id', foto.id)
+      if (error) throw error
+      setFotos(prev => ({
+        ...prev,
+        [foto.visita_id]: (prev[foto.visita_id] || []).map(f =>
+          f.id === foto.id ? { ...f, compartimento: compartimento || null } : f
+        )
+      }))
+      setEditingCompartimento(null)
     } catch (err) {
       toast.error('Erro', err.message)
     }
@@ -576,6 +598,59 @@ export default function AcompanhamentoFotos({ projeto, userId, userName }) {
                               }}>
                                 Destaque
                               </div>
+                            )}
+                            {/* Compartimento badge / edit */}
+                            {editingCompartimento === foto.id ? (
+                              <div
+                                onClick={e => e.stopPropagation()}
+                                style={{
+                                  position: 'absolute', bottom: '6px', right: '6px', left: foto.destaque ? '80px' : '6px',
+                                }}
+                              >
+                                <select
+                                  autoFocus
+                                  value={foto.compartimento || ''}
+                                  onChange={e => handleSetCompartimento(foto, e.target.value)}
+                                  onBlur={() => setEditingCompartimento(null)}
+                                  style={{
+                                    width: '100%', padding: '3px 4px', fontSize: '10px',
+                                    borderRadius: '4px', border: 'none', background: 'rgba(255,255,255,0.95)',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  <option value="">Sem compartimento</option>
+                                  {COMPARTIMENTOS.map(c => (
+                                    <option key={c} value={c}>{c}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            ) : foto.compartimento ? (
+                              <div
+                                onClick={e => { e.stopPropagation(); setEditingCompartimento(foto.id) }}
+                                style={{
+                                  position: 'absolute', bottom: foto.destaque ? '26px' : '6px', left: '6px',
+                                  padding: '2px 6px', background: 'rgba(74,93,74,0.85)', borderRadius: '4px',
+                                  fontSize: '10px', fontWeight: 500, color: '#fff', cursor: 'pointer',
+                                  display: 'flex', alignItems: 'center', gap: '3px', maxWidth: 'calc(100% - 12px)',
+                                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                                }}
+                                title={`Compartimento: ${foto.compartimento}`}
+                              >
+                                <Home size={9} /> {foto.compartimento}
+                              </div>
+                            ) : (
+                              <button
+                                onClick={e => { e.stopPropagation(); setEditingCompartimento(foto.id) }}
+                                style={{
+                                  position: 'absolute', bottom: '6px', left: foto.destaque ? '80px' : '6px',
+                                  padding: '3px 5px', background: 'rgba(0,0,0,0.4)', border: 'none',
+                                  borderRadius: '4px', cursor: 'pointer', display: 'flex',
+                                  alignItems: 'center', gap: '3px', color: '#fff', fontSize: '10px'
+                                }}
+                                title="Atribuir compartimento"
+                              >
+                                <Home size={10} />
+                              </button>
                             )}
                           </div>
                         ))}
