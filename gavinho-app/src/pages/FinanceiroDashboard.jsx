@@ -380,6 +380,19 @@ export default function FinanceiroDashboard() {
           trend={totais.desvioProjectado > 0 ? 'up' : totais.desvioProjectado < 0 ? 'down' : 'neutral'}
           color={totais.desvioProjectado > 0 ? '#b88a8a' : undefined}
         />
+        <KpiCard
+          label="Físico vs Financeiro"
+          value={`${totais.progressoFisicoMedio || 0}%`}
+          sub={`Financeiro: ${fmtPct(totais.progressoFinanceiro)}`}
+          trend={totais.progressoFinanceiro > (totais.progressoFisicoMedio || 0) + 10 ? 'up' : 'neutral'}
+          color={
+            Math.abs((totais.progressoFinanceiro || 0) - (totais.progressoFisicoMedio || 0)) > 20
+              ? '#b88a8a'
+              : Math.abs((totais.progressoFinanceiro || 0) - (totais.progressoFisicoMedio || 0)) > 10
+                ? '#c9a882'
+                : '#4a5d4a'
+          }
+        />
       </div>
 
       {/* ── SECTION TABS ── */}
@@ -417,7 +430,7 @@ export default function FinanceiroDashboard() {
             {/* Header */}
             <div style={{
               display: 'grid',
-              gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 80px',
+              gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 70px 80px',
               gap: '8px', padding: '10px 16px',
               background: 'rgba(74, 93, 74, 0.06)',
               fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase',
@@ -428,6 +441,7 @@ export default function FinanceiroDashboard() {
               <span style={{ textAlign: 'right' }}>Comprometido</span>
               <span style={{ textAlign: 'right' }}>Facturado</span>
               <span style={{ textAlign: 'right' }}>Pago</span>
+              <span style={{ textAlign: 'center' }}>Físico</span>
               <span style={{ textAlign: 'center' }}>Estado</span>
             </div>
 
@@ -438,7 +452,7 @@ export default function FinanceiroDashboard() {
                   onClick={() => toggleCap(cap.capitulo)}
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 80px',
+                    gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 70px 80px',
                     gap: '8px', padding: '10px 16px',
                     cursor: 'pointer', fontSize: '0.85rem',
                     borderTop: '1px solid rgba(150,150,150,0.1)',
@@ -466,6 +480,12 @@ export default function FinanceiroDashboard() {
                   <span style={{ textAlign: 'right' }}>{fmtFull(cap.facturado)}</span>
                   <span style={{ textAlign: 'right' }}>{fmtFull(cap.pago)}</span>
                   <span style={{ textAlign: 'center' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#4a5d4a' }}>{cap.progresso}%</span>
+                    <div style={{ marginTop: '2px' }}>
+                      <ProgressBar value={cap.progresso} max={100} color="#4a5d4a" height={4} />
+                    </div>
+                  </span>
+                  <span style={{ textAlign: 'center' }}>
                     <HealthBadge status={cap.estado_health} />
                   </span>
                 </div>
@@ -483,7 +503,7 @@ export default function FinanceiroDashboard() {
             {extras.filter(e => e.estado === 'aprovado').length > 0 && (
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 80px',
+                gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 70px 80px',
                 gap: '8px', padding: '10px 16px',
                 borderTop: '1px solid rgba(150,150,150,0.15)',
                 fontSize: '0.85rem', fontStyle: 'italic', color: 'var(--brown-light)'
@@ -494,13 +514,14 @@ export default function FinanceiroDashboard() {
                 <span style={{ textAlign: 'right' }}>—</span>
                 <span style={{ textAlign: 'right' }}>—</span>
                 <span />
+                <span />
               </div>
             )}
 
             {/* Totals row */}
             <div style={{
               display: 'grid',
-              gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 80px',
+              gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 70px 80px',
               gap: '8px', padding: '12px 16px',
               borderTop: '2px solid var(--stone, #e0ddd4)',
               fontSize: '0.9rem', fontWeight: 700, background: 'rgba(74, 93, 74, 0.04)'
@@ -510,6 +531,7 @@ export default function FinanceiroDashboard() {
               <span style={{ textAlign: 'right' }}>{fmtFull(totais.comprometido)}</span>
               <span style={{ textAlign: 'right' }}>{fmtFull(totais.facturado)}</span>
               <span style={{ textAlign: 'right' }}>{fmtFull(totais.pago)}</span>
+              <span style={{ textAlign: 'center', color: '#4a5d4a' }}>{totais.progressoFisicoMedio || 0}%</span>
               <span />
             </div>
           </div>

@@ -49,12 +49,10 @@ Tabelas principais: `projetos`, `obras`, `utilizadores`, `orcamento_capitulos`, 
 
 ### Pendentes no código
 
-1. **Progresso físico nos capítulos financeiros**
-   - **Ficheiro:** `gavinho-app/src/hooks/useFinanceiroDashboard.js:199`
-   - **Comentário:** `progresso: 0 // TODO: link to physical progress from obras`
-   - **Contexto:** O hook `useFinanceiroDashboard` constrói dados por capítulo de orçamento para o painel financeiro. O campo `progresso` está hardcoded a `0`. Deveria obter o progresso físico real da tabela `obras` (campo `obras.progresso`, INTEGER 0-100).
-   - **Complexidade:** Média — requer determinar a relação capítulo → obra (via orçamento/projeto), fazer query à tabela `obras`, e mapear o progresso para cada capítulo. Pode não ser um mapeamento 1:1 se um projeto tiver múltiplas obras.
+_(Sem TODOs pendentes)_
 
 ### Resolvidos
 
 1. ~~**Faturação no Finance.jsx**~~ — O TODO `faturado: 0, // TODO: implementar quando tiver tabela de faturação` existia em `gavinho-app 3/src/pages/Finance.jsx:184`. Já não existe na versão principal (`gavinho-app/`), e a tabela `facturacao_cliente` já foi criada na BD.
+
+2. ~~**Progresso físico nos capítulos financeiros**~~ — O TODO `progresso: 0 // TODO: link to physical progress from obras` em `useFinanceiroDashboard.js` foi resolvido. O hook agora busca `obras.progresso` via Supabase, calcula a média ponderada das obras activas do projecto, e alimenta o motor de projecção ETC/EAC. O dashboard mostra KPI "Físico vs Financeiro" e alerta quando progresso financeiro > físico + 15pp.
