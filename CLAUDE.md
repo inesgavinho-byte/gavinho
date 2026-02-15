@@ -28,7 +28,7 @@ gavinho/
 - **Backend:** Supabase (PostgreSQL, Auth, Storage, Realtime, Edge Functions)
 - **Edge Functions:** Deno/TypeScript
 - **Deploy:** Netlify
-- **Integrações:** Twilio (WhatsApp), Microsoft Graph (Outlook), OpenAI, web-push
+- **Integrações:** Microsoft Graph (Outlook), OpenAI, web-push
 
 ## Comandos
 
@@ -43,7 +43,7 @@ npm run build      # Build de produção
 
 Schema completo documentado em `docs/SUPABASE_DATABASE_SCHEMA.md`.
 
-Tabelas principais: `projetos`, `obras`, `utilizadores`, `orcamento_capitulos`, `facturacao_cliente`, `obra_timeline`, `obra_acoes`, `whatsapp_mensagens`, `obra_emails`.
+Tabelas principais: `projetos`, `obras`, `utilizadores`, `orcamento_capitulos`, `facturacao_cliente`, `obra_timeline`, `obra_acoes`, `obra_emails`.
 
 ## TODO
 

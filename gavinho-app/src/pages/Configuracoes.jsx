@@ -4,15 +4,14 @@ import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../components/ui/ThemeProvider'
 import {
   Settings, User, Bell, Palette, Globe, Shield, Database,
-  Mail, Phone, Key, Save, Loader2, Check, X, Moon, Sun,
-  Smartphone, Webhook, AlertCircle, Eye, EyeOff, RefreshCw
+  Mail, Key, Save, Loader2, Check, X, Moon, Sun,
+  AlertCircle, RefreshCw
 } from 'lucide-react'
 
 const TABS = [
   { id: 'perfil', label: 'Perfil', icon: User },
   { id: 'notificacoes', label: 'Notificacoes', icon: Bell },
   { id: 'aparencia', label: 'Aparencia', icon: Palette },
-  { id: 'integracoes', label: 'Integracoes', icon: Webhook },
   { id: 'seguranca', label: 'Seguranca', icon: Shield }
 ]
 
@@ -42,15 +41,6 @@ export default function Configuracoes() {
     push_alertas: true
   })
 
-  // WhatsApp config state
-  const [whatsappConfig, setWhatsappConfig] = useState({
-    accountSid: '',
-    authToken: '',
-    phoneNumber: '',
-    ativo: false
-  })
-  const [showAuthToken, setShowAuthToken] = useState(false)
-
   useEffect(() => {
     if (profile) {
       setPerfilData({
@@ -68,30 +58,7 @@ export default function Configuracoes() {
         }))
       }
     }
-
-    loadWhatsappConfig()
   }, [profile, user])
-
-  const loadWhatsappConfig = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('whatsapp_config')
-        .select('*')
-        .eq('ativo', true)
-        .maybeSingle()
-
-      if (data) {
-        setWhatsappConfig({
-          accountSid: data.twilio_account_sid || '',
-          authToken: '',
-          phoneNumber: data.twilio_phone_number || '',
-          ativo: data.ativo
-        })
-      }
-    } catch (err) {
-      console.error('Erro ao carregar config WhatsApp:', err)
-    }
-  }
 
   const showMessage = (text, type = 'success') => {
     setMessage({ text, type })
@@ -156,57 +123,6 @@ export default function Configuracoes() {
     } catch (err) {
       console.error('Erro ao guardar notificacoes:', err)
       showMessage('Erro ao guardar notificacoes', 'error')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleSaveWhatsapp = async () => {
-    if (!whatsappConfig.accountSid || !whatsappConfig.phoneNumber) {
-      showMessage('Preenche Account SID e Numero WhatsApp', 'error')
-      return
-    }
-
-    setSaving(true)
-    try {
-      const { data: existing } = await supabase
-        .from('whatsapp_config')
-        .select('id')
-        .eq('ativo', true)
-        .maybeSingle()
-
-      const configData = {
-        twilio_account_sid: whatsappConfig.accountSid,
-        twilio_phone_number: whatsappConfig.phoneNumber.replace(/\s/g, ''),
-        ativo: true,
-        updated_at: new Date().toISOString()
-      }
-
-      if (whatsappConfig.authToken) {
-        configData.twilio_auth_token_encrypted = whatsappConfig.authToken
-      }
-
-      if (existing) {
-        await supabase
-          .from('whatsapp_config')
-          .update(configData)
-          .eq('id', existing.id)
-      } else {
-        if (!whatsappConfig.authToken) {
-          showMessage('Auth Token e obrigatorio na primeira configuracao', 'error')
-          setSaving(false)
-          return
-        }
-        configData.twilio_auth_token_encrypted = whatsappConfig.authToken
-        configData.created_at = new Date().toISOString()
-        await supabase.from('whatsapp_config').insert(configData)
-      }
-
-      setWhatsappConfig(prev => ({ ...prev, authToken: '', ativo: true }))
-      showMessage('Configuracao WhatsApp guardada com sucesso!')
-    } catch (err) {
-      console.error('Erro ao guardar config WhatsApp:', err)
-      showMessage('Erro ao guardar configuracao', 'error')
     } finally {
       setSaving(false)
     }
@@ -400,104 +316,6 @@ export default function Configuracoes() {
     </div>
   )
 
-  const renderIntegracoesTab = () => (
-    <div className="flex flex-col gap-lg">
-      <div className="card">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-          <Phone size={24} style={{ color: '#25D366' }} />
-          <div>
-            <h3 style={{ margin: 0, fontWeight: 600 }}>WhatsApp Business (Twilio)</h3>
-            <span className="text-muted" style={{ fontSize: '12px' }}>
-              {whatsappConfig.ativo ? 'Conectado' : 'Nao configurado'}
-            </span>
-          </div>
-          {whatsappConfig.ativo && (
-            <span className="badge" style={{ marginLeft: 'auto', background: 'rgba(37, 211, 102, 0.15)', color: '#25D366' }}>
-              Ativo
-            </span>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-md">
-          <div className="input-group">
-            <label className="input-label">Account SID</label>
-            <input
-              type="text"
-              className="input"
-              placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-              value={whatsappConfig.accountSid}
-              onChange={(e) => setWhatsappConfig(prev => ({ ...prev, accountSid: e.target.value }))}
-              style={{ fontFamily: 'monospace' }}
-            />
-          </div>
-
-          <div className="input-group">
-            <label className="input-label">Auth Token {whatsappConfig.ativo && '(deixar vazio para manter)'}</label>
-            <div style={{ position: 'relative' }}>
-              <input
-                type={showAuthToken ? 'text' : 'password'}
-                className="input"
-                placeholder={whatsappConfig.ativo ? '••••••••••••••••' : 'Auth Token'}
-                value={whatsappConfig.authToken}
-                onChange={(e) => setWhatsappConfig(prev => ({ ...prev, authToken: e.target.value }))}
-                style={{ fontFamily: 'monospace', paddingRight: '40px' }}
-              />
-              <button
-                type="button"
-                onClick={() => setShowAuthToken(!showAuthToken)}
-                style={{
-                  position: 'absolute',
-                  right: '12px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--brown-light)'
-                }}
-              >
-                {showAuthToken ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
-          </div>
-
-          <div className="input-group">
-            <label className="input-label">Numero WhatsApp (Twilio)</label>
-            <input
-              type="text"
-              className="input"
-              placeholder="+14155238886"
-              value={whatsappConfig.phoneNumber}
-              onChange={(e) => setWhatsappConfig(prev => ({ ...prev, phoneNumber: e.target.value }))}
-              style={{ fontFamily: 'monospace' }}
-            />
-          </div>
-        </div>
-
-        <div style={{
-          marginTop: '16px',
-          padding: '12px',
-          background: 'rgba(201, 168, 130, 0.15)',
-          borderRadius: 'var(--radius-md)',
-          fontSize: '12px',
-          color: 'var(--brown-dark)'
-        }}>
-          <strong>Webhook URL:</strong>
-          <code style={{ display: 'block', marginTop: '4px', wordBreak: 'break-all' }}>
-            https://vctcppuvqjstscbzdykn.supabase.co/functions/v1/twilio-webhook
-          </code>
-        </div>
-
-        <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end' }}>
-          <button className="btn btn-primary" onClick={handleSaveWhatsapp} disabled={saving}>
-            {saving ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={16} />}
-            Guardar Configuracao
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-
   const renderSegurancaTab = () => (
     <div className="flex flex-col gap-lg">
       <div className="card">
@@ -564,7 +382,6 @@ export default function Configuracoes() {
       case 'perfil': return renderPerfilTab()
       case 'notificacoes': return renderNotificacoesTab()
       case 'aparencia': return renderAparenciaTab()
-      case 'integracoes': return renderIntegracoesTab()
       case 'seguranca': return renderSegurancaTab()
       default: return null
     }

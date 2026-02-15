@@ -145,9 +145,6 @@
 | `chat_canais` | Canais de chat |
 | `chat_mensagens` | Mensagens de chat |
 | `notificacoes` | Notificações |
-| `whatsapp_config` | Configuração WhatsApp |
-| `whatsapp_contactos` | Contactos WhatsApp |
-| `whatsapp_mensagens` | Mensagens WhatsApp |
 | `email_config` | Configuração de email |
 
 ---

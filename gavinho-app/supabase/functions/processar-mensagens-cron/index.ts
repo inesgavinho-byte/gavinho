@@ -1,4 +1,4 @@
-// Supabase Edge Function para processamento automático de mensagens com IA
+// Supabase Edge Function para processamento automático de emails com IA
 // Deploy: supabase functions deploy processar-mensagens-cron
 // Chamada via cron ou webhook para processamento periódico
 
@@ -60,18 +60,12 @@ Exemplo de resposta:
 
 // Configuração de processamento
 const CONFIG = {
-  BATCH_SIZE_WHATSAPP: 20,
   BATCH_SIZE_EMAIL: 10,
   MAX_RETRIES: 3,
   RETRY_DELAY_MS: 1000,
 }
 
 interface ProcessingResult {
-  whatsapp: {
-    processed: number
-    suggestions: number
-    errors: number
-  }
   email: {
     processed: number
     suggestions: number
@@ -113,18 +107,11 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     const result: ProcessingResult = {
-      whatsapp: { processed: 0, suggestions: 0, errors: 0 },
       email: { processed: 0, suggestions: 0, errors: 0 },
       duration_ms: 0,
     }
 
-    // 1. Processar mensagens WhatsApp
-    const whatsappResult = await processarMensagensWhatsApp(
-      supabase, anthropicApiKey, openaiApiKey
-    )
-    result.whatsapp = whatsappResult
-
-    // 2. Processar emails
+    // Processar emails
     const emailResult = await processarEmails(
       supabase, anthropicApiKey, openaiApiKey
     )
@@ -132,7 +119,7 @@ serve(async (req) => {
 
     result.duration_ms = Date.now() - startTime
 
-    // 3. Registar execução no log
+    // Registar execução no log
     await registarExecucao(supabase, result)
 
 
@@ -140,7 +127,7 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         ...result,
-        message: `Processadas ${result.whatsapp.processed} mensagens WhatsApp e ${result.email.processed} emails`,
+        message: `Processados ${result.email.processed} emails`,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
@@ -152,77 +139,6 @@ serve(async (req) => {
     )
   }
 })
-
-// Processar mensagens WhatsApp não processadas
-async function processarMensagensWhatsApp(
-  supabase: any,
-  anthropicApiKey: string | undefined,
-  openaiApiKey: string | undefined
-) {
-  const result = { processed: 0, suggestions: 0, errors: 0 }
-
-  const { data: mensagens, error: fetchError } = await supabase
-    .from('whatsapp_mensagens')
-    .select('id, conteudo, obra_id, autor_nome, created_at, telefone_origem')
-    .eq('processada_ia', false)
-    .eq('tipo', 'recebida')
-    .not('conteudo', 'is', null)
-    .order('created_at', { ascending: true })
-    .limit(CONFIG.BATCH_SIZE_WHATSAPP)
-
-  if (fetchError) {
-    console.error('Erro ao buscar mensagens WhatsApp:', fetchError)
-    throw fetchError
-  }
-
-  if (!mensagens || mensagens.length === 0) {
-    return result
-  }
-
-
-  for (const mensagem of mensagens) {
-    try {
-      const sugestoes = await analisarMensagem(
-        mensagem.conteudo,
-        anthropicApiKey,
-        openaiApiKey
-      )
-
-      // Guardar sugestões
-      for (const sugestao of sugestoes) {
-        const { error: insertError } = await supabase
-          .from('ia_sugestoes')
-          .insert({
-            mensagem_id: mensagem.id,
-            obra_id: mensagem.obra_id,
-            tipo: sugestao.tipo,
-            dados: sugestao.dados,
-            texto_original: mensagem.conteudo,
-            confianca: sugestao.confianca || 0.8,
-            status: 'pendente',
-            fonte: 'whatsapp',
-          })
-
-        if (!insertError) {
-          result.suggestions++
-        }
-      }
-
-      // Marcar como processada
-      await supabase
-        .from('whatsapp_mensagens')
-        .update({ processada_ia: true })
-        .eq('id', mensagem.id)
-
-      result.processed++
-    } catch (error) {
-      console.error(`Erro ao processar mensagem ${mensagem.id}:`, error)
-      result.errors++
-    }
-  }
-
-  return result
-}
 
 // Processar emails não processados
 async function processarEmails(
@@ -498,14 +414,11 @@ async function registarExecucao(supabase: any, result: ProcessingResult) {
   try {
     await supabase.from('ia_processamento_log').insert({
       tipo: 'cron_automatico',
-      whatsapp_processadas: result.whatsapp.processed,
-      whatsapp_sugestoes: result.whatsapp.suggestions,
-      whatsapp_erros: result.whatsapp.errors,
       email_processadas: result.email.processed,
       email_sugestoes: result.email.suggestions,
       email_erros: result.email.errors,
       duracao_ms: result.duration_ms,
-      sucesso: result.whatsapp.errors === 0 && result.email.errors === 0,
+      sucesso: result.email.errors === 0,
     })
   } catch (error) {
     // Ignorar erro se tabela de log não existir

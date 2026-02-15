@@ -1,10 +1,9 @@
 # Processamento Automatico de IA
 
-Edge Function para processamento automatico de mensagens (WhatsApp e Email) com analise de IA.
+Edge Function para processamento automatico de emails com analise de IA.
 
 ## Funcionalidades
 
-- Processa mensagens WhatsApp nao analisadas
 - Processa emails nao analisados
 - Gera sugestoes automaticas (requisicoes, tarefas, nao-conformidades, etc.)
 - Suporta Claude (Anthropic) e OpenAI como backends de IA
@@ -85,7 +84,7 @@ Se pg_cron estiver habilitado no Supabase:
 SELECT * FROM v_ia_processamento_stats;
 ```
 
-### Ver mensagens pendentes
+### Ver emails pendentes
 
 ```sql
 SELECT * FROM v_ia_mensagens_pendentes;
@@ -132,18 +131,13 @@ curl -X POST http://localhost:54321/functions/v1/processar-mensagens-cron \
 ```json
 {
   "success": true,
-  "whatsapp": {
-    "processed": 15,
-    "suggestions": 8,
-    "errors": 0
-  },
   "email": {
     "processed": 5,
     "suggestions": 3,
     "errors": 0
   },
   "duration_ms": 2340,
-  "message": "Processadas 15 mensagens WhatsApp e 5 emails"
+  "message": "Processados 5 emails"
 }
 ```
 
@@ -163,16 +157,15 @@ curl -X POST http://localhost:54321/functions/v1/processar-mensagens-cron \
 
 1. Verificar se CRON_SECRET esta definido
 2. Verificar logs: `supabase functions logs processar-mensagens-cron`
-3. Verificar se ha mensagens pendentes: `SELECT * FROM v_ia_mensagens_pendentes`
+3. Verificar se ha emails pendentes: `SELECT * FROM v_ia_mensagens_pendentes`
 
 ### Sem sugestoes geradas
 
 1. Verificar se API keys de IA estao definidas
-2. Verificar conteudo das mensagens (podem nao ter info relevante)
+2. Verificar conteudo dos emails (podem nao ter info relevante)
 3. Funcao usa fallback de palavras-chave se IA indisponivel
 
 ### Muitos erros
 
 1. Verificar limites de API (rate limiting)
 2. Aumentar intervalo: `UPDATE ia_cron_config SET intervalo_minutos = 10`
-3. Reduzir batch size: `UPDATE ia_cron_config SET batch_size_whatsapp = 10`
