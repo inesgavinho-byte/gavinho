@@ -14,7 +14,7 @@ interface CriarAcaoRequest {
   tipo_acao: 'tarefa' | 'incidente' | 'confirmacao' | 'evento' | 'evidencia'
   titulo: string
   descricao?: string
-  origem_tipo: 'whatsapp' | 'email' | 'manual' | 'ia_sugestao' | 'sistema'
+  origem_tipo: 'email' | 'manual' | 'ia_sugestao' | 'sistema'
   origem_mensagem_id?: string
   origem_sugestao_id?: string
   responsavel_nome?: string

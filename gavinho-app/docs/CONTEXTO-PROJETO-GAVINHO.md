@@ -118,7 +118,7 @@ gavinho-app/
 - Lista de obras com timeline visual
 - Detalhe com tabs organizadas em grupos colapsáveis:
   - **Resumo**: Dashboard da obra
-  - **Comunicação**: Email, WhatsApp, Chat
+  - **Comunicação**: Email, Chat
   - **Planeamento**: Calendário, Tracking
   - **Acompanhamento**: Fotografias, Relatórios, Não Conformidades
   - **Gestão**: Licenças, Orçamentação, Autos
@@ -137,7 +137,6 @@ gavinho-app/
 
 **Páginas**: `ObraComunicacoes.jsx`, `ChatObras.jsx`, `ChatProjetos.jsx`
 
-- Integração WhatsApp via Twilio
 - Email tracking
 - Chat interno colaborativo
 
@@ -228,7 +227,6 @@ concelho_prompts (id, concelho_id, codigo, titulo, prompt_sistema)
 
 ```sql
 comunicacoes (id, obra_id, projeto_id, tipo, origem, conteudo, remetente)
-whatsapp_config (twilio_account_sid, twilio_auth_token_encrypted)
 mensagens_processadas (id, comunicacao_id, resumo_ia, tags_extraidas)
 ```
 
@@ -249,13 +247,9 @@ design_review_itens (id, sessao_id, ficheiro_url, anotacoes)
 |--------|-----------|
 | `analisar-viabilidade` | Análise IA de viabilidade urbanística |
 | `viabilidade-chat` | Chat com assistente IA de viabilidade |
-| `analisar-mensagens` | Processamento IA de comunicações |
 | `analisar-escopo` | Análise de escopo de trabalho |
 | `email-send` | Envio de emails (SendGrid) |
 | `email-webhook` | Receção de emails |
-| `twilio-send` | Envio WhatsApp |
-| `twilio-webhook` | Receção WhatsApp |
-| `twilio-conversations` | Gestão de conversas |
 | `obra-acoes` | Ações automatizadas de obra |
 | `outlook-sync` | Sincronização Outlook |
 | `processar-mensagens-cron` | Processamento batch de mensagens |
@@ -387,7 +381,7 @@ SENDGRID_API_KEY=SG...
 - [x] Entregáveis com versionamento
 - [x] Design Review com anotações
 - [x] Viabilidade Urbanística (Sintra)
-- [x] Comunicações (WhatsApp, Email)
+- [x] Comunicações (Email)
 - [x] Diário de Bordo
 - [x] Decision Log
 - [x] Gestão de Equipa

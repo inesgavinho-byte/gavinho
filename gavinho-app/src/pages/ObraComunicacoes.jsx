@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../components/ui/Toast'
 import {
-  ArrowLeft, MessageSquare, Mail, Phone, Filter, Search, Plus, Clock,
+  ArrowLeft, MessageSquare, Mail, Filter, Search, Plus, Clock,
   AlertTriangle, CheckCircle2, Calendar, FileText, Paperclip, Users,
   Building, Truck, Wind, Hammer, Package, Shield, DollarSign, MoreHorizontal,
   Send, ChevronRight, ChevronDown, X, Check, Loader2, RefreshCw,
@@ -254,7 +254,6 @@ export default function ObraComunicacoes() {
 
   const getItemIcon = (tipo) => {
     switch (tipo) {
-      case 'whatsapp_mensagem': return Phone
       case 'email': return Mail
       case 'acao_tarefa': return ClipboardList
       case 'acao_incidente': return AlertTriangle
@@ -268,7 +267,6 @@ export default function ObraComunicacoes() {
 
   const getItemColor = (tipo) => {
     switch (tipo) {
-      case 'whatsapp_mensagem': return '#25D366'
       case 'email': return '#3B82F6'
       case 'acao_tarefa': return '#8B5CF6'
       case 'acao_incidente': return '#EF4444'
@@ -465,7 +463,6 @@ export default function ObraComunicacoes() {
           }}
         >
           <option value="todos">Todos os tipos</option>
-          <option value="whatsapp_mensagem">WhatsApp</option>
           <option value="email">Email</option>
           <option value="acao_tarefa">Tarefas</option>
           <option value="acao_incidente">Incidentes</option>
@@ -882,7 +879,6 @@ export default function ObraComunicacoes() {
                             )}
                             {acao.origem_tipo && (
                               <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#9CA3AF' }}>
-                                {acao.origem_tipo === 'whatsapp' && <Phone style={{ width: 12, height: 12 }} />}
                                 {acao.origem_tipo === 'email' && <Mail style={{ width: 12, height: 12 }} />}
                                 {acao.origem_tipo === 'ia_sugestao' && <Bot style={{ width: 12, height: 12 }} />}
                                 {acao.origem_tipo === 'manual' && <Users style={{ width: 12, height: 12 }} />}
