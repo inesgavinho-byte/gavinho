@@ -9,7 +9,7 @@ import { RenderModal, ImageLightbox } from '../modals'
 import { useArchvizRenders } from '../../../hooks/useArchvizRenders'
 import styles from '../../../pages/ProjetoDetalhe.module.css'
 
-const MoleskineDigital = lazy(() => import('../../MoleskineDigital'))
+const MoleskineDigital = lazy(() => import('../../MoleskineDigital/index'))
 
 const LazyFallback = () => (
   <div className={styles.loadingContainer}>
