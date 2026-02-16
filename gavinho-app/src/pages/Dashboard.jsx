@@ -28,6 +28,16 @@ import {
   PendingApprovalsWidget,
   UnreadMessagesWidget
 } from '../components/DashboardWidgets'
+import {
+  FONTS,
+  FONT_SIZES,
+  FONT_WEIGHTS,
+  COLORS,
+  SPACING,
+  RADIUS,
+  SHADOWS,
+  KPI_ACCENTS,
+} from '../styles/designTokens'
 
 export default function Dashboard() {
   const navigate = useNavigate()
@@ -211,13 +221,13 @@ export default function Dashboard() {
           <div style={{
             width: '48px',
             height: '48px',
-            border: '3px solid var(--stone)',
-            borderTopColor: 'var(--accent-olive)',
+            border: `3px solid ${COLORS.border}`,
+            borderTopColor: COLORS.accent,
             borderRadius: '50%',
             animation: 'spin 1s linear infinite',
             margin: '0 auto 16px'
           }}></div>
-          <p style={{ color: 'var(--text-secondary)' }}>A carregar dashboard...</p>
+          <p style={{ color: COLORS.textSecondary, fontFamily: FONTS.body }}>A carregar dashboard...</p>
         </div>
       </div>
     )
@@ -237,8 +247,9 @@ export default function Dashboard() {
         <div>
           <p style={{
             fontSize: '14px',
-            color: 'var(--accent-olive)',
+            color: COLORS.accent,
             fontWeight: '600',
+            fontFamily: FONTS.body,
             marginBottom: '4px',
             letterSpacing: '0.5px',
             textTransform: 'uppercase'
@@ -246,17 +257,19 @@ export default function Dashboard() {
             {getGreeting()}{getFirstName() ? `, ${getFirstName()}` : ''}
           </p>
           <h1 style={{
+            fontFamily: FONTS.heading,
             fontSize: '32px',
             fontWeight: '700',
             letterSpacing: '-0.5px',
-            color: 'var(--brown)',
+            color: COLORS.textPrimary,
             margin: 0
           }}>
             Dashboard
           </h1>
           <p style={{
             fontSize: '14px',
-            color: 'var(--brown-light)',
+            fontFamily: FONTS.body,
+            color: COLORS.textSecondary,
             marginTop: '4px'
           }}>
             Visão geral da GAVINHO Group
@@ -281,16 +294,16 @@ export default function Dashboard() {
       }}>
         {/* Projetos Ativos */}
         <div style={{
-          background: 'linear-gradient(135deg, #F8F6F0 0%, #F0EDE4 100%)',
+          background: KPI_ACCENTS.olive.gradient,
           borderRadius: '20px',
           padding: '24px',
-          border: '1px solid var(--stone)',
+          border: `1px solid ${COLORS.border}`,
           position: 'relative',
           overflow: 'hidden',
           cursor: 'pointer',
           transition: 'all 0.3s ease'
         }}
-          onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)' }}
+          onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = SHADOWS.md }}
           onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none' }}
           onClick={() => navigate('/projetos')}
         >
@@ -304,39 +317,39 @@ export default function Dashboard() {
             background: 'rgba(122, 139, 110, 0.06)'
           }} />
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-            <span style={{ fontSize: '13px', color: 'var(--brown-light)', fontWeight: '500' }}>Projetos Ativos</span>
+            <span style={{ fontSize: '13px', color: COLORS.textSecondary, fontWeight: '500', fontFamily: FONTS.body }}>Projetos Ativos</span>
             <div style={{
               width: '40px',
               height: '40px',
               borderRadius: '12px',
-              background: 'rgba(122, 139, 110, 0.12)',
+              background: KPI_ACCENTS.olive.bg,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
             }}>
-              <FolderKanban size={20} style={{ color: 'var(--accent-olive)' }} />
+              <FolderKanban size={20} style={{ color: COLORS.accent }} />
             </div>
           </div>
-          <div style={{ fontSize: '36px', fontWeight: '700', color: 'var(--brown)', lineHeight: 1, letterSpacing: '-1px' }}>
+          <div style={{ fontFamily: FONTS.heading, fontSize: '36px', fontWeight: '700', color: COLORS.textPrimary, lineHeight: 1, letterSpacing: '-1px' }}>
             {stats.projetosAtivos}
           </div>
-          <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginTop: '6px' }}>
+          <div style={{ fontSize: '12px', fontFamily: FONTS.body, color: COLORS.textSecondary, marginTop: '6px' }}>
             {stats.totalProjetos} total
           </div>
         </div>
 
         {/* Pipeline Total */}
         <div style={{
-          background: 'linear-gradient(135deg, #F8F5EE 0%, #F2EDDF 100%)',
+          background: KPI_ACCENTS.gold.gradient,
           borderRadius: '20px',
           padding: '24px',
-          border: '1px solid var(--stone)',
+          border: `1px solid ${COLORS.border}`,
           position: 'relative',
           overflow: 'hidden',
           cursor: 'pointer',
           transition: 'all 0.3s ease'
         }}
-          onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)' }}
+          onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = SHADOWS.md }}
           onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none' }}
         >
           <div style={{
@@ -349,39 +362,39 @@ export default function Dashboard() {
             background: 'rgba(201, 168, 108, 0.06)'
           }} />
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-            <span style={{ fontSize: '13px', color: 'var(--brown-light)', fontWeight: '500' }}>Pipeline Total</span>
+            <span style={{ fontSize: '13px', color: COLORS.textSecondary, fontWeight: '500', fontFamily: FONTS.body }}>Pipeline Total</span>
             <div style={{
               width: '40px',
               height: '40px',
               borderRadius: '12px',
-              background: 'rgba(201, 168, 108, 0.12)',
+              background: KPI_ACCENTS.gold.bg,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
             }}>
-              <Euro size={20} style={{ color: 'var(--warning)' }} />
+              <Euro size={20} style={{ color: COLORS.warning }} />
             </div>
           </div>
-          <div style={{ fontSize: '36px', fontWeight: '700', color: 'var(--brown)', lineHeight: 1, letterSpacing: '-1px' }}>
+          <div style={{ fontFamily: FONTS.heading, fontSize: '36px', fontWeight: '700', color: COLORS.textPrimary, lineHeight: 1, letterSpacing: '-1px' }}>
             {formatCurrency(stats.pipelineTotal)}
           </div>
-          <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginTop: '6px' }}>
+          <div style={{ fontSize: '12px', fontFamily: FONTS.body, color: COLORS.textSecondary, marginTop: '6px' }}>
             valor contratado
           </div>
         </div>
 
         {/* Clientes */}
         <div style={{
-          background: 'linear-gradient(135deg, #F5F7F9 0%, #EDF0F4 100%)',
+          background: KPI_ACCENTS.steel.gradient,
           borderRadius: '20px',
           padding: '24px',
-          border: '1px solid var(--stone)',
+          border: `1px solid ${COLORS.border}`,
           position: 'relative',
           overflow: 'hidden',
           cursor: 'pointer',
           transition: 'all 0.3s ease'
         }}
-          onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)' }}
+          onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = SHADOWS.md }}
           onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none' }}
         >
           <div style={{
@@ -394,38 +407,38 @@ export default function Dashboard() {
             background: 'rgba(122, 139, 158, 0.06)'
           }} />
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-            <span style={{ fontSize: '13px', color: 'var(--brown-light)', fontWeight: '500' }}>Clientes</span>
+            <span style={{ fontSize: '13px', color: COLORS.textSecondary, fontWeight: '500', fontFamily: FONTS.body }}>Clientes</span>
             <div style={{
               width: '40px',
               height: '40px',
               borderRadius: '12px',
-              background: 'rgba(122, 139, 158, 0.12)',
+              background: KPI_ACCENTS.steel.bg,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
             }}>
-              <Users size={20} style={{ color: 'var(--info)' }} />
+              <Users size={20} style={{ color: COLORS.info }} />
             </div>
           </div>
-          <div style={{ fontSize: '36px', fontWeight: '700', color: 'var(--brown)', lineHeight: 1, letterSpacing: '-1px' }}>
+          <div style={{ fontFamily: FONTS.heading, fontSize: '36px', fontWeight: '700', color: COLORS.textPrimary, lineHeight: 1, letterSpacing: '-1px' }}>
             {stats.totalClientes}
           </div>
-          <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginTop: '6px' }}>
+          <div style={{ fontSize: '12px', fontFamily: FONTS.body, color: COLORS.textSecondary, marginTop: '6px' }}>
             na base de dados
           </div>
         </div>
 
         {/* Progresso Médio */}
         <div style={{
-          background: 'linear-gradient(135deg, #F8F6F0 0%, #F0EDE4 100%)',
+          background: KPI_ACCENTS.olive.gradient,
           borderRadius: '20px',
           padding: '24px',
-          border: '1px solid var(--stone)',
+          border: `1px solid ${COLORS.border}`,
           position: 'relative',
           overflow: 'hidden',
           transition: 'all 0.3s ease'
         }}
-          onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)' }}
+          onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = SHADOWS.md }}
           onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none' }}
         >
           <div style={{
@@ -438,26 +451,26 @@ export default function Dashboard() {
             background: 'rgba(201, 168, 108, 0.06)'
           }} />
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-            <span style={{ fontSize: '13px', color: 'var(--brown-light)', fontWeight: '500' }}>Progresso Médio</span>
+            <span style={{ fontSize: '13px', color: COLORS.textSecondary, fontWeight: '500', fontFamily: FONTS.body }}>Progresso Médio</span>
             <div style={{
               width: '40px',
               height: '40px',
               borderRadius: '12px',
-              background: 'rgba(201, 168, 108, 0.12)',
+              background: KPI_ACCENTS.gold.bg,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
             }}>
-              <TrendingUp size={20} style={{ color: 'var(--warning)' }} />
+              <TrendingUp size={20} style={{ color: COLORS.warning }} />
             </div>
           </div>
-          <div style={{ fontSize: '36px', fontWeight: '700', color: 'var(--brown)', lineHeight: 1, letterSpacing: '-1px' }}>
+          <div style={{ fontFamily: FONTS.heading, fontSize: '36px', fontWeight: '700', color: COLORS.textPrimary, lineHeight: 1, letterSpacing: '-1px' }}>
             {stats.progressoMedio}%
           </div>
           <div style={{
             width: '100%',
             height: '4px',
-            background: 'var(--stone)',
+            background: COLORS.border,
             borderRadius: '2px',
             marginTop: '12px',
             overflow: 'hidden'
@@ -465,7 +478,7 @@ export default function Dashboard() {
             <div style={{
               width: `${stats.progressoMedio}%`,
               height: '100%',
-              background: 'linear-gradient(90deg, var(--warning), var(--accent-olive))',
+              background: `linear-gradient(90deg, ${COLORS.warning}, ${COLORS.accent})`,
               borderRadius: '2px',
               transition: 'width 1s ease'
             }} />
@@ -485,10 +498,10 @@ export default function Dashboard() {
           alignItems: 'center',
           gap: '14px',
           padding: '16px 20px',
-          background: 'var(--white)',
+          background: COLORS.bgCard,
           borderRadius: '16px',
-          border: '1px solid var(--stone)',
-          borderLeft: '4px solid var(--success)'
+          border: `1px solid ${COLORS.border}`,
+          borderLeft: `4px solid ${COLORS.success}`
         }}>
           <div style={{
             width: '42px',
@@ -500,13 +513,13 @@ export default function Dashboard() {
             justifyContent: 'center',
             flexShrink: 0
           }}>
-            <CheckCircle2 size={20} style={{ color: 'var(--success)' }} />
+            <CheckCircle2 size={20} style={{ color: COLORS.success }} />
           </div>
           <div>
-            <div style={{ fontSize: '26px', fontWeight: '700', color: 'var(--brown)', lineHeight: 1 }}>
+            <div style={{ fontFamily: FONTS.heading, fontSize: '26px', fontWeight: '700', color: COLORS.textPrimary, lineHeight: 1 }}>
               {stats.projetosAtivos - stats.projetosEmRisco}
             </div>
-            <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginTop: '2px' }}>Projetos no Prazo</div>
+            <div style={{ fontSize: '12px', fontFamily: FONTS.body, color: COLORS.textSecondary, marginTop: '2px' }}>Projetos no Prazo</div>
           </div>
         </div>
 
@@ -515,10 +528,10 @@ export default function Dashboard() {
           alignItems: 'center',
           gap: '14px',
           padding: '16px 20px',
-          background: 'var(--white)',
+          background: COLORS.bgCard,
           borderRadius: '16px',
-          border: '1px solid var(--stone)',
-          borderLeft: '4px solid var(--warning)'
+          border: `1px solid ${COLORS.border}`,
+          borderLeft: `4px solid ${COLORS.warning}`
         }}>
           <div style={{
             width: '42px',
@@ -530,13 +543,13 @@ export default function Dashboard() {
             justifyContent: 'center',
             flexShrink: 0
           }}>
-            <Clock size={20} style={{ color: 'var(--warning)' }} />
+            <Clock size={20} style={{ color: COLORS.warning }} />
           </div>
           <div>
-            <div style={{ fontSize: '26px', fontWeight: '700', color: 'var(--brown)', lineHeight: 1 }}>
+            <div style={{ fontFamily: FONTS.heading, fontSize: '26px', fontWeight: '700', color: COLORS.textPrimary, lineHeight: 1 }}>
               {stats.projetosEmProposta}
             </div>
-            <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginTop: '2px' }}>Em Proposta/Conceito</div>
+            <div style={{ fontSize: '12px', fontFamily: FONTS.body, color: COLORS.textSecondary, marginTop: '2px' }}>Em Proposta/Conceito</div>
           </div>
         </div>
 
@@ -545,10 +558,10 @@ export default function Dashboard() {
           alignItems: 'center',
           gap: '14px',
           padding: '16px 20px',
-          background: 'var(--white)',
+          background: COLORS.bgCard,
           borderRadius: '16px',
-          border: '1px solid var(--stone)',
-          borderLeft: '4px solid var(--error)'
+          border: `1px solid ${COLORS.border}`,
+          borderLeft: `4px solid ${COLORS.error}`
         }}>
           <div style={{
             width: '42px',
@@ -560,13 +573,13 @@ export default function Dashboard() {
             justifyContent: 'center',
             flexShrink: 0
           }}>
-            <AlertTriangle size={20} style={{ color: 'var(--error)' }} />
+            <AlertTriangle size={20} style={{ color: COLORS.error }} />
           </div>
           <div>
-            <div style={{ fontSize: '26px', fontWeight: '700', color: 'var(--brown)', lineHeight: 1 }}>
+            <div style={{ fontFamily: FONTS.heading, fontSize: '26px', fontWeight: '700', color: COLORS.textPrimary, lineHeight: 1 }}>
               {stats.projetosEmRisco}
             </div>
-            <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginTop: '2px' }}>Em Risco / Bloqueados</div>
+            <div style={{ fontSize: '12px', fontFamily: FONTS.body, color: COLORS.textSecondary, marginTop: '2px' }}>Em Risco / Bloqueados</div>
           </div>
         </div>
       </div>
@@ -583,9 +596,9 @@ export default function Dashboard() {
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 340px', gap: '20px', marginBottom: '24px' }}>
         {/* Recent Projects */}
         <div style={{
-          background: 'var(--white)',
+          background: COLORS.bgCard,
           borderRadius: '20px',
-          border: '1px solid var(--stone)',
+          border: `1px solid ${COLORS.border}`,
           overflow: 'hidden'
         }}>
           <div style={{
@@ -595,15 +608,15 @@ export default function Dashboard() {
             padding: '20px 24px 16px'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <BarChart3 size={18} style={{ color: 'var(--accent-olive)' }} />
-              <h3 style={{ fontSize: '17px', fontWeight: '600', color: 'var(--brown)', margin: 0 }}>
+              <BarChart3 size={18} style={{ color: COLORS.accent }} />
+              <h3 style={{ fontSize: '17px', fontWeight: '600', fontFamily: FONTS.body, color: COLORS.textPrimary, margin: 0 }}>
                 Projetos Recentes
               </h3>
             </div>
             <button
               className="btn btn-ghost btn-sm"
               onClick={() => navigate('/projetos')}
-              style={{ fontSize: '13px', color: 'var(--accent-olive)', fontWeight: '500' }}
+              style={{ fontSize: '13px', fontFamily: FONTS.body, color: COLORS.accent, fontWeight: '500' }}
             >
               Ver todos
               <ArrowRight size={14} style={{ marginLeft: '4px' }} />
@@ -617,14 +630,15 @@ export default function Dashboard() {
                 display: 'grid',
                 gridTemplateColumns: '100px 1fr 120px 130px 120px', minWidth: '590px',
                 padding: '10px 24px',
-                borderBottom: '1px solid var(--stone)',
-                background: 'var(--cream)'
+                borderBottom: `1px solid ${COLORS.border}`,
+                background: COLORS.bgCardHover
               }}>
                 {['Código', 'Nome', 'Fase', 'Progresso', 'Localização'].map(h => (
                   <span key={h} style={{
                     fontSize: '11px',
                     fontWeight: '600',
-                    color: 'var(--brown-light)',
+                    fontFamily: FONTS.body,
+                    color: COLORS.textSecondary,
                     textTransform: 'uppercase',
                     letterSpacing: '0.5px'
                   }}>
@@ -647,20 +661,21 @@ export default function Dashboard() {
                     borderBottom: idx < recentProjects.length - 1 ? '1px solid rgba(229, 226, 217, 0.5)' : 'none',
                     transition: 'background 0.15s ease'
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = 'var(--cream)'}
+                  onMouseEnter={(e) => e.currentTarget.style.background = COLORS.bgCardHover}
                   onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                 >
                   <span style={{
                     fontWeight: '600',
-                    color: 'var(--accent-olive)',
-                    fontFamily: "'SF Mono', 'Fira Code', monospace",
+                    color: COLORS.accent,
+                    fontFamily: FONTS.mono,
                     fontSize: '13px'
                   }}>
                     {project.codigo}
                   </span>
                   <span style={{
+                    fontFamily: FONTS.heading,
                     fontWeight: '500',
-                    color: 'var(--brown)',
+                    color: COLORS.textPrimary,
                     fontSize: '14px',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
@@ -675,6 +690,7 @@ export default function Dashboard() {
                     borderRadius: '20px',
                     fontSize: '11px',
                     fontWeight: '600',
+                    fontFamily: FONTS.body,
                     background: `${getFaseColor(project.fase)}18`,
                     color: getFaseColor(project.fase),
                     width: 'fit-content'
@@ -685,7 +701,7 @@ export default function Dashboard() {
                     <div style={{
                       width: '50px',
                       height: '6px',
-                      background: 'var(--stone)',
+                      background: COLORS.border,
                       borderRadius: '3px',
                       overflow: 'hidden'
                     }}>
@@ -697,20 +713,20 @@ export default function Dashboard() {
                         transition: 'width 0.5s ease'
                       }} />
                     </div>
-                    <span style={{ fontSize: '12px', color: 'var(--brown-light)', fontWeight: '500' }}>
+                    <span style={{ fontSize: '12px', fontFamily: FONTS.body, color: COLORS.textSecondary, fontWeight: '500' }}>
                       {project.progresso || 0}%
                     </span>
                   </div>
-                  <span style={{ color: 'var(--brown-light)', fontSize: '13px' }}>
+                  <span style={{ color: COLORS.textSecondary, fontFamily: FONTS.body, fontSize: '13px' }}>
                     {project.localizacao || '-'}
                   </span>
                 </div>
               ))}
             </div>
           ) : (
-            <div style={{ padding: '48px', textAlign: 'center', color: 'var(--brown-light)' }}>
+            <div style={{ padding: '48px', textAlign: 'center', color: COLORS.textSecondary }}>
               <FolderKanban size={48} style={{ opacity: 0.2, marginBottom: '16px' }} />
-              <p style={{ margin: '0 0 12px' }}>Nenhum projeto encontrado</p>
+              <p style={{ margin: '0 0 12px', fontFamily: FONTS.body }}>Nenhum projeto encontrado</p>
               <button className="btn btn-primary btn-sm" onClick={() => navigate('/projetos')}>
                 Criar Projeto
               </button>
@@ -720,16 +736,16 @@ export default function Dashboard() {
 
         {/* Phase Distribution */}
         <div style={{
-          background: 'var(--white)',
+          background: COLORS.bgCard,
           borderRadius: '20px',
-          border: '1px solid var(--stone)',
+          border: `1px solid ${COLORS.border}`,
           padding: '20px 24px',
           display: 'flex',
           flexDirection: 'column'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-            <Activity size={18} style={{ color: 'var(--accent-olive)' }} />
-            <h3 style={{ fontSize: '17px', fontWeight: '600', color: 'var(--brown)', margin: 0 }}>
+            <Activity size={18} style={{ color: COLORS.accent }} />
+            <h3 style={{ fontSize: '17px', fontWeight: '600', fontFamily: FONTS.body, color: COLORS.textPrimary, margin: 0 }}>
               Por Fase
             </h3>
           </div>
@@ -742,7 +758,7 @@ export default function Dashboard() {
               borderRadius: '4px',
               overflow: 'hidden',
               marginBottom: '20px',
-              background: 'var(--stone)'
+              background: COLORS.border
             }}>
               {projectsByPhase.map(({ fase, count }) => (
                 <div key={fase} style={{
@@ -762,12 +778,12 @@ export default function Dashboard() {
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   padding: '10px 14px',
-                  background: 'var(--cream)',
+                  background: COLORS.bgCardHover,
                   borderRadius: '12px',
                   transition: 'all 0.15s ease'
                 }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--stone)'; e.currentTarget.style.transform = 'translateX(4px)' }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--cream)'; e.currentTarget.style.transform = 'translateX(0)' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = COLORS.border; e.currentTarget.style.transform = 'translateX(4px)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = COLORS.bgCardHover; e.currentTarget.style.transform = 'translateX(0)' }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <div style={{
@@ -777,19 +793,20 @@ export default function Dashboard() {
                       background: getFaseColor(fase),
                       flexShrink: 0
                     }} />
-                    <span style={{ fontWeight: '500', fontSize: '13px', color: 'var(--brown)' }}>{fase}</span>
+                    <span style={{ fontWeight: '500', fontSize: '13px', fontFamily: FONTS.body, color: COLORS.textPrimary }}>{fase}</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{
                       fontSize: '11px',
-                      color: 'var(--brown-light)',
+                      fontFamily: FONTS.body,
+                      color: COLORS.textSecondary,
                       fontWeight: '500'
                     }}>
                       {Math.round((count / totalPhaseCount) * 100)}%
                     </span>
                     <span style={{
                       fontWeight: '700',
-                      color: 'var(--brown)',
+                      color: COLORS.textPrimary,
                       fontSize: '15px',
                       minWidth: '24px',
                       textAlign: 'right'
@@ -801,7 +818,7 @@ export default function Dashboard() {
               ))}
             </div>
           ) : (
-            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--brown-light)' }}>
+            <div style={{ padding: '24px', textAlign: 'center', color: COLORS.textSecondary, fontFamily: FONTS.body }}>
               Sem dados
             </div>
           )}
@@ -810,9 +827,9 @@ export default function Dashboard() {
 
       {/* Recent Activity */}
       <div style={{
-        background: 'var(--white)',
+        background: COLORS.bgCard,
         borderRadius: '20px',
-        border: '1px solid var(--stone)',
+        border: `1px solid ${COLORS.border}`,
         overflow: 'hidden'
       }}>
         <div style={{
@@ -822,15 +839,15 @@ export default function Dashboard() {
           padding: '20px 24px 16px'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <MessageSquare size={18} style={{ color: 'var(--accent-olive)' }} />
-            <h3 style={{ fontSize: '17px', fontWeight: '600', color: 'var(--brown)', margin: 0 }}>
+            <MessageSquare size={18} style={{ color: COLORS.accent }} />
+            <h3 style={{ fontSize: '17px', fontWeight: '600', fontFamily: FONTS.body, color: COLORS.textPrimary, margin: 0 }}>
               Últimos Desenvolvimentos
             </h3>
           </div>
           <button
             className="btn btn-ghost btn-sm"
             onClick={() => navigate('/workspace')}
-            style={{ fontSize: '13px', color: 'var(--accent-olive)', fontWeight: '500' }}
+            style={{ fontSize: '13px', fontFamily: FONTS.body, color: COLORS.accent, fontWeight: '500' }}
           >
             Ver todos
             <ArrowRight size={14} style={{ marginLeft: '4px' }} />
@@ -853,7 +870,7 @@ export default function Dashboard() {
                   background: activity.hasMention ? 'rgba(122, 139, 110, 0.04)' : 'transparent',
                   transition: 'background 0.15s ease'
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.background = activity.hasMention ? 'rgba(122, 139, 110, 0.08)' : 'var(--cream)'}
+                onMouseEnter={(e) => e.currentTarget.style.background = activity.hasMention ? 'rgba(122, 139, 110, 0.08)' : COLORS.bgCardHover}
                 onMouseLeave={(e) => e.currentTarget.style.background = activity.hasMention ? 'rgba(122, 139, 110, 0.04)' : 'transparent'}
               >
                 <div style={{
@@ -866,7 +883,8 @@ export default function Dashboard() {
                   justifyContent: 'center',
                   fontSize: '12px',
                   fontWeight: 600,
-                  color: 'var(--brown)',
+                  fontFamily: FONTS.body,
+                  color: COLORS.textPrimary,
                   flexShrink: 0
                 }}>
                   {getInitials(activity.autor.nome)}
@@ -874,7 +892,7 @@ export default function Dashboard() {
 
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
-                    <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--brown)' }}>
+                    <span style={{ fontWeight: 600, fontSize: '13px', fontFamily: FONTS.body, color: COLORS.textPrimary }}>
                       {activity.autor.nome}
                     </span>
                     {activity.hasMention && (
@@ -883,17 +901,18 @@ export default function Dashboard() {
                         alignItems: 'center',
                         gap: '3px',
                         padding: '2px 8px',
-                        background: 'var(--accent-olive)',
+                        background: COLORS.accent,
                         color: 'white',
                         borderRadius: '10px',
                         fontSize: '10px',
-                        fontWeight: 600
+                        fontWeight: 600,
+                        fontFamily: FONTS.body
                       }}>
                         <AtSign size={9} />
                         Menção
                       </span>
                     )}
-                    <span style={{ fontSize: '11px', color: 'var(--brown-light)', marginLeft: 'auto' }}>
+                    <span style={{ fontSize: '11px', fontFamily: FONTS.body, color: COLORS.textSecondary, marginLeft: 'auto' }}>
                       {formatRelativeTime(activity.created_at)}
                     </span>
                   </div>
@@ -901,7 +920,8 @@ export default function Dashboard() {
                   <p style={{
                     margin: 0,
                     fontSize: '13px',
-                    color: 'var(--brown-light)',
+                    fontFamily: FONTS.body,
+                    color: COLORS.textSecondary,
                     lineHeight: 1.4,
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
@@ -914,9 +934,9 @@ export default function Dashboard() {
             ))}
           </div>
         ) : (
-          <div style={{ padding: '40px', textAlign: 'center', color: 'var(--brown-light)' }}>
+          <div style={{ padding: '40px', textAlign: 'center', color: COLORS.textSecondary }}>
             <MessageSquare size={36} style={{ opacity: 0.2, marginBottom: '12px' }} />
-            <p style={{ margin: 0, fontSize: '14px' }}>Sem atividade recente</p>
+            <p style={{ margin: 0, fontSize: '14px', fontFamily: FONTS.body }}>Sem atividade recente</p>
           </div>
         )}
       </div>

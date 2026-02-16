@@ -17,6 +17,10 @@ import {
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import {
+  FONTS,
+  COLORS,
+} from '../styles/designTokens'
 
 // Widget: Alertas de Prazos Críticos (Tarefas a Vencer)
 export function CriticalDeadlinesWidget() {
@@ -119,7 +123,7 @@ export function CriticalDeadlinesWidget() {
       <div className="card-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <AlertTriangle size={20} style={{ color: stats.overdue > 0 ? 'var(--error)' : 'var(--warning)' }} />
-          <h3 className="card-title">Prazos Críticos</h3>
+          <h3 className="card-title" style={{ fontFamily: FONTS.body }}>Prazos Críticos</h3>
         </div>
         <button className="btn btn-ghost btn-sm" onClick={() => navigate('/tarefas')}>
           Ver todas <ArrowRight size={14} style={{ marginLeft: '4px' }} />
@@ -132,7 +136,7 @@ export function CriticalDeadlinesWidget() {
             width: '24px',
             height: '24px',
             border: '2px solid var(--stone)',
-            borderTopColor: 'var(--gold)',
+            borderTopColor: COLORS.gold,
             borderRadius: '50%',
             animation: 'spin 1s linear infinite',
             margin: '0 auto'
@@ -151,31 +155,33 @@ export function CriticalDeadlinesWidget() {
           }}>
             <div style={{ flex: 1, textAlign: 'center' }}>
               <div style={{
+                fontFamily: FONTS.heading,
                 fontSize: '20px',
                 fontWeight: '700',
                 color: stats.overdue > 0 ? 'var(--error)' : 'var(--text-secondary)'
               }}>
                 {stats.overdue}
               </div>
-              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Atrasadas</div>
+              <div style={{ fontSize: '11px', fontFamily: FONTS.body, color: 'var(--text-secondary)' }}>Atrasadas</div>
             </div>
             <div style={{ width: '1px', background: 'var(--stone)' }} />
             <div style={{ flex: 1, textAlign: 'center' }}>
               <div style={{
+                fontFamily: FONTS.heading,
                 fontSize: '20px',
                 fontWeight: '700',
                 color: stats.dueToday > 0 ? 'var(--warning)' : 'var(--text-secondary)'
               }}>
                 {stats.dueToday}
               </div>
-              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Hoje</div>
+              <div style={{ fontSize: '11px', fontFamily: FONTS.body, color: 'var(--text-secondary)' }}>Hoje</div>
             </div>
             <div style={{ width: '1px', background: 'var(--stone)' }} />
             <div style={{ flex: 1, textAlign: 'center' }}>
-              <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--info)' }}>
+              <div style={{ fontFamily: FONTS.heading, fontSize: '20px', fontWeight: '700', color: 'var(--info)' }}>
                 {stats.dueThisWeek}
               </div>
-              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Esta Semana</div>
+              <div style={{ fontSize: '11px', fontFamily: FONTS.body, color: 'var(--text-secondary)' }}>Esta Semana</div>
             </div>
           </div>
 
@@ -204,6 +210,7 @@ export function CriticalDeadlinesWidget() {
                     <div style={{
                       fontSize: '13px',
                       fontWeight: '500',
+                      fontFamily: FONTS.body,
                       color: 'var(--text-primary)',
                       whiteSpace: 'nowrap',
                       overflow: 'hidden',
@@ -212,7 +219,7 @@ export function CriticalDeadlinesWidget() {
                       {task.titulo}
                     </div>
                     {task.projetos && (
-                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                      <div style={{ fontSize: '11px', fontFamily: FONTS.body, color: 'var(--text-secondary)' }}>
                         {task.projetos.codigo}
                       </div>
                     )}
@@ -227,6 +234,7 @@ export function CriticalDeadlinesWidget() {
                     <span style={{
                       fontSize: '12px',
                       fontWeight: '600',
+                      fontFamily: FONTS.body,
                       color: task.isOverdue ? 'var(--error)' : task.isTodayDeadline ? 'var(--warning)' : 'var(--text-secondary)'
                     }}>
                       {formatDate(task.data_limite)}
@@ -238,7 +246,7 @@ export function CriticalDeadlinesWidget() {
           ) : (
             <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>
               <CheckCircle2 size={32} style={{ opacity: 0.3, marginBottom: '8px' }} />
-              <p style={{ margin: 0, fontSize: '13px' }}>Sem tarefas urgentes</p>
+              <p style={{ margin: 0, fontSize: '13px', fontFamily: FONTS.body }}>Sem tarefas urgentes</p>
             </div>
           )}
         </>
@@ -350,7 +358,7 @@ export function BudgetHealthWidget() {
       <div className="card-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <Euro size={20} style={{ color: 'var(--success)' }} />
-          <h3 className="card-title">Saúde Orçamental</h3>
+          <h3 className="card-title" style={{ fontFamily: FONTS.body }}>Saúde Orçamental</h3>
         </div>
         <button className="btn btn-ghost btn-sm" onClick={() => navigate('/orcamentos')}>
           Ver todos <ArrowRight size={14} style={{ marginLeft: '4px' }} />
@@ -363,7 +371,7 @@ export function BudgetHealthWidget() {
             width: '24px',
             height: '24px',
             border: '2px solid var(--stone)',
-            borderTopColor: 'var(--gold)',
+            borderTopColor: COLORS.gold,
             borderRadius: '50%',
             animation: 'spin 1s linear infinite',
             margin: '0 auto'
@@ -381,28 +389,29 @@ export function BudgetHealthWidget() {
             borderRadius: '10px'
           }}>
             <div style={{ flex: 1, textAlign: 'center' }}>
-              <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--success)' }}>
+              <div style={{ fontFamily: FONTS.heading, fontSize: '20px', fontWeight: '700', color: 'var(--success)' }}>
                 {stats.approved}
               </div>
-              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Aprovados</div>
+              <div style={{ fontSize: '11px', fontFamily: FONTS.body, color: 'var(--text-secondary)' }}>Aprovados</div>
             </div>
             <div style={{ width: '1px', background: 'var(--stone)' }} />
             <div style={{ flex: 1, textAlign: 'center' }}>
-              <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--info)' }}>
+              <div style={{ fontFamily: FONTS.heading, fontSize: '20px', fontWeight: '700', color: 'var(--info)' }}>
                 {stats.pending}
               </div>
-              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Pendentes</div>
+              <div style={{ fontSize: '11px', fontFamily: FONTS.body, color: 'var(--text-secondary)' }}>Pendentes</div>
             </div>
             <div style={{ width: '1px', background: 'var(--stone)' }} />
             <div style={{ flex: 1, textAlign: 'center' }}>
               <div style={{
+                fontFamily: FONTS.heading,
                 fontSize: '20px',
                 fontWeight: '700',
                 color: stats.atRisk > 0 ? 'var(--error)' : 'var(--text-secondary)'
               }}>
                 {stats.atRisk}
               </div>
-              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Em Risco</div>
+              <div style={{ fontSize: '11px', fontFamily: FONTS.body, color: 'var(--text-secondary)' }}>Em Risco</div>
             </div>
           </div>
 
@@ -433,6 +442,7 @@ export function BudgetHealthWidget() {
                       <div style={{
                         fontSize: '13px',
                         fontWeight: '500',
+                        fontFamily: FONTS.body,
                         color: 'var(--text-primary)',
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
@@ -441,7 +451,7 @@ export function BudgetHealthWidget() {
                         {budget.titulo || budget.codigo}
                       </div>
                       {budget.projetos && (
-                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                        <div style={{ fontSize: '11px', fontFamily: FONTS.body, color: 'var(--text-secondary)' }}>
                           {budget.projetos.codigo}
                         </div>
                       )}
@@ -451,6 +461,7 @@ export function BudgetHealthWidget() {
                       <span style={{
                         fontSize: '12px',
                         fontWeight: '600',
+                        fontFamily: FONTS.body,
                         color: 'var(--text-primary)'
                       }}>
                         {formatCurrency(budget.total)}
@@ -464,7 +475,7 @@ export function BudgetHealthWidget() {
           ) : (
             <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>
               <Euro size={32} style={{ opacity: 0.3, marginBottom: '8px' }} />
-              <p style={{ margin: 0, fontSize: '13px' }}>Sem orçamentos</p>
+              <p style={{ margin: 0, fontSize: '13px', fontFamily: FONTS.body }}>Sem orçamentos</p>
             </div>
           )}
         </>
@@ -546,7 +557,7 @@ export function PendingApprovalsWidget() {
       <div className="card-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <Package size={20} style={{ color: stats.urgent > 0 ? 'var(--warning)' : 'var(--info)' }} />
-          <h3 className="card-title">Aprovações Pendentes</h3>
+          <h3 className="card-title" style={{ fontFamily: FONTS.body }}>Aprovações Pendentes</h3>
         </div>
         <button className="btn btn-ghost btn-sm" onClick={() => navigate('/requisicoes')}>
           Ver todas <ArrowRight size={14} style={{ marginLeft: '4px' }} />
@@ -559,7 +570,7 @@ export function PendingApprovalsWidget() {
             width: '24px',
             height: '24px',
             border: '2px solid var(--stone)',
-            borderTopColor: 'var(--gold)',
+            borderTopColor: COLORS.gold,
             borderRadius: '50%',
             animation: 'spin 1s linear infinite',
             margin: '0 auto'
@@ -581,13 +592,14 @@ export function PendingApprovalsWidget() {
           }}>
             <div style={{ flex: 1 }}>
               <div style={{
+                fontFamily: FONTS.heading,
                 fontSize: '28px',
                 fontWeight: '700',
                 color: stats.pending > 0 ? 'var(--warning)' : 'var(--success)'
               }}>
                 {stats.pending}
               </div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+              <div style={{ fontSize: '12px', fontFamily: FONTS.body, color: 'var(--text-secondary)' }}>
                 Requisições Pendentes
               </div>
             </div>
@@ -601,7 +613,7 @@ export function PendingApprovalsWidget() {
                 borderRadius: '8px'
               }}>
                 <AlertTriangle size={16} style={{ color: 'var(--error)' }} />
-                <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--error)' }}>
+                <span style={{ fontSize: '14px', fontWeight: '600', fontFamily: FONTS.body, color: 'var(--error)' }}>
                   {stats.urgent} urgente{stats.urgent > 1 ? 's' : ''}
                 </span>
               </div>
@@ -634,6 +646,7 @@ export function PendingApprovalsWidget() {
                       <div style={{
                         fontSize: '13px',
                         fontWeight: '500',
+                        fontFamily: FONTS.body,
                         color: 'var(--text-primary)',
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
@@ -646,6 +659,7 @@ export function PendingApprovalsWidget() {
                         alignItems: 'center',
                         gap: '8px',
                         fontSize: '11px',
+                        fontFamily: FONTS.body,
                         color: 'var(--text-secondary)'
                       }}>
                         <span>{req.quantidade} {req.unidade}</span>
@@ -654,7 +668,7 @@ export function PendingApprovalsWidget() {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                       {req.valor_estimado && (
-                        <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                        <span style={{ fontSize: '12px', fontFamily: FONTS.body, color: 'var(--text-secondary)' }}>
                           {formatCurrency(req.valor_estimado)}
                         </span>
                       )}
@@ -663,6 +677,7 @@ export function PendingApprovalsWidget() {
                         borderRadius: '10px',
                         fontSize: '10px',
                         fontWeight: '600',
+                        fontFamily: FONTS.body,
                         background: urgencyInfo.color,
                         color: 'white'
                       }}>
@@ -676,7 +691,7 @@ export function PendingApprovalsWidget() {
           ) : (
             <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>
               <CheckCircle2 size={32} style={{ opacity: 0.3, marginBottom: '8px', color: 'var(--success)' }} />
-              <p style={{ margin: 0, fontSize: '13px' }}>Sem aprovações pendentes</p>
+              <p style={{ margin: 0, fontSize: '13px', fontFamily: FONTS.body }}>Sem aprovações pendentes</p>
             </div>
           )}
         </>
@@ -790,13 +805,14 @@ export function UnreadMessagesWidget() {
       <div className="card-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <MessageSquare size={20} style={{ color: stats.mentions > 0 ? 'var(--accent-olive)' : 'var(--info)' }} />
-          <h3 className="card-title">Mensagens</h3>
+          <h3 className="card-title" style={{ fontFamily: FONTS.body }}>Mensagens</h3>
           {stats.mentions > 0 && (
             <span style={{
               padding: '2px 8px',
               borderRadius: '10px',
               fontSize: '11px',
               fontWeight: '600',
+              fontFamily: FONTS.body,
               background: 'var(--accent-olive)',
               color: 'white'
             }}>
@@ -815,7 +831,7 @@ export function UnreadMessagesWidget() {
             width: '24px',
             height: '24px',
             border: '2px solid var(--stone)',
-            borderTopColor: 'var(--gold)',
+            borderTopColor: COLORS.gold,
             borderRadius: '50%',
             animation: 'spin 1s linear infinite',
             margin: '0 auto'
@@ -858,6 +874,7 @@ export function UnreadMessagesWidget() {
                     justifyContent: 'center',
                     fontSize: '11px',
                     fontWeight: 600,
+                    fontFamily: FONTS.body,
                     color: 'var(--brown-dark)',
                     flexShrink: 0
                   }}>
@@ -875,17 +892,19 @@ export function UnreadMessagesWidget() {
                       <span style={{
                         fontWeight: 600,
                         fontSize: '13px',
+                        fontFamily: FONTS.body,
                         color: 'var(--text-primary)'
                       }}>
                         {msg.autor_nome}
                       </span>
-                      <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                      <span style={{ fontSize: '11px', fontFamily: FONTS.body, color: 'var(--text-secondary)' }}>
                         {formatRelativeTime(msg.created_at)}
                       </span>
                     </div>
                     <p style={{
                       margin: 0,
                       fontSize: '12px',
+                      fontFamily: FONTS.body,
                       color: 'var(--text-secondary)',
                       lineHeight: 1.4,
                       whiteSpace: 'nowrap',
@@ -901,7 +920,7 @@ export function UnreadMessagesWidget() {
           ) : (
             <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>
               <CheckCircle2 size={32} style={{ opacity: 0.3, marginBottom: '8px', color: 'var(--success)' }} />
-              <p style={{ margin: 0, fontSize: '13px' }}>Sem mensagens novas</p>
+              <p style={{ margin: 0, fontSize: '13px', fontFamily: FONTS.body }}>Sem mensagens novas</p>
             </div>
           )}
         </>
