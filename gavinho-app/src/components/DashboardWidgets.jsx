@@ -17,6 +17,14 @@ import {
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import {
+  FONTS,
+  FONT_SIZES,
+  FONT_WEIGHTS,
+  COLORS,
+  SPACING,
+  RADIUS,
+} from '../styles/designTokens'
 
 // Widget: Alertas de Prazos Críticos (Tarefas a Vencer)
 export function CriticalDeadlinesWidget() {
@@ -103,36 +111,25 @@ export function CriticalDeadlinesWidget() {
     return date.toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' })
   }
 
-  const getPriorityColor = (prioridade) => {
-    switch (prioridade) {
-      case 'urgente': return 'var(--error)'
-      case 'alta': return 'var(--warning)'
-      case 'media': return 'var(--info)'
-      default: return 'var(--text-secondary)'
-    }
-  }
-
-  const totalAlerts = stats.overdue + stats.dueToday + stats.dueThisWeek
-
   return (
     <div className="card" style={{ height: '100%' }}>
       <div className="card-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <AlertTriangle size={20} style={{ color: stats.overdue > 0 ? 'var(--error)' : 'var(--warning)' }} />
-          <h3 className="card-title">Prazos Críticos</h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.md }}>
+          <AlertTriangle size={20} style={{ color: stats.overdue > 0 ? COLORS.error : COLORS.warning }} />
+          <h3 className="card-title" style={{ fontFamily: FONTS.body }}>Prazos Críticos</h3>
         </div>
         <button className="btn btn-ghost btn-sm" onClick={() => navigate('/tarefas')}>
-          Ver todas <ArrowRight size={14} style={{ marginLeft: '4px' }} />
+          Ver todas <ArrowRight size={14} style={{ marginLeft: SPACING.xs }} />
         </button>
       </div>
 
       {loading ? (
-        <div style={{ padding: '24px', textAlign: 'center' }}>
+        <div style={{ padding: SPACING.xl, textAlign: 'center' }}>
           <div style={{
             width: '24px',
             height: '24px',
-            border: '2px solid var(--stone)',
-            borderTopColor: 'var(--gold)',
+            border: `2px solid ${COLORS.border}`,
+            borderTopColor: COLORS.gold,
             borderRadius: '50%',
             animation: 'spin 1s linear infinite',
             margin: '0 auto'
@@ -143,45 +140,52 @@ export function CriticalDeadlinesWidget() {
           {/* Summary Stats */}
           <div style={{
             display: 'flex',
-            gap: '12px',
-            marginBottom: '16px',
-            padding: '12px',
-            background: 'var(--cream)',
-            borderRadius: '10px'
+            gap: SPACING.md,
+            marginBottom: SPACING.base,
+            padding: SPACING.md,
+            background: COLORS.bgCardHover,
+            borderRadius: RADIUS.sm
           }}>
             <div style={{ flex: 1, textAlign: 'center' }}>
               <div style={{
-                fontSize: '20px',
-                fontWeight: '700',
-                color: stats.overdue > 0 ? 'var(--error)' : 'var(--text-secondary)'
+                fontFamily: FONTS.heading,
+                fontSize: FONT_SIZES.xl,
+                fontWeight: FONT_WEIGHTS.bold,
+                color: stats.overdue > 0 ? COLORS.error : COLORS.textSecondary
               }}>
                 {stats.overdue}
               </div>
-              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Atrasadas</div>
+              <div style={{ fontSize: FONT_SIZES.xs, fontFamily: FONTS.body, color: COLORS.textSecondary }}>Atrasadas</div>
             </div>
-            <div style={{ width: '1px', background: 'var(--stone)' }} />
+            <div style={{ width: '1px', background: COLORS.border }} />
             <div style={{ flex: 1, textAlign: 'center' }}>
               <div style={{
-                fontSize: '20px',
-                fontWeight: '700',
-                color: stats.dueToday > 0 ? 'var(--warning)' : 'var(--text-secondary)'
+                fontFamily: FONTS.heading,
+                fontSize: FONT_SIZES.xl,
+                fontWeight: FONT_WEIGHTS.bold,
+                color: stats.dueToday > 0 ? COLORS.warning : COLORS.textSecondary
               }}>
                 {stats.dueToday}
               </div>
-              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Hoje</div>
+              <div style={{ fontSize: FONT_SIZES.xs, fontFamily: FONTS.body, color: COLORS.textSecondary }}>Hoje</div>
             </div>
-            <div style={{ width: '1px', background: 'var(--stone)' }} />
+            <div style={{ width: '1px', background: COLORS.border }} />
             <div style={{ flex: 1, textAlign: 'center' }}>
-              <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--info)' }}>
+              <div style={{
+                fontFamily: FONTS.heading,
+                fontSize: FONT_SIZES.xl,
+                fontWeight: FONT_WEIGHTS.bold,
+                color: COLORS.info
+              }}>
                 {stats.dueThisWeek}
               </div>
-              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Esta Semana</div>
+              <div style={{ fontSize: FONT_SIZES.xs, fontFamily: FONTS.body, color: COLORS.textSecondary }}>Esta Semana</div>
             </div>
           </div>
 
           {/* Task List */}
           {tasks.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: SPACING.sm }}>
               {tasks.map(task => (
                 <div
                   key={task.id}
@@ -189,22 +193,23 @@ export function CriticalDeadlinesWidget() {
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '12px',
-                    padding: '10px 12px',
-                    background: task.isOverdue ? 'rgba(184, 138, 138, 0.1)' : 'transparent',
-                    borderRadius: '8px',
+                    gap: SPACING.md,
+                    padding: `${SPACING.md} ${SPACING.md}`,
+                    background: task.isOverdue ? COLORS.errorBg : 'transparent',
+                    borderRadius: RADIUS.sm,
                     cursor: 'pointer',
-                    borderLeft: `3px solid ${task.isOverdue ? 'var(--error)' : task.isTodayDeadline ? 'var(--warning)' : 'var(--info)'}`,
+                    borderLeft: `3px solid ${task.isOverdue ? COLORS.error : task.isTodayDeadline ? COLORS.warning : COLORS.info}`,
                     transition: 'background 0.15s'
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = 'var(--cream)'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = task.isOverdue ? 'rgba(184, 138, 138, 0.1)' : 'transparent'}
+                  onMouseEnter={(e) => e.currentTarget.style.background = COLORS.bgCardHover}
+                  onMouseLeave={(e) => e.currentTarget.style.background = task.isOverdue ? COLORS.errorBg : 'transparent'}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{
-                      fontSize: '13px',
-                      fontWeight: '500',
-                      color: 'var(--text-primary)',
+                      fontSize: FONT_SIZES.base,
+                      fontWeight: FONT_WEIGHTS.medium,
+                      fontFamily: FONTS.body,
+                      color: COLORS.textPrimary,
                       whiteSpace: 'nowrap',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis'
@@ -212,7 +217,7 @@ export function CriticalDeadlinesWidget() {
                       {task.titulo}
                     </div>
                     {task.projetos && (
-                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                      <div style={{ fontSize: FONT_SIZES.xs, fontFamily: FONTS.body, color: COLORS.textSecondary }}>
                         {task.projetos.codigo}
                       </div>
                     )}
@@ -220,14 +225,15 @@ export function CriticalDeadlinesWidget() {
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '6px',
+                    gap: SPACING.sm,
                     flexShrink: 0
                   }}>
-                    <Clock size={12} style={{ color: task.isOverdue ? 'var(--error)' : 'var(--text-secondary)' }} />
+                    <Clock size={12} style={{ color: task.isOverdue ? COLORS.error : COLORS.textSecondary }} />
                     <span style={{
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      color: task.isOverdue ? 'var(--error)' : task.isTodayDeadline ? 'var(--warning)' : 'var(--text-secondary)'
+                      fontSize: FONT_SIZES.sm,
+                      fontWeight: FONT_WEIGHTS.semibold,
+                      fontFamily: FONTS.body,
+                      color: task.isOverdue ? COLORS.error : task.isTodayDeadline ? COLORS.warning : COLORS.textSecondary
                     }}>
                       {formatDate(task.data_limite)}
                     </span>
@@ -236,9 +242,9 @@ export function CriticalDeadlinesWidget() {
               ))}
             </div>
           ) : (
-            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-              <CheckCircle2 size={32} style={{ opacity: 0.3, marginBottom: '8px' }} />
-              <p style={{ margin: 0, fontSize: '13px' }}>Sem tarefas urgentes</p>
+            <div style={{ padding: SPACING.xl, textAlign: 'center', color: COLORS.textSecondary }}>
+              <CheckCircle2 size={32} style={{ opacity: 0.3, marginBottom: SPACING.sm }} />
+              <p style={{ margin: 0, fontSize: FONT_SIZES.base, fontFamily: FONTS.body }}>Sem tarefas urgentes</p>
             </div>
           )}
         </>
@@ -327,43 +333,43 @@ export function BudgetHealthWidget() {
 
   const getStatusInfo = (status) => {
     switch (status) {
-      case 'aprovado': return { label: 'Aprovado', color: 'var(--success)', icon: CheckCircle2 }
-      case 'enviado': return { label: 'Enviado', color: 'var(--info)', icon: Clock }
-      case 'rascunho': return { label: 'Rascunho', color: 'var(--text-secondary)', icon: FileCheck }
-      case 'rejeitado': return { label: 'Rejeitado', color: 'var(--error)', icon: XCircle }
-      case 'expirado': return { label: 'Expirado', color: 'var(--warning)', icon: AlertCircle }
-      default: return { label: status, color: 'var(--text-secondary)', icon: FileCheck }
+      case 'aprovado': return { label: 'Aprovado', color: COLORS.success, icon: CheckCircle2 }
+      case 'enviado': return { label: 'Enviado', color: COLORS.info, icon: Clock }
+      case 'rascunho': return { label: 'Rascunho', color: COLORS.textSecondary, icon: FileCheck }
+      case 'rejeitado': return { label: 'Rejeitado', color: COLORS.error, icon: XCircle }
+      case 'expirado': return { label: 'Expirado', color: COLORS.warning, icon: AlertCircle }
+      default: return { label: status, color: COLORS.textSecondary, icon: FileCheck }
     }
   }
 
   const getHealthIcon = (health) => {
     switch (health) {
-      case 'over': return <TrendingUp size={14} style={{ color: 'var(--error)' }} />
-      case 'attention': return <TrendingUp size={14} style={{ color: 'var(--warning)' }} />
-      case 'under': return <TrendingDown size={14} style={{ color: 'var(--info)' }} />
-      default: return <CheckCircle2 size={14} style={{ color: 'var(--success)' }} />
+      case 'over': return <TrendingUp size={14} style={{ color: COLORS.error }} />
+      case 'attention': return <TrendingUp size={14} style={{ color: COLORS.warning }} />
+      case 'under': return <TrendingDown size={14} style={{ color: COLORS.info }} />
+      default: return <CheckCircle2 size={14} style={{ color: COLORS.success }} />
     }
   }
 
   return (
     <div className="card" style={{ height: '100%' }}>
       <div className="card-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <Euro size={20} style={{ color: 'var(--success)' }} />
-          <h3 className="card-title">Saúde Orçamental</h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.md }}>
+          <Euro size={20} style={{ color: COLORS.success }} />
+          <h3 className="card-title" style={{ fontFamily: FONTS.body }}>Saúde Orçamental</h3>
         </div>
         <button className="btn btn-ghost btn-sm" onClick={() => navigate('/orcamentos')}>
-          Ver todos <ArrowRight size={14} style={{ marginLeft: '4px' }} />
+          Ver todos <ArrowRight size={14} style={{ marginLeft: SPACING.xs }} />
         </button>
       </div>
 
       {loading ? (
-        <div style={{ padding: '24px', textAlign: 'center' }}>
+        <div style={{ padding: SPACING.xl, textAlign: 'center' }}>
           <div style={{
             width: '24px',
             height: '24px',
-            border: '2px solid var(--stone)',
-            borderTopColor: 'var(--gold)',
+            border: `2px solid ${COLORS.border}`,
+            borderTopColor: COLORS.gold,
             borderRadius: '50%',
             animation: 'spin 1s linear infinite',
             margin: '0 auto'
@@ -374,41 +380,42 @@ export function BudgetHealthWidget() {
           {/* Summary Stats */}
           <div style={{
             display: 'flex',
-            gap: '12px',
-            marginBottom: '16px',
-            padding: '12px',
-            background: 'var(--cream)',
-            borderRadius: '10px'
+            gap: SPACING.md,
+            marginBottom: SPACING.base,
+            padding: SPACING.md,
+            background: COLORS.bgCardHover,
+            borderRadius: RADIUS.sm
           }}>
             <div style={{ flex: 1, textAlign: 'center' }}>
-              <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--success)' }}>
+              <div style={{ fontFamily: FONTS.heading, fontSize: FONT_SIZES.xl, fontWeight: FONT_WEIGHTS.bold, color: COLORS.success }}>
                 {stats.approved}
               </div>
-              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Aprovados</div>
+              <div style={{ fontSize: FONT_SIZES.xs, fontFamily: FONTS.body, color: COLORS.textSecondary }}>Aprovados</div>
             </div>
-            <div style={{ width: '1px', background: 'var(--stone)' }} />
+            <div style={{ width: '1px', background: COLORS.border }} />
             <div style={{ flex: 1, textAlign: 'center' }}>
-              <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--info)' }}>
+              <div style={{ fontFamily: FONTS.heading, fontSize: FONT_SIZES.xl, fontWeight: FONT_WEIGHTS.bold, color: COLORS.info }}>
                 {stats.pending}
               </div>
-              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Pendentes</div>
+              <div style={{ fontSize: FONT_SIZES.xs, fontFamily: FONTS.body, color: COLORS.textSecondary }}>Pendentes</div>
             </div>
-            <div style={{ width: '1px', background: 'var(--stone)' }} />
+            <div style={{ width: '1px', background: COLORS.border }} />
             <div style={{ flex: 1, textAlign: 'center' }}>
               <div style={{
-                fontSize: '20px',
-                fontWeight: '700',
-                color: stats.atRisk > 0 ? 'var(--error)' : 'var(--text-secondary)'
+                fontFamily: FONTS.heading,
+                fontSize: FONT_SIZES.xl,
+                fontWeight: FONT_WEIGHTS.bold,
+                color: stats.atRisk > 0 ? COLORS.error : COLORS.textSecondary
               }}>
                 {stats.atRisk}
               </div>
-              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Em Risco</div>
+              <div style={{ fontSize: FONT_SIZES.xs, fontFamily: FONTS.body, color: COLORS.textSecondary }}>Em Risco</div>
             </div>
           </div>
 
           {/* Budget List */}
           {budgets.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: SPACING.sm }}>
               {budgets.map(budget => {
                 const statusInfo = getStatusInfo(budget.status)
                 const StatusIcon = statusInfo.icon
@@ -419,21 +426,22 @@ export function BudgetHealthWidget() {
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '12px',
-                      padding: '10px 12px',
-                      borderRadius: '8px',
+                      gap: SPACING.md,
+                      padding: `${SPACING.md} ${SPACING.md}`,
+                      borderRadius: RADIUS.sm,
                       cursor: 'pointer',
                       borderLeft: `3px solid ${statusInfo.color}`,
                       transition: 'background 0.15s'
                     }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = 'var(--cream)'}
+                    onMouseEnter={(e) => e.currentTarget.style.background = COLORS.bgCardHover}
                     onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                   >
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{
-                        fontSize: '13px',
-                        fontWeight: '500',
-                        color: 'var(--text-primary)',
+                        fontSize: FONT_SIZES.base,
+                        fontWeight: FONT_WEIGHTS.medium,
+                        fontFamily: FONTS.body,
+                        color: COLORS.textPrimary,
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis'
@@ -441,17 +449,18 @@ export function BudgetHealthWidget() {
                         {budget.titulo || budget.codigo}
                       </div>
                       {budget.projetos && (
-                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                        <div style={{ fontSize: FONT_SIZES.xs, fontFamily: FONTS.body, color: COLORS.textSecondary }}>
                           {budget.projetos.codigo}
                         </div>
                       )}
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.sm, flexShrink: 0 }}>
                       {getHealthIcon(budget.health)}
                       <span style={{
-                        fontSize: '12px',
-                        fontWeight: '600',
-                        color: 'var(--text-primary)'
+                        fontSize: FONT_SIZES.sm,
+                        fontWeight: FONT_WEIGHTS.semibold,
+                        fontFamily: FONTS.body,
+                        color: COLORS.textPrimary
                       }}>
                         {formatCurrency(budget.total)}
                       </span>
@@ -462,9 +471,9 @@ export function BudgetHealthWidget() {
               })}
             </div>
           ) : (
-            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-              <Euro size={32} style={{ opacity: 0.3, marginBottom: '8px' }} />
-              <p style={{ margin: 0, fontSize: '13px' }}>Sem orçamentos</p>
+            <div style={{ padding: SPACING.xl, textAlign: 'center', color: COLORS.textSecondary }}>
+              <Euro size={32} style={{ opacity: 0.3, marginBottom: SPACING.sm }} />
+              <p style={{ margin: 0, fontSize: FONT_SIZES.base, fontFamily: FONTS.body }}>Sem orçamentos</p>
             </div>
           )}
         </>
@@ -529,10 +538,10 @@ export function PendingApprovalsWidget() {
 
   const getUrgencyInfo = (urgencia) => {
     switch (urgencia) {
-      case 'urgente': return { label: 'Urgente', color: 'var(--error)', bg: 'rgba(184, 138, 138, 0.15)' }
-      case 'alta': return { label: 'Alta', color: 'var(--warning)', bg: 'rgba(201, 168, 130, 0.15)' }
-      case 'normal': return { label: 'Normal', color: 'var(--info)', bg: 'rgba(138, 158, 184, 0.15)' }
-      default: return { label: 'Baixa', color: 'var(--text-secondary)', bg: 'var(--cream)' }
+      case 'urgente': return { label: 'Urgente', color: COLORS.error, bg: COLORS.errorBg }
+      case 'alta': return { label: 'Alta', color: COLORS.warning, bg: COLORS.warningBg }
+      case 'normal': return { label: 'Normal', color: COLORS.info, bg: 'rgba(122, 139, 158, 0.15)' }
+      default: return { label: 'Baixa', color: COLORS.textSecondary, bg: COLORS.bgCardHover }
     }
   }
 
@@ -544,22 +553,22 @@ export function PendingApprovalsWidget() {
   return (
     <div className="card" style={{ height: '100%' }}>
       <div className="card-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <Package size={20} style={{ color: stats.urgent > 0 ? 'var(--warning)' : 'var(--info)' }} />
-          <h3 className="card-title">Aprovações Pendentes</h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.md }}>
+          <Package size={20} style={{ color: stats.urgent > 0 ? COLORS.warning : COLORS.info }} />
+          <h3 className="card-title" style={{ fontFamily: FONTS.body }}>Aprovações Pendentes</h3>
         </div>
         <button className="btn btn-ghost btn-sm" onClick={() => navigate('/requisicoes')}>
-          Ver todas <ArrowRight size={14} style={{ marginLeft: '4px' }} />
+          Ver todas <ArrowRight size={14} style={{ marginLeft: SPACING.xs }} />
         </button>
       </div>
 
       {loading ? (
-        <div style={{ padding: '24px', textAlign: 'center' }}>
+        <div style={{ padding: SPACING.xl, textAlign: 'center' }}>
           <div style={{
             width: '24px',
             height: '24px',
-            border: '2px solid var(--stone)',
-            borderTopColor: 'var(--gold)',
+            border: `2px solid ${COLORS.border}`,
+            borderTopColor: COLORS.gold,
             borderRadius: '50%',
             animation: 'spin 1s linear infinite',
             margin: '0 auto'
@@ -570,24 +579,25 @@ export function PendingApprovalsWidget() {
           {/* Summary Stats */}
           <div style={{
             display: 'flex',
-            gap: '16px',
-            marginBottom: '16px',
-            padding: '16px',
+            gap: SPACING.base,
+            marginBottom: SPACING.base,
+            padding: SPACING.base,
             background: stats.urgent > 0
-              ? 'linear-gradient(135deg, rgba(201, 168, 130, 0.1) 0%, rgba(201, 168, 130, 0.05) 100%)'
-              : 'var(--cream)',
-            borderRadius: '10px',
-            borderLeft: stats.urgent > 0 ? '4px solid var(--warning)' : 'none'
+              ? COLORS.warningBg
+              : COLORS.bgCardHover,
+            borderRadius: RADIUS.sm,
+            borderLeft: stats.urgent > 0 ? `4px solid ${COLORS.warning}` : 'none'
           }}>
             <div style={{ flex: 1 }}>
               <div style={{
+                fontFamily: FONTS.heading,
                 fontSize: '28px',
-                fontWeight: '700',
-                color: stats.pending > 0 ? 'var(--warning)' : 'var(--success)'
+                fontWeight: FONT_WEIGHTS.bold,
+                color: stats.pending > 0 ? COLORS.warning : COLORS.success
               }}>
                 {stats.pending}
               </div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+              <div style={{ fontSize: FONT_SIZES.sm, fontFamily: FONTS.body, color: COLORS.textSecondary }}>
                 Requisições Pendentes
               </div>
             </div>
@@ -595,13 +605,13 @@ export function PendingApprovalsWidget() {
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
-                padding: '8px 12px',
-                background: 'rgba(184, 138, 138, 0.15)',
-                borderRadius: '8px'
+                gap: SPACING.sm,
+                padding: `${SPACING.sm} ${SPACING.md}`,
+                background: COLORS.errorBg,
+                borderRadius: RADIUS.sm
               }}>
-                <AlertTriangle size={16} style={{ color: 'var(--error)' }} />
-                <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--error)' }}>
+                <AlertTriangle size={16} style={{ color: COLORS.error }} />
+                <span style={{ fontSize: FONT_SIZES.md, fontWeight: FONT_WEIGHTS.semibold, fontFamily: FONTS.body, color: COLORS.error }}>
                   {stats.urgent} urgente{stats.urgent > 1 ? 's' : ''}
                 </span>
               </div>
@@ -610,7 +620,7 @@ export function PendingApprovalsWidget() {
 
           {/* Requisition List */}
           {requisitions.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: SPACING.sm }}>
               {requisitions.map(req => {
                 const urgencyInfo = getUrgencyInfo(req.urgencia)
                 return (
@@ -620,9 +630,9 @@ export function PendingApprovalsWidget() {
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '12px',
-                      padding: '10px 12px',
-                      borderRadius: '8px',
+                      gap: SPACING.md,
+                      padding: `${SPACING.md} ${SPACING.md}`,
+                      borderRadius: RADIUS.sm,
                       cursor: 'pointer',
                       background: urgencyInfo.bg,
                       transition: 'opacity 0.15s'
@@ -632,9 +642,10 @@ export function PendingApprovalsWidget() {
                   >
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{
-                        fontSize: '13px',
-                        fontWeight: '500',
-                        color: 'var(--text-primary)',
+                        fontSize: FONT_SIZES.base,
+                        fontWeight: FONT_WEIGHTS.medium,
+                        fontFamily: FONTS.body,
+                        color: COLORS.textPrimary,
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis'
@@ -644,27 +655,29 @@ export function PendingApprovalsWidget() {
                       <div style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '8px',
-                        fontSize: '11px',
-                        color: 'var(--text-secondary)'
+                        gap: SPACING.sm,
+                        fontSize: FONT_SIZES.xs,
+                        fontFamily: FONTS.body,
+                        color: COLORS.textSecondary
                       }}>
                         <span>{req.quantidade} {req.unidade}</span>
                         {req.obras && <span>• {req.obras.codigo}</span>}
                       </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.sm, flexShrink: 0 }}>
                       {req.valor_estimado && (
-                        <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                        <span style={{ fontSize: FONT_SIZES.sm, fontFamily: FONTS.body, color: COLORS.textSecondary }}>
                           {formatCurrency(req.valor_estimado)}
                         </span>
                       )}
                       <span style={{
-                        padding: '2px 8px',
-                        borderRadius: '10px',
+                        padding: `2px ${SPACING.sm}`,
+                        borderRadius: RADIUS.sm,
                         fontSize: '10px',
-                        fontWeight: '600',
+                        fontWeight: FONT_WEIGHTS.semibold,
+                        fontFamily: FONTS.body,
                         background: urgencyInfo.color,
-                        color: 'white'
+                        color: COLORS.textInverse
                       }}>
                         {urgencyInfo.label}
                       </span>
@@ -674,9 +687,9 @@ export function PendingApprovalsWidget() {
               })}
             </div>
           ) : (
-            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-              <CheckCircle2 size={32} style={{ opacity: 0.3, marginBottom: '8px', color: 'var(--success)' }} />
-              <p style={{ margin: 0, fontSize: '13px' }}>Sem aprovações pendentes</p>
+            <div style={{ padding: SPACING.xl, textAlign: 'center', color: COLORS.textSecondary }}>
+              <CheckCircle2 size={32} style={{ opacity: 0.3, marginBottom: SPACING.sm, color: COLORS.success }} />
+              <p style={{ margin: 0, fontSize: FONT_SIZES.base, fontFamily: FONTS.body }}>Sem aprovações pendentes</p>
             </div>
           )}
         </>
@@ -788,34 +801,35 @@ export function UnreadMessagesWidget() {
   return (
     <div className="card" style={{ height: '100%' }}>
       <div className="card-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <MessageSquare size={20} style={{ color: stats.mentions > 0 ? 'var(--accent-olive)' : 'var(--info)' }} />
-          <h3 className="card-title">Mensagens</h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.md }}>
+          <MessageSquare size={20} style={{ color: stats.mentions > 0 ? COLORS.accent : COLORS.info }} />
+          <h3 className="card-title" style={{ fontFamily: FONTS.body }}>Mensagens</h3>
           {stats.mentions > 0 && (
             <span style={{
-              padding: '2px 8px',
-              borderRadius: '10px',
-              fontSize: '11px',
-              fontWeight: '600',
-              background: 'var(--accent-olive)',
-              color: 'white'
+              padding: `2px ${SPACING.sm}`,
+              borderRadius: RADIUS.sm,
+              fontSize: FONT_SIZES.xs,
+              fontWeight: FONT_WEIGHTS.semibold,
+              fontFamily: FONTS.body,
+              background: COLORS.accent,
+              color: COLORS.textInverse
             }}>
               {stats.mentions} menções
             </span>
           )}
         </div>
         <button className="btn btn-ghost btn-sm" onClick={() => navigate('/workspace')}>
-          Abrir <ArrowRight size={14} style={{ marginLeft: '4px' }} />
+          Abrir <ArrowRight size={14} style={{ marginLeft: SPACING.xs }} />
         </button>
       </div>
 
       {loading ? (
-        <div style={{ padding: '24px', textAlign: 'center' }}>
+        <div style={{ padding: SPACING.xl, textAlign: 'center' }}>
           <div style={{
             width: '24px',
             height: '24px',
-            border: '2px solid var(--stone)',
-            borderTopColor: 'var(--gold)',
+            border: `2px solid ${COLORS.border}`,
+            borderTopColor: COLORS.gold,
             borderRadius: '50%',
             animation: 'spin 1s linear infinite',
             margin: '0 auto'
@@ -833,32 +847,33 @@ export function UnreadMessagesWidget() {
                   style={{
                     display: 'flex',
                     alignItems: 'flex-start',
-                    gap: '12px',
-                    padding: '12px 0',
+                    gap: SPACING.md,
+                    padding: `${SPACING.md} 0`,
                     cursor: 'pointer',
-                    borderBottom: idx < messages.length - 1 ? '1px solid var(--stone)' : 'none',
-                    background: msg.isMention ? 'rgba(139, 155, 123, 0.08)' : 'transparent',
+                    borderBottom: idx < messages.length - 1 ? `1px solid ${COLORS.border}` : 'none',
+                    background: msg.isMention ? 'rgba(122, 139, 110, 0.08)' : 'transparent',
                     marginLeft: '-16px',
                     marginRight: '-16px',
-                    paddingLeft: '16px',
-                    paddingRight: '16px',
+                    paddingLeft: SPACING.base,
+                    paddingRight: SPACING.base,
                     transition: 'background 0.15s'
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = 'var(--cream)'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = msg.isMention ? 'rgba(139, 155, 123, 0.08)' : 'transparent'}
+                  onMouseEnter={(e) => e.currentTarget.style.background = COLORS.bgCardHover}
+                  onMouseLeave={(e) => e.currentTarget.style.background = msg.isMention ? 'rgba(122, 139, 110, 0.08)' : 'transparent'}
                 >
                   {/* Avatar */}
                   <div style={{
                     width: '32px',
                     height: '32px',
                     borderRadius: '50%',
-                    background: 'linear-gradient(135deg, var(--blush) 0%, var(--blush-dark) 100%)',
+                    background: `linear-gradient(135deg, ${COLORS.border} 0%, ${COLORS.borderHover} 100%)`,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    color: 'var(--brown-dark)',
+                    fontSize: FONT_SIZES.xs,
+                    fontWeight: FONT_WEIGHTS.semibold,
+                    fontFamily: FONTS.body,
+                    color: COLORS.textPrimary,
                     flexShrink: 0
                   }}>
                     {getInitials(msg.autor_nome)}
@@ -869,24 +884,26 @@ export function UnreadMessagesWidget() {
                     <div style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '8px',
+                      gap: SPACING.sm,
                       marginBottom: '2px'
                     }}>
                       <span style={{
-                        fontWeight: 600,
-                        fontSize: '13px',
-                        color: 'var(--text-primary)'
+                        fontWeight: FONT_WEIGHTS.semibold,
+                        fontSize: FONT_SIZES.base,
+                        fontFamily: FONTS.body,
+                        color: COLORS.textPrimary
                       }}>
                         {msg.autor_nome}
                       </span>
-                      <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                      <span style={{ fontSize: FONT_SIZES.xs, fontFamily: FONTS.body, color: COLORS.textSecondary }}>
                         {formatRelativeTime(msg.created_at)}
                       </span>
                     </div>
                     <p style={{
                       margin: 0,
-                      fontSize: '12px',
-                      color: 'var(--text-secondary)',
+                      fontSize: FONT_SIZES.sm,
+                      fontFamily: FONTS.body,
+                      color: COLORS.textSecondary,
                       lineHeight: 1.4,
                       whiteSpace: 'nowrap',
                       overflow: 'hidden',
@@ -899,9 +916,9 @@ export function UnreadMessagesWidget() {
               ))}
             </div>
           ) : (
-            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-              <CheckCircle2 size={32} style={{ opacity: 0.3, marginBottom: '8px', color: 'var(--success)' }} />
-              <p style={{ margin: 0, fontSize: '13px' }}>Sem mensagens novas</p>
+            <div style={{ padding: SPACING.xl, textAlign: 'center', color: COLORS.textSecondary }}>
+              <CheckCircle2 size={32} style={{ opacity: 0.3, marginBottom: SPACING.sm, color: COLORS.success }} />
+              <p style={{ margin: 0, fontSize: FONT_SIZES.base, fontFamily: FONTS.body }}>Sem mensagens novas</p>
             </div>
           )}
         </>

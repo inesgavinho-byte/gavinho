@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gavinho Dashboard — Visual Mockup</title>
+<!--
+  MOCKUP DE REFERÊNCIA — Dashboard Redesign
+  Cores: earthy palette (olive, gold, terracotta, steel)
+  Tipografia: Cormorant Garamond (títulos) + Quattrocento Sans (corpo)
+  Este ficheiro é APENAS referência visual; a implementação real é em React.
+-->
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Quattrocento+Sans:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --sandy-beach: #F2F0E7;
+    --white: #FFFFFF;
+    --cream: #F5F3EB;
+    --off-white: #F8F6F0;
+    --stone: #E5E2D9;
+    --stone-dark: #D5D2C9;
+    --brown: #3D3D3D;
+    --brown-light: #6B6B6B;
+    --brown-dark: #2D2D2D;
+    --success: #7A8B6E;
+    --warning: #C9A86C;
+    --error: #9A6B5B;
+    --info: #7A8B9E;
+    --accent-olive: #7A8B6E;
+    --shadow-sm: 0 2px 8px rgba(95,92,89,0.06);
+    --shadow-md: 0 4px 20px rgba(95,92,89,0.1);
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: 'Quattrocento Sans', sans-serif;
+    background: var(--sandy-beach);
+    color: var(--brown);
+    padding: 32px 48px;
+    min-height: 100vh;
+  }
+
+  /* ── Header ─────────────────────── */
+  .dash-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-bottom: 32px;
+  }
+  .dash-header .greeting {
+    font-size: 13px;
+    color: var(--accent-olive);
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .dash-header h1 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 36px;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+    color: var(--brown-dark);
+    line-height: 1.1;
+  }
+  .dash-header .subtitle {
+    font-size: 14px;
+    color: var(--brown-light);
+    margin-top: 4px;
+  }
+  .btn-primary {
+    background: var(--accent-olive);
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 12px;
+    font-family: 'Quattrocento Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all .2s;
+  }
+  .btn-primary:hover { opacity:.9; transform:translateY(-1px); }
+
+  /* ── KPI Grid (4 cards) ─────────── */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .kpi-card {
+    border-radius: 20px;
+    padding: 24px;
+    border: 1px solid var(--stone);
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all .25s ease;
+  }
+  .kpi-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md);
+  }
+  .kpi-card .accent-circle {
+    position: absolute;
+    top: -20px; right: -20px;
+    width: 100px; height: 100px;
+    border-radius: 50%;
+    opacity: .06;
+  }
+  .kpi-card .top-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .kpi-card .label {
+    font-size: 13px;
+    color: var(--brown-light);
+    font-weight: 500;
+  }
+  .kpi-card .icon-box {
+    width: 40px; height: 40px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .kpi-card .value {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 40px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -1px;
+    color: var(--brown-dark);
+  }
+  .kpi-card .sub {
+    font-size: 12px;
+    color: var(--brown-light);
+    margin-top: 6px;
+  }
+
+  /* KPI colour variants */
+  .kpi-olive   { background: linear-gradient(135deg, #F8F6F0, #F0EDE4); }
+  .kpi-olive .accent-circle { background: var(--success); }
+  .kpi-olive .icon-box { background: rgba(122,139,110,.12); }
+
+  .kpi-gold    { background: linear-gradient(135deg, #F8F5EE, #F2EDDF); }
+  .kpi-gold .accent-circle { background: var(--warning); }
+  .kpi-gold .icon-box { background: rgba(201,168,108,.12); }
+
+  .kpi-steel   { background: linear-gradient(135deg, #F5F7F9, #EDF0F4); }
+  .kpi-steel .accent-circle { background: var(--info); }
+  .kpi-steel .icon-box { background: rgba(122,139,158,.12); }
+
+  /* ── Status strip ───────────────── */
+  .status-strip {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .status-chip {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 20px;
+    background: var(--white);
+    border-radius: 16px;
+    border: 1px solid var(--stone);
+  }
+  .status-chip .circle {
+    width: 42px; height: 42px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .status-chip .val {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .status-chip .lbl {
+    font-size: 12px;
+    color: var(--brown-light);
+    margin-top: 2px;
+  }
+
+  /* ── Widget row (4-col) ─────────── */
+  .widget-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+    margin-bottom: 24px;
+  }
+  .widget-card {
+    background: var(--white);
+    border-radius: 16px;
+    border: 1px solid var(--stone);
+    padding: 20px 24px;
+  }
+  .widget-card h3 {
+    font-family: 'Quattrocento Sans', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .widget-card .stat-bar {
+    display: flex;
+    gap: 12px;
+    padding: 12px;
+    background: var(--cream);
+    border-radius: 10px;
+    margin-bottom: 14px;
+  }
+  .widget-card .stat-item { flex:1; text-align:center; }
+  .widget-card .stat-num { font-size:20px; font-weight:700; }
+  .widget-card .stat-lbl { font-size:11px; color:var(--brown-light); }
+
+  /* ── Main content (table + sidebar) */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 20px;
+    margin-bottom: 24px;
+  }
+  .table-card {
+    background: var(--white);
+    border-radius: 20px;
+    border: 1px solid var(--stone);
+    overflow: hidden;
+  }
+  .table-card .card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px 16px;
+  }
+  .table-card h3 {
+    font-family: 'Quattrocento Sans', sans-serif;
+    font-size: 17px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .table-header {
+    display: grid;
+    grid-template-columns: 100px 1fr 120px 130px 120px;
+    padding: 10px 24px;
+    border-bottom: 1px solid var(--stone);
+    background: var(--cream);
+  }
+  .table-header span {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--brown-light);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+  .table-row {
+    display: grid;
+    grid-template-columns: 100px 1fr 120px 130px 120px;
+    padding: 14px 24px;
+    align-items: center;
+    cursor: pointer;
+    border-bottom: 1px solid rgba(229,226,217,.5);
+    transition: background .15s;
+  }
+  .table-row:last-child { border-bottom:none; }
+  .table-row:hover { background: var(--cream); }
+  .table-row .code {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent-olive);
+  }
+  .table-row .name {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--brown);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding-right: 12px;
+  }
+  .table-row .phase-badge {
+    display: inline-flex;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: 'Quattrocento Sans', sans-serif;
+  }
+  .table-row .progress-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .progress-bar {
+    width: 50px; height: 6px;
+    background: var(--stone);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width .5s ease;
+  }
+  .table-row .loc {
+    color: var(--brown-light);
+    font-size: 13px;
+  }
+
+  /* ── Phase sidebar ──────────────── */
+  .phase-sidebar {
+    background: var(--white);
+    border-radius: 20px;
+    border: 1px solid var(--stone);
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+  }
+  .phase-sidebar h3 {
+    font-family: 'Quattrocento Sans', sans-serif;
+    font-size: 17px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .phase-bar-stacked {
+    display: flex;
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 20px;
+    background: var(--stone);
+  }
+  .phase-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: var(--cream);
+    border-radius: 12px;
+    margin-bottom: 8px;
+    transition: all .15s;
+    cursor: default;
+  }
+  .phase-item:hover {
+    background: var(--stone);
+    transform: translateX(4px);
+  }
+  .phase-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* ── Activity feed ──────────────── */
+  .activity-card {
+    background: var(--white);
+    border-radius: 20px;
+    border: 1px solid var(--stone);
+    overflow: hidden;
+  }
+  .activity-card .card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px 16px;
+  }
+  .activity-card h3 {
+    font-family: 'Quattrocento Sans', sans-serif;
+    font-size: 17px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .activity-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 14px 24px;
+    border-bottom: 1px solid rgba(229,226,217,.5);
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .activity-item:last-child { border-bottom:none; }
+  .activity-item:hover { background: var(--cream); }
+  .activity-item .avatar {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--stone), var(--stone-dark));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--brown);
+    flex-shrink: 0;
+  }
+  .activity-item .author { font-weight:600; font-size:13px; }
+  .activity-item .time { font-size:11px; color:var(--brown-light); margin-left:auto; }
+  .activity-item .excerpt {
+    font-size: 13px;
+    color: var(--brown-light);
+    line-height: 1.4;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .mention-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 8px;
+    background: var(--accent-olive);
+    color: #fff;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══ HEADER ═══ -->
+<div class="dash-header">
+  <div>
+    <p class="greeting">Boa tarde, Inês</p>
+    <h1>Dashboard</h1>
+    <p class="subtitle">Visão geral da GAVINHO Group</p>
+  </div>
+  <button class="btn-primary">Ver Projetos ↗</button>
+</div>
+
+<!-- ═══ KPI CARDS ═══ -->
+<div class="kpi-grid">
+  <div class="kpi-card kpi-olive">
+    <div class="accent-circle"></div>
+    <div class="top-row">
+      <span class="label">Projetos Ativos</span>
+      <div class="icon-box">📂</div>
+    </div>
+    <div class="value">12</div>
+    <div class="sub">18 total</div>
+  </div>
+
+  <div class="kpi-card kpi-gold">
+    <div class="accent-circle"></div>
+    <div class="top-row">
+      <span class="label">Pipeline Total</span>
+      <div class="icon-box">€</div>
+    </div>
+    <div class="value">€2.4M</div>
+    <div class="sub">valor contratado</div>
+  </div>
+
+  <div class="kpi-card kpi-steel">
+    <div class="accent-circle"></div>
+    <div class="top-row">
+      <span class="label">Clientes</span>
+      <div class="icon-box">👥</div>
+    </div>
+    <div class="value">34</div>
+    <div class="sub">na base de dados</div>
+  </div>
+
+  <div class="kpi-card kpi-olive">
+    <div class="accent-circle"></div>
+    <div class="top-row">
+      <span class="label">Progresso Médio</span>
+      <div class="icon-box">📈</div>
+    </div>
+    <div class="value">67%</div>
+    <div class="sub" style="margin-top:12px">
+      <div style="height:4px;background:var(--stone);border-radius:2px;overflow:hidden">
+        <div style="width:67%;height:100%;background:linear-gradient(90deg,var(--warning),var(--success));border-radius:2px"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ STATUS STRIP ═══ -->
+<div class="status-strip">
+  <div class="status-chip" style="border-left:4px solid var(--success)">
+    <div class="circle" style="background:rgba(122,139,110,.1)">✓</div>
+    <div><div class="val" style="color:var(--brown)">9</div><div class="lbl">Projetos no Prazo</div></div>
+  </div>
+  <div class="status-chip" style="border-left:4px solid var(--warning)">
+    <div class="circle" style="background:rgba(201,168,108,.1)">⏳</div>
+    <div><div class="val" style="color:var(--brown)">4</div><div class="lbl">Em Proposta/Conceito</div></div>
+  </div>
+  <div class="status-chip" style="border-left:4px solid var(--error)">
+    <div class="circle" style="background:rgba(154,107,91,.1)">⚠</div>
+    <div><div class="val" style="color:var(--brown)">3</div><div class="lbl">Em Risco / Bloqueados</div></div>
+  </div>
+</div>
+
+<!-- ═══ WIDGET ROW (4 widgets) ═══ -->
+<div class="widget-row">
+  <div class="widget-card">
+    <h3>⚠ Prazos Críticos</h3>
+    <div class="stat-bar">
+      <div class="stat-item"><div class="stat-num" style="color:var(--error)">2</div><div class="stat-lbl">Atrasadas</div></div>
+      <div style="width:1px;background:var(--stone)"></div>
+      <div class="stat-item"><div class="stat-num" style="color:var(--warning)">1</div><div class="stat-lbl">Hoje</div></div>
+      <div style="width:1px;background:var(--stone)"></div>
+      <div class="stat-item"><div class="stat-num" style="color:var(--info)">3</div><div class="stat-lbl">Esta Semana</div></div>
+    </div>
+    <div style="font-size:12px;color:var(--brown-light);padding:8px;border-left:3px solid var(--error);margin-bottom:6px;background:rgba(154,107,91,.08);border-radius:0 6px 6px 0">Rever projecto Faro</div>
+    <div style="font-size:12px;color:var(--brown-light);padding:8px;border-left:3px solid var(--warning);margin-bottom:6px;border-radius:0 6px 6px 0">Enviar orçamento #42</div>
+  </div>
+  <div class="widget-card">
+    <h3>€ Saúde Orçamental</h3>
+    <div class="stat-bar">
+      <div class="stat-item"><div class="stat-num" style="color:var(--success)">5</div><div class="stat-lbl">Aprovados</div></div>
+      <div style="width:1px;background:var(--stone)"></div>
+      <div class="stat-item"><div class="stat-num" style="color:var(--info)">3</div><div class="stat-lbl">Pendentes</div></div>
+      <div style="width:1px;background:var(--stone)"></div>
+      <div class="stat-item"><div class="stat-num" style="color:var(--error)">1</div><div class="stat-lbl">Em Risco</div></div>
+    </div>
+  </div>
+  <div class="widget-card">
+    <h3>📦 Aprovações Pendentes</h3>
+    <div style="font-size:28px;font-weight:700;color:var(--warning)">4</div>
+    <div style="font-size:12px;color:var(--brown-light)">Requisições Pendentes</div>
+  </div>
+  <div class="widget-card">
+    <h3>💬 Mensagens</h3>
+    <div style="font-size:12px;color:var(--brown-light);padding:8px 0;border-bottom:1px solid var(--stone)"><b>Pedro S.</b> — Confirmar materiais… <span style="float:right;color:var(--brown-light)">2h</span></div>
+    <div style="font-size:12px;color:var(--brown-light);padding:8px 0"><b>Ana M.</b> — Reunião amanhã… <span style="float:right;color:var(--brown-light)">5h</span></div>
+  </div>
+</div>
+
+<!-- ═══ MAIN: TABLE + PHASE SIDEBAR ═══ -->
+<div class="main-grid">
+  <div class="table-card">
+    <div class="card-top">
+      <h3>📊 Projetos Recentes</h3>
+      <span style="font-size:13px;color:var(--accent-olive);font-weight:500;cursor:pointer">Ver todos →</span>
+    </div>
+    <div class="table-header">
+      <span>Código</span><span>Nome</span><span>Fase</span><span>Progresso</span><span>Localização</span>
+    </div>
+    <div class="table-row">
+      <span class="code">GH-042</span>
+      <span class="name">Villa Algarve</span>
+      <span><span class="phase-badge" style="background:rgba(122,158,122,.12);color:#7A9E7A">Construção</span></span>
+      <span class="progress-wrap">
+        <span class="progress-bar"><span class="progress-bar-fill" style="width:78%;background:var(--success)"></span></span>
+        <span style="font-size:12px;color:var(--brown-light)">78%</span>
+      </span>
+      <span class="loc">Faro</span>
+    </div>
+    <div class="table-row">
+      <span class="code">GH-041</span>
+      <span class="name">Escritório Porto</span>
+      <span><span class="phase-badge" style="background:rgba(201,168,130,.12);color:#C9A882">Conceito</span></span>
+      <span class="progress-wrap">
+        <span class="progress-bar"><span class="progress-bar-fill" style="width:25%;background:var(--warning)"></span></span>
+        <span style="font-size:12px;color:var(--brown-light)">25%</span>
+      </span>
+      <span class="loc">Porto</span>
+    </div>
+    <div class="table-row">
+      <span class="code">GH-039</span>
+      <span class="name">Residência Cascais</span>
+      <span><span class="phase-badge" style="background:rgba(176,165,153,.12);color:#B0A599">Licenciamento</span></span>
+      <span class="progress-wrap">
+        <span class="progress-bar"><span class="progress-bar-fill" style="width:52%;background:var(--info)"></span></span>
+        <span style="font-size:12px;color:var(--brown-light)">52%</span>
+      </span>
+      <span class="loc">Cascais</span>
+    </div>
+  </div>
+
+  <div class="phase-sidebar">
+    <h3>📊 Por Fase</h3>
+    <div class="phase-bar-stacked">
+      <div style="width:33%;background:#C9A882"></div>
+      <div style="width:22%;background:#7A9E7A"></div>
+      <div style="width:17%;background:#B0A599"></div>
+      <div style="width:11%;background:#8A9EB8"></div>
+      <div style="width:17%;background:#5F5C59"></div>
+    </div>
+    <div class="phase-item"><div style="display:flex;align-items:center;gap:10px"><span class="phase-dot" style="background:#C9A882"></span><span style="font-size:13px;font-weight:500">Conceito</span></div><div style="display:flex;gap:8px;align-items:center"><span style="font-size:11px;color:var(--brown-light)">33%</span><span style="font-weight:700;font-size:15px">6</span></div></div>
+    <div class="phase-item"><div style="display:flex;align-items:center;gap:10px"><span class="phase-dot" style="background:#7A9E7A"></span><span style="font-size:13px;font-weight:500">Construção</span></div><div style="display:flex;gap:8px;align-items:center"><span style="font-size:11px;color:var(--brown-light)">22%</span><span style="font-weight:700;font-size:15px">4</span></div></div>
+    <div class="phase-item"><div style="display:flex;align-items:center;gap:10px"><span class="phase-dot" style="background:#B0A599"></span><span style="font-size:13px;font-weight:500">Licenciamento</span></div><div style="display:flex;gap:8px;align-items:center"><span style="font-size:11px;color:var(--brown-light)">17%</span><span style="font-weight:700;font-size:15px">3</span></div></div>
+    <div class="phase-item"><div style="display:flex;align-items:center;gap:10px"><span class="phase-dot" style="background:#8A9EB8"></span><span style="font-size:13px;font-weight:500">Proposta</span></div><div style="display:flex;gap:8px;align-items:center"><span style="font-size:11px;color:var(--brown-light)">11%</span><span style="font-weight:700;font-size:15px">2</span></div></div>
+    <div class="phase-item"><div style="display:flex;align-items:center;gap:10px"><span class="phase-dot" style="background:#5F5C59"></span><span style="font-size:13px;font-weight:500">Fit-out</span></div><div style="display:flex;gap:8px;align-items:center"><span style="font-size:11px;color:var(--brown-light)">17%</span><span style="font-weight:700;font-size:15px">3</span></div></div>
+  </div>
+</div>
+
+<!-- ═══ ACTIVITY FEED ═══ -->
+<div class="activity-card">
+  <div class="card-top">
+    <h3>💬 Últimos Desenvolvimentos</h3>
+    <span style="font-size:13px;color:var(--accent-olive);font-weight:500;cursor:pointer">Ver todos →</span>
+  </div>
+  <div class="activity-item">
+    <div class="avatar">PS</div>
+    <div style="flex:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+        <span class="author">Pedro Santos</span>
+        <span class="mention-badge">@Menção</span>
+        <span class="time">2h</span>
+      </div>
+      <p class="excerpt">Confirmar materiais para a obra de Cascais antes do fim do dia</p>
+    </div>
+  </div>
+  <div class="activity-item">
+    <div class="avatar">AM</div>
+    <div style="flex:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+        <span class="author">Ana Martins</span>
+        <span class="time">5h</span>
+      </div>
+      <p class="excerpt">Reunião com cliente amanhã às 10h — confirmar sala</p>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
