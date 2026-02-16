@@ -19,7 +19,7 @@ export default function PortalRelatorios() {
     try {
       const { data, error } = await supabase
         .from('obra_relatorios')
-        .select('id, titulo, descricao, resumo_portal, created_at, data_relatorio, tipo')
+        .select('id, titulo, descricao, resumo_portal, created_at, data_publicacao, tipo')
         .eq('publicar_no_portal', true)
         .order('created_at', { ascending: false })
 
@@ -85,7 +85,7 @@ export default function PortalRelatorios() {
                     <div style={{ display: 'flex', gap: '12px', fontSize: '12px', color: '#8B8670', paddingLeft: '23px' }}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <Calendar size={11} />
-                        {new Date(r.data_relatorio || r.created_at).toLocaleDateString('pt-PT', {
+                        {new Date(r.data_publicacao || r.created_at).toLocaleDateString('pt-PT', {
                           day: 'numeric', month: 'long', year: 'numeric'
                         })}
                       </span>
