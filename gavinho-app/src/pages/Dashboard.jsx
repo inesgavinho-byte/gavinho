@@ -37,9 +37,6 @@ import {
   RADIUS,
   SHADOWS,
   KPI_ACCENTS,
-  getPhaseColor,
-  getPhaseBg,
-  getStatusColor as getTokenStatusColor,
 } from '../styles/designTokens'
 
 export default function Dashboard() {
@@ -159,7 +156,30 @@ export default function Dashboard() {
     return `€${value.toFixed(0)}`
   }
 
-  const getStatusColor = (status) => getTokenStatusColor(status)
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'on_track': return 'var(--success)'
+      case 'at_risk': return 'var(--warning)'
+      case 'delayed': return 'var(--error)'
+      case 'on_hold': return 'var(--info)'
+      case 'completed': return 'var(--success)'
+      default: return 'var(--info)'
+    }
+  }
+
+  const getFaseColor = (fase) => {
+    const colors = {
+      'Proposta': '#8A9EB8',
+      'Conceito': '#C9A882',
+      'Projeto': '#C3BAAF',
+      'Projeto Execução': '#B0A599',
+      'Licenciamento': '#B0A599',
+      'Construção': '#7A9E7A',
+      'Fit-out': '#5F5C59',
+      'Entrega': '#4A4845'
+    }
+    return colors[fase] || '#C3BAAF'
+  }
 
   const formatRelativeTime = (dateString) => {
     const date = new Date(dateString)
@@ -207,7 +227,7 @@ export default function Dashboard() {
             animation: 'spin 1s linear infinite',
             margin: '0 auto 16px'
           }}></div>
-          <p style={{ color: COLORS.textSecondary, fontFamily: FONTS.body, fontSize: FONT_SIZES.md }}>A carregar dashboard...</p>
+          <p style={{ color: COLORS.textSecondary, fontFamily: FONTS.body }}>A carregar dashboard...</p>
         </div>
       </div>
     )
@@ -220,40 +240,37 @@ export default function Dashboard() {
       {/* Header with greeting */}
       <div style={{
         display: 'flex',
-        alignItems: isMobile ? 'flex-start' : 'flex-end',
+        alignItems: 'flex-end',
         justifyContent: 'space-between',
-        flexDirection: isMobile ? 'column' : 'row',
-        gap: isMobile ? SPACING.base : 0,
-        marginBottom: SPACING['3xl']
+        marginBottom: '36px'
       }}>
         <div>
           <p style={{
-            fontSize: FONT_SIZES.base,
+            fontSize: '14px',
             color: COLORS.accent,
-            fontWeight: FONT_WEIGHTS.semibold,
+            fontWeight: '600',
             fontFamily: FONTS.body,
-            marginBottom: SPACING.xs,
-            letterSpacing: '0.8px',
+            marginBottom: '4px',
+            letterSpacing: '0.5px',
             textTransform: 'uppercase'
           }}>
             {getGreeting()}{getFirstName() ? `, ${getFirstName()}` : ''}
           </p>
           <h1 style={{
             fontFamily: FONTS.heading,
-            fontSize: FONT_SIZES['3xl'],
-            fontWeight: FONT_WEIGHTS.semibold,
+            fontSize: '32px',
+            fontWeight: '700',
             letterSpacing: '-0.5px',
             color: COLORS.textPrimary,
-            margin: 0,
-            lineHeight: 1.1
+            margin: 0
           }}>
             Dashboard
           </h1>
           <p style={{
-            fontSize: FONT_SIZES.md,
+            fontSize: '14px',
             fontFamily: FONTS.body,
             color: COLORS.textSecondary,
-            marginTop: SPACING.xs
+            marginTop: '4px'
           }}>
             Visão geral da GAVINHO Group
           </p>
@@ -261,7 +278,7 @@ export default function Dashboard() {
         <button
           className="btn btn-primary"
           onClick={() => navigate('/projetos')}
-          style={{ display: 'flex', alignItems: 'center', gap: SPACING.sm }}
+          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
         >
           Ver Projetos
           <ArrowUpRight size={16} />
@@ -272,19 +289,19 @@ export default function Dashboard() {
       <div className="stagger-children" style={{
         display: 'grid',
         gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
-        gap: isMobile ? SPACING.md : SPACING.base,
-        marginBottom: SPACING.xl
+        gap: isMobile ? '10px' : '16px',
+        marginBottom: '24px'
       }}>
         {/* Projetos Ativos */}
         <div style={{
           background: KPI_ACCENTS.olive.gradient,
-          borderRadius: RADIUS.xl,
-          padding: SPACING.xl,
+          borderRadius: '20px',
+          padding: '24px',
           border: `1px solid ${COLORS.border}`,
           position: 'relative',
           overflow: 'hidden',
           cursor: 'pointer',
-          transition: 'all 0.25s ease'
+          transition: 'all 0.3s ease'
         }}
           onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = SHADOWS.md }}
           onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none' }}
@@ -299,12 +316,12 @@ export default function Dashboard() {
             borderRadius: '50%',
             background: 'rgba(122, 139, 110, 0.06)'
           }} />
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: SPACING.base }}>
-            <span style={{ fontSize: FONT_SIZES.base, color: COLORS.textSecondary, fontWeight: FONT_WEIGHTS.medium, fontFamily: FONTS.body }}>Projetos Ativos</span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+            <span style={{ fontSize: '13px', color: COLORS.textSecondary, fontWeight: '500', fontFamily: FONTS.body }}>Projetos Ativos</span>
             <div style={{
               width: '40px',
               height: '40px',
-              borderRadius: RADIUS.md,
+              borderRadius: '12px',
               background: KPI_ACCENTS.olive.bg,
               display: 'flex',
               alignItems: 'center',
@@ -313,10 +330,10 @@ export default function Dashboard() {
               <FolderKanban size={20} style={{ color: COLORS.accent }} />
             </div>
           </div>
-          <div style={{ fontFamily: FONTS.heading, fontSize: '40px', fontWeight: FONT_WEIGHTS.bold, color: COLORS.textPrimary, lineHeight: 1, letterSpacing: '-1px' }}>
+          <div style={{ fontFamily: FONTS.heading, fontSize: '36px', fontWeight: '700', color: COLORS.textPrimary, lineHeight: 1, letterSpacing: '-1px' }}>
             {stats.projetosAtivos}
           </div>
-          <div style={{ fontSize: FONT_SIZES.sm, fontFamily: FONTS.body, color: COLORS.textSecondary, marginTop: SPACING.sm }}>
+          <div style={{ fontSize: '12px', fontFamily: FONTS.body, color: COLORS.textSecondary, marginTop: '6px' }}>
             {stats.totalProjetos} total
           </div>
         </div>
@@ -324,13 +341,13 @@ export default function Dashboard() {
         {/* Pipeline Total */}
         <div style={{
           background: KPI_ACCENTS.gold.gradient,
-          borderRadius: RADIUS.xl,
-          padding: SPACING.xl,
+          borderRadius: '20px',
+          padding: '24px',
           border: `1px solid ${COLORS.border}`,
           position: 'relative',
           overflow: 'hidden',
           cursor: 'pointer',
-          transition: 'all 0.25s ease'
+          transition: 'all 0.3s ease'
         }}
           onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = SHADOWS.md }}
           onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none' }}
@@ -344,12 +361,12 @@ export default function Dashboard() {
             borderRadius: '50%',
             background: 'rgba(201, 168, 108, 0.06)'
           }} />
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: SPACING.base }}>
-            <span style={{ fontSize: FONT_SIZES.base, color: COLORS.textSecondary, fontWeight: FONT_WEIGHTS.medium, fontFamily: FONTS.body }}>Pipeline Total</span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+            <span style={{ fontSize: '13px', color: COLORS.textSecondary, fontWeight: '500', fontFamily: FONTS.body }}>Pipeline Total</span>
             <div style={{
               width: '40px',
               height: '40px',
-              borderRadius: RADIUS.md,
+              borderRadius: '12px',
               background: KPI_ACCENTS.gold.bg,
               display: 'flex',
               alignItems: 'center',
@@ -358,10 +375,10 @@ export default function Dashboard() {
               <Euro size={20} style={{ color: COLORS.warning }} />
             </div>
           </div>
-          <div style={{ fontFamily: FONTS.heading, fontSize: '40px', fontWeight: FONT_WEIGHTS.bold, color: COLORS.textPrimary, lineHeight: 1, letterSpacing: '-1px' }}>
+          <div style={{ fontFamily: FONTS.heading, fontSize: '36px', fontWeight: '700', color: COLORS.textPrimary, lineHeight: 1, letterSpacing: '-1px' }}>
             {formatCurrency(stats.pipelineTotal)}
           </div>
-          <div style={{ fontSize: FONT_SIZES.sm, fontFamily: FONTS.body, color: COLORS.textSecondary, marginTop: SPACING.sm }}>
+          <div style={{ fontSize: '12px', fontFamily: FONTS.body, color: COLORS.textSecondary, marginTop: '6px' }}>
             valor contratado
           </div>
         </div>
@@ -369,13 +386,13 @@ export default function Dashboard() {
         {/* Clientes */}
         <div style={{
           background: KPI_ACCENTS.steel.gradient,
-          borderRadius: RADIUS.xl,
-          padding: SPACING.xl,
+          borderRadius: '20px',
+          padding: '24px',
           border: `1px solid ${COLORS.border}`,
           position: 'relative',
           overflow: 'hidden',
           cursor: 'pointer',
-          transition: 'all 0.25s ease'
+          transition: 'all 0.3s ease'
         }}
           onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = SHADOWS.md }}
           onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none' }}
@@ -389,12 +406,12 @@ export default function Dashboard() {
             borderRadius: '50%',
             background: 'rgba(122, 139, 158, 0.06)'
           }} />
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: SPACING.base }}>
-            <span style={{ fontSize: FONT_SIZES.base, color: COLORS.textSecondary, fontWeight: FONT_WEIGHTS.medium, fontFamily: FONTS.body }}>Clientes</span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+            <span style={{ fontSize: '13px', color: COLORS.textSecondary, fontWeight: '500', fontFamily: FONTS.body }}>Clientes</span>
             <div style={{
               width: '40px',
               height: '40px',
-              borderRadius: RADIUS.md,
+              borderRadius: '12px',
               background: KPI_ACCENTS.steel.bg,
               display: 'flex',
               alignItems: 'center',
@@ -403,10 +420,10 @@ export default function Dashboard() {
               <Users size={20} style={{ color: COLORS.info }} />
             </div>
           </div>
-          <div style={{ fontFamily: FONTS.heading, fontSize: '40px', fontWeight: FONT_WEIGHTS.bold, color: COLORS.textPrimary, lineHeight: 1, letterSpacing: '-1px' }}>
+          <div style={{ fontFamily: FONTS.heading, fontSize: '36px', fontWeight: '700', color: COLORS.textPrimary, lineHeight: 1, letterSpacing: '-1px' }}>
             {stats.totalClientes}
           </div>
-          <div style={{ fontSize: FONT_SIZES.sm, fontFamily: FONTS.body, color: COLORS.textSecondary, marginTop: SPACING.sm }}>
+          <div style={{ fontSize: '12px', fontFamily: FONTS.body, color: COLORS.textSecondary, marginTop: '6px' }}>
             na base de dados
           </div>
         </div>
@@ -414,12 +431,12 @@ export default function Dashboard() {
         {/* Progresso Médio */}
         <div style={{
           background: KPI_ACCENTS.olive.gradient,
-          borderRadius: RADIUS.xl,
-          padding: SPACING.xl,
+          borderRadius: '20px',
+          padding: '24px',
           border: `1px solid ${COLORS.border}`,
           position: 'relative',
           overflow: 'hidden',
-          transition: 'all 0.25s ease'
+          transition: 'all 0.3s ease'
         }}
           onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = SHADOWS.md }}
           onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none' }}
@@ -433,12 +450,12 @@ export default function Dashboard() {
             borderRadius: '50%',
             background: 'rgba(201, 168, 108, 0.06)'
           }} />
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: SPACING.base }}>
-            <span style={{ fontSize: FONT_SIZES.base, color: COLORS.textSecondary, fontWeight: FONT_WEIGHTS.medium, fontFamily: FONTS.body }}>Progresso Médio</span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+            <span style={{ fontSize: '13px', color: COLORS.textSecondary, fontWeight: '500', fontFamily: FONTS.body }}>Progresso Médio</span>
             <div style={{
               width: '40px',
               height: '40px',
-              borderRadius: RADIUS.md,
+              borderRadius: '12px',
               background: KPI_ACCENTS.gold.bg,
               display: 'flex',
               alignItems: 'center',
@@ -447,7 +464,7 @@ export default function Dashboard() {
               <TrendingUp size={20} style={{ color: COLORS.warning }} />
             </div>
           </div>
-          <div style={{ fontFamily: FONTS.heading, fontSize: '40px', fontWeight: FONT_WEIGHTS.bold, color: COLORS.textPrimary, lineHeight: 1, letterSpacing: '-1px' }}>
+          <div style={{ fontFamily: FONTS.heading, fontSize: '36px', fontWeight: '700', color: COLORS.textPrimary, lineHeight: 1, letterSpacing: '-1px' }}>
             {stats.progressoMedio}%
           </div>
           <div style={{
@@ -455,7 +472,7 @@ export default function Dashboard() {
             height: '4px',
             background: COLORS.border,
             borderRadius: '2px',
-            marginTop: SPACING.md,
+            marginTop: '12px',
             overflow: 'hidden'
           }}>
             <div style={{
@@ -473,16 +490,16 @@ export default function Dashboard() {
       <div style={{
         display: 'grid',
         gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
-        gap: SPACING.md,
-        marginBottom: SPACING.xl
+        gap: '12px',
+        marginBottom: '24px'
       }}>
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: SPACING.md,
-          padding: `${SPACING.base} ${SPACING.lg}`,
+          gap: '14px',
+          padding: '16px 20px',
           background: COLORS.bgCard,
-          borderRadius: RADIUS.lg,
+          borderRadius: '16px',
           border: `1px solid ${COLORS.border}`,
           borderLeft: `4px solid ${COLORS.success}`
         }}>
@@ -490,7 +507,7 @@ export default function Dashboard() {
             width: '42px',
             height: '42px',
             borderRadius: '50%',
-            background: COLORS.successBg,
+            background: 'rgba(122, 139, 110, 0.1)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -499,20 +516,20 @@ export default function Dashboard() {
             <CheckCircle2 size={20} style={{ color: COLORS.success }} />
           </div>
           <div>
-            <div style={{ fontFamily: FONTS.heading, fontSize: '28px', fontWeight: FONT_WEIGHTS.bold, color: COLORS.textPrimary, lineHeight: 1 }}>
+            <div style={{ fontFamily: FONTS.heading, fontSize: '26px', fontWeight: '700', color: COLORS.textPrimary, lineHeight: 1 }}>
               {stats.projetosAtivos - stats.projetosEmRisco}
             </div>
-            <div style={{ fontSize: FONT_SIZES.sm, fontFamily: FONTS.body, color: COLORS.textSecondary, marginTop: '2px' }}>Projetos no Prazo</div>
+            <div style={{ fontSize: '12px', fontFamily: FONTS.body, color: COLORS.textSecondary, marginTop: '2px' }}>Projetos no Prazo</div>
           </div>
         </div>
 
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: SPACING.md,
-          padding: `${SPACING.base} ${SPACING.lg}`,
+          gap: '14px',
+          padding: '16px 20px',
           background: COLORS.bgCard,
-          borderRadius: RADIUS.lg,
+          borderRadius: '16px',
           border: `1px solid ${COLORS.border}`,
           borderLeft: `4px solid ${COLORS.warning}`
         }}>
@@ -520,7 +537,7 @@ export default function Dashboard() {
             width: '42px',
             height: '42px',
             borderRadius: '50%',
-            background: COLORS.warningBg,
+            background: 'rgba(201, 168, 108, 0.1)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -529,20 +546,20 @@ export default function Dashboard() {
             <Clock size={20} style={{ color: COLORS.warning }} />
           </div>
           <div>
-            <div style={{ fontFamily: FONTS.heading, fontSize: '28px', fontWeight: FONT_WEIGHTS.bold, color: COLORS.textPrimary, lineHeight: 1 }}>
+            <div style={{ fontFamily: FONTS.heading, fontSize: '26px', fontWeight: '700', color: COLORS.textPrimary, lineHeight: 1 }}>
               {stats.projetosEmProposta}
             </div>
-            <div style={{ fontSize: FONT_SIZES.sm, fontFamily: FONTS.body, color: COLORS.textSecondary, marginTop: '2px' }}>Em Proposta/Conceito</div>
+            <div style={{ fontSize: '12px', fontFamily: FONTS.body, color: COLORS.textSecondary, marginTop: '2px' }}>Em Proposta/Conceito</div>
           </div>
         </div>
 
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: SPACING.md,
-          padding: `${SPACING.base} ${SPACING.lg}`,
+          gap: '14px',
+          padding: '16px 20px',
           background: COLORS.bgCard,
-          borderRadius: RADIUS.lg,
+          borderRadius: '16px',
           border: `1px solid ${COLORS.border}`,
           borderLeft: `4px solid ${COLORS.error}`
         }}>
@@ -550,7 +567,7 @@ export default function Dashboard() {
             width: '42px',
             height: '42px',
             borderRadius: '50%',
-            background: COLORS.errorBg,
+            background: 'rgba(154, 107, 91, 0.1)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -559,16 +576,16 @@ export default function Dashboard() {
             <AlertTriangle size={20} style={{ color: COLORS.error }} />
           </div>
           <div>
-            <div style={{ fontFamily: FONTS.heading, fontSize: '28px', fontWeight: FONT_WEIGHTS.bold, color: COLORS.textPrimary, lineHeight: 1 }}>
+            <div style={{ fontFamily: FONTS.heading, fontSize: '26px', fontWeight: '700', color: COLORS.textPrimary, lineHeight: 1 }}>
               {stats.projetosEmRisco}
             </div>
-            <div style={{ fontSize: FONT_SIZES.sm, fontFamily: FONTS.body, color: COLORS.textSecondary, marginTop: '2px' }}>Em Risco / Bloqueados</div>
+            <div style={{ fontSize: '12px', fontFamily: FONTS.body, color: COLORS.textSecondary, marginTop: '2px' }}>Em Risco / Bloqueados</div>
           </div>
         </div>
       </div>
 
       {/* KPI Widgets Row */}
-      <div className="grid grid-4 mb-xl" style={{ gap: SPACING.lg }}>
+      <div className="grid grid-4 mb-xl" style={{ gap: '20px' }}>
         <CriticalDeadlinesWidget />
         <BudgetHealthWidget />
         <PendingApprovalsWidget />
@@ -576,11 +593,11 @@ export default function Dashboard() {
       </div>
 
       {/* Main Content Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 340px', gap: SPACING.lg, marginBottom: SPACING.xl }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 340px', gap: '20px', marginBottom: '24px' }}>
         {/* Recent Projects */}
         <div style={{
           background: COLORS.bgCard,
-          borderRadius: RADIUS.xl,
+          borderRadius: '20px',
           border: `1px solid ${COLORS.border}`,
           overflow: 'hidden'
         }}>
@@ -588,21 +605,21 @@ export default function Dashboard() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: `${SPACING.lg} ${SPACING.xl} ${SPACING.base}`
+            padding: '20px 24px 16px'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.md }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <BarChart3 size={18} style={{ color: COLORS.accent }} />
-              <h3 style={{ fontSize: FONT_SIZES.lg, fontWeight: FONT_WEIGHTS.semibold, fontFamily: FONTS.body, color: COLORS.textPrimary, margin: 0 }}>
+              <h3 style={{ fontSize: '17px', fontWeight: '600', fontFamily: FONTS.body, color: COLORS.textPrimary, margin: 0 }}>
                 Projetos Recentes
               </h3>
             </div>
             <button
               className="btn btn-ghost btn-sm"
               onClick={() => navigate('/projetos')}
-              style={{ fontSize: FONT_SIZES.base, fontFamily: FONTS.body, color: COLORS.accent, fontWeight: FONT_WEIGHTS.medium }}
+              style={{ fontSize: '13px', fontFamily: FONTS.body, color: COLORS.accent, fontWeight: '500' }}
             >
               Ver todos
-              <ArrowRight size={14} style={{ marginLeft: SPACING.xs }} />
+              <ArrowRight size={14} style={{ marginLeft: '4px' }} />
             </button>
           </div>
 
@@ -612,14 +629,14 @@ export default function Dashboard() {
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: '100px 1fr 120px 130px 120px', minWidth: '590px',
-                padding: `${SPACING.md} ${SPACING.xl}`,
+                padding: '10px 24px',
                 borderBottom: `1px solid ${COLORS.border}`,
                 background: COLORS.bgCardHover
               }}>
                 {['Código', 'Nome', 'Fase', 'Progresso', 'Localização'].map(h => (
                   <span key={h} style={{
-                    fontSize: FONT_SIZES.xs,
-                    fontWeight: FONT_WEIGHTS.semibold,
+                    fontSize: '11px',
+                    fontWeight: '600',
                     fontFamily: FONTS.body,
                     color: COLORS.textSecondary,
                     textTransform: 'uppercase',
@@ -638,7 +655,7 @@ export default function Dashboard() {
                   style={{
                     display: 'grid',
                     gridTemplateColumns: '100px 1fr 120px 130px 120px', minWidth: '590px',
-                    padding: `${SPACING.md} ${SPACING.xl}`,
+                    padding: '14px 24px',
                     alignItems: 'center',
                     cursor: 'pointer',
                     borderBottom: idx < recentProjects.length - 1 ? '1px solid rgba(229, 226, 217, 0.5)' : 'none',
@@ -648,39 +665,39 @@ export default function Dashboard() {
                   onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                 >
                   <span style={{
-                    fontWeight: FONT_WEIGHTS.semibold,
+                    fontWeight: '600',
                     color: COLORS.accent,
                     fontFamily: FONTS.mono,
-                    fontSize: FONT_SIZES.base
+                    fontSize: '13px'
                   }}>
                     {project.codigo}
                   </span>
                   <span style={{
                     fontFamily: FONTS.heading,
-                    fontWeight: FONT_WEIGHTS.semibold,
+                    fontWeight: '500',
                     color: COLORS.textPrimary,
-                    fontSize: '15px',
+                    fontSize: '14px',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
-                    paddingRight: SPACING.md
+                    paddingRight: '12px'
                   }}>
                     {project.nome}
                   </span>
                   <span style={{
                     display: 'inline-flex',
-                    padding: `${SPACING.xs} ${SPACING.md}`,
-                    borderRadius: RADIUS.full,
-                    fontSize: FONT_SIZES.xs,
-                    fontWeight: FONT_WEIGHTS.semibold,
+                    padding: '4px 12px',
+                    borderRadius: '20px',
+                    fontSize: '11px',
+                    fontWeight: '600',
                     fontFamily: FONTS.body,
-                    background: getPhaseBg(project.fase),
-                    color: getPhaseColor(project.fase),
+                    background: `${getFaseColor(project.fase)}18`,
+                    color: getFaseColor(project.fase),
                     width: 'fit-content'
                   }}>
                     {project.fase || 'N/D'}
                   </span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.sm }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <div style={{
                       width: '50px',
                       height: '6px',
@@ -696,20 +713,20 @@ export default function Dashboard() {
                         transition: 'width 0.5s ease'
                       }} />
                     </div>
-                    <span style={{ fontSize: FONT_SIZES.sm, fontFamily: FONTS.body, color: COLORS.textSecondary, fontWeight: FONT_WEIGHTS.medium }}>
+                    <span style={{ fontSize: '12px', fontFamily: FONTS.body, color: COLORS.textSecondary, fontWeight: '500' }}>
                       {project.progresso || 0}%
                     </span>
                   </div>
-                  <span style={{ color: COLORS.textSecondary, fontFamily: FONTS.body, fontSize: FONT_SIZES.base }}>
+                  <span style={{ color: COLORS.textSecondary, fontFamily: FONTS.body, fontSize: '13px' }}>
                     {project.localizacao || '-'}
                   </span>
                 </div>
               ))}
             </div>
           ) : (
-            <div style={{ padding: SPACING['4xl'], textAlign: 'center', color: COLORS.textSecondary }}>
-              <FolderKanban size={48} style={{ opacity: 0.2, marginBottom: SPACING.base }} />
-              <p style={{ margin: `0 0 ${SPACING.md}`, fontFamily: FONTS.body }}>Nenhum projeto encontrado</p>
+            <div style={{ padding: '48px', textAlign: 'center', color: COLORS.textSecondary }}>
+              <FolderKanban size={48} style={{ opacity: 0.2, marginBottom: '16px' }} />
+              <p style={{ margin: '0 0 12px', fontFamily: FONTS.body }}>Nenhum projeto encontrado</p>
               <button className="btn btn-primary btn-sm" onClick={() => navigate('/projetos')}>
                 Criar Projeto
               </button>
@@ -720,15 +737,15 @@ export default function Dashboard() {
         {/* Phase Distribution */}
         <div style={{
           background: COLORS.bgCard,
-          borderRadius: RADIUS.xl,
+          borderRadius: '20px',
           border: `1px solid ${COLORS.border}`,
-          padding: `${SPACING.lg} ${SPACING.xl}`,
+          padding: '20px 24px',
           display: 'flex',
           flexDirection: 'column'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.md, marginBottom: SPACING.lg }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
             <Activity size={18} style={{ color: COLORS.accent }} />
-            <h3 style={{ fontSize: FONT_SIZES.lg, fontWeight: FONT_WEIGHTS.semibold, fontFamily: FONTS.body, color: COLORS.textPrimary, margin: 0 }}>
+            <h3 style={{ fontSize: '17px', fontWeight: '600', fontFamily: FONTS.body, color: COLORS.textPrimary, margin: 0 }}>
               Por Fase
             </h3>
           </div>
@@ -740,13 +757,13 @@ export default function Dashboard() {
               height: '8px',
               borderRadius: '4px',
               overflow: 'hidden',
-              marginBottom: SPACING.lg,
+              marginBottom: '20px',
               background: COLORS.border
             }}>
               {projectsByPhase.map(({ fase, count }) => (
                 <div key={fase} style={{
                   width: `${(count / totalPhaseCount) * 100}%`,
-                  background: getPhaseColor(fase),
+                  background: getFaseColor(fase),
                   transition: 'width 0.5s ease'
                 }} />
               ))}
@@ -754,42 +771,41 @@ export default function Dashboard() {
           )}
 
           {projectsByPhase.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: SPACING.sm, flex: 1 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
               {projectsByPhase.map(({ fase, count }) => (
                 <div key={fase} style={{
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  padding: `${SPACING.md} ${SPACING.md}`,
+                  padding: '10px 14px',
                   background: COLORS.bgCardHover,
-                  borderRadius: RADIUS.md,
-                  transition: 'all 0.15s ease',
-                  cursor: 'default'
+                  borderRadius: '12px',
+                  transition: 'all 0.15s ease'
                 }}
                   onMouseEnter={(e) => { e.currentTarget.style.background = COLORS.border; e.currentTarget.style.transform = 'translateX(4px)' }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = COLORS.bgCardHover; e.currentTarget.style.transform = 'translateX(0)' }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.md }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <div style={{
                       width: '8px',
                       height: '8px',
                       borderRadius: '50%',
-                      background: getPhaseColor(fase),
+                      background: getFaseColor(fase),
                       flexShrink: 0
                     }} />
-                    <span style={{ fontWeight: FONT_WEIGHTS.medium, fontSize: FONT_SIZES.base, fontFamily: FONTS.body, color: COLORS.textPrimary }}>{fase}</span>
+                    <span style={{ fontWeight: '500', fontSize: '13px', fontFamily: FONTS.body, color: COLORS.textPrimary }}>{fase}</span>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.sm }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{
-                      fontSize: FONT_SIZES.xs,
+                      fontSize: '11px',
                       fontFamily: FONTS.body,
                       color: COLORS.textSecondary,
-                      fontWeight: FONT_WEIGHTS.medium
+                      fontWeight: '500'
                     }}>
                       {Math.round((count / totalPhaseCount) * 100)}%
                     </span>
                     <span style={{
-                      fontWeight: FONT_WEIGHTS.bold,
+                      fontWeight: '700',
                       color: COLORS.textPrimary,
                       fontSize: '15px',
                       minWidth: '24px',
@@ -802,7 +818,7 @@ export default function Dashboard() {
               ))}
             </div>
           ) : (
-            <div style={{ padding: SPACING.xl, textAlign: 'center', color: COLORS.textSecondary, fontFamily: FONTS.body }}>
+            <div style={{ padding: '24px', textAlign: 'center', color: COLORS.textSecondary, fontFamily: FONTS.body }}>
               Sem dados
             </div>
           )}
@@ -812,7 +828,7 @@ export default function Dashboard() {
       {/* Recent Activity */}
       <div style={{
         background: COLORS.bgCard,
-        borderRadius: RADIUS.xl,
+        borderRadius: '20px',
         border: `1px solid ${COLORS.border}`,
         overflow: 'hidden'
       }}>
@@ -820,21 +836,21 @@ export default function Dashboard() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: `${SPACING.lg} ${SPACING.xl} ${SPACING.base}`
+          padding: '20px 24px 16px'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.md }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <MessageSquare size={18} style={{ color: COLORS.accent }} />
-            <h3 style={{ fontSize: FONT_SIZES.lg, fontWeight: FONT_WEIGHTS.semibold, fontFamily: FONTS.body, color: COLORS.textPrimary, margin: 0 }}>
+            <h3 style={{ fontSize: '17px', fontWeight: '600', fontFamily: FONTS.body, color: COLORS.textPrimary, margin: 0 }}>
               Últimos Desenvolvimentos
             </h3>
           </div>
           <button
             className="btn btn-ghost btn-sm"
             onClick={() => navigate('/workspace')}
-            style={{ fontSize: FONT_SIZES.base, fontFamily: FONTS.body, color: COLORS.accent, fontWeight: FONT_WEIGHTS.medium }}
+            style={{ fontSize: '13px', fontFamily: FONTS.body, color: COLORS.accent, fontWeight: '500' }}
           >
             Ver todos
-            <ArrowRight size={14} style={{ marginLeft: SPACING.xs }} />
+            <ArrowRight size={14} style={{ marginLeft: '4px' }} />
           </button>
         </div>
 
@@ -847,8 +863,8 @@ export default function Dashboard() {
                 style={{
                   display: 'flex',
                   alignItems: 'flex-start',
-                  gap: SPACING.md,
-                  padding: `${SPACING.md} ${SPACING.xl}`,
+                  gap: '14px',
+                  padding: '14px 24px',
                   cursor: 'pointer',
                   borderBottom: idx < recentActivity.length - 1 ? '1px solid rgba(229, 226, 217, 0.5)' : 'none',
                   background: activity.hasMention ? 'rgba(122, 139, 110, 0.04)' : 'transparent',
@@ -861,12 +877,12 @@ export default function Dashboard() {
                   width: '36px',
                   height: '36px',
                   borderRadius: '50%',
-                  background: `linear-gradient(135deg, ${COLORS.border} 0%, ${COLORS.borderHover} 100%)`,
+                  background: 'linear-gradient(135deg, var(--stone) 0%, var(--stone-dark) 100%)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: FONT_SIZES.sm,
-                  fontWeight: FONT_WEIGHTS.semibold,
+                  fontSize: '12px',
+                  fontWeight: 600,
                   fontFamily: FONTS.body,
                   color: COLORS.textPrimary,
                   flexShrink: 0
@@ -875,8 +891,8 @@ export default function Dashboard() {
                 </div>
 
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.sm, marginBottom: '3px' }}>
-                    <span style={{ fontWeight: FONT_WEIGHTS.semibold, fontSize: FONT_SIZES.base, fontFamily: FONTS.body, color: COLORS.textPrimary }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
+                    <span style={{ fontWeight: 600, fontSize: '13px', fontFamily: FONTS.body, color: COLORS.textPrimary }}>
                       {activity.autor.nome}
                     </span>
                     {activity.hasMention && (
@@ -884,26 +900,26 @@ export default function Dashboard() {
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: '3px',
-                        padding: `2px ${SPACING.sm}`,
+                        padding: '2px 8px',
                         background: COLORS.accent,
-                        color: COLORS.textInverse,
-                        borderRadius: RADIUS.sm,
+                        color: 'white',
+                        borderRadius: '10px',
                         fontSize: '10px',
-                        fontWeight: FONT_WEIGHTS.semibold,
+                        fontWeight: 600,
                         fontFamily: FONTS.body
                       }}>
                         <AtSign size={9} />
                         Menção
                       </span>
                     )}
-                    <span style={{ fontSize: FONT_SIZES.xs, fontFamily: FONTS.body, color: COLORS.textSecondary, marginLeft: 'auto' }}>
+                    <span style={{ fontSize: '11px', fontFamily: FONTS.body, color: COLORS.textSecondary, marginLeft: 'auto' }}>
                       {formatRelativeTime(activity.created_at)}
                     </span>
                   </div>
 
                   <p style={{
                     margin: 0,
-                    fontSize: FONT_SIZES.base,
+                    fontSize: '13px',
                     fontFamily: FONTS.body,
                     color: COLORS.textSecondary,
                     lineHeight: 1.4,
@@ -919,8 +935,8 @@ export default function Dashboard() {
           </div>
         ) : (
           <div style={{ padding: '40px', textAlign: 'center', color: COLORS.textSecondary }}>
-            <MessageSquare size={36} style={{ opacity: 0.2, marginBottom: SPACING.md }} />
-            <p style={{ margin: 0, fontSize: FONT_SIZES.md, fontFamily: FONTS.body }}>Sem atividade recente</p>
+            <MessageSquare size={36} style={{ opacity: 0.2, marginBottom: '12px' }} />
+            <p style={{ margin: 0, fontSize: '14px', fontFamily: FONTS.body }}>Sem atividade recente</p>
           </div>
         )}
       </div>
