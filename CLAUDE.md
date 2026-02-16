@@ -45,6 +45,17 @@ Schema completo documentado em `docs/SUPABASE_DATABASE_SCHEMA.md`.
 
 Tabelas principais: `projetos`, `obras`, `utilizadores`, `orcamento_capitulos`, `facturacao_cliente`, `obra_timeline`, `obra_acoes`, `obra_emails`.
 
+## Relatórios Automáticos
+
+Blueprint completo em `docs/BLUEPRINT_RELATORIOS_AUTOMATICOS.md` — 4 fases, 33 itens, ~59% concluído.
+
+| Fase | Descrição | Progresso |
+|------|-----------|-----------|
+| 1 | Motor colecta + geração IA | 67% (6/9) |
+| 2 | DOCX/PDF branded + editor | 79% (5/7) |
+| 3 | Distribuição email/portal + agendamento | 65% (6/10) |
+| 4 | Relatório mensal + refinamento | 21% (1/7) |
+
 ## TODO
 
 ### Pendentes no código
