@@ -29,7 +29,7 @@ export default function PortalTimeline() {
         config.mostrar_entregas_material !== false
           ? supabase
               .from('purchase_orders')
-              .select('id, codigo, descricao_portal, data_entrega_prevista, data_entrega_real, estado')
+              .select('id, descricao_portal, data_entrega_prevista, data_entrega_real, estado')
               .eq('projeto_id', config.projeto_id)
               .eq('publicar_no_portal', true)
               .not('estado', 'in', '("cancelada","rascunho")')
@@ -38,9 +38,9 @@ export default function PortalTimeline() {
       ])
 
       if (marcosRes.error && marcosRes.error.code !== '42P01') throw marcosRes.error
-      if (entregasRes.error && entregasRes.error.code !== '42P01') throw entregasRes.error
-
       setMarcos(marcosRes.data || [])
+
+      if (entregasRes.error && entregasRes.error.code !== '42P01') throw entregasRes.error
       setEntregas(entregasRes.data || [])
     } catch (err) {
       console.error('Timeline error:', err)
@@ -205,7 +205,7 @@ export default function PortalTimeline() {
                 <Truck size={16} style={{ color: '#ADAA96', flexShrink: 0, marginTop: '2px' }} />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: '14px', fontWeight: 500, color: '#2D2B28' }}>
-                    {e.descricao_portal || e.codigo}
+                    {e.descricao_portal || e.id}
                   </div>
                   <div style={{ display: 'flex', gap: '12px', fontSize: '12px', color: '#8B8670', marginTop: '4px' }}>
                     {e.data_entrega_prevista && (
