@@ -120,22 +120,35 @@ export default function Sidebar({ isOpen, onClose, isMobile, collapsed, onToggle
 
   return (
     <aside className={`sidebar ${isOpen ? 'open' : ''} ${collapsed ? 'collapsed' : ''}`}>
-      {/* Header: Logo + Toggle */}
-      <div className="sidebar-header">
-        <NavLink to="/" className="sidebar-logo" onClick={handleNavClick}>
-          <div className="logo-mark">G</div>
-          {!collapsed && <span className="logo-text">GAVINHO</span>}
-        </NavLink>
-        {!isMobile && (
+      {/* Header: Logo + Toggle (expanded) / Toggle only (collapsed) */}
+      {!collapsed && (
+        <div className="sidebar-header">
+          <NavLink to="/" className="sidebar-logo" onClick={handleNavClick}>
+            <div className="logo-mark">G</div>
+            <span className="logo-text">GAVINHO</span>
+          </NavLink>
+          {!isMobile && (
+            <button
+              onClick={onToggleCollapse}
+              className="sidebar-toggle-btn"
+              title="Colapsar sidebar"
+            >
+              <PanelLeftClose size={16} />
+            </button>
+          )}
+        </div>
+      )}
+      {collapsed && !isMobile && (
+        <div className="sidebar-header-collapsed">
           <button
             onClick={onToggleCollapse}
             className="sidebar-toggle-btn"
-            title={collapsed ? 'Expandir sidebar' : 'Colapsar sidebar'}
+            title="Expandir sidebar"
           >
-            {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+            <PanelLeftOpen size={18} />
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* G.A.R.V.I.S. AI Assistant */}
       <NavLink

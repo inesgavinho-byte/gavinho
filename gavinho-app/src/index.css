@@ -355,13 +355,14 @@ h4 { font-size: 17px; }
   -webkit-backdrop-filter: blur(var(--sidebar-blur));
   display: flex;
   flex-direction: column;
-  padding: 16px 10px;
+  padding: 12px 10px;
   border-right: 1px solid var(--sidebar-border);
   position: fixed;
   top: 0;
   left: 0;
   bottom: 0;
   z-index: 100;
+  overflow: hidden;
   transition: width 0.25s ease, padding 0.25s ease;
   font-family: 'Quattrocento Sans', -apple-system, BlinkMacSystemFont, sans-serif;
 }
@@ -371,7 +372,15 @@ h4 { font-size: 17px; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px 20px;
+  padding: 4px 12px 14px;
+}
+
+/* Collapsed: toggle-only header (no logo) */
+.sidebar-header-collapsed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 6px 8px;
 }
 
 .sidebar-logo {
@@ -430,8 +439,8 @@ h4 { font-size: 17px; }
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 12px;
-  margin: 0 2px 16px;
+  padding: 9px 12px;
+  margin: 0 2px 10px;
   border-radius: 10px;
   text-decoration: none;
   cursor: pointer;
@@ -495,7 +504,7 @@ h4 { font-size: 17px; }
 .garvis-collapsed {
   justify-content: center;
   padding: 10px;
-  margin: 0 4px 12px;
+  margin: 0 4px 8px;
 }
 
 .garvis-collapsed svg {
@@ -506,11 +515,11 @@ h4 { font-size: 17px; }
 /* ── Navigation ── */
 .sidebar-nav {
   flex: 1;
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 .nav-section {
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .nav-section-title {
@@ -534,11 +543,11 @@ h4 { font-size: 17px; }
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 7px 12px;
+  padding: 6px 12px;
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
-  margin-bottom: 1px;
+  margin-bottom: 0;
   text-decoration: none;
   color: var(--sidebar-item-color);
   font-family: 'Quattrocento Sans', sans-serif;
@@ -599,7 +608,7 @@ h4 { font-size: 17px; }
 
 /* ── Footer ── */
 .sidebar-footer {
-  padding-top: 12px;
+  padding-top: 8px;
   border-top: 1px solid var(--sidebar-border);
 }
 
@@ -1676,31 +1685,10 @@ tbody tr:last-child td {
    ======================================== */
 .sidebar.collapsed {
   width: 72px;
-  padding: 16px 6px;
+  padding: 8px 6px;
 }
 
-.sidebar.collapsed .sidebar-header {
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 6px 12px;
-}
-
-.sidebar.collapsed .sidebar-logo {
-  gap: 0;
-}
-
-.sidebar.collapsed .logo-text {
-  display: none;
-}
-
-.sidebar.collapsed .logo-mark {
-  transition: transform 0.2s ease;
-}
-
-.sidebar.collapsed .logo-mark:hover {
-  transform: scale(1.08);
-}
+/* Header is hidden in collapsed mode; only toggle-btn shows */
 
 .sidebar.collapsed .nav-section-title {
   display: none;
@@ -1709,14 +1697,14 @@ tbody tr:last-child td {
 .sidebar.collapsed .nav-section-divider {
   height: 1px;
   background: var(--sidebar-border);
-  margin: 6px 10px;
+  margin: 4px 10px;
 }
 
 .sidebar.collapsed .nav-item {
   justify-content: center;
-  padding: 10px;
+  padding: 8px;
   border-radius: 10px;
-  margin: 2px 4px;
+  margin: 1px 4px;
   position: relative;
 }
 
