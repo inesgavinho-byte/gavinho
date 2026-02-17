@@ -266,7 +266,41 @@ export default function ObraDetalhe() {
 
       {/* Sub-tabs */}
       {activeMainTab === 'tracking' && renderSubtabs(trackingSubtabs, activeTrackingSubtab, handleTrackingSubtabChange, 'Sub-separadores tracking')}
-      {activeMainTab === 'acompanhamento' && renderSubtabs(acompanhamentoSubtabs, activeAcompanhamentoSubtab, setActiveAcompanhamentoSubtab, 'Sub-separadores acompanhamento')}
+      {activeMainTab === 'acompanhamento' && (
+        <div
+          role="tablist"
+          aria-label="Sub-separadores acompanhamento"
+          style={{
+            display: 'flex', gap: '24px', padding: '0', marginBottom: '20px',
+            borderBottom: `1px solid ${colors.border}`
+          }}
+        >
+          {acompanhamentoSubtabs.map(subtab => {
+            const isActive = activeAcompanhamentoSubtab === subtab.id
+            return (
+              <button
+                key={subtab.id}
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => setActiveAcompanhamentoSubtab(subtab.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '6px', padding: '14px 0',
+                  background: 'none', border: 'none',
+                  borderBottom: isActive ? '2px solid #2C2C2B' : '2px solid transparent',
+                  cursor: 'pointer', marginBottom: '-1px',
+                  color: isActive ? '#2C2C2B' : colors.textMuted,
+                  fontWeight: isActive ? 600 : 400,
+                  fontSize: '14px',
+                  fontFamily: "'Quattrocento Sans', sans-serif",
+                  transition: 'all 0.2s'
+                }}
+              >
+                {subtab.label}
+              </button>
+            )
+          })}
+        </div>
+      )}
       {activeMainTab === 'fiscalizacao' && renderSubtabs(fiscalizacaoSubtabs, activeFiscalizacaoSubtab, setActiveFiscalizacaoSubtab, 'Sub-separadores fiscalização')}
       {activeMainTab === 'equipas' && renderSubtabs(equipasSubtabs, activeEquipasSubtab, setActiveEquipasSubtab, 'Sub-separadores equipas')}
 
@@ -288,6 +322,7 @@ export default function ObraDetalhe() {
 
         {activeMainTab === 'acompanhamento' && (
           <AcompanhamentoTab
+            obra={obra}
             obraId={obra.id}
             activeSubtab={activeAcompanhamentoSubtab}
             currentUser={currentUser}
