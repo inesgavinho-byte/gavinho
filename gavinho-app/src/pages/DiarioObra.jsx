@@ -164,7 +164,14 @@ export default function DiarioObra() {
       .select('*')
       .eq('ativo', true)
       .order('ordem')
-    if (data) setEspecialidades(data)
+    if (data) {
+      const seen = new Set()
+      setEspecialidades(data.filter(e => {
+        if (seen.has(e.nome)) return false
+        seen.add(e.nome)
+        return true
+      }))
+    }
   }
 
   const fetchZonas = async () => {

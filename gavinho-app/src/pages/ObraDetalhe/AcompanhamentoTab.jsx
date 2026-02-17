@@ -67,7 +67,14 @@ export default function AcompanhamentoTab({ obraId, activeSubtab, currentUser })
       if (fotosRes.error) throw fotosRes.error
       setFotos(fotosRes.data || [])
       setZonas(zonasRes.data || [])
-      setEspecialidades(especRes.data || [])
+      // Deduplicate especialidades by nome (DB may have duplicates)
+      const seen = new Set()
+      const uniqueEspec = (especRes.data || []).filter(e => {
+        if (seen.has(e.nome)) return false
+        seen.add(e.nome)
+        return true
+      })
+      setEspecialidades(uniqueEspec)
     } catch (err) { console.error('Erro fotos:', err) }
     finally { setFotosLoading(false) }
   }, [obraId])
