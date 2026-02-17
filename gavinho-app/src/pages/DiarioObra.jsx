@@ -1,18 +1,46 @@
-import { useState, useEffect } from 'react'
+// =====================================================
+// DIÁRIO DE OBRA — Timeline View + Formulário
+// Vista cronológica de registos diários com sidebar
+// =====================================================
+
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 import {
   Sun, Cloud, CloudRain, Wind, CloudFog,
   Plus, Trash2, Edit2, Check, X, Upload, ChevronRight,
-  Save, Send, Clock, Users, AlertTriangle, Camera, ArrowRight
+  Save, Send, Clock, Users, AlertTriangle, Camera, ArrowRight,
+  Download, Calendar, ChevronLeft, Image, FileText, MessageSquare,
+  MapPin, Thermometer, Eye
 } from 'lucide-react'
 
+const FONTS = {
+  heading: "'Cormorant Garamond', Georgia, serif",
+  body: "'Quattrocento Sans', -apple-system, BlinkMacSystemFont, sans-serif",
+  mono: "'SF Mono', 'Fira Code', 'Consolas', monospace",
+}
+
+const C = {
+  success: '#5B7B6A',
+  warning: '#C4956A',
+  danger: '#A65D57',
+  info: '#7A8B9E',
+  dark: '#2C2C2B',
+  muted: '#9A978A',
+  light: '#6B6B6B',
+  border: '#E5E2D9',
+  cream: '#F5F3EB',
+  white: '#FFFFFF',
+  bg: '#FAF8F4',
+}
+
 const WEATHER_OPTIONS = [
-  { id: 'sol', label: 'Sol', icon: Sun },
-  { id: 'nublado', label: 'Nublado', icon: Cloud },
-  { id: 'chuva', label: 'Chuva', icon: CloudRain },
-  { id: 'vento', label: 'Vento', icon: Wind },
-  { id: 'neblina', label: 'Neblina', icon: CloudFog },
+  { id: 'sol', label: 'Sol', icon: Sun, emoji: '☀️', desc: 'Céu limpo' },
+  { id: 'nublado', label: 'Nublado', icon: Cloud, emoji: '☁️', desc: 'Nublado' },
+  { id: 'chuva', label: 'Chuva', icon: CloudRain, emoji: '🌧️', desc: 'Chuva' },
+  { id: 'vento', label: 'Vento', icon: Wind, emoji: '💨', desc: 'Ventoso' },
+  { id: 'neblina', label: 'Neblina', icon: CloudFog, emoji: '🌫️', desc: 'Neblina' },
 ]
 
 const FUNCOES = [
@@ -26,9 +54,46 @@ const FUNCOES = [
 const SEVERIDADES = ['Baixa', 'Média', 'Alta']
 const SEVERIDADES_NC = ['MENOR', 'MAIOR', 'CRÍTICA']
 
+const SPECIALTY_COLORS = {
+  'CARPINTARIA': { bg: 'rgba(196,149,106,0.12)', color: '#B8834A' },
+  'ELETRICIDADE': { bg: 'rgba(122,139,158,0.12)', color: '#5A7A9E' },
+  'PEDRA NATURAL': { bg: 'rgba(154,151,138,0.12)', color: '#7A7768' },
+  'ALVENARIA': { bg: 'rgba(91,123,106,0.12)', color: '#4A6B5A' },
+  'AVAC': { bg: 'rgba(166,93,87,0.12)', color: '#A65D57' },
+  'CANALIZAÇÃO': { bg: 'rgba(107,107,107,0.12)', color: '#5A5A5A' },
+  'PINTURA': { bg: 'rgba(196,149,106,0.12)', color: '#B8834A' },
+  'SERRALHARIA': { bg: 'rgba(122,139,158,0.12)', color: '#5A7A9E' },
+  'IMPERMEABILIZAÇÃO': { bg: 'rgba(91,123,106,0.12)', color: '#4A6B5A' },
+}
+
+const DIAS_SEMANA = ['DOMINGO', 'SEGUNDA-FEIRA', 'TERÇA-FEIRA', 'QUARTA-FEIRA', 'QUINTA-FEIRA', 'SEXTA-FEIRA', 'SÁBADO']
+const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
+
+const TABS = [
+  { key: 'resumo', label: 'Resumo' },
+  { key: 'diario', label: 'Diário' },
+  { key: 'fotografias', label: 'Fotografias' },
+  { key: 'nao_conformidades', label: 'Não Conformidades' },
+  { key: 'documentos', label: 'Documentos' },
+]
+
+function getSpecialtyTag(text) {
+  if (!text) return null
+  const upper = text.toUpperCase()
+  for (const key of Object.keys(SPECIALTY_COLORS)) {
+    if (upper.includes(key)) return key
+  }
+  return null
+}
+
+function getDefaultSpecialtyColors(tag) {
+  return SPECIALTY_COLORS[tag] || { bg: 'rgba(154,151,138,0.12)', color: '#7A7768' }
+}
+
 export default function DiarioObra() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { profile } = useAuth()
   const [searchParams] = useSearchParams()
   const dataParam = searchParams.get('data')
 
@@ -39,6 +104,19 @@ export default function DiarioObra() {
   const [saving, setSaving] = useState(false)
   const [lastSaved, setLastSaved] = useState(null)
   const [diarioId, setDiarioId] = useState(null)
+  const [activeTab, setActiveTab] = useState('diario')
+
+  // All diary entries for timeline
+  const [allEntries, setAllEntries] = useState([])
+  const [loadingEntries, setLoadingEntries] = useState(true)
+
+  // Form modal
+  const [showFormModal, setShowFormModal] = useState(false)
+  const [editingEntry, setEditingEntry] = useState(null)
+
+  // Calendar
+  const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth())
+  const [calendarYear, setCalendarYear] = useState(new Date().getFullYear())
 
   // Form state
   const [selectedObra, setSelectedObra] = useState(id || '')
@@ -86,14 +164,14 @@ export default function DiarioObra() {
   useEffect(() => {
     if (selectedObra) {
       fetchObraDetails()
-      fetchExistingDiario()
+      fetchAllEntries()
     }
-  }, [selectedObra, data])
+  }, [selectedObra])
 
   const fetchObras = async () => {
     const { data } = await supabase
       .from('obras')
-      .select('id, codigo, nome')
+      .select('id, codigo, nome, morada, diretor_obra')
       .order('codigo')
     if (data) setObras(data)
   }
@@ -109,12 +187,23 @@ export default function DiarioObra() {
     setLoading(false)
   }
 
-  const fetchExistingDiario = async () => {
+  const fetchAllEntries = async () => {
+    setLoadingEntries(true)
+    const { data: entries } = await supabase
+      .from('obra_diario')
+      .select('*')
+      .eq('obra_id', selectedObra)
+      .order('data', { ascending: false })
+    if (entries) setAllEntries(entries)
+    setLoadingEntries(false)
+  }
+
+  const fetchExistingDiario = async (targetDate) => {
     const { data: diario } = await supabase
       .from('obra_diario')
       .select('*')
       .eq('obra_id', selectedObra)
-      .eq('data', data)
+      .eq('data', targetDate)
       .single()
 
     if (diario) {
@@ -162,13 +251,13 @@ export default function DiarioObra() {
     setShowAddTrabalhador(false)
   }
 
-  const handleRemoveTrabalhador = (id) => {
-    setTrabalhadores(trabalhadores.filter(t => t.id !== id))
+  const handleRemoveTrabalhador = (tid) => {
+    setTrabalhadores(trabalhadores.filter(t => t.id !== tid))
   }
 
-  const handleToggleTrabalhadorEstado = (id) => {
+  const handleToggleTrabalhadorEstado = (tid) => {
     setTrabalhadores(trabalhadores.map(t =>
-      t.id === id ? { ...t, estado: t.estado === 'PRESENTE' ? 'AUSENTE' : 'PRESENTE' } : t
+      t.id === tid ? { ...t, estado: t.estado === 'PRESENTE' ? 'AUSENTE' : 'PRESENTE' } : t
     ))
   }
 
@@ -180,20 +269,20 @@ export default function DiarioObra() {
     setShowAddTarefa(false)
   }
 
-  const handleToggleTarefa = (id) => {
+  const handleToggleTarefa = (tid) => {
     setTarefas(tarefas.map(t =>
-      t.id === id ? { ...t, concluida: !t.concluida } : t
+      t.id === tid ? { ...t, concluida: !t.concluida } : t
     ))
   }
 
-  const handleTarefaPercentagem = (id, percentagem) => {
+  const handleTarefaPercentagem = (tid, percentagem) => {
     setTarefas(tarefas.map(t =>
-      t.id === id ? { ...t, percentagem } : t
+      t.id === tid ? { ...t, percentagem } : t
     ))
   }
 
-  const handleRemoveTarefa = (id) => {
-    setTarefas(tarefas.filter(t => t.id !== id))
+  const handleRemoveTarefa = (tid) => {
+    setTarefas(tarefas.filter(t => t.id !== tid))
   }
 
   // Handlers de Ocorrências
@@ -203,8 +292,8 @@ export default function DiarioObra() {
     setNovaOcorrencia({ severidade: 'Baixa', descricao: '' })
   }
 
-  const handleRemoveOcorrencia = (id) => {
-    setOcorrencias(ocorrencias.filter(o => o.id !== id))
+  const handleRemoveOcorrencia = (oid) => {
+    setOcorrencias(ocorrencias.filter(o => o.id !== oid))
   }
 
   // Handlers de Não Conformidades
@@ -228,8 +317,8 @@ export default function DiarioObra() {
     setShowAddNC(true)
   }
 
-  const handleRemoveNC = (id) => {
-    setNaoConformidades(naoConformidades.filter(nc => nc.id !== id))
+  const handleRemoveNC = (ncid) => {
+    setNaoConformidades(naoConformidades.filter(nc => nc.id !== ncid))
   }
 
   // Handlers de Fotos
@@ -248,12 +337,12 @@ export default function DiarioObra() {
     }
   }
 
-  const handleFotoDescricao = (id, descricao) => {
-    setFotos(fotos.map(f => f.id === id ? { ...f, descricao } : f))
+  const handleFotoDescricao = (fid, descricao) => {
+    setFotos(fotos.map(f => f.id === fid ? { ...f, descricao } : f))
   }
 
-  const handleRemoveFoto = (id) => {
-    setFotos(fotos.filter(f => f.id !== id))
+  const handleRemoveFoto = (fid) => {
+    setFotos(fotos.filter(f => f.id !== fid))
   }
 
   // Handlers de Próximos Passos
@@ -264,8 +353,8 @@ export default function DiarioObra() {
     setShowAddPasso(false)
   }
 
-  const handleRemovePasso = (id) => {
-    setProximosPassos(proximosPassos.filter(p => p.id !== id))
+  const handleRemovePasso = (pid) => {
+    setProximosPassos(proximosPassos.filter(p => p.id !== pid))
   }
 
   // Guardar Rascunho
@@ -332,650 +421,1265 @@ export default function DiarioObra() {
     }
 
     setSaving(false)
-    navigate(`/obras/${selectedObra}`)
+    setShowFormModal(false)
+    fetchAllEntries()
   }
 
-  if (loading && selectedObra) {
+  // Open form for new entry
+  const handleNewEntry = () => {
+    resetForm()
+    setData(new Date().toISOString().split('T')[0])
+    setEditingEntry(null)
+    setDiarioId(null)
+    setShowFormModal(true)
+  }
+
+  // Open form to edit existing entry
+  const handleEditEntry = async (entry) => {
+    setEditingEntry(entry)
+    setData(entry.data)
+    setDiarioId(entry.id)
+    setFuncao(entry.funcao || 'Encarregado de Obra')
+    setCondicaoMeteo(entry.condicoes_meteo?.toLowerCase() || 'sol')
+    setTemperatura(entry.temperatura || '')
+    setObservacoesMeteo(entry.observacoes_meteo || '')
+    setTrabalhadores(entry.trabalhadores || [])
+    setTarefas(entry.tarefas || [])
+    setOcorrencias(entry.ocorrencias || [])
+    setNaoConformidades(entry.nao_conformidades || [])
+    setFotos(entry.fotos || [])
+    setProximosPassos(entry.proximos_passos || [])
+    setLastSaved(entry.updated_at ? new Date(entry.updated_at) : null)
+    setShowFormModal(true)
+  }
+
+  // Week summary stats
+  const weekSummary = useMemo(() => {
+    const now = new Date()
+    const startOfWeek = new Date(now)
+    startOfWeek.setDate(now.getDate() - now.getDay() + 1) // Monday
+    const endOfWeek = new Date(startOfWeek)
+    endOfWeek.setDate(startOfWeek.getDate() + 4) // Friday
+
+    const weekEntries = allEntries.filter(e => {
+      const d = new Date(e.data)
+      return d >= startOfWeek && d <= endOfWeek
+    })
+
+    const totalWorkers = weekEntries.reduce((sum, e) => {
+      const present = (e.trabalhadores || []).filter(t => t.estado === 'PRESENTE').length
+      return sum + present
+    }, 0)
+
+    const totalPhotos = weekEntries.reduce((sum, e) => sum + (e.fotos || []).length, 0)
+    const totalIncidents = weekEntries.reduce((sum, e) => sum + (e.ocorrencias || []).length, 0)
+
+    return {
+      diasRegistados: weekEntries.length,
+      diasTotal: 5,
+      mediaObra: weekEntries.length > 0 ? (totalWorkers / weekEntries.length).toFixed(1) : '0',
+      fotografias: totalPhotos,
+      incidentes: totalIncidents,
+    }
+  }, [allEntries])
+
+  // Days with entries for calendar
+  const entryDates = useMemo(() => {
+    return new Set(allEntries.map(e => e.data))
+  }, [allEntries])
+
+  // Calendar days
+  const calendarDays = useMemo(() => {
+    const firstDay = new Date(calendarYear, calendarMonth, 1)
+    const lastDay = new Date(calendarYear, calendarMonth + 1, 0)
+    const startDay = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1 // Monday-start
+    const days = []
+    for (let i = 0; i < startDay; i++) days.push(null)
+    for (let d = 1; d <= lastDay.getDate(); d++) days.push(d)
+    return days
+  }, [calendarMonth, calendarYear])
+
+  // Pending items for the obra
+  const pendingItems = useMemo(() => {
+    const items = []
+    allEntries.forEach(e => {
+      (e.ocorrencias || []).forEach(o => {
+        if (o.severidade === 'Alta') {
+          items.push({ type: 'bloqueio', text: o.descricao, date: e.data, color: C.danger })
+        }
+      });
+      (e.nao_conformidades || []).forEach(nc => {
+        items.push({ type: 'nc', text: nc.descricao, date: e.data, color: C.warning })
+      });
+      (e.proximos_passos || []).forEach(p => {
+        items.push({ type: 'decisao', text: p.texto, date: e.data, color: C.dark })
+      })
+    })
+    return items.slice(0, 5)
+  }, [allEntries])
+
+  // No obra selected — show selector
+  if (!selectedObra) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '50vh' }}>
-        <div className="chat-spinner" style={{ width: 32, height: 32, border: '3px solid var(--stone)', borderTopColor: 'var(--blush)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+      <div style={{ maxWidth: '600px', margin: '80px auto', textAlign: 'center' }}>
+        <h1 style={{ fontFamily: FONTS.heading, fontSize: '32px', fontWeight: 600, color: C.dark, marginBottom: '8px' }}>
+          Diário de Obra
+        </h1>
+        <p style={{ fontFamily: FONTS.body, fontSize: '14px', color: C.light, marginBottom: '32px' }}>
+          Selecione a obra para ver o diário
+        </p>
+        <select
+          value={selectedObra}
+          onChange={(e) => {
+            setSelectedObra(e.target.value)
+            if (e.target.value) navigate(`/obras/${e.target.value}/diario`)
+          }}
+          style={{
+            width: '100%', padding: '12px 16px', border: `1px solid ${C.border}`,
+            borderRadius: '10px', fontSize: '14px', fontFamily: FONTS.body,
+            background: C.white, color: C.dark, cursor: 'pointer',
+          }}
+        >
+          <option value="">Selecionar obra...</option>
+          {obras.map(o => (
+            <option key={o.id} value={o.id}>{o.codigo} — {o.nome}</option>
+          ))}
+        </select>
       </div>
     )
   }
 
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '50vh' }}>
+        <div style={{
+          width: '40px', height: '40px', border: `3px solid ${C.border}`,
+          borderTopColor: C.success, borderRadius: '50%', animation: 'spin 1s linear infinite',
+        }} />
+      </div>
+    )
+  }
+
+  const formatDate = (dateStr) => {
+    const d = new Date(dateStr + 'T00:00:00')
+    return { day: d.getDate(), month: MESES[d.getMonth()], weekday: DIAS_SEMANA[d.getDay()], year: d.getFullYear() }
+  }
+
+  const getWeatherInfo = (meteo) => {
+    const w = WEATHER_OPTIONS.find(o => o.id === meteo?.toLowerCase()) || WEATHER_OPTIONS[0]
+    return w
+  }
+
   return (
-    <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-      {/* Breadcrumb */}
-      <div className="breadcrumb" style={{ marginBottom: 8 }}>
-        <Link to="/obras" style={{ color: 'var(--brown-light)', textDecoration: 'none' }}>Obras</Link>
-        <span style={{ margin: '0 8px', color: 'var(--brown-light)' }}>›</span>
+    <div style={{ maxWidth: '1200px' }}>
+      {/* ═══ BREADCRUMB ═══ */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '6px',
+        marginBottom: '16px',
+        fontFamily: FONTS.body, fontSize: '12px',
+      }}>
+        <Link to="/obras" style={{ color: C.muted, textDecoration: 'none' }}>Obras</Link>
+        <ChevronRight size={12} style={{ color: C.muted }} />
         {obra && (
           <>
-            <Link to={`/obras/${obra.id}`} style={{ color: 'var(--brown-light)', textDecoration: 'none' }}>{obra.codigo}</Link>
-            <span style={{ margin: '0 8px', color: 'var(--brown-light)' }}>›</span>
+            <Link to={`/obras/${obra.id}`} style={{ color: C.muted, textDecoration: 'none' }}>{obra.codigo}</Link>
+            <ChevronRight size={12} style={{ color: C.muted }} />
           </>
         )}
-        <span style={{ color: 'var(--brown)' }}>Diário de Obra</span>
+        <span style={{ color: C.dark, fontWeight: 600 }}>Diário de Obra</span>
       </div>
 
-      {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 28, fontWeight: 700, color: 'var(--brown)', marginBottom: 4 }}>Diário de Obra</h1>
-        <p style={{ color: 'var(--brown-light)', fontSize: 14 }}>Registo diário de atividades, recursos e ocorrências</p>
-      </div>
-
-      {/* Meta Info Card */}
-      <div className="card" style={{ padding: 20, marginBottom: 20 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 20 }}>
-          <div>
-            <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--brown-light)', marginBottom: 8, display: 'block' }}>OBRA</label>
-            <select
-              value={selectedObra}
-              onChange={(e) => setSelectedObra(e.target.value)}
-              className="select"
-              style={{ width: '100%' }}
-            >
-              <option value="">Selecionar obra...</option>
-              {obras.map(o => (
-                <option key={o.id} value={o.id}>{o.codigo} — {o.nome}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--brown-light)', marginBottom: 8, display: 'block' }}>DATA</label>
-            <input
-              type="date"
-              value={data}
-              onChange={(e) => setData(e.target.value)}
-              className="input"
-            />
-          </div>
-          <div>
-            <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--brown-light)', marginBottom: 8, display: 'block' }}>FUNÇÃO</label>
-            <select
-              value={funcao}
-              onChange={(e) => setFuncao(e.target.value)}
-              className="select"
-              style={{ width: '100%' }}
-            >
-              {FUNCOES.map(f => (
-                <option key={f} value={f}>{f}</option>
-              ))}
-            </select>
-          </div>
+      {/* ═══ HEADER ═══ */}
+      <div style={{ marginBottom: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+          <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: C.success }} />
+          <span style={{
+            fontFamily: FONTS.mono, fontSize: '12px', fontWeight: 700,
+            color: C.light, letterSpacing: '0.04em',
+          }}>
+            {obra?.codigo}
+          </span>
+        </div>
+        <h1 style={{
+          fontFamily: FONTS.heading,
+          fontSize: '36px',
+          fontWeight: 600,
+          color: C.dark,
+          letterSpacing: '-0.5px',
+          margin: 0,
+          lineHeight: 1.1,
+        }}>
+          {obra?.nome || 'Diário de Obra'}
+        </h1>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '16px',
+          marginTop: '8px',
+        }}>
+          {obra?.morada && (
+            <span style={{
+              fontFamily: FONTS.body, fontSize: '13px', color: C.light,
+              display: 'flex', alignItems: 'center', gap: '4px',
+            }}>
+              <MapPin size={12} style={{ color: C.muted }} />
+              {obra.morada}
+            </span>
+          )}
+          {obra?.diretor_obra && (
+            <span style={{
+              fontFamily: FONTS.body, fontSize: '13px', color: C.light,
+            }}>
+              Dir. Obra: <strong style={{ color: C.dark }}>{obra.diretor_obra}</strong>
+            </span>
+          )}
         </div>
       </div>
 
-      {/* Secção 1: Condições Meteorológicas */}
-      <SectionCard number={1} title="Condições Meteorológicas" subtitle="Selecione as condições observadas durante o dia">
-        <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
-          {WEATHER_OPTIONS.map(w => {
-            const Icon = w.icon
-            const isSelected = condicaoMeteo === w.id
-            return (
-              <button
-                key={w.id}
-                onClick={() => setCondicaoMeteo(w.id)}
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: '16px 24px',
-                  background: isSelected ? 'var(--cream)' : 'var(--white)',
-                  border: isSelected ? '2px solid var(--olive-gray)' : '2px solid var(--stone)',
-                  borderRadius: 12,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                <Icon size={28} strokeWidth={1.5} color={isSelected ? 'var(--olive-gray)' : 'var(--brown-light)'} />
-                <span style={{ fontSize: 13, color: isSelected ? 'var(--brown)' : 'var(--brown-light)' }}>{w.label}</span>
-              </button>
-            )
-          })}
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 20 }}>
-          <div>
-            <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--brown-light)', marginBottom: 8, display: 'block' }}>TEMPERATURA (°C)</label>
-            <input
-              type="number"
-              value={temperatura}
-              onChange={(e) => setTemperatura(e.target.value)}
-              placeholder="Ex: 14"
-              className="input"
-            />
-          </div>
-          <div>
-            <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--brown-light)', marginBottom: 8, display: 'block' }}>OBSERVAÇÕES</label>
-            <input
-              type="text"
-              value={observacoesMeteo}
-              onChange={(e) => setObservacoesMeteo(e.target.value)}
-              placeholder="Ex: Manhã com nevoeiro, tarde limpa"
-              className="input"
-            />
-          </div>
-        </div>
-      </SectionCard>
-
-      {/* Secção 2: Trabalhadores */}
-      <SectionCard number={2} title="Trabalhadores / Subempreiteiros Presentes" subtitle="Registo de presenças da equipa em obra">
-        {/* Summary Cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 24 }}>
-          <div style={{ background: 'var(--cream)', borderRadius: 12, padding: 20, textAlign: 'center' }}>
-            <div style={{ fontSize: 32, fontWeight: 700, color: 'var(--brown)' }}>{trabPresentes}</div>
-            <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--brown-light)' }}>PRESENTES</div>
-          </div>
-          <div style={{ background: 'var(--cream)', borderRadius: 12, padding: 20, textAlign: 'center' }}>
-            <div style={{ fontSize: 32, fontWeight: 700, color: 'var(--brown)' }}>{trabAusentes}</div>
-            <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--brown-light)' }}>AUSENTES</div>
-          </div>
-          <div style={{ background: 'var(--cream)', borderRadius: 12, padding: 20, textAlign: 'center' }}>
-            <div style={{ fontSize: 32, fontWeight: 700, color: 'var(--brown)' }}>{trabSubempreiteiros}</div>
-            <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--brown-light)' }}>SUBEMPREITEIROS</div>
-          </div>
-        </div>
-
-        {/* Table */}
-        {trabalhadores.length > 0 && (
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1.5fr 1fr 60px', gap: 16, padding: '12px 16px', borderBottom: '1px solid var(--stone)', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--brown-light)' }}>
-              <span>NOME</span>
-              <span>FUNÇÃO</span>
-              <span>TIPO</span>
-              <span>ESTADO</span>
-              <span></span>
-            </div>
-            {trabalhadores.map(t => (
-              <div key={t.id} style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1.5fr 1fr 60px', gap: 16, padding: '14px 16px', borderBottom: '1px solid var(--stone)', alignItems: 'center' }}>
-                <span style={{ color: 'var(--brown)' }}>{t.nome}</span>
-                <span style={{ color: 'var(--brown-light)' }}>{t.funcao}</span>
-                <span style={{ color: 'var(--brown-light)' }}>{t.tipo}</span>
-                <span>
-                  <button
-                    onClick={() => handleToggleTrabalhadorEstado(t.id)}
-                    style={{
-                      padding: '4px 10px',
-                      borderRadius: 6,
-                      border: 'none',
-                      fontSize: 11,
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      background: t.estado === 'PRESENTE' ? 'var(--success-bg)' : 'var(--error-bg)',
-                      color: t.estado === 'PRESENTE' ? 'var(--success)' : 'var(--error)'
-                    }}
-                  >
-                    {t.estado}
-                  </button>
-                </span>
-                <button onClick={() => handleRemoveTrabalhador(t.id)} className="btn btn-ghost btn-icon" style={{ width: 32, height: 32 }}>
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Add Trabalhador */}
-        {showAddTrabalhador ? (
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1.5fr 1fr auto', gap: 12, alignItems: 'end', padding: 16, background: 'var(--cream)', borderRadius: 12 }}>
-            <div>
-              <label style={{ fontSize: 11, fontWeight: 500, color: 'var(--brown-light)', marginBottom: 4, display: 'block' }}>Nome</label>
-              <input
-                type="text"
-                value={novoTrabalhador.nome}
-                onChange={(e) => setNovoTrabalhador({...novoTrabalhador, nome: e.target.value})}
-                className="input"
-                placeholder="Nome do trabalhador"
-              />
-            </div>
-            <div>
-              <label style={{ fontSize: 11, fontWeight: 500, color: 'var(--brown-light)', marginBottom: 4, display: 'block' }}>Função</label>
-              <input
-                type="text"
-                value={novoTrabalhador.funcao}
-                onChange={(e) => setNovoTrabalhador({...novoTrabalhador, funcao: e.target.value})}
-                className="input"
-                placeholder="Ex: Pedreiro"
-              />
-            </div>
-            <div>
-              <label style={{ fontSize: 11, fontWeight: 500, color: 'var(--brown-light)', marginBottom: 4, display: 'block' }}>Tipo</label>
-              <select
-                value={novoTrabalhador.tipo}
-                onChange={(e) => setNovoTrabalhador({...novoTrabalhador, tipo: e.target.value})}
-                className="select"
-              >
-                <option value="Equipa">Equipa</option>
-                <option value="Subempreiteiro">Subempreiteiro</option>
-              </select>
-            </div>
-            <div>
-              <label style={{ fontSize: 11, fontWeight: 500, color: 'var(--brown-light)', marginBottom: 4, display: 'block' }}>Estado</label>
-              <select
-                value={novoTrabalhador.estado}
-                onChange={(e) => setNovoTrabalhador({...novoTrabalhador, estado: e.target.value})}
-                className="select"
-              >
-                <option value="PRESENTE">Presente</option>
-                <option value="AUSENTE">Ausente</option>
-              </select>
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={handleAddTrabalhador} className="btn btn-primary" style={{ padding: '10px 16px' }}>
-                <Check size={16} />
-              </button>
-              <button onClick={() => setShowAddTrabalhador(false)} className="btn btn-ghost" style={{ padding: '10px 16px' }}>
-                <X size={16} />
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button onClick={() => setShowAddTrabalhador(true)} className="btn btn-outline" style={{ gap: 8 }}>
-            <Plus size={16} /> Adicionar Trabalhador
-          </button>
-        )}
-      </SectionCard>
-
-      {/* Secção 3: Tarefas Executadas */}
-      <SectionCard number={3} title="Tarefas Executadas" subtitle="Trabalhos realizados durante o dia">
-        {tarefas.map(t => (
-          <div key={t.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '16px 0', borderBottom: '1px solid var(--stone)' }}>
+      {/* ═══ TABS ═══ */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        borderBottom: `1px solid ${C.border}`,
+        marginBottom: '24px',
+      }}>
+        <div style={{ display: 'flex', gap: '4px' }}>
+          {TABS.map(tab => (
             <button
-              onClick={() => handleToggleTarefa(t.id)}
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
               style={{
-                width: 24,
-                height: 24,
-                borderRadius: 6,
-                border: t.concluida ? 'none' : '2px solid var(--stone-dark)',
-                background: t.concluida ? 'var(--olive-gray)' : 'transparent',
+                padding: '12px 18px',
+                background: 'none',
+                border: 'none',
+                borderBottom: activeTab === tab.key ? `2px solid ${C.dark}` : '2px solid transparent',
+                fontFamily: FONTS.body,
+                fontSize: '13px',
+                fontWeight: activeTab === tab.key ? 700 : 400,
+                color: activeTab === tab.key ? C.dark : C.light,
                 cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-                marginTop: 2
+                transition: 'all 0.15s',
+                marginBottom: '-1px',
               }}
             >
-              {t.concluida && <Check size={14} color="white" />}
+              {tab.label}
             </button>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 600, color: 'var(--brown)', marginBottom: 4 }}>{t.titulo}</div>
-              {t.descricao && <div style={{ fontSize: 13, color: 'var(--brown-light)' }}>{t.descricao}</div>}
-            </div>
-            <select
-              value={t.percentagem}
-              onChange={(e) => handleTarefaPercentagem(t.id, e.target.value)}
-              className="select"
-              style={{ width: 100, padding: '8px 12px' }}
-            >
-              <option value="0">0%</option>
-              <option value="25">25%</option>
-              <option value="50">50%</option>
-              <option value="75">75%</option>
-              <option value="100">100%</option>
-            </select>
-            <button onClick={() => handleRemoveTarefa(t.id)} className="btn btn-ghost btn-icon" style={{ width: 32, height: 32 }}>
-              <Trash2 size={14} />
-            </button>
-          </div>
-        ))}
-
-        {showAddTarefa ? (
-          <div style={{ padding: 16, background: 'var(--cream)', borderRadius: 12, marginTop: 16 }}>
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 11, fontWeight: 500, color: 'var(--brown-light)', marginBottom: 4, display: 'block' }}>Título da Tarefa</label>
-              <input
-                type="text"
-                value={novaTarefa.titulo}
-                onChange={(e) => setNovaTarefa({...novaTarefa, titulo: e.target.value})}
-                className="input"
-                placeholder="Ex: Demolição de parede divisória — Suite"
-              />
-            </div>
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 11, fontWeight: 500, color: 'var(--brown-light)', marginBottom: 4, display: 'block' }}>Descrição (opcional)</label>
-              <input
-                type="text"
-                value={novaTarefa.descricao}
-                onChange={(e) => setNovaTarefa({...novaTarefa, descricao: e.target.value})}
-                className="input"
-                placeholder="Ex: Remoção completa da parede entre quarto e WC conforme projeto"
-              />
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={handleAddTarefa} className="btn btn-primary">Adicionar</button>
-              <button onClick={() => setShowAddTarefa(false)} className="btn btn-ghost">Cancelar</button>
-            </div>
-          </div>
-        ) : (
-          <button onClick={() => setShowAddTarefa(true)} className="btn btn-outline" style={{ gap: 8, marginTop: 16 }}>
-            <Plus size={16} /> Adicionar Tarefa
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: '8px', paddingBottom: '8px' }}>
+          <button style={{
+            display: 'flex', alignItems: 'center', gap: '6px',
+            padding: '8px 16px', background: C.white,
+            border: `1px solid ${C.border}`, borderRadius: '8px',
+            fontFamily: FONTS.body, fontSize: '12px', fontWeight: 500,
+            color: C.light, cursor: 'pointer',
+          }}>
+            <Download size={13} />
+            Exportar
           </button>
-        )}
-      </SectionCard>
+          <button
+            onClick={handleNewEntry}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '6px',
+              padding: '8px 18px', background: C.dark,
+              border: 'none', borderRadius: '8px',
+              fontFamily: FONTS.body, fontSize: '12px', fontWeight: 600,
+              color: C.white, cursor: 'pointer',
+            }}
+          >
+            <Plus size={13} />
+            Nova Entrada
+          </button>
+        </div>
+      </div>
 
-      {/* Secção 4: Ocorrências / Incidentes */}
-      <SectionCard number={4} title="Ocorrências / Incidentes" subtitle="Registe situações relevantes ou problemas identificados">
-        {/* Severidade Selection */}
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--brown)', marginBottom: 12, display: 'block' }}>Severidade</label>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-            {SEVERIDADES.map(s => (
+      {/* ═══ TWO-COLUMN LAYOUT ═══ */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '24px' }}>
+
+        {/* ── LEFT: TIMELINE ── */}
+        <div>
+          {loadingEntries ? (
+            <div style={{ padding: '48px', textAlign: 'center' }}>
+              <div style={{
+                width: '32px', height: '32px', border: `3px solid ${C.border}`,
+                borderTopColor: C.success, borderRadius: '50%', animation: 'spin 1s linear infinite',
+                margin: '0 auto 12px',
+              }} />
+              <p style={{ fontFamily: FONTS.body, fontSize: '13px', color: C.light }}>A carregar entradas...</p>
+            </div>
+          ) : allEntries.length === 0 ? (
+            <div style={{
+              padding: '64px 24px', textAlign: 'center',
+              background: C.white, borderRadius: '14px', border: `1px solid ${C.border}`,
+            }}>
+              <FileText size={40} style={{ color: C.border, marginBottom: '12px' }} />
+              <p style={{ fontFamily: FONTS.body, fontSize: '14px', color: C.light, marginBottom: '16px' }}>
+                Sem registos no diário de obra
+              </p>
               <button
-                key={s}
-                onClick={() => setNovaOcorrencia({...novaOcorrencia, severidade: s})}
+                onClick={handleNewEntry}
                 style={{
-                  padding: '14px 20px',
-                  borderRadius: 8,
-                  border: novaOcorrencia.severidade === s ? '2px solid var(--olive-gray)' : '2px solid var(--stone)',
-                  background: novaOcorrencia.severidade === s ? 'var(--cream)' : 'var(--white)',
-                  cursor: 'pointer',
-                  fontSize: 14,
-                  fontWeight: 500,
-                  color: 'var(--brown)'
+                  display: 'inline-flex', alignItems: 'center', gap: '6px',
+                  padding: '10px 20px', background: C.dark,
+                  border: 'none', borderRadius: '8px',
+                  fontFamily: FONTS.body, fontSize: '13px', fontWeight: 600,
+                  color: C.white, cursor: 'pointer',
                 }}
               >
-                {s}
+                <Plus size={14} />
+                Criar Primeira Entrada
               </button>
-            ))}
-          </div>
+            </div>
+          ) : (
+            <div style={{ position: 'relative', paddingLeft: '28px' }}>
+              {/* Timeline line */}
+              <div style={{
+                position: 'absolute', left: '8px', top: '6px', bottom: '0',
+                width: '2px', background: C.border,
+              }} />
+
+              {allEntries.map((entry, idx) => {
+                const dt = formatDate(entry.data)
+                const weather = getWeatherInfo(entry.condicoes_meteo)
+                const workers = (entry.trabalhadores || []).filter(t => t.estado === 'PRESENTE').length
+                const photosCount = (entry.fotos || []).length
+                const tasks = entry.tarefas || []
+                const incidents = entry.ocorrencias || []
+                const ncs = entry.nao_conformidades || []
+                const notes = entry.observacoes_meteo
+                const isFirst = idx === 0
+
+                return (
+                  <div key={entry.id} style={{ position: 'relative', marginBottom: '32px' }}>
+                    {/* Timeline dot */}
+                    <div style={{
+                      position: 'absolute', left: '-24px', top: '6px',
+                      width: '12px', height: '12px', borderRadius: '50%',
+                      background: isFirst ? C.success : C.white,
+                      border: isFirst ? `2px solid ${C.success}` : `2px solid ${C.border}`,
+                      zIndex: 1,
+                    }} />
+
+                    {/* Day card */}
+                    <div style={{
+                      background: C.white,
+                      borderRadius: '14px',
+                      border: `1px solid ${C.border}`,
+                      overflow: 'hidden',
+                      boxShadow: isFirst ? '0 2px 8px rgba(0,0,0,0.04)' : 'none',
+                    }}>
+                      {/* Date header */}
+                      <div style={{
+                        padding: '18px 22px',
+                        borderBottom: `1px solid ${C.border}`,
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}>
+                        <div>
+                          <h2 style={{
+                            fontFamily: FONTS.heading,
+                            fontSize: '24px',
+                            fontWeight: 600,
+                            color: C.dark,
+                            margin: 0,
+                            lineHeight: 1.2,
+                          }}>
+                            {dt.day} {dt.month}
+                          </h2>
+                          <span style={{
+                            fontFamily: FONTS.body, fontSize: '10px', fontWeight: 700,
+                            textTransform: 'uppercase', letterSpacing: '0.08em',
+                            color: C.muted,
+                          }}>
+                            {dt.weekday}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <span style={{
+                            fontFamily: FONTS.body, fontSize: '13px', color: C.light,
+                            display: 'flex', alignItems: 'center', gap: '5px',
+                          }}>
+                            {weather.emoji} {entry.temperatura ? `${entry.temperatura}°C` : ''} {entry.temperatura ? '·' : ''} {weather.desc}
+                          </span>
+                          <button
+                            onClick={() => handleEditEntry(entry)}
+                            style={{
+                              padding: '5px 10px', background: 'transparent',
+                              border: `1px solid ${C.border}`, borderRadius: '6px',
+                              cursor: 'pointer', color: C.muted,
+                              display: 'flex', alignItems: 'center', gap: '4px',
+                              fontFamily: FONTS.body, fontSize: '11px',
+                            }}
+                          >
+                            <Edit2 size={11} /> Editar
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Stats bar */}
+                      <div style={{
+                        padding: '10px 22px',
+                        background: C.cream,
+                        display: 'flex',
+                        gap: '20px',
+                        fontSize: '12px',
+                        fontFamily: FONTS.body,
+                        color: C.light,
+                      }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <Users size={13} style={{ color: C.muted }} />
+                          <strong style={{ color: C.dark }}>{workers}</strong> em obra
+                        </span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <Clock size={13} style={{ color: C.muted }} />
+                          08:00 — 17:30
+                        </span>
+                        {photosCount > 0 && (
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            <Camera size={13} style={{ color: C.muted }} />
+                            <strong style={{ color: C.dark }}>{photosCount}</strong> fotos
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Tasks/Activities */}
+                      <div style={{ padding: '16px 22px' }}>
+                        {tasks.length > 0 && (
+                          <div style={{ marginBottom: '14px' }}>
+                            {tasks.map((task, tIdx) => {
+                              const specialty = getSpecialtyTag(task.titulo) || getSpecialtyTag(task.descricao)
+                              const specColors = specialty ? getDefaultSpecialtyColors(specialty) : null
+                              return (
+                                <div key={task.id || tIdx} style={{
+                                  padding: '10px 0',
+                                  borderBottom: tIdx < tasks.length - 1 ? `1px solid ${C.border}` : 'none',
+                                }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                    {specColors && (
+                                      <span style={{
+                                        padding: '2px 8px',
+                                        borderRadius: '4px',
+                                        background: specColors.bg,
+                                        color: specColors.color,
+                                        fontFamily: FONTS.body,
+                                        fontSize: '10px',
+                                        fontWeight: 700,
+                                        textTransform: 'uppercase',
+                                        letterSpacing: '0.04em',
+                                      }}>
+                                        {specialty}
+                                      </span>
+                                    )}
+                                    <span style={{
+                                      fontFamily: FONTS.body, fontSize: '13px',
+                                      fontWeight: 600, color: C.dark,
+                                    }}>
+                                      {task.titulo}
+                                    </span>
+                                    {task.concluida && (
+                                      <Check size={13} style={{ color: C.success }} />
+                                    )}
+                                    {task.percentagem && task.percentagem !== '0' && !task.concluida && (
+                                      <span style={{
+                                        fontFamily: FONTS.mono, fontSize: '10px',
+                                        color: C.muted, fontWeight: 600,
+                                      }}>
+                                        {task.percentagem}%
+                                      </span>
+                                    )}
+                                  </div>
+                                  {task.descricao && (
+                                    <p style={{
+                                      fontFamily: FONTS.body, fontSize: '12px',
+                                      color: C.light, margin: '2px 0 0', lineHeight: 1.5,
+                                    }}>
+                                      {task.descricao}
+                                    </p>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+
+                        {/* Photos row */}
+                        {(entry.fotos || []).length > 0 && (
+                          <div style={{
+                            display: 'flex', gap: '8px', marginBottom: '14px',
+                            overflow: 'hidden',
+                          }}>
+                            {(entry.fotos || []).slice(0, 4).map((foto, fIdx) => (
+                              <div key={fIdx} style={{
+                                width: '80px', height: '60px', borderRadius: '8px',
+                                overflow: 'hidden', flexShrink: 0,
+                              }}>
+                                <img src={foto.url} alt="" style={{
+                                  width: '100%', height: '100%', objectFit: 'cover',
+                                }} />
+                              </div>
+                            ))}
+                            {(entry.fotos || []).length > 4 && (
+                              <div style={{
+                                width: '80px', height: '60px', borderRadius: '8px',
+                                background: C.cream, display: 'flex',
+                                alignItems: 'center', justifyContent: 'center',
+                                fontFamily: FONTS.body, fontSize: '12px',
+                                fontWeight: 700, color: C.muted, flexShrink: 0,
+                              }}>
+                                +{(entry.fotos || []).length - 4}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Incidents/warnings */}
+                        {incidents.length > 0 && (
+                          <div style={{ marginBottom: '14px' }}>
+                            {incidents.map((inc, iIdx) => (
+                              <div key={iIdx} style={{
+                                display: 'flex', alignItems: 'center', gap: '8px',
+                                padding: '8px 12px', borderRadius: '8px',
+                                background: inc.severidade === 'Alta' ? 'rgba(166,93,87,0.06)' : 'rgba(196,149,106,0.06)',
+                                marginBottom: iIdx < incidents.length - 1 ? '6px' : 0,
+                              }}>
+                                <AlertTriangle size={13} style={{
+                                  color: inc.severidade === 'Alta' ? C.danger : C.warning,
+                                  flexShrink: 0,
+                                }} />
+                                <span style={{
+                                  fontFamily: FONTS.body, fontSize: '12px',
+                                  color: inc.severidade === 'Alta' ? C.danger : C.warning,
+                                  fontWeight: 500,
+                                }}>
+                                  {inc.descricao}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Non-conformities */}
+                        {ncs.length > 0 && (
+                          <div style={{ marginBottom: '14px' }}>
+                            {ncs.map((nc, nIdx) => (
+                              <div key={nIdx} style={{
+                                display: 'flex', alignItems: 'center', gap: '8px',
+                                padding: '8px 12px', borderRadius: '8px',
+                                background: 'rgba(166,93,87,0.06)',
+                                marginBottom: nIdx < ncs.length - 1 ? '6px' : 0,
+                              }}>
+                                <span style={{
+                                  padding: '2px 6px', borderRadius: '4px',
+                                  background: nc.severidade === 'CRÍTICA' ? C.danger : nc.severidade === 'MAIOR' ? 'rgba(166,93,87,0.12)' : 'rgba(196,149,106,0.12)',
+                                  color: nc.severidade === 'CRÍTICA' ? C.white : nc.severidade === 'MAIOR' ? C.danger : C.warning,
+                                  fontFamily: FONTS.body, fontSize: '9px', fontWeight: 700,
+                                  flexShrink: 0,
+                                }}>
+                                  {nc.severidade}
+                                </span>
+                                <span style={{
+                                  fontFamily: FONTS.body, fontSize: '12px', color: C.dark,
+                                }}>
+                                  {nc.descricao}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Notes */}
+                        {entry.observacoes_meteo && (
+                          <div style={{
+                            padding: '12px 16px',
+                            background: C.cream,
+                            borderRadius: '8px',
+                            borderLeft: `3px solid ${C.border}`,
+                            marginBottom: '14px',
+                          }}>
+                            <span style={{
+                              fontFamily: FONTS.body, fontSize: '10px', fontWeight: 700,
+                              textTransform: 'uppercase', letterSpacing: '0.06em',
+                              color: C.muted, display: 'block', marginBottom: '4px',
+                            }}>
+                              NOTAS DO DIA
+                            </span>
+                            <p style={{
+                              fontFamily: FONTS.body, fontSize: '12px',
+                              color: C.light, margin: 0, lineHeight: 1.5,
+                              fontStyle: 'italic',
+                            }}>
+                              {entry.observacoes_meteo}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Entry footer */}
+                      <div style={{
+                        padding: '10px 22px',
+                        borderTop: `1px solid ${C.border}`,
+                        fontFamily: FONTS.body, fontSize: '11px', color: C.muted,
+                      }}>
+                        Registado por <strong style={{ color: C.dark }}>{entry.funcao || 'Encarregado de Obra'}</strong>
+                        {entry.updated_at && (
+                          <> · {new Date(entry.data + 'T00:00:00').toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' })} {entry.updated_at ? new Date(entry.updated_at).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }) : ''}</>
+                        )}
+                        {entry.status === 'rascunho' && (
+                          <span style={{
+                            marginLeft: '8px', padding: '2px 8px',
+                            background: 'rgba(196,149,106,0.12)', borderRadius: '4px',
+                            color: C.warning, fontWeight: 600, fontSize: '10px',
+                          }}>
+                            RASCUNHO
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
 
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--brown)', marginBottom: 8, display: 'block' }}>Descrição da Ocorrência</label>
-          <textarea
-            value={novaOcorrencia.descricao}
-            onChange={(e) => setNovaOcorrencia({...novaOcorrencia, descricao: e.target.value})}
-            className="textarea"
-            rows={3}
-            placeholder="Descreva a ocorrência ou incidente..."
-          />
-        </div>
-
-        {novaOcorrencia.descricao && (
-          <button onClick={handleAddOcorrencia} className="btn btn-outline" style={{ gap: 8, marginBottom: 16 }}>
-            <Plus size={16} /> Adicionar Outra Ocorrência
-          </button>
-        )}
-
-        {/* Lista de Ocorrências */}
-        {ocorrencias.length > 0 && (
-          <div style={{ marginTop: 24 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--brown)', marginBottom: 12 }}>Ocorrências Registadas</div>
-            {ocorrencias.map(o => (
-              <div key={o.id} style={{ display: 'flex', gap: 12, padding: 16, background: 'var(--cream)', borderRadius: 12, marginBottom: 12, alignItems: 'flex-start' }}>
-                <span style={{
-                  padding: '4px 10px',
-                  borderRadius: 6,
-                  fontSize: 11,
-                  fontWeight: 600,
-                  background: o.severidade === 'Alta' ? 'var(--error-bg)' : o.severidade === 'Média' ? 'var(--warning-bg)' : 'var(--success-bg)',
-                  color: o.severidade === 'Alta' ? 'var(--error)' : o.severidade === 'Média' ? 'var(--warning)' : 'var(--success)'
-                }}>
-                  {o.severidade}
-                </span>
-                <p style={{ flex: 1, margin: 0, fontSize: 14, color: 'var(--brown)' }}>{o.descricao}</p>
-                <button onClick={() => handleRemoveOcorrencia(o.id)} className="btn btn-ghost btn-icon" style={{ width: 32, height: 32 }}>
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            ))}
+        {/* ── RIGHT SIDEBAR ── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* Week Summary */}
+          <div style={{
+            background: C.white, borderRadius: '14px',
+            border: `1px solid ${C.border}`, padding: '20px',
+          }}>
+            <span style={{
+              fontFamily: FONTS.body, fontSize: '10px', fontWeight: 700,
+              textTransform: 'uppercase', letterSpacing: '0.06em',
+              color: C.muted, display: 'block', marginBottom: '16px',
+            }}>
+              RESUMO DA SEMANA
+            </span>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+              {[
+                { label: 'DIAS REGISTADOS', value: `${weekSummary.diasRegistados}/${weekSummary.diasTotal}`, color: C.dark },
+                { label: 'MÉDIA EM OBRA', value: weekSummary.mediaObra, color: C.dark },
+                { label: 'FOTOGRAFIAS', value: weekSummary.fotografias, color: C.dark },
+                { label: 'INCIDENTES', value: weekSummary.incidentes, color: weekSummary.incidentes > 0 ? C.danger : C.dark },
+              ].map(item => (
+                <div key={item.label}>
+                  <span style={{
+                    fontFamily: FONTS.body, fontSize: '9px', fontWeight: 700,
+                    textTransform: 'uppercase', letterSpacing: '0.05em',
+                    color: C.muted, display: 'block', marginBottom: '4px',
+                  }}>
+                    {item.label}
+                  </span>
+                  <span style={{
+                    fontFamily: FONTS.body, fontSize: '22px', fontWeight: 700,
+                    color: item.color, letterSpacing: '-0.5px',
+                  }}>
+                    {item.value}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
-        )}
-      </SectionCard>
 
-      {/* Secção 5: Não Conformidades */}
-      <SectionCard number={5} title="Não Conformidades" subtitle="Desvios ao projeto, especificações ou normas">
-        {/* Lista de NC */}
-        {naoConformidades.map(nc => (
-          <div key={nc.id} style={{ padding: 20, background: 'var(--cream)', borderRadius: 12, marginBottom: 16 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+          {/* Calendar */}
+          <div style={{
+            background: C.white, borderRadius: '14px',
+            border: `1px solid ${C.border}`, padding: '20px',
+          }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              marginBottom: '14px',
+            }}>
+              <button
+                onClick={() => {
+                  if (calendarMonth === 0) { setCalendarMonth(11); setCalendarYear(y => y - 1) }
+                  else setCalendarMonth(m => m - 1)
+                }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.muted, padding: '4px' }}
+              >
+                <ChevronLeft size={16} />
+              </button>
               <span style={{
-                padding: '4px 12px',
-                borderRadius: 6,
-                fontSize: 11,
-                fontWeight: 700,
-                background: nc.severidade === 'CRÍTICA' ? 'var(--error)' : nc.severidade === 'MAIOR' ? 'var(--error-bg)' : 'var(--warning-bg)',
-                color: nc.severidade === 'CRÍTICA' ? 'white' : nc.severidade === 'MAIOR' ? 'var(--error)' : 'var(--warning)'
+                fontFamily: FONTS.body, fontSize: '12px', fontWeight: 700,
+                textTransform: 'uppercase', letterSpacing: '0.06em',
+                color: C.dark,
               }}>
-                {nc.severidade}
+                {MESES[calendarMonth].toUpperCase()} {calendarYear}
               </span>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => handleEditNC(nc)} className="btn btn-outline btn-sm">Editar</button>
-                <button onClick={() => handleRemoveNC(nc.id)} className="btn btn-outline btn-sm">Remover</button>
-              </div>
+              <button
+                onClick={() => {
+                  if (calendarMonth === 11) { setCalendarMonth(0); setCalendarYear(y => y + 1) }
+                  else setCalendarMonth(m => m + 1)
+                }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.muted, padding: '4px' }}
+              >
+                <ChevronRight size={16} />
+              </button>
             </div>
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--brown-light)', marginBottom: 4, display: 'block' }}>Descrição</label>
-              <p style={{ margin: 0, color: 'var(--brown)', fontSize: 14, lineHeight: 1.5 }}>{nc.descricao}</p>
-            </div>
-            {nc.acaoCorretiva && (
-              <div>
-                <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--brown-light)', marginBottom: 4, display: 'block' }}>Ação Corretiva Proposta</label>
-                <p style={{ margin: 0, color: 'var(--brown)', fontSize: 14, lineHeight: 1.5 }}>{nc.acaoCorretiva}</p>
-              </div>
-            )}
-          </div>
-        ))}
 
-        {/* Add NC Form */}
-        {showAddNC ? (
-          <div style={{ padding: 20, background: 'var(--cream)', borderRadius: 12 }}>
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--brown)', marginBottom: 8, display: 'block' }}>Severidade</label>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {SEVERIDADES_NC.map(s => (
-                  <button
-                    key={s}
-                    onClick={() => setNovaNC({...novaNC, severidade: s})}
+            {/* Day headers */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', marginBottom: '4px' }}>
+              {['S', 'T', 'Q', 'Q', 'S', 'S', 'D'].map((d, i) => (
+                <div key={i} style={{
+                  textAlign: 'center', fontFamily: FONTS.body,
+                  fontSize: '10px', fontWeight: 700, color: C.muted,
+                  padding: '4px 0',
+                }}>
+                  {d}
+                </div>
+              ))}
+            </div>
+
+            {/* Calendar grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px' }}>
+              {calendarDays.map((day, i) => {
+                if (!day) return <div key={i} />
+                const dateStr = `${calendarYear}-${String(calendarMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+                const hasEntry = entryDates.has(dateStr)
+                const isToday = dateStr === new Date().toISOString().split('T')[0]
+                return (
+                  <div
+                    key={i}
                     style={{
-                      padding: '8px 16px',
-                      borderRadius: 6,
-                      border: novaNC.severidade === s ? 'none' : '2px solid var(--stone)',
-                      background: novaNC.severidade === s ? (s === 'CRÍTICA' ? 'var(--error)' : s === 'MAIOR' ? 'var(--error-bg)' : 'var(--warning-bg)') : 'var(--white)',
-                      color: novaNC.severidade === s ? (s === 'CRÍTICA' ? 'white' : s === 'MAIOR' ? 'var(--error)' : 'var(--warning)') : 'var(--brown)',
-                      cursor: 'pointer',
-                      fontSize: 12,
-                      fontWeight: 600
+                      textAlign: 'center',
+                      padding: '6px 0',
+                      borderRadius: '6px',
+                      background: isToday ? C.dark : 'transparent',
+                      cursor: hasEntry ? 'pointer' : 'default',
                     }}
                   >
-                    {s}
-                  </button>
+                    <span style={{
+                      fontFamily: FONTS.body, fontSize: '12px',
+                      fontWeight: isToday || hasEntry ? 600 : 400,
+                      color: isToday ? C.white : hasEntry ? C.dark : C.muted,
+                    }}>
+                      {day}
+                    </span>
+                    {hasEntry && !isToday && (
+                      <div style={{
+                        width: '4px', height: '4px', borderRadius: '50%',
+                        background: C.success, margin: '2px auto 0',
+                      }} />
+                    )}
+                    {hasEntry && isToday && (
+                      <div style={{
+                        width: '4px', height: '4px', borderRadius: '50%',
+                        background: C.white, margin: '2px auto 0',
+                      }} />
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Pending Items */}
+          {pendingItems.length > 0 && (
+            <div style={{
+              background: C.white, borderRadius: '14px',
+              border: `1px solid ${C.border}`, padding: '20px',
+            }}>
+              <span style={{
+                fontFamily: FONTS.body, fontSize: '10px', fontWeight: 700,
+                textTransform: 'uppercase', letterSpacing: '0.06em',
+                color: C.muted, display: 'block', marginBottom: '14px',
+              }}>
+                PENDENTES NESTA OBRA
+              </span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {pendingItems.map((item, idx) => (
+                  <div key={idx} style={{
+                    display: 'flex', gap: '10px', alignItems: 'flex-start',
+                  }}>
+                    <div style={{
+                      width: '8px', height: '8px', borderRadius: '50%',
+                      background: item.color, flexShrink: 0, marginTop: '5px',
+                    }} />
+                    <div style={{ flex: 1 }}>
+                      <span style={{
+                        fontFamily: FONTS.body, fontSize: '10px', fontWeight: 700,
+                        textTransform: 'uppercase', letterSpacing: '0.04em',
+                        color: item.color,
+                      }}>
+                        {item.type === 'bloqueio' ? 'Bloqueio' : item.type === 'nc' ? 'NC' : 'Decisão'}
+                      </span>
+                      <p style={{
+                        fontFamily: FONTS.body, fontSize: '12px',
+                        color: C.dark, margin: '2px 0 0', lineHeight: 1.4,
+                      }}>
+                        {item.text}
+                      </p>
+                      <span style={{
+                        fontFamily: FONTS.body, fontSize: '10px', color: C.muted,
+                      }}>
+                        {item.type === 'bloqueio' ? 'Desde' : 'Registada'} {new Date(item.date + 'T00:00:00').toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' })}
+                      </span>
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--brown-light)', marginBottom: 8, display: 'block' }}>Descrição</label>
-              <textarea
-                value={novaNC.descricao}
-                onChange={(e) => setNovaNC({...novaNC, descricao: e.target.value})}
-                className="textarea"
-                rows={3}
-                placeholder="Descreva a não conformidade identificada..."
-              />
-            </div>
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--brown-light)', marginBottom: 8, display: 'block' }}>Ação Corretiva Proposta</label>
-              <textarea
-                value={novaNC.acaoCorretiva}
-                onChange={(e) => setNovaNC({...novaNC, acaoCorretiva: e.target.value})}
-                className="textarea"
-                rows={2}
-                placeholder="Proponha uma ação corretiva..."
-              />
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={handleAddNC} className="btn btn-primary">{editingNC ? 'Guardar' : 'Adicionar'}</button>
-              <button onClick={() => { setShowAddNC(false); setEditingNC(null); setNovaNC({ severidade: 'MAIOR', descricao: '', acaoCorretiva: '' }) }} className="btn btn-ghost">Cancelar</button>
-            </div>
-          </div>
-        ) : (
-          <button onClick={() => setShowAddNC(true)} className="btn btn-outline" style={{ gap: 8 }}>
-            <Plus size={16} /> Adicionar Não Conformidade
-          </button>
-        )}
-      </SectionCard>
-
-      {/* Secção 6: Registo Fotográfico */}
-      <SectionCard number={6} title="Registo Fotográfico" subtitle="Fotografias dos trabalhos e situações relevantes">
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-          {fotos.map(f => (
-            <div key={f.id} style={{ position: 'relative' }}>
-              <div style={{ aspectRatio: '4/3', borderRadius: 12, overflow: 'hidden', marginBottom: 8 }}>
-                <img src={f.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                <button
-                  onClick={() => handleRemoveFoto(f.id)}
-                  style={{
-                    position: 'absolute',
-                    top: 8,
-                    right: 8,
-                    width: 28,
-                    height: 28,
-                    borderRadius: '50%',
-                    background: 'rgba(0,0,0,0.6)',
-                    border: 'none',
-                    color: 'white',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  <X size={16} />
-                </button>
-              </div>
-              <div>
-                <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--brown-light)', marginBottom: 4, display: 'block' }}>DESCRIÇÃO</label>
-                <textarea
-                  value={f.descricao}
-                  onChange={(e) => handleFotoDescricao(f.id, e.target.value)}
-                  className="textarea"
-                  rows={3}
-                  placeholder="Descreva a foto..."
-                  style={{ fontSize: 13 }}
-                />
-              </div>
-            </div>
-          ))}
-
-          {/* Upload Area */}
-          <label style={{
-            aspectRatio: '4/3',
-            border: '2px dashed var(--stone-dark)',
-            borderRadius: 12,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 8,
-            cursor: 'pointer',
-            background: 'var(--white)',
-            transition: 'all 0.2s ease'
-          }}>
-            <input type="file" accept="image/*" multiple onChange={handleAddFoto} style={{ display: 'none' }} />
-            <Upload size={24} color="var(--brown-light)" />
-            <span style={{ fontSize: 13, color: 'var(--brown-light)' }}>Adicionar foto</span>
-          </label>
-        </div>
-      </SectionCard>
-
-      {/* Secção 7: Próximos Passos Sugeridos */}
-      <SectionCard number={7} title="Próximos Passos Sugeridos" subtitle="Recomendações para o dia seguinte">
-        {proximosPassos.map(p => (
-          <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--stone)' }}>
-            <ArrowRight size={16} color="var(--olive-gray)" />
-            <span style={{ flex: 1, color: 'var(--brown)' }}>{p.texto}</span>
-            <button onClick={() => handleRemovePasso(p.id)} className="btn btn-ghost btn-icon" style={{ width: 32, height: 32 }}>
-              <Trash2 size={14} />
-            </button>
-          </div>
-        ))}
-
-        {showAddPasso ? (
-          <div style={{ display: 'flex', gap: 12, marginTop: 16, alignItems: 'end' }}>
-            <div style={{ flex: 1 }}>
-              <input
-                type="text"
-                value={novoPasso}
-                onChange={(e) => setNovoPasso(e.target.value)}
-                className="input"
-                placeholder="Descreva o próximo passo..."
-                onKeyDown={(e) => e.key === 'Enter' && handleAddPasso()}
-              />
-            </div>
-            <button onClick={handleAddPasso} className="btn btn-primary">Adicionar</button>
-            <button onClick={() => setShowAddPasso(false)} className="btn btn-ghost">Cancelar</button>
-          </div>
-        ) : (
-          <button onClick={() => setShowAddPasso(true)} className="btn btn-outline" style={{ gap: 8, marginTop: 16 }}>
-            <Plus size={16} /> Adicionar Passo
-          </button>
-        )}
-      </SectionCard>
-
-      {/* Footer */}
-      <div style={{
-        position: 'sticky',
-        bottom: 0,
-        background: 'var(--sandy-beach)',
-        padding: '16px 0',
-        marginTop: 32,
-        borderTop: '1px solid var(--stone)',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
-        <div style={{ fontSize: 13, color: 'var(--brown-light)' }}>
-          Última gravação: {lastSaved ? (
-            <strong style={{ color: 'var(--brown)' }}>Rascunho às {lastSaved.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}</strong>
-          ) : (
-            <span>Não guardado</span>
           )}
         </div>
-        <div style={{ display: 'flex', gap: 12 }}>
-          <button onClick={handleSaveRascunho} disabled={saving || !selectedObra} className="btn btn-outline" style={{ gap: 8 }}>
-            <Save size={16} /> Guardar Rascunho
-          </button>
-          <button onClick={handleSubmit} disabled={saving || !selectedObra} className="btn btn-primary" style={{ gap: 8, background: 'var(--olive-gray)' }}>
-            <Send size={16} /> Submeter Registo
-          </button>
-        </div>
       </div>
+
+      {/* ═══ FORM MODAL ═══ */}
+      {showFormModal && (
+        <div style={{
+          position: 'fixed', inset: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+          zIndex: 1000, padding: '40px 20px', overflowY: 'auto',
+        }}>
+          <div style={{
+            background: C.white, borderRadius: '16px',
+            width: '100%', maxWidth: '800px',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+          }}>
+            {/* Modal header */}
+            <div style={{
+              padding: '20px 24px',
+              borderBottom: `1px solid ${C.border}`,
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              position: 'sticky', top: 0, background: C.white,
+              borderRadius: '16px 16px 0 0', zIndex: 1,
+            }}>
+              <div>
+                <h3 style={{
+                  margin: 0, fontSize: '22px', fontWeight: 600,
+                  fontFamily: FONTS.heading, color: C.dark,
+                }}>
+                  {editingEntry ? 'Editar Registo' : 'Nova Entrada'}
+                </h3>
+                <p style={{ margin: '2px 0 0', fontFamily: FONTS.body, fontSize: '12px', color: C.light }}>
+                  {obra?.codigo} — {obra?.nome}
+                </p>
+              </div>
+              <button onClick={() => setShowFormModal(false)} style={{
+                background: 'none', border: 'none', cursor: 'pointer', color: C.muted,
+                padding: '6px', borderRadius: '8px',
+              }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal body */}
+            <div style={{ padding: '24px', maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}>
+              {/* Meta row */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
+                <div>
+                  <label style={labelStyle}>DATA</label>
+                  <input
+                    type="date"
+                    value={data}
+                    onChange={(e) => setData(e.target.value)}
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <label style={labelStyle}>FUNÇÃO</label>
+                  <select value={funcao} onChange={(e) => setFuncao(e.target.value)} style={inputStyle}>
+                    {FUNCOES.map(f => <option key={f} value={f}>{f}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Section 1: Weather */}
+              <FormSection title="Condições Meteorológicas">
+                <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
+                  {WEATHER_OPTIONS.map(w => {
+                    const Icon = w.icon
+                    const isSelected = condicaoMeteo === w.id
+                    return (
+                      <button
+                        key={w.id}
+                        onClick={() => setCondicaoMeteo(w.id)}
+                        style={{
+                          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
+                          padding: '12px 18px',
+                          background: isSelected ? 'rgba(91,123,106,0.08)' : C.white,
+                          border: isSelected ? `2px solid ${C.success}` : `1px solid ${C.border}`,
+                          borderRadius: '10px', cursor: 'pointer',
+                        }}
+                      >
+                        <Icon size={22} strokeWidth={1.5} color={isSelected ? C.success : C.muted} />
+                        <span style={{ fontSize: '11px', fontFamily: FONTS.body, color: isSelected ? C.dark : C.light }}>{w.label}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px' }}>
+                  <div>
+                    <label style={labelStyle}>TEMPERATURA (°C)</label>
+                    <input type="number" value={temperatura} onChange={(e) => setTemperatura(e.target.value)} placeholder="Ex: 16" style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>OBSERVAÇÕES</label>
+                    <input type="text" value={observacoesMeteo} onChange={(e) => setObservacoesMeteo(e.target.value)} placeholder="Ex: Manhã com nevoeiro, tarde limpa" style={inputStyle} />
+                  </div>
+                </div>
+              </FormSection>
+
+              {/* Section 2: Workers */}
+              <FormSection title="Trabalhadores em Obra">
+                <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
+                  {[
+                    { label: 'PRESENTES', value: trabPresentes, color: C.success },
+                    { label: 'AUSENTES', value: trabAusentes, color: C.danger },
+                    { label: 'SUBEMPR.', value: trabSubempreiteiros, color: C.info },
+                  ].map(s => (
+                    <div key={s.label} style={{
+                      flex: 1, background: C.cream, borderRadius: '10px',
+                      padding: '12px', textAlign: 'center',
+                    }}>
+                      <div style={{ fontFamily: FONTS.body, fontSize: '24px', fontWeight: 700, color: s.color }}>{s.value}</div>
+                      <div style={{ fontFamily: FONTS.body, fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: C.muted }}>{s.label}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {trabalhadores.map(t => (
+                  <div key={t.id} style={{
+                    display: 'flex', alignItems: 'center', gap: '10px',
+                    padding: '8px 0', borderBottom: `1px solid ${C.border}`,
+                    fontFamily: FONTS.body, fontSize: '13px',
+                  }}>
+                    <span style={{ flex: 1, color: C.dark }}>{t.nome}</span>
+                    <span style={{ color: C.light, fontSize: '12px' }}>{t.funcao}</span>
+                    <span style={{
+                      padding: '3px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 600,
+                      background: t.estado === 'PRESENTE' ? 'rgba(91,123,106,0.10)' : 'rgba(166,93,87,0.10)',
+                      color: t.estado === 'PRESENTE' ? C.success : C.danger,
+                      cursor: 'pointer',
+                    }} onClick={() => handleToggleTrabalhadorEstado(t.id)}>
+                      {t.estado}
+                    </span>
+                    <button onClick={() => handleRemoveTrabalhador(t.id)} style={iconBtnStyle}>
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                ))}
+
+                {showAddTrabalhador ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1fr auto', gap: '8px', marginTop: '12px', alignItems: 'end' }}>
+                    <div>
+                      <label style={labelStyle}>Nome</label>
+                      <input type="text" value={novoTrabalhador.nome} onChange={(e) => setNovoTrabalhador({...novoTrabalhador, nome: e.target.value})} style={inputStyle} placeholder="Nome" />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Função</label>
+                      <input type="text" value={novoTrabalhador.funcao} onChange={(e) => setNovoTrabalhador({...novoTrabalhador, funcao: e.target.value})} style={inputStyle} placeholder="Função" />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Tipo</label>
+                      <select value={novoTrabalhador.tipo} onChange={(e) => setNovoTrabalhador({...novoTrabalhador, tipo: e.target.value})} style={inputStyle}>
+                        <option value="Equipa">Equipa</option>
+                        <option value="Subempreiteiro">Subempreiteiro</option>
+                      </select>
+                    </div>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button onClick={handleAddTrabalhador} style={{ ...smallBtnStyle, background: C.dark, color: C.white }}><Check size={14} /></button>
+                      <button onClick={() => setShowAddTrabalhador(false)} style={smallBtnStyle}><X size={14} /></button>
+                    </div>
+                  </div>
+                ) : (
+                  <button onClick={() => setShowAddTrabalhador(true)} style={{ ...outlineBtnStyle, marginTop: '12px' }}>
+                    <Plus size={14} /> Adicionar Trabalhador
+                  </button>
+                )}
+              </FormSection>
+
+              {/* Section 3: Tasks */}
+              <FormSection title="Tarefas Executadas">
+                {tarefas.map(t => (
+                  <div key={t.id} style={{
+                    display: 'flex', alignItems: 'center', gap: '10px',
+                    padding: '10px 0', borderBottom: `1px solid ${C.border}`,
+                  }}>
+                    <button onClick={() => handleToggleTarefa(t.id)} style={{
+                      width: '20px', height: '20px', borderRadius: '5px', flexShrink: 0,
+                      border: t.concluida ? 'none' : `2px solid ${C.border}`,
+                      background: t.concluida ? C.success : 'transparent',
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      {t.concluida && <Check size={12} color="white" />}
+                    </button>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontFamily: FONTS.body, fontSize: '13px', fontWeight: 600, color: C.dark }}>{t.titulo}</div>
+                      {t.descricao && <div style={{ fontFamily: FONTS.body, fontSize: '12px', color: C.light }}>{t.descricao}</div>}
+                    </div>
+                    <select value={t.percentagem} onChange={(e) => handleTarefaPercentagem(t.id, e.target.value)} style={{ ...inputStyle, width: '80px', padding: '6px 8px', fontSize: '12px' }}>
+                      {[0, 25, 50, 75, 100].map(p => <option key={p} value={String(p)}>{p}%</option>)}
+                    </select>
+                    <button onClick={() => handleRemoveTarefa(t.id)} style={iconBtnStyle}><Trash2 size={13} /></button>
+                  </div>
+                ))}
+
+                {showAddTarefa ? (
+                  <div style={{ padding: '14px', background: C.cream, borderRadius: '10px', marginTop: '12px' }}>
+                    <div style={{ marginBottom: '10px' }}>
+                      <label style={labelStyle}>Título</label>
+                      <input type="text" value={novaTarefa.titulo} onChange={(e) => setNovaTarefa({...novaTarefa, titulo: e.target.value})} style={inputStyle} placeholder="Ex: Demolição de parede — Suite" />
+                    </div>
+                    <div style={{ marginBottom: '10px' }}>
+                      <label style={labelStyle}>Descrição (opcional)</label>
+                      <input type="text" value={novaTarefa.descricao} onChange={(e) => setNovaTarefa({...novaTarefa, descricao: e.target.value})} style={inputStyle} placeholder="Detalhes adicionais..." />
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button onClick={handleAddTarefa} style={{ ...smallBtnStyle, background: C.dark, color: C.white, padding: '8px 16px' }}>Adicionar</button>
+                      <button onClick={() => setShowAddTarefa(false)} style={{ ...smallBtnStyle, padding: '8px 16px' }}>Cancelar</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button onClick={() => setShowAddTarefa(true)} style={{ ...outlineBtnStyle, marginTop: '12px' }}>
+                    <Plus size={14} /> Adicionar Tarefa
+                  </button>
+                )}
+              </FormSection>
+
+              {/* Section 4: Occurrences */}
+              <FormSection title="Ocorrências / Incidentes">
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                  {SEVERIDADES.map(s => (
+                    <button key={s} onClick={() => setNovaOcorrencia({...novaOcorrencia, severidade: s})} style={{
+                      padding: '8px 16px', borderRadius: '8px', cursor: 'pointer',
+                      border: novaOcorrencia.severidade === s ? `2px solid ${s === 'Alta' ? C.danger : s === 'Média' ? C.warning : C.success}` : `1px solid ${C.border}`,
+                      background: novaOcorrencia.severidade === s ? (s === 'Alta' ? 'rgba(166,93,87,0.08)' : s === 'Média' ? 'rgba(196,149,106,0.08)' : 'rgba(91,123,106,0.08)') : C.white,
+                      fontFamily: FONTS.body, fontSize: '12px', fontWeight: 500, color: C.dark,
+                    }}>
+                      {s}
+                    </button>
+                  ))}
+                </div>
+                <textarea value={novaOcorrencia.descricao} onChange={(e) => setNovaOcorrencia({...novaOcorrencia, descricao: e.target.value})} placeholder="Descreva a ocorrência..." rows={2} style={{ ...inputStyle, resize: 'vertical' }} />
+                {novaOcorrencia.descricao && (
+                  <button onClick={handleAddOcorrencia} style={{ ...outlineBtnStyle, marginTop: '8px' }}>
+                    <Plus size={14} /> Adicionar Ocorrência
+                  </button>
+                )}
+                {ocorrencias.map(o => (
+                  <div key={o.id} style={{ display: 'flex', gap: '10px', padding: '10px', background: C.cream, borderRadius: '8px', marginTop: '8px', alignItems: 'center' }}>
+                    <span style={{
+                      padding: '3px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 700,
+                      background: o.severidade === 'Alta' ? 'rgba(166,93,87,0.12)' : o.severidade === 'Média' ? 'rgba(196,149,106,0.12)' : 'rgba(91,123,106,0.12)',
+                      color: o.severidade === 'Alta' ? C.danger : o.severidade === 'Média' ? C.warning : C.success,
+                    }}>{o.severidade}</span>
+                    <span style={{ flex: 1, fontFamily: FONTS.body, fontSize: '12px', color: C.dark }}>{o.descricao}</span>
+                    <button onClick={() => handleRemoveOcorrencia(o.id)} style={iconBtnStyle}><Trash2 size={13} /></button>
+                  </div>
+                ))}
+              </FormSection>
+
+              {/* Section 5: Non-conformities */}
+              <FormSection title="Não Conformidades">
+                {naoConformidades.map(nc => (
+                  <div key={nc.id} style={{ padding: '12px', background: C.cream, borderRadius: '8px', marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <span style={{
+                        padding: '3px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 700,
+                        background: nc.severidade === 'CRÍTICA' ? C.danger : 'rgba(166,93,87,0.12)',
+                        color: nc.severidade === 'CRÍTICA' ? C.white : C.danger,
+                      }}>{nc.severidade}</span>
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <button onClick={() => handleEditNC(nc)} style={iconBtnStyle}><Edit2 size={12} /></button>
+                        <button onClick={() => handleRemoveNC(nc.id)} style={iconBtnStyle}><Trash2 size={12} /></button>
+                      </div>
+                    </div>
+                    <p style={{ fontFamily: FONTS.body, fontSize: '12px', color: C.dark, margin: 0 }}>{nc.descricao}</p>
+                    {nc.acaoCorretiva && <p style={{ fontFamily: FONTS.body, fontSize: '11px', color: C.light, margin: '4px 0 0' }}>Ação: {nc.acaoCorretiva}</p>}
+                  </div>
+                ))}
+                {showAddNC ? (
+                  <div style={{ padding: '14px', background: C.cream, borderRadius: '10px' }}>
+                    <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
+                      {SEVERIDADES_NC.map(s => (
+                        <button key={s} onClick={() => setNovaNC({...novaNC, severidade: s})} style={{
+                          padding: '6px 12px', borderRadius: '6px', cursor: 'pointer',
+                          border: novaNC.severidade === s ? 'none' : `1px solid ${C.border}`,
+                          background: novaNC.severidade === s ? (s === 'CRÍTICA' ? C.danger : 'rgba(166,93,87,0.12)') : C.white,
+                          color: novaNC.severidade === s ? (s === 'CRÍTICA' ? C.white : C.danger) : C.dark,
+                          fontFamily: FONTS.body, fontSize: '11px', fontWeight: 600,
+                        }}>{s}</button>
+                      ))}
+                    </div>
+                    <div style={{ marginBottom: '8px' }}>
+                      <label style={labelStyle}>Descrição</label>
+                      <textarea value={novaNC.descricao} onChange={(e) => setNovaNC({...novaNC, descricao: e.target.value})} rows={2} style={{ ...inputStyle, resize: 'vertical' }} placeholder="Descreva a não conformidade..." />
+                    </div>
+                    <div style={{ marginBottom: '10px' }}>
+                      <label style={labelStyle}>Ação Corretiva</label>
+                      <textarea value={novaNC.acaoCorretiva} onChange={(e) => setNovaNC({...novaNC, acaoCorretiva: e.target.value})} rows={2} style={{ ...inputStyle, resize: 'vertical' }} placeholder="Ação corretiva proposta..." />
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button onClick={handleAddNC} style={{ ...smallBtnStyle, background: C.dark, color: C.white, padding: '8px 16px' }}>{editingNC ? 'Guardar' : 'Adicionar'}</button>
+                      <button onClick={() => { setShowAddNC(false); setEditingNC(null); setNovaNC({ severidade: 'MAIOR', descricao: '', acaoCorretiva: '' }) }} style={{ ...smallBtnStyle, padding: '8px 16px' }}>Cancelar</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button onClick={() => setShowAddNC(true)} style={outlineBtnStyle}>
+                    <Plus size={14} /> Adicionar NC
+                  </button>
+                )}
+              </FormSection>
+
+              {/* Section 6: Photos */}
+              <FormSection title="Registo Fotográfico">
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+                  {fotos.map(f => (
+                    <div key={f.id} style={{ position: 'relative' }}>
+                      <div style={{ aspectRatio: '4/3', borderRadius: '10px', overflow: 'hidden', marginBottom: '6px' }}>
+                        <img src={f.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <button onClick={() => handleRemoveFoto(f.id)} style={{
+                          position: 'absolute', top: '6px', right: '6px',
+                          width: '24px', height: '24px', borderRadius: '50%',
+                          background: 'rgba(0,0,0,0.6)', border: 'none',
+                          color: 'white', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}><X size={14} /></button>
+                      </div>
+                      <input type="text" value={f.descricao} onChange={(e) => handleFotoDescricao(f.id, e.target.value)} placeholder="Descrição..." style={{ ...inputStyle, fontSize: '11px', padding: '6px 8px' }} />
+                    </div>
+                  ))}
+                  <label style={{
+                    aspectRatio: '4/3', border: `2px dashed ${C.border}`,
+                    borderRadius: '10px', display: 'flex', flexDirection: 'column',
+                    alignItems: 'center', justifyContent: 'center', gap: '6px',
+                    cursor: 'pointer', background: C.cream,
+                  }}>
+                    <input type="file" accept="image/*" multiple onChange={handleAddFoto} style={{ display: 'none' }} />
+                    <Upload size={20} color={C.muted} />
+                    <span style={{ fontFamily: FONTS.body, fontSize: '11px', color: C.light }}>Adicionar foto</span>
+                  </label>
+                </div>
+              </FormSection>
+
+              {/* Section 7: Next Steps */}
+              <FormSection title="Próximos Passos">
+                {proximosPassos.map(p => (
+                  <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderBottom: `1px solid ${C.border}` }}>
+                    <ArrowRight size={14} color={C.success} />
+                    <span style={{ flex: 1, fontFamily: FONTS.body, fontSize: '13px', color: C.dark }}>{p.texto}</span>
+                    <button onClick={() => handleRemovePasso(p.id)} style={iconBtnStyle}><Trash2 size={13} /></button>
+                  </div>
+                ))}
+                {showAddPasso ? (
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '10px', alignItems: 'end' }}>
+                    <div style={{ flex: 1 }}>
+                      <input type="text" value={novoPasso} onChange={(e) => setNovoPasso(e.target.value)} style={inputStyle} placeholder="Próximo passo..." onKeyDown={(e) => e.key === 'Enter' && handleAddPasso()} />
+                    </div>
+                    <button onClick={handleAddPasso} style={{ ...smallBtnStyle, background: C.dark, color: C.white, padding: '9px 14px' }}>Adicionar</button>
+                    <button onClick={() => setShowAddPasso(false)} style={{ ...smallBtnStyle, padding: '9px 14px' }}>Cancelar</button>
+                  </div>
+                ) : (
+                  <button onClick={() => setShowAddPasso(true)} style={{ ...outlineBtnStyle, marginTop: '10px' }}>
+                    <Plus size={14} /> Adicionar Passo
+                  </button>
+                )}
+              </FormSection>
+            </div>
+
+            {/* Modal footer */}
+            <div style={{
+              padding: '16px 24px',
+              borderTop: `1px solid ${C.border}`,
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              position: 'sticky', bottom: 0, background: C.white,
+              borderRadius: '0 0 16px 16px',
+            }}>
+              <div style={{ fontFamily: FONTS.body, fontSize: '12px', color: C.muted }}>
+                {lastSaved ? (
+                  <>Rascunho às <strong style={{ color: C.dark }}>{lastSaved.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}</strong></>
+                ) : 'Não guardado'}
+              </div>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button onClick={() => setShowFormModal(false)} style={{
+                  padding: '10px 18px', background: 'transparent',
+                  border: `1px solid ${C.border}`, borderRadius: '8px',
+                  cursor: 'pointer', fontFamily: FONTS.body, fontSize: '13px',
+                  color: C.dark, fontWeight: 500,
+                }}>
+                  Cancelar
+                </button>
+                <button onClick={handleSaveRascunho} disabled={saving} style={{
+                  padding: '10px 18px', background: C.white,
+                  border: `1px solid ${C.border}`, borderRadius: '8px',
+                  cursor: 'pointer', fontFamily: FONTS.body, fontSize: '13px',
+                  color: C.dark, fontWeight: 500,
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                }}>
+                  <Save size={14} />
+                  Rascunho
+                </button>
+                <button onClick={handleSubmit} disabled={saving} style={{
+                  padding: '10px 20px', background: C.dark, color: C.white,
+                  border: 'none', borderRadius: '8px', cursor: 'pointer',
+                  fontFamily: FONTS.body, fontSize: '13px', fontWeight: 600,
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                }}>
+                  <Send size={14} />
+                  Submeter
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
-// Section Card Component
-function SectionCard({ number, title, subtitle, children }) {
+// Form section wrapper
+function FormSection({ title, children }) {
   return (
-    <div className="card" style={{ padding: 24, marginBottom: 20 }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, marginBottom: 20 }}>
-        <div style={{
-          width: 32,
-          height: 32,
-          borderRadius: '50%',
-          background: 'var(--olive-gray)',
-          color: 'white',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: 14,
-          fontWeight: 600,
-          flexShrink: 0
-        }}>
-          {number}
-        </div>
-        <div>
-          <h3 style={{ fontSize: 16, fontWeight: 600, color: 'var(--brown)', marginBottom: 2 }}>{title}</h3>
-          <p style={{ fontSize: 13, color: 'var(--brown-light)', margin: 0 }}>{subtitle}</p>
-        </div>
-      </div>
-      <div style={{ borderTop: '1px solid var(--stone)', paddingTop: 20 }}>
-        {children}
-      </div>
+    <div style={{ marginBottom: '20px' }}>
+      <h4 style={{
+        fontFamily: "'Quattrocento Sans', sans-serif",
+        fontSize: '11px', fontWeight: 700,
+        textTransform: 'uppercase', letterSpacing: '0.06em',
+        color: '#9A978A', marginBottom: '12px',
+        paddingBottom: '8px', borderBottom: '1px solid #E5E2D9',
+      }}>
+        {title}
+      </h4>
+      {children}
     </div>
   )
+}
+
+// Shared styles
+const labelStyle = {
+  display: 'block', fontSize: '10px', fontWeight: 700,
+  textTransform: 'uppercase', letterSpacing: '0.05em',
+  color: '#9A978A', marginBottom: '5px',
+  fontFamily: "'Quattrocento Sans', sans-serif",
+}
+
+const inputStyle = {
+  width: '100%', padding: '9px 12px',
+  border: '1px solid #E5E2D9', borderRadius: '8px',
+  boxSizing: 'border-box', fontSize: '13px',
+  fontFamily: "'Quattrocento Sans', sans-serif",
+  color: '#2C2C2B', outline: 'none', background: '#FFFFFF',
+}
+
+const iconBtnStyle = {
+  padding: '5px', background: 'transparent', border: 'none',
+  borderRadius: '6px', cursor: 'pointer', color: '#9A978A',
+}
+
+const smallBtnStyle = {
+  padding: '8px 12px', background: '#FFFFFF',
+  border: '1px solid #E5E2D9', borderRadius: '8px',
+  cursor: 'pointer', fontFamily: "'Quattrocento Sans', sans-serif",
+  fontSize: '12px', fontWeight: 500, color: '#2C2C2B',
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+}
+
+const outlineBtnStyle = {
+  display: 'flex', alignItems: 'center', gap: '6px',
+  padding: '8px 14px', background: '#FFFFFF',
+  border: '1px solid #E5E2D9', borderRadius: '8px',
+  cursor: 'pointer', fontFamily: "'Quattrocento Sans', sans-serif",
+  fontSize: '12px', fontWeight: 500, color: '#6B6B6B',
 }
