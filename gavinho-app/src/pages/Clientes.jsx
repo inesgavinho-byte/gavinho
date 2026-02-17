@@ -11,13 +11,9 @@ import {
   Edit,
   Trash2,
   User,
-  Users,
   FolderKanban,
-  Clock,
-  AlertTriangle,
   LayoutGrid,
-  List,
-  ChevronRight
+  List
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../components/ui/Toast'
@@ -51,13 +47,23 @@ function daysSince(dateStr) {
   return Math.floor((new Date() - new Date(dateStr)) / (1000 * 60 * 60 * 24))
 }
 
-const STATUS_BADGE = {
-  'Em Curso': { bg: 'rgba(122, 139, 110, 0.15)', color: 'var(--success)' },
-  'Planeamento': { bg: 'var(--stone)', color: 'var(--brown)' },
-  'Concluído': { bg: 'rgba(138, 158, 184, 0.15)', color: 'var(--info)' },
-  'Concluída': { bg: 'rgba(138, 158, 184, 0.15)', color: 'var(--info)' },
-  'Pausada': { bg: 'rgba(201, 168, 130, 0.2)', color: '#9A7B52' },
-  'Cancelada': { bg: 'rgba(184, 138, 138, 0.15)', color: 'var(--error)' },
+const STATUS_MAP = {
+  'on_track':   { label: 'ATIVO',       bg: 'rgba(122, 139, 110, 0.15)', color: 'var(--success)' },
+  'at_risk':    { label: 'EM RISCO',    bg: 'rgba(201, 168, 130, 0.2)',  color: '#9A7B52' },
+  'delayed':    { label: 'ATRASADO',    bg: 'rgba(184, 138, 138, 0.15)', color: 'var(--error)' },
+  'on_hold':    { label: 'PAUSADO',     bg: 'rgba(201, 168, 130, 0.2)',  color: '#9A7B52' },
+  'completed':  { label: 'CONCLUÍDO',   bg: 'rgba(138, 158, 184, 0.15)', color: 'var(--info)' },
+  'blocked':    { label: 'BLOQUEADO',   bg: 'rgba(184, 138, 138, 0.15)', color: 'var(--error)' },
+  'Em Curso':   { label: 'ATIVO',       bg: 'rgba(122, 139, 110, 0.15)', color: 'var(--success)' },
+  'Planeamento':{ label: 'PLANEAMENTO', bg: 'var(--stone)',              color: 'var(--brown)' },
+  'Concluído':  { label: 'CONCLUÍDO',   bg: 'rgba(138, 158, 184, 0.15)', color: 'var(--info)' },
+  'Concluída':  { label: 'CONCLUÍDO',   bg: 'rgba(138, 158, 184, 0.15)', color: 'var(--info)' },
+  'Pausada':    { label: 'PAUSADO',     bg: 'rgba(201, 168, 130, 0.2)',  color: '#9A7B52' },
+  'Cancelada':  { label: 'CANCELADO',   bg: 'rgba(184, 138, 138, 0.15)', color: 'var(--error)' },
+}
+
+function getStatusInfo(status) {
+  return STATUS_MAP[status] || { label: status || 'N/D', bg: 'var(--stone)', color: 'var(--brown)' }
 }
 
 const AVATAR_COLORS = [
@@ -166,7 +172,7 @@ export default function Clientes() {
     const particulares = clients.filter(c => (c.tipo || 'Particular') === 'Particular').length
     const empresas = total - particulares
 
-    const activeStatuses = ['Em Curso', 'Planeamento', 'Em Progresso']
+    const activeStatuses = ['on_track', 'at_risk', 'Em Curso', 'Planeamento', 'Em Progresso', 'in_progress']
     const clientsWithActive = new Set()
     let activeProjectCount = 0
     projects.forEach(p => {
@@ -204,12 +210,13 @@ export default function Clientes() {
       result = result.filter(c =>
         c.nome?.toLowerCase().includes(term) ||
         c.empresa?.toLowerCase().includes(term) ||
-        c.email?.toLowerCase().includes(term)
+        c.email?.toLowerCase().includes(term) ||
+        c.cidade?.toLowerCase().includes(term)
       )
     }
 
     // Chip filters
-    const activeStatuses = ['Em Curso', 'Planeamento', 'Em Progresso']
+    const activeStatuses = ['on_track', 'at_risk', 'Em Curso', 'Planeamento', 'Em Progresso', 'in_progress']
     if (activeFilter === 'com_projeto') {
       const activeClientIds = new Set()
       projects.forEach(p => {
@@ -318,41 +325,28 @@ export default function Clientes() {
       </div>
 
       {/* ── KPI Stats ────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', marginBottom: '32px' }}>
-        <div className="stat-card">
-          <div className="stat-icon clients"><Users /></div>
-          <div className="stat-value">{stats.total}</div>
-          <div className="stat-label">Total Clientes</div>
-          <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginTop: '4px' }}>
-            {stats.particulares} particulares · {stats.empresas} empresas
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '28px' }}>
+        {[
+          { value: stats.total, label: 'Total Clientes', color: 'var(--brown)', sub: `${stats.particulares} particulares · ${stats.empresas} empresas` },
+          { value: stats.comProjetoAtivo, label: 'Projeto Ativo', color: 'var(--accent-olive-dark)', sub: `${stats.projetosEmCurso} projetos em curso` },
+          { value: stats.decisoesPendentes, label: 'Decisões Pendentes', color: '#9A7B52', sub: 'Aguardam resposta' },
+          { value: stats.semContacto, label: 'Sem Contacto +14D', color: 'var(--error)', sub: 'Requer follow-up' },
+        ].map((kpi, i) => (
+          <div key={i} style={{
+            background: 'var(--white)', borderRadius: '12px', padding: '20px',
+            border: '1px solid var(--stone)'
+          }}>
+            <div style={{ fontSize: '28px', fontWeight: 700, color: kpi.color, lineHeight: 1.1 }}>
+              {kpi.value}
+            </div>
+            <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--brown)', marginTop: '6px' }}>
+              {kpi.label}
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--brown-light)', marginTop: '2px' }}>
+              {kpi.sub}
+            </div>
           </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon obras"><FolderKanban /></div>
-          <div className="stat-value">{stats.comProjetoAtivo}</div>
-          <div className="stat-label">Com Projeto Ativo</div>
-          <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginTop: '4px' }}>
-            {stats.projetosEmCurso} projetos em curso
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon finance"><Clock /></div>
-          <div className="stat-value">{stats.decisoesPendentes}</div>
-          <div className="stat-label">Decisões Pendentes</div>
-          <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginTop: '4px' }}>
-            Aguardam resposta cliente
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon" style={{ background: 'rgba(154, 107, 91, 0.15)' }}>
-            <AlertTriangle style={{ stroke: 'var(--error)' }} />
-          </div>
-          <div className="stat-value">{stats.semContacto}</div>
-          <div className="stat-label">Sem Contacto +14D</div>
-          <div style={{ fontSize: '12px', color: 'var(--brown-light)', marginTop: '4px' }}>
-            Requer follow-up
-          </div>
-        </div>
+        ))}
       </div>
 
       {/* ── Search + Filter Chips ────────────────── */}
@@ -361,7 +355,7 @@ export default function Clientes() {
           <Search size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--brown-light)' }} />
           <input
             type="text"
-            placeholder="Procurar por nome, empresa ou email..."
+            placeholder="Procurar cliente, projeto, localização..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             style={{
@@ -392,38 +386,36 @@ export default function Clientes() {
         </div>
       </div>
 
-      {/* ── Results Bar ──────────────────────────── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <span style={{ fontSize: '14px', color: 'var(--brown-light)', fontWeight: 500 }}>
-          {filteredClients.length} cliente{filteredClients.length !== 1 ? 's' : ''}
-        </span>
-        <div style={{ display: 'flex', border: '1px solid var(--stone)', borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
-          <button
-            onClick={() => setViewMode('cards')}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '6px',
-              padding: '8px 14px', fontSize: '13px', fontWeight: 500, cursor: 'pointer',
-              border: 'none',
-              background: viewMode === 'cards' ? 'var(--brown)' : 'var(--white)',
-              color: viewMode === 'cards' ? 'var(--white)' : 'var(--brown-light)',
-              transition: 'all 0.2s ease'
-            }}
-          >
-            <LayoutGrid size={14} /> Cards
-          </button>
-          <button
-            onClick={() => setViewMode('lista')}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '6px',
-              padding: '8px 14px', fontSize: '13px', fontWeight: 500, cursor: 'pointer',
-              border: 'none', borderLeft: '1px solid var(--stone)',
-              background: viewMode === 'lista' ? 'var(--brown)' : 'var(--white)',
-              color: viewMode === 'lista' ? 'var(--white)' : 'var(--brown-light)',
-              transition: 'all 0.2s ease'
-            }}
-          >
-            <List size={14} /> Lista
-          </button>
+      {/* ── View Tabs ──────────────────────────── */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid var(--stone)' }}>
+        <div style={{ display: 'flex', gap: '0' }}>
+          {[
+            { key: 'cards', label: 'Cards', icon: <LayoutGrid size={14} /> },
+            { key: 'lista', label: 'Lista', icon: <List size={14} /> },
+          ].map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setViewMode(tab.key)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '6px',
+                padding: '10px 16px', fontSize: '13px', fontWeight: 500, cursor: 'pointer',
+                border: 'none', background: 'none',
+                color: viewMode === tab.key ? 'var(--brown)' : 'var(--brown-light)',
+                borderBottom: viewMode === tab.key ? '2px solid var(--brown)' : '2px solid transparent',
+                marginBottom: '-1px', transition: 'all 0.2s ease'
+              }}
+            >
+              {tab.icon} {tab.label}
+              <span style={{
+                fontSize: '11px', fontWeight: 600,
+                padding: '1px 7px', borderRadius: '10px',
+                background: viewMode === tab.key ? 'var(--brown)' : 'var(--stone)',
+                color: viewMode === tab.key ? 'var(--white)' : 'var(--brown-light)'
+              }}>
+                {filteredClients.length}
+              </span>
+            </button>
+          ))}
         </div>
       </div>
 
@@ -485,14 +477,19 @@ export default function Clientes() {
                         </span>
                       )}
                     </div>
-                    {client.email && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--brown-light)', marginTop: '8px' }}>
-                        <Mail size={13} /> {client.email}
-                      </div>
-                    )}
-                    {client.telefone && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--brown-light)', marginTop: '4px' }}>
-                        <Phone size={13} /> {client.telefone}
+                    {/* Contact info - horizontal */}
+                    {(client.email || client.telefone) && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '12px', color: 'var(--brown-light)', marginTop: '8px', flexWrap: 'wrap' }}>
+                        {client.email && (
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Mail size={12} /> {client.email}
+                          </span>
+                        )}
+                        {client.telefone && (
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Phone size={12} /> {client.telefone}
+                          </span>
+                        )}
                       </div>
                     )}
                   </div>
@@ -539,7 +536,7 @@ export default function Clientes() {
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                       {clientProjects.slice(0, 3).map(p => {
-                        const badge = STATUS_BADGE[p.status] || { bg: 'var(--stone)', color: 'var(--brown)' }
+                        const si = getStatusInfo(p.status)
                         return (
                           <div key={p.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                             <span style={{ fontSize: '13px', color: 'var(--brown)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
@@ -550,9 +547,9 @@ export default function Clientes() {
                             <span style={{
                               padding: '2px 8px', borderRadius: '10px', fontSize: '10px',
                               fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0,
-                              background: badge.bg, color: badge.color
+                              background: si.bg, color: si.color
                             }}>
-                              {p.status || 'N/D'}
+                              {si.label}
                             </span>
                           </div>
                         )
@@ -566,34 +563,20 @@ export default function Clientes() {
                   </div>
                 )}
 
-                {/* Decisions Section */}
+                {/* Decisions Section - Inline */}
                 {clientDecisions.length > 0 && (
-                  <div style={{ borderTop: '1px solid var(--stone)', padding: '16px 20px' }}>
-                    <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--brown)', marginBottom: '10px' }}>
-                      {clientDecisions.length} decisão{clientDecisions.length !== 1 ? 'ões' : ''} pendente{clientDecisions.length !== 1 ? 's' : ''}
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      {clientDecisions.slice(0, 2).map(d => (
-                        <div key={d.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--brown)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--warning)', flexShrink: 0 }} />
-                            {d.titulo}
-                          </span>
-                          <span style={{
-                            padding: '2px 8px', borderRadius: '10px', fontSize: '10px',
-                            fontWeight: 500, whiteSpace: 'nowrap', flexShrink: 0,
-                            background: 'rgba(201, 168, 130, 0.2)', color: '#9A7B52'
-                          }}>
-                            {timeAgo(d.created_at)}
-                          </span>
-                        </div>
-                      ))}
-                      {clientDecisions.length > 2 && (
-                        <span style={{ fontSize: '12px', color: 'var(--brown-light)', fontStyle: 'italic' }}>
-                          +{clientDecisions.length - 2} mais
-                        </span>
-                      )}
-                    </div>
+                  <div style={{ borderTop: '1px solid var(--stone)', padding: '12px 20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--warning)', flexShrink: 0 }} />
+                    <span style={{ fontSize: '12px', color: 'var(--brown)' }}>
+                      <span style={{ fontWeight: 600 }}>
+                        {clientDecisions.length} {clientDecisions.length === 1 ? 'decisão pendente' : 'decisões pendentes'}
+                      </span>
+                      <span style={{ color: 'var(--brown-light)' }}>
+                        {' — '}
+                        {clientDecisions.slice(0, 2).map(d => d.titulo).join(', ')}
+                        {clientDecisions.length > 2 && ` +${clientDecisions.length - 2}`}
+                      </span>
+                    </span>
                   </div>
                 )}
 
@@ -604,7 +587,9 @@ export default function Clientes() {
                   background: 'var(--cream)'
                 }}>
                   <span style={{ fontSize: '12px', color: 'var(--brown-light)' }}>
-                    Último contacto: {lastContactLabel || 'N/D'}
+                    Último contacto: {client.updated_at
+                      ? `${new Date(client.updated_at).toLocaleDateString('pt-PT')} · ${lastContactLabel}`
+                      : 'N/D'}
                   </span>
                   {lastContactLabel && (
                     <span style={{
