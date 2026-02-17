@@ -4,7 +4,8 @@ import {
   Plus, X, Camera, BookOpen, FileText, AlertTriangle,
   Upload, Trash2, Edit, Send, FileCheck, ChevronDown,
   ChevronLeft, ChevronRight, Sun, Cloud, CloudRain, Wind, CloudFog,
-  Users, Save, Check, Loader2, ArrowRight, Thermometer, Clock
+  Users, Save, Check, Loader2, ArrowRight, Thermometer, Clock,
+  MapPin, Info, AlertCircle
 } from 'lucide-react'
 import { colors } from './constants'
 import { formatDate } from './utils'
@@ -18,6 +19,22 @@ const WEATHER_OPTIONS = [
 ]
 
 const DIARIO_FUNCOES = ['Encarregado de Obra', 'Diretor de Obra', 'Engenheiro', 'Técnico de Segurança', 'Fiscal de Obra']
+
+const MONTHS_PT = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
+const WEEKDAYS_FULL_PT = ['DOMINGO', 'SEGUNDA-FEIRA', 'TERÇA-FEIRA', 'QUARTA-FEIRA', 'QUINTA-FEIRA', 'SEXTA-FEIRA', 'SÁBADO']
+
+const ESPECIALIDADE_COLORS = {
+  'Carpintaria': '#2563eb', 'Eletricidade': '#d97706', 'Elétrico': '#d97706',
+  'Pedra Natural': '#78716c', 'Revestimentos': '#78716c', 'AVAC': '#059669',
+  'Canalização': '#0891b2', 'Hidráulica': '#0891b2', 'Serralharia': '#475569',
+  'Alvenaria': '#92400e', 'Alvenarias': '#92400e', 'Pintura': '#7c3aed',
+  'Estrutura': '#dc2626', 'Impermeabilização': '#0d9488', 'Caixilharia': '#4f46e5',
+  'Vidros': '#06b6d4', 'Gás': '#ea580c', 'Paisagismo': '#16a34a', 'Piscina': '#0284c7',
+}
+
+function getEspecColor(nome) { return ESPECIALIDADE_COLORS[nome] || '#8B8670' }
+function formatDatePT(dateStr) { const d = new Date(dateStr + 'T12:00:00'); return `${d.getDate()} ${MONTHS_PT[d.getMonth()]}` }
+function getDayOfWeek(dateStr) { const d = new Date(dateStr + 'T12:00:00'); return WEEKDAYS_FULL_PT[d.getDay()] }
 
 export default function AcompanhamentoTab({ obraId, activeSubtab, currentUser }) {
   // ============================================
@@ -204,7 +221,12 @@ export default function AcompanhamentoTab({ obraId, activeSubtab, currentUser })
         condicoes_meteo: entry.condicoes_meteo || 'sol',
         temperatura: entry.temperatura || '',
         observacoes_meteo: entry.observacoes_meteo || '',
+        hora_inicio: entry.hora_inicio ? entry.hora_inicio.substring(0, 5) : '',
+        hora_fim: entry.hora_fim ? entry.hora_fim.substring(0, 5) : '',
         trabalhadores: entry.trabalhadores || [],
+        trabalhadores_gavinho: entry.trabalhadores_gavinho || 0,
+        trabalhadores_subempreiteiros: entry.trabalhadores_subempreiteiros || 0,
+        atividades: entry.atividades || [],
         tarefas: entry.tarefas || [],
         ocorrencias: entry.ocorrencias || [],
         nao_conformidades: entry.nao_conformidades || [],
@@ -218,7 +240,9 @@ export default function AcompanhamentoTab({ obraId, activeSubtab, currentUser })
         data: new Date().toISOString().split('T')[0],
         funcao: 'Encarregado de Obra',
         condicoes_meteo: 'sol', temperatura: '', observacoes_meteo: '',
-        trabalhadores: [], tarefas: [], ocorrencias: [],
+        hora_inicio: '', hora_fim: '',
+        trabalhadores: [], trabalhadores_gavinho: 0, trabalhadores_subempreiteiros: 0,
+        atividades: [], tarefas: [], ocorrencias: [],
         nao_conformidades: [], fotos: [], proximos_passos: [],
         status: 'rascunho'
       })
@@ -260,14 +284,18 @@ export default function AcompanhamentoTab({ obraId, activeSubtab, currentUser })
         condicoes_meteo: diarioForm.condicoes_meteo,
         temperatura: diarioForm.temperatura ? parseFloat(diarioForm.temperatura) : null,
         observacoes_meteo: diarioForm.observacoes_meteo || null,
+        hora_inicio: diarioForm.hora_inicio || null,
+        hora_fim: diarioForm.hora_fim || null,
         trabalhadores: diarioForm.trabalhadores,
-        trabalhadores_gavinho: diarioForm.trabalhadores.filter(t => t.tipo === 'Equipa' && t.estado === 'PRESENTE').length,
-        trabalhadores_subempreiteiros: diarioForm.trabalhadores.filter(t => t.tipo === 'Subempreiteiro' && t.estado === 'PRESENTE').length,
+        trabalhadores_gavinho: diarioForm.trabalhadores_gavinho || diarioForm.trabalhadores.filter(t => t.tipo === 'Equipa' && t.estado === 'PRESENTE').length,
+        trabalhadores_subempreiteiros: diarioForm.trabalhadores_subempreiteiros || diarioForm.trabalhadores.filter(t => t.tipo === 'Subempreiteiro' && t.estado === 'PRESENTE').length,
+        atividades: diarioForm.atividades || [],
         tarefas: diarioForm.tarefas,
         ocorrencias: diarioForm.ocorrencias,
         nao_conformidades: diarioForm.nao_conformidades,
         fotos: allFotos,
         proximos_passos: diarioForm.proximos_passos,
+        registado_por_nome: diarioForm.funcao,
         status,
         updated_at: new Date().toISOString()
       }
@@ -787,20 +815,6 @@ export default function AcompanhamentoTab({ obraId, activeSubtab, currentUser })
         </button>
       </div>
 
-      {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 16 }}>
-        {[
-          { label: 'Total', value: diarioStats.total, color: colors.primary, bg: colors.background },
-          { label: 'Submetidos', value: diarioStats.submetidos, color: '#10B981', bg: '#D1FAE5' },
-          { label: 'Rascunhos', value: diarioStats.rascunhos, color: '#F59E0B', bg: '#FEF3C7' },
-        ].map(s => (
-          <div key={s.label} style={{ padding: 14, background: s.bg, borderRadius: 10, textAlign: 'center' }}>
-            <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: 11, color: s.color, marginTop: 2 }}>{s.label}</div>
-          </div>
-        ))}
-      </div>
-
       {/* Timeline */}
       {diarioLoading ? (
         <div style={{ textAlign: 'center', padding: 48, color: colors.textMuted }}>A carregar...</div>
@@ -813,166 +827,105 @@ export default function AcompanhamentoTab({ obraId, activeSubtab, currentUser })
           </button>
         </div>
       ) : (
-        <div style={{ position: 'relative', paddingLeft: 28 }}>
-          {/* Vertical line */}
-          <div style={{ position: 'absolute', left: 5, top: 6, bottom: 0, width: 2, background: colors.border }} />
-
-          {filteredDiario.map((d, i) => {
+        <div>
+          {filteredDiario.map((d) => {
             const weather = getWeatherInfo(d.condicoes_meteo)
             const WeatherIcon = weather.icon
-            const isExpanded = expandedDiario === d.id
-            const statusInfo = d.status === 'submetido'
-              ? { label: 'Submetido', color: '#10B981', bg: '#D1FAE5' }
-              : { label: 'Rascunho', color: '#F59E0B', bg: '#FEF3C7' }
-            const trabCount = (d.trabalhadores_gavinho || 0) + (d.trabalhadores_subempreiteiros || 0)
-            const tarefasCount = (d.tarefas || []).length
-            const fotosCount = (d.fotos || []).length
-            const ocorrenciasCount = (d.ocorrencias || []).length
+            const trabArray = d.trabalhadores || []
+            const trabPresentes = trabArray.filter?.(t => t.estado === 'PRESENTE')?.length
+            const workerCount = trabPresentes || (d.trabalhadores_gavinho || 0) + (d.trabalhadores_subempreiteiros || 0)
+            const atividades = d.atividades || []
+            const displayAtividades = atividades.length > 0 ? atividades : (d.tarefas || []).map(t => ({ especialidade_nome: 'Geral', zona: '', descricao: t.descricao || t.titulo || t.texto || (typeof t === 'string' ? t : ''), fotos: [] }))
+            const ativFotos = atividades.reduce((s, a) => s + (a.fotos?.length || 0), 0)
+            const photoCount = (d.fotos?.length || 0) + ativFotos
+            const horaInicio = d.hora_inicio ? d.hora_inicio.substring(0, 5) : null
+            const horaFim = d.hora_fim ? d.hora_fim.substring(0, 5) : null
 
             return (
-              <div key={d.id} style={{ marginBottom: i < filteredDiario.length - 1 ? 12 : 0 }}>
-                {/* Date dot */}
-                <div style={{ position: 'absolute', left: -1, marginTop: 16, width: 12, height: 12, borderRadius: '50%', background: d.status === 'submetido' ? '#10B981' : colors.primary, border: `2px solid ${colors.white}`, boxShadow: `0 0 0 2px ${colors.border}`, zIndex: 1 }} />
-
-                {/* Entry card */}
-                <div style={{ background: colors.white, borderRadius: 12, border: `1px solid ${colors.border}`, overflow: 'hidden' }}>
-                  {/* Card header — clickable */}
-                  <div
-                    onClick={() => setExpandedDiario(isExpanded ? null : d.id)}
-                    style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}
-                  >
-                    {/* Weather icon */}
-                    <div style={{ width: 44, height: 44, borderRadius: 10, background: colors.background, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <WeatherIcon size={22} style={{ color: weather.color }} />
-                    </div>
-
-                    {/* Info */}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: 14, fontWeight: 700, color: colors.text }}>
-                          {new Date(d.data + 'T00:00:00').toLocaleDateString('pt-PT', { weekday: 'short', day: 'numeric', month: 'short' })}
-                        </span>
-                        {d.temperatura && (
-                          <span style={{ fontSize: 12, color: colors.textMuted }}>
-                            {d.temperatura}°C
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ display: 'flex', gap: 10, marginTop: 4, fontSize: 12, color: colors.textMuted, flexWrap: 'wrap' }}>
-                        {trabCount > 0 && <span><Users size={11} style={{ verticalAlign: -1, marginRight: 3 }} />{trabCount} trab.</span>}
-                        {tarefasCount > 0 && <span>{tarefasCount} tarefa{tarefasCount > 1 ? 's' : ''}</span>}
-                        {fotosCount > 0 && <span><Camera size={11} style={{ verticalAlign: -1, marginRight: 3 }} />{fotosCount}</span>}
-                        {ocorrenciasCount > 0 && <span style={{ color: colors.warning }}><AlertTriangle size={11} style={{ verticalAlign: -1, marginRight: 3 }} />{ocorrenciasCount}</span>}
-                      </div>
-                    </div>
-
-                    {/* Status + chevron */}
-                    <span style={{ padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, color: statusInfo.color, background: statusInfo.bg }}>{statusInfo.label}</span>
-                    <ChevronDown size={18} style={{ color: colors.textMuted, transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }} />
+              <div key={d.id} style={{ background: colors.white, borderRadius: 12, border: `1px solid ${colors.border}`, overflow: 'hidden', marginBottom: 16 }}>
+                {/* Date Header */}
+                <div style={{ padding: '12px 20px', background: colors.background, borderBottom: `1px solid ${colors.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 15, fontWeight: 700, color: colors.text }}>{formatDatePT(d.data)}</span>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: colors.textMuted, letterSpacing: 0.5 }}>{getDayOfWeek(d.data)}</span>
                   </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, color: d.status === 'submetido' ? '#10B981' : '#F59E0B', background: d.status === 'submetido' ? '#D1FAE5' : '#FEF3C7' }}>
+                      {d.status === 'submetido' ? 'Submetido' : 'Rascunho'}
+                    </span>
+                    <button onClick={() => openDiarioModal(d)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: colors.textMuted }} title="Editar"><Edit size={14} /></button>
+                    <button onClick={() => handleDiarioDelete(d.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: colors.error }} title="Apagar"><Trash2 size={14} /></button>
+                  </div>
+                </div>
 
-                  {/* Expanded detail */}
-                  {isExpanded && (
-                    <div style={{ padding: '0 20px 16px', borderTop: `1px solid ${colors.border}` }}>
-                      {/* Weather detail */}
-                      <div style={{ display: 'flex', gap: 12, paddingTop: 16, marginBottom: 16, flexWrap: 'wrap' }}>
-                        <span style={{ padding: '6px 12px', borderRadius: 8, fontSize: 12, background: colors.background, color: colors.text, display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <WeatherIcon size={14} style={{ color: weather.color }} /> {weather.label}
-                        </span>
-                        {d.temperatura && <span style={{ padding: '6px 12px', borderRadius: 8, fontSize: 12, background: colors.background, color: colors.text }}><Thermometer size={14} style={{ verticalAlign: -2, marginRight: 4 }} />{d.temperatura}°C</span>}
-                        {d.funcao && <span style={{ padding: '6px 12px', borderRadius: 8, fontSize: 12, background: colors.background, color: colors.textMuted }}>{d.funcao}</span>}
-                      </div>
-                      {d.observacoes_meteo && <p style={{ margin: '0 0 16px', fontSize: 13, color: colors.textMuted, fontStyle: 'italic' }}>{d.observacoes_meteo}</p>}
+                {/* Weather + Stats Bar */}
+                <div style={{ padding: '10px 20px', borderBottom: `1px solid ${colors.border}`, display: 'flex', alignItems: 'center', gap: 18, fontSize: 13, color: colors.textMuted }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <WeatherIcon size={15} style={{ color: weather.color }} />
+                    <span style={{ color: colors.text }}>{d.temperatura ? `${d.temperatura}°C · ` : ''}{weather.label}</span>
+                  </span>
+                  {workerCount > 0 && <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Users size={13} /> {workerCount} em obra</span>}
+                  {(horaInicio || horaFim) && <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Clock size={13} /> {horaInicio || '—'} – {horaFim || '—'}</span>}
+                  {photoCount > 0 && <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Camera size={13} /> {photoCount} fotos</span>}
+                </div>
 
-                      {/* Workers */}
-                      {(d.trabalhadores || []).length > 0 && (
-                        <div style={{ marginBottom: 16 }}>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: colors.text, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Trabalhadores ({d.trabalhadores.length})</div>
-                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                            {d.trabalhadores.map((t, ti) => (
-                              <span key={ti} style={{ padding: '4px 10px', borderRadius: 6, fontSize: 12, background: t.estado === 'PRESENTE' ? '#D1FAE5' : '#FEE2E2', color: t.estado === 'PRESENTE' ? '#065F46' : '#991B1B' }}>
-                                {t.nome} <span style={{ opacity: 0.6 }}>({t.funcao})</span>
-                              </span>
-                            ))}
+                {/* Activities by Specialty */}
+                <div style={{ padding: '0 20px' }}>
+                  {displayAtividades.map((ativ, idx) => {
+                    const espColor = getEspecColor(ativ.especialidade_nome)
+                    const aFotos = ativ.fotos || []
+                    const maxThumbs = 3
+                    const extra = aFotos.length > maxThumbs ? aFotos.length - maxThumbs : 0
+                    return (
+                      <div key={idx} style={{ padding: '14px 0', borderBottom: idx < displayAtividades.length - 1 ? `1px solid ${colors.border}` : 'none' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+                          <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: 0.5, background: `${espColor}18`, color: espColor, textTransform: 'uppercase' }}>
+                            {ativ.especialidade_nome || 'Geral'}
+                          </span>
+                          {ativ.zona && <span style={{ fontSize: 12, color: colors.textMuted }}>{ativ.zona}</span>}
+                        </div>
+                        <p style={{ margin: 0, fontSize: 13, color: colors.text, lineHeight: 1.6 }}>{ativ.descricao}</p>
+                        {ativ.alerta && (
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 10px', marginTop: 8, background: (ativ.alerta.tipo || '') === 'bloqueio' ? `${colors.error}12` : '#FEF3C7', borderRadius: 6, borderLeft: `3px solid ${(ativ.alerta.tipo || '') === 'bloqueio' ? colors.error : colors.warning}` }}>
+                            <AlertTriangle size={13} color={(ativ.alerta.tipo || '') === 'bloqueio' ? colors.error : colors.warning} style={{ flexShrink: 0, marginTop: 1 }} />
+                            <span style={{ fontSize: 12, color: colors.text }}>{typeof ativ.alerta === 'string' ? ativ.alerta : ativ.alerta.descricao}</span>
                           </div>
-                        </div>
-                      )}
-
-                      {/* Tasks */}
-                      {(d.tarefas || []).length > 0 && (
-                        <div style={{ marginBottom: 16 }}>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: colors.text, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Tarefas</div>
-                          {d.tarefas.map((t, ti) => (
-                            <div key={ti} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: ti < d.tarefas.length - 1 ? `1px solid ${colors.border}` : 'none' }}>
-                              <div style={{ width: 18, height: 18, borderRadius: 4, background: t.concluida ? colors.success : colors.border, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                {t.concluida && <Check size={12} color="#fff" />}
-                              </div>
-                              <span style={{ flex: 1, fontSize: 13, color: colors.text }}>{t.titulo || t.texto || t}</span>
-                              {t.percentagem && <span style={{ fontSize: 11, color: colors.textMuted }}>{t.percentagem}%</span>}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Occurrences */}
-                      {(d.ocorrencias || []).length > 0 && (
-                        <div style={{ marginBottom: 16 }}>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: colors.text, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Ocorrências</div>
-                          {d.ocorrencias.map((o, oi) => {
-                            const sevColor = o.severidade === 'Alta' ? colors.error : o.severidade === 'Média' ? colors.warning : colors.success
-                            return (
-                              <div key={oi} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '6px 0' }}>
-                                <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 600, color: sevColor, background: `${sevColor}18`, flexShrink: 0 }}>{o.severidade}</span>
-                                <span style={{ fontSize: 13, color: colors.text }}>{o.descricao}</span>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      )}
-
-                      {/* Photos */}
-                      {(d.fotos || []).length > 0 && (
-                        <div style={{ marginBottom: 16 }}>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: colors.text, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Fotos ({d.fotos.length})</div>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 8 }}>
-                            {d.fotos.map((f, fi) => (
-                              <div key={fi} style={{ paddingBottom: '75%', position: 'relative', borderRadius: 8, overflow: 'hidden', background: colors.background }}>
-                                <img src={f.url || f} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Next steps */}
-                      {(d.proximos_passos || []).length > 0 && (
-                        <div style={{ marginBottom: 16 }}>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: colors.text, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Próximos Passos</div>
-                          {d.proximos_passos.map((p, pi) => (
-                            <div key={pi} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '4px 0' }}>
-                              <ArrowRight size={12} style={{ color: colors.primary, flexShrink: 0 }} />
-                              <span style={{ fontSize: 13, color: colors.text }}>{p.texto || p}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Action buttons */}
-                      <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                        <button onClick={() => openDiarioModal(d)} style={{ padding: '6px 14px', background: colors.background, border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', color: colors.text }}>
-                          <Edit size={12} style={{ verticalAlign: -2, marginRight: 4 }} />Editar
-                        </button>
-                        {d.status === 'rascunho' && (
-                          <button onClick={() => { handleDiarioSave.call(null); /* handled via modal */ openDiarioModal(d) }} style={{ padding: '6px 14px', background: '#D1FAE5', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#10B981' }}>
-                            <Send size={12} style={{ verticalAlign: -2, marginRight: 4 }} />Submeter
-                          </button>
                         )}
-                        <button onClick={() => handleDiarioDelete(d.id)} style={{ padding: '6px 14px', background: '#FFEBEE', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#F44336' }}>
-                          <Trash2 size={12} style={{ verticalAlign: -2, marginRight: 4 }} />Apagar
-                        </button>
+                        {ativ.nota && (
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, padding: '6px 10px', marginTop: 8, background: colors.background, borderRadius: 6 }}>
+                            <Info size={12} color={colors.textMuted} style={{ flexShrink: 0, marginTop: 1 }} />
+                            <span style={{ fontSize: 12, color: colors.textMuted }}>{ativ.nota}</span>
+                          </div>
+                        )}
+                        {aFotos.length > 0 && (
+                          <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+                            {aFotos.slice(0, maxThumbs).map((foto, fi) => (
+                              <div key={fi} style={{ width: 56, height: 42, borderRadius: 5, overflow: 'hidden', flexShrink: 0 }}>
+                                <img src={typeof foto === 'string' ? foto : foto.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
+                              </div>
+                            ))}
+                            {extra > 0 && (
+                              <div style={{ width: 56, height: 42, borderRadius: 5, background: colors.background, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 600, color: colors.textMuted, flexShrink: 0 }}>+{extra}</div>
+                            )}
+                          </div>
+                        )}
                       </div>
+                    )
+                  })}
+
+                  {/* Inline alerts from ocorrencias */}
+                  {(d.ocorrencias || []).map((oc, oi) => (
+                    <div key={`oc-${oi}`} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '10px 12px', margin: '6px 0', background: oc.severidade === 'Alta' ? `${colors.error}12` : '#FEF3C7', borderRadius: 6, borderLeft: `3px solid ${oc.severidade === 'Alta' ? colors.error : colors.warning}` }}>
+                      <AlertTriangle size={14} color={oc.severidade === 'Alta' ? colors.error : colors.warning} style={{ flexShrink: 0, marginTop: 1 }} />
+                      <span style={{ fontSize: 13, color: colors.text, lineHeight: 1.4 }}>{oc.descricao}</span>
                     </div>
-                  )}
+                  ))}
+                </div>
+
+                {/* Registered By Footer */}
+                <div style={{ padding: '10px 20px', borderTop: `1px solid ${colors.border}`, fontSize: 12, color: colors.textMuted }}>
+                  Registado por <strong style={{ color: colors.text }}>{d.registado_por_nome || d.funcao || 'Utilizador'}</strong>
+                  {d.updated_at && <> · {new Date(d.updated_at).toLocaleDateString('pt-PT')} {new Date(d.updated_at).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}</>}
                 </div>
               </div>
             )
@@ -983,31 +936,39 @@ export default function AcompanhamentoTab({ obraId, activeSubtab, currentUser })
       {/* New/Edit Modal */}
       {showDiarioModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ background: colors.white, borderRadius: 16, width: '100%', maxWidth: 640, maxHeight: '90vh', overflow: 'auto' }}>
+          <div style={{ background: colors.white, borderRadius: 16, width: '100%', maxWidth: 720, maxHeight: '90vh', overflow: 'auto' }}>
             {/* Modal header */}
-            <div style={{ padding: 20, borderBottom: `1px solid ${colors.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ padding: 20, borderBottom: `1px solid ${colors.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: colors.white, borderRadius: '16px 16px 0 0', zIndex: 1 }}>
               <h2 style={{ margin: 0, fontSize: 18, color: colors.text }}>{diarioEditId ? 'Editar Entrada' : 'Nova Entrada'}</h2>
               <button onClick={() => setShowDiarioModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.textMuted }}><X size={20} /></button>
             </div>
 
             <div style={{ padding: 20 }}>
-              {/* Date + Role */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+              {/* Date + Role + Hours */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 14 }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: colors.text, marginBottom: 6 }}>Data *</label>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: colors.textMuted, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>Data</label>
                   <input type="date" value={diarioForm.data} onChange={e => setDiarioForm({ ...diarioForm, data: e.target.value })} style={{ width: '100%', padding: '10px 12px', border: `1px solid ${colors.border}`, borderRadius: 8, fontSize: 14, boxSizing: 'border-box' }} />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: colors.text, marginBottom: 6 }}>Função</label>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: colors.textMuted, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>Função</label>
                   <select value={diarioForm.funcao} onChange={e => setDiarioForm({ ...diarioForm, funcao: e.target.value })} style={{ width: '100%', padding: '10px 12px', border: `1px solid ${colors.border}`, borderRadius: 8, fontSize: 13, boxSizing: 'border-box' }}>
                     {DIARIO_FUNCOES.map(f => <option key={f} value={f}>{f}</option>)}
                   </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: colors.textMuted, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>Horário</label>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <input type="time" value={diarioForm.hora_inicio || ''} onChange={e => setDiarioForm({ ...diarioForm, hora_inicio: e.target.value })} style={{ flex: 1, padding: '10px 8px', border: `1px solid ${colors.border}`, borderRadius: 8, fontSize: 13, boxSizing: 'border-box' }} />
+                    <span style={{ color: colors.textMuted }}>–</span>
+                    <input type="time" value={diarioForm.hora_fim || ''} onChange={e => setDiarioForm({ ...diarioForm, hora_fim: e.target.value })} style={{ flex: 1, padding: '10px 8px', border: `1px solid ${colors.border}`, borderRadius: 8, fontSize: 13, boxSizing: 'border-box' }} />
+                  </div>
                 </div>
               </div>
 
               {/* Weather */}
               <div style={{ marginBottom: 14 }}>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: colors.text, marginBottom: 6 }}>Meteorologia</label>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: colors.textMuted, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>Meteorologia</label>
                 <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
                   {WEATHER_OPTIONS.map(w => {
                     const WIcon = w.icon
@@ -1026,48 +987,55 @@ export default function AcompanhamentoTab({ obraId, activeSubtab, currentUser })
                 </div>
               </div>
 
-              {/* Workers */}
+              {/* Workers (simplified) */}
               <div style={{ marginBottom: 14 }}>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: colors.text, marginBottom: 6 }}>Trabalhadores ({diarioForm.trabalhadores.length})</label>
-                {diarioForm.trabalhadores.length > 0 && (
-                  <div style={{ marginBottom: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    {diarioForm.trabalhadores.map((t, ti) => (
-                      <span key={ti} style={{ padding: '4px 10px', borderRadius: 6, fontSize: 12, background: t.estado === 'PRESENTE' ? '#D1FAE5' : '#FEE2E2', color: t.estado === 'PRESENTE' ? '#065F46' : '#991B1B', display: 'flex', alignItems: 'center', gap: 4 }}>
-                        {t.nome} ({t.funcao})
-                        <X size={12} style={{ cursor: 'pointer' }} onClick={() => setDiarioForm({ ...diarioForm, trabalhadores: diarioForm.trabalhadores.filter((_, j) => j !== ti) })} />
-                      </span>
-                    ))}
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: colors.textMuted, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>Trabalhadores em Obra</label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, color: colors.textMuted, marginBottom: 4 }}>Equipa Gavinho</label>
+                    <input type="number" min="0" value={diarioForm.trabalhadores_gavinho || 0} onChange={e => setDiarioForm({ ...diarioForm, trabalhadores_gavinho: parseInt(e.target.value) || 0 })} style={{ width: '100%', padding: '10px 12px', border: `1px solid ${colors.border}`, borderRadius: 8, fontSize: 14, boxSizing: 'border-box' }} />
                   </div>
-                )}
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1fr auto', gap: 6 }}>
-                  <input type="text" value={diarioTempTrab.nome} onChange={e => setDiarioTempTrab({ ...diarioTempTrab, nome: e.target.value })} placeholder="Nome" style={{ padding: '8px 10px', border: `1px solid ${colors.border}`, borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} />
-                  <input type="text" value={diarioTempTrab.funcao} onChange={e => setDiarioTempTrab({ ...diarioTempTrab, funcao: e.target.value })} placeholder="Função" style={{ padding: '8px 10px', border: `1px solid ${colors.border}`, borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} />
-                  <select value={diarioTempTrab.tipo} onChange={e => setDiarioTempTrab({ ...diarioTempTrab, tipo: e.target.value })} style={{ padding: '8px 6px', border: `1px solid ${colors.border}`, borderRadius: 6, fontSize: 11, boxSizing: 'border-box' }}>
-                    <option value="Equipa">Equipa</option>
-                    <option value="Subempreiteiro">Sub.</option>
-                  </select>
-                  <button onClick={() => { if (!diarioTempTrab.nome) return; setDiarioForm({ ...diarioForm, trabalhadores: [...diarioForm.trabalhadores, { ...diarioTempTrab, id: Date.now() }] }); setDiarioTempTrab({ nome: '', funcao: '', tipo: 'Equipa', estado: 'PRESENTE' }) }} style={{ padding: '8px 12px', background: colors.primary, color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}><Plus size={14} /></button>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, color: colors.textMuted, marginBottom: 4 }}>Subempreiteiros</label>
+                    <input type="number" min="0" value={diarioForm.trabalhadores_subempreiteiros || 0} onChange={e => setDiarioForm({ ...diarioForm, trabalhadores_subempreiteiros: parseInt(e.target.value) || 0 })} style={{ width: '100%', padding: '10px 12px', border: `1px solid ${colors.border}`, borderRadius: 8, fontSize: 14, boxSizing: 'border-box' }} />
+                  </div>
                 </div>
               </div>
 
-              {/* Tasks */}
+              {/* Atividades por Especialidade */}
               <div style={{ marginBottom: 14 }}>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: colors.text, marginBottom: 6 }}>Tarefas ({diarioForm.tarefas.length})</label>
-                {diarioForm.tarefas.map((t, ti) => (
-                  <div key={ti} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0' }}>
-                    <span style={{ flex: 1, fontSize: 13, color: colors.text }}>{t.titulo || t.texto || t}</span>
-                    <X size={14} style={{ cursor: 'pointer', color: colors.textMuted }} onClick={() => setDiarioForm({ ...diarioForm, tarefas: diarioForm.tarefas.filter((_, j) => j !== ti) })} />
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: colors.textMuted, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>Atividades por Especialidade</label>
+                {(diarioForm.atividades || []).map((ativ, idx) => {
+                  const espColor = getEspecColor(ativ.especialidade_nome)
+                  return (
+                    <div key={idx} style={{ padding: 12, background: colors.background, borderRadius: 10, marginBottom: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                        <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: `${espColor}18`, color: espColor, textTransform: 'uppercase' }}>{ativ.especialidade_nome || 'Geral'}</span>
+                        {ativ.zona && <span style={{ fontSize: 11, color: colors.textMuted }}>{ativ.zona}</span>}
+                        <X size={14} style={{ marginLeft: 'auto', cursor: 'pointer', color: colors.textMuted }} onClick={() => setDiarioForm({ ...diarioForm, atividades: diarioForm.atividades.filter((_, j) => j !== idx) })} />
+                      </div>
+                      <p style={{ margin: 0, fontSize: 13, color: colors.text, lineHeight: 1.5 }}>{ativ.descricao}</p>
+                    </div>
+                  )
+                })}
+                <div style={{ padding: 12, background: colors.background, borderRadius: 10 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                    <select value={diarioTempTarefa.especialidade || ''} onChange={e => setDiarioTempTarefa(typeof diarioTempTarefa === 'object' ? { ...diarioTempTarefa, especialidade: e.target.value } : { especialidade: e.target.value, zona: '', descricao: '' })} style={{ padding: '8px 10px', border: `1px solid ${colors.border}`, borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }}>
+                      <option value="">Especialidade...</option>
+                      {especialidades.map(e => <option key={e.id} value={e.nome}>{e.nome}</option>)}
+                    </select>
+                    <input type="text" value={typeof diarioTempTarefa === 'object' ? (diarioTempTarefa.zona || '') : ''} onChange={e => setDiarioTempTarefa(typeof diarioTempTarefa === 'object' ? { ...diarioTempTarefa, zona: e.target.value } : { especialidade: '', zona: e.target.value, descricao: '' })} placeholder="Zona / Localização" style={{ padding: '8px 10px', border: `1px solid ${colors.border}`, borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} />
                   </div>
-                ))}
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <input type="text" value={diarioTempTarefa} onChange={e => setDiarioTempTarefa(e.target.value)} placeholder="Adicionar tarefa..." onKeyDown={e => { if (e.key === 'Enter' && diarioTempTarefa) { setDiarioForm({ ...diarioForm, tarefas: [...diarioForm.tarefas, { id: Date.now(), titulo: diarioTempTarefa, concluida: false }] }); setDiarioTempTarefa('') } }} style={{ flex: 1, padding: '8px 10px', border: `1px solid ${colors.border}`, borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }} />
-                  <button onClick={() => { if (!diarioTempTarefa) return; setDiarioForm({ ...diarioForm, tarefas: [...diarioForm.tarefas, { id: Date.now(), titulo: diarioTempTarefa, concluida: false }] }); setDiarioTempTarefa('') }} style={{ padding: '8px 12px', background: colors.primary, color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}><Plus size={14} /></button>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <input type="text" value={typeof diarioTempTarefa === 'object' ? (diarioTempTarefa.descricao || '') : diarioTempTarefa} onChange={e => setDiarioTempTarefa(typeof diarioTempTarefa === 'object' ? { ...diarioTempTarefa, descricao: e.target.value } : { especialidade: '', zona: '', descricao: e.target.value })} placeholder="Descreva os trabalhos realizados..." onKeyDown={e => { if (e.key === 'Enter') { const t = typeof diarioTempTarefa === 'object' ? diarioTempTarefa : { descricao: diarioTempTarefa }; if (!t.descricao) return; setDiarioForm({ ...diarioForm, atividades: [...(diarioForm.atividades || []), { especialidade_nome: t.especialidade || 'Geral', zona: t.zona || '', descricao: t.descricao, fotos: [] }] }); setDiarioTempTarefa({ especialidade: '', zona: '', descricao: '' }) } }} style={{ flex: 1, padding: '8px 10px', border: `1px solid ${colors.border}`, borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }} />
+                    <button onClick={() => { const t = typeof diarioTempTarefa === 'object' ? diarioTempTarefa : { descricao: diarioTempTarefa }; if (!t.descricao) return; setDiarioForm({ ...diarioForm, atividades: [...(diarioForm.atividades || []), { especialidade_nome: t.especialidade || 'Geral', zona: t.zona || '', descricao: t.descricao, fotos: [] }] }); setDiarioTempTarefa({ especialidade: '', zona: '', descricao: '' }) }} style={{ padding: '8px 12px', background: colors.primary, color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}><Plus size={14} /></button>
+                  </div>
                 </div>
               </div>
 
               {/* Occurrences */}
               <div style={{ marginBottom: 14 }}>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: colors.text, marginBottom: 6 }}>Ocorrências ({diarioForm.ocorrencias.length})</label>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: colors.textMuted, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>Ocorrências ({diarioForm.ocorrencias.length})</label>
                 {diarioForm.ocorrencias.map((o, oi) => (
                   <div key={oi} style={{ display: 'flex', gap: 6, alignItems: 'flex-start', padding: '4px 0' }}>
                     <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 600, color: o.severidade === 'Alta' ? colors.error : o.severidade === 'Média' ? colors.warning : colors.success, background: `${o.severidade === 'Alta' ? colors.error : o.severidade === 'Média' ? colors.warning : colors.success}18` }}>{o.severidade}</span>
@@ -1086,7 +1054,7 @@ export default function AcompanhamentoTab({ obraId, activeSubtab, currentUser })
 
               {/* Photos */}
               <div style={{ marginBottom: 14 }}>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: colors.text, marginBottom: 6 }}>Fotos ({diarioForm.fotos.length + diarioPhotoPreviews.length})</label>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: colors.textMuted, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>Fotos ({diarioForm.fotos.length + diarioPhotoPreviews.length})</label>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
                   {diarioForm.fotos.map((f, fi) => (
                     <div key={fi} style={{ width: 72, height: 54, borderRadius: 6, overflow: 'hidden', position: 'relative' }}>
@@ -1106,29 +1074,13 @@ export default function AcompanhamentoTab({ obraId, activeSubtab, currentUser })
                   <Camera size={14} style={{ verticalAlign: -2, marginRight: 6 }} />Adicionar fotos
                 </button>
               </div>
-
-              {/* Next steps */}
-              <div style={{ marginBottom: 14 }}>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: colors.text, marginBottom: 6 }}>Próximos Passos ({diarioForm.proximos_passos.length})</label>
-                {diarioForm.proximos_passos.map((p, pi) => (
-                  <div key={pi} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0' }}>
-                    <ArrowRight size={12} style={{ color: colors.primary }} />
-                    <span style={{ flex: 1, fontSize: 13 }}>{p.texto || p}</span>
-                    <X size={14} style={{ cursor: 'pointer', color: colors.textMuted }} onClick={() => setDiarioForm({ ...diarioForm, proximos_passos: diarioForm.proximos_passos.filter((_, j) => j !== pi) })} />
-                  </div>
-                ))}
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <input type="text" value={diarioTempPasso} onChange={e => setDiarioTempPasso(e.target.value)} placeholder="Próximo passo..." onKeyDown={e => { if (e.key === 'Enter' && diarioTempPasso) { setDiarioForm({ ...diarioForm, proximos_passos: [...diarioForm.proximos_passos, { id: Date.now(), texto: diarioTempPasso }] }); setDiarioTempPasso('') } }} style={{ flex: 1, padding: '8px 10px', border: `1px solid ${colors.border}`, borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }} />
-                  <button onClick={() => { if (!diarioTempPasso) return; setDiarioForm({ ...diarioForm, proximos_passos: [...diarioForm.proximos_passos, { id: Date.now(), texto: diarioTempPasso }] }); setDiarioTempPasso('') }} style={{ padding: '8px 12px', background: colors.primary, color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}><Plus size={14} /></button>
-                </div>
-              </div>
             </div>
 
             {/* Modal footer */}
-            <div style={{ padding: 20, borderTop: `1px solid ${colors.border}`, display: 'flex', gap: 12 }}>
+            <div style={{ padding: 20, borderTop: `1px solid ${colors.border}`, display: 'flex', gap: 12, position: 'sticky', bottom: 0, background: colors.white, borderRadius: '0 0 16px 16px' }}>
               <button onClick={() => setShowDiarioModal(false)} style={{ flex: 1, padding: 12, background: 'transparent', border: `1px solid ${colors.border}`, borderRadius: 8, fontSize: 14, cursor: 'pointer' }}>Cancelar</button>
               <button onClick={() => handleDiarioSave('rascunho')} disabled={diarioSaving} style={{ flex: 1, padding: 12, background: colors.background, border: `1px solid ${colors.border}`, borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer', color: colors.text }}>
-                {diarioSaving ? 'A guardar...' : 'Guardar Rascunho'}
+                {diarioSaving ? 'A guardar...' : 'Rascunho'}
               </button>
               <button onClick={() => handleDiarioSave('submetido')} disabled={diarioSaving} style={{ flex: 1, padding: 12, background: colors.primary, color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
                 {diarioSaving ? 'A guardar...' : 'Submeter'}
