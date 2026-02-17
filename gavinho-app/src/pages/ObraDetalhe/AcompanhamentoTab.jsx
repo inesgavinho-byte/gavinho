@@ -3,10 +3,21 @@ import { supabase } from '../../lib/supabase'
 import {
   Plus, X, Camera, BookOpen, FileText, AlertTriangle,
   Upload, Trash2, Edit, Send, FileCheck, ChevronDown,
-  ChevronLeft, ChevronRight
+  ChevronLeft, ChevronRight, Sun, Cloud, CloudRain, Wind, CloudFog,
+  Users, Save, Check, Loader2, ArrowRight, Thermometer, Clock
 } from 'lucide-react'
 import { colors } from './constants'
 import { formatDate } from './utils'
+
+const WEATHER_OPTIONS = [
+  { key: 'sol', label: 'Sol', icon: Sun, color: '#f59e0b' },
+  { key: 'nublado', label: 'Nublado', icon: Cloud, color: '#6b7280' },
+  { key: 'chuva', label: 'Chuva', icon: CloudRain, color: '#3b82f6' },
+  { key: 'vento', label: 'Vento', icon: Wind, color: '#8b5cf6' },
+  { key: 'neblina', label: 'Neblina', icon: CloudFog, color: '#64748b' },
+]
+
+const DIARIO_FUNCOES = ['Encarregado de Obra', 'Diretor de Obra', 'Engenheiro', 'Técnico de Segurança', 'Fiscal de Obra']
 
 export default function AcompanhamentoTab({ obraId, activeSubtab, currentUser }) {
   // ============================================
@@ -130,22 +141,50 @@ export default function AcompanhamentoTab({ obraId, activeSubtab, currentUser })
   }
 
   // ============================================
-  // DIARIO DE PROJETO: STATE
+  // DIARIO DE OBRA: STATE
   // ============================================
   const [diarioEntradas, setDiarioEntradas] = useState([])
   const [diarioLoading, setDiarioLoading] = useState(false)
   const [showDiarioModal, setShowDiarioModal] = useState(false)
   const [diarioSaving, setDiarioSaving] = useState(false)
-  const [diarioForm, setDiarioForm] = useState({ titulo: '', descricao: '', tipo: 'manual', impacto_prazo: 'nenhum', impacto_custo: 'nenhum', accoes_requeridas: '', responsavel_accao: '', data_limite: '' })
+  const [diarioEditId, setDiarioEditId] = useState(null)
+  const [expandedDiario, setExpandedDiario] = useState(null)
+  const [diarioFiltroMes, setDiarioFiltroMes] = useState('')
+  const [diarioPhotoFiles, setDiarioPhotoFiles] = useState([])
+  const [diarioPhotoPreviews, setDiarioPhotoPreviews] = useState([])
+  const diarioPhotoRef = useRef(null)
+  const [diarioForm, setDiarioForm] = useState({
+    data: new Date().toISOString().split('T')[0],
+    funcao: 'Encarregado de Obra',
+    condicoes_meteo: 'sol',
+    temperatura: '',
+    observacoes_meteo: '',
+    trabalhadores: [],
+    tarefas: [],
+    ocorrencias: [],
+    nao_conformidades: [],
+    fotos: [],
+    proximos_passos: [],
+    status: 'rascunho'
+  })
+  // Temp fields for inline adds
+  const [diarioTempTrab, setDiarioTempTrab] = useState({ nome: '', funcao: '', tipo: 'Equipa', estado: 'PRESENTE' })
+  const [diarioTempTarefa, setDiarioTempTarefa] = useState('')
+  const [diarioTempOcorrencia, setDiarioTempOcorrencia] = useState({ severidade: 'Baixa', descricao: '' })
+  const [diarioTempPasso, setDiarioTempPasso] = useState('')
 
   // ============================================
-  // DIARIO DE PROJETO: LOGIC
+  // DIARIO DE OBRA: LOGIC
   // ============================================
   const loadDiario = useCallback(async () => {
     if (!obraId) return
     setDiarioLoading(true)
     try {
-      const { data, error } = await supabase.from('obra_diario_projeto').select('*').eq('obra_id', obraId).order('data_evento', { ascending: false })
+      const { data, error } = await supabase
+        .from('obra_diario')
+        .select('*')
+        .eq('obra_id', obraId)
+        .order('data', { ascending: false })
       if (error) throw error
       setDiarioEntradas(data || [])
     } catch (err) { console.error('Erro diario:', err) }
@@ -156,27 +195,125 @@ export default function AcompanhamentoTab({ obraId, activeSubtab, currentUser })
     if (activeSubtab === 'diario' && obraId) loadDiario()
   }, [activeSubtab, obraId, loadDiario])
 
-  const handleDiarioSave = async () => {
-    if (!diarioForm.titulo) return
+  const openDiarioModal = (entry = null) => {
+    if (entry) {
+      setDiarioEditId(entry.id)
+      setDiarioForm({
+        data: entry.data || new Date().toISOString().split('T')[0],
+        funcao: entry.funcao || 'Encarregado de Obra',
+        condicoes_meteo: entry.condicoes_meteo || 'sol',
+        temperatura: entry.temperatura || '',
+        observacoes_meteo: entry.observacoes_meteo || '',
+        trabalhadores: entry.trabalhadores || [],
+        tarefas: entry.tarefas || [],
+        ocorrencias: entry.ocorrencias || [],
+        nao_conformidades: entry.nao_conformidades || [],
+        fotos: entry.fotos || [],
+        proximos_passos: entry.proximos_passos || [],
+        status: entry.status || 'rascunho'
+      })
+    } else {
+      setDiarioEditId(null)
+      setDiarioForm({
+        data: new Date().toISOString().split('T')[0],
+        funcao: 'Encarregado de Obra',
+        condicoes_meteo: 'sol', temperatura: '', observacoes_meteo: '',
+        trabalhadores: [], tarefas: [], ocorrencias: [],
+        nao_conformidades: [], fotos: [], proximos_passos: [],
+        status: 'rascunho'
+      })
+    }
+    setDiarioPhotoFiles([])
+    setDiarioPhotoPreviews([])
+    setShowDiarioModal(true)
+  }
+
+  const handleDiarioPhotoSelect = (e) => {
+    const files = Array.from(e.target.files || []).filter(f => f.type.startsWith('image/') && f.size <= 10 * 1024 * 1024)
+    setDiarioPhotoFiles(prev => [...prev, ...files])
+    files.forEach(file => {
+      const reader = new FileReader()
+      reader.onload = (ev) => setDiarioPhotoPreviews(prev => [...prev, ev.target.result])
+      reader.readAsDataURL(file)
+    })
+    if (e.target) e.target.value = ''
+  }
+
+  const handleDiarioSave = async (status = 'rascunho') => {
     setDiarioSaving(true)
     try {
-      const maxNum = diarioEntradas.reduce((max, d) => { const n = parseInt(d.codigo?.replace('DP-', '')); return n > max ? n : max }, 0)
-      await supabase.from('obra_diario_projeto').insert({
-        obra_id: obraId, codigo: `DP-${String(maxNum + 1).padStart(3, '0')}`,
-        titulo: diarioForm.titulo, descricao: diarioForm.descricao || null,
-        tipo: diarioForm.tipo, impacto_prazo: diarioForm.impacto_prazo,
-        impacto_custo: diarioForm.impacto_custo,
-        accoes_requeridas: diarioForm.accoes_requeridas || null,
-        responsavel_accao: diarioForm.responsavel_accao || null,
-        data_limite: diarioForm.data_limite || null,
-        created_by: currentUser?.id || null
-      })
+      // Upload new photos
+      let allFotos = [...diarioForm.fotos]
+      for (const file of diarioPhotoFiles) {
+        const ext = file.name.split('.').pop()
+        const fileName = `diario/${obraId}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+        const { error: upErr } = await supabase.storage.from('obra-fotos').upload(fileName, file)
+        if (upErr) throw upErr
+        const { data: urlData } = supabase.storage.from('obra-fotos').getPublicUrl(fileName)
+        allFotos.push({ id: Date.now() + Math.random(), url: urlData.publicUrl, descricao: '' })
+      }
+
+      const payload = {
+        obra_id: obraId,
+        data: diarioForm.data,
+        funcao: diarioForm.funcao,
+        condicoes_meteo: diarioForm.condicoes_meteo,
+        temperatura: diarioForm.temperatura ? parseFloat(diarioForm.temperatura) : null,
+        observacoes_meteo: diarioForm.observacoes_meteo || null,
+        trabalhadores: diarioForm.trabalhadores,
+        trabalhadores_gavinho: diarioForm.trabalhadores.filter(t => t.tipo === 'Equipa' && t.estado === 'PRESENTE').length,
+        trabalhadores_subempreiteiros: diarioForm.trabalhadores.filter(t => t.tipo === 'Subempreiteiro' && t.estado === 'PRESENTE').length,
+        tarefas: diarioForm.tarefas,
+        ocorrencias: diarioForm.ocorrencias,
+        nao_conformidades: diarioForm.nao_conformidades,
+        fotos: allFotos,
+        proximos_passos: diarioForm.proximos_passos,
+        status,
+        updated_at: new Date().toISOString()
+      }
+
+      if (diarioEditId) {
+        const { error } = await supabase.from('obra_diario').update(payload).eq('id', diarioEditId)
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from('obra_diario').insert([payload])
+        if (error) throw error
+      }
+
       setShowDiarioModal(false)
-      setDiarioForm({ titulo: '', descricao: '', tipo: 'manual', impacto_prazo: 'nenhum', impacto_custo: 'nenhum', accoes_requeridas: '', responsavel_accao: '', data_limite: '' })
+      setExpandedDiario(null)
       loadDiario()
-    } catch (err) { console.error('Erro diario:', err); alert('Erro: ' + err.message) }
-    finally { setDiarioSaving(false) }
+    } catch (err) {
+      console.error('Erro diario:', err)
+      alert('Erro ao guardar: ' + err.message)
+    } finally { setDiarioSaving(false) }
   }
+
+  const handleDiarioDelete = async (id) => {
+    if (!confirm('Apagar esta entrada do diário?')) return
+    try {
+      const { error } = await supabase.from('obra_diario').delete().eq('id', id)
+      if (error) throw error
+      setExpandedDiario(null)
+      loadDiario()
+    } catch (err) { console.error('Erro delete diario:', err) }
+  }
+
+  const diarioStats = {
+    total: diarioEntradas.length,
+    submetidos: diarioEntradas.filter(d => d.status === 'submetido').length,
+    rascunhos: diarioEntradas.filter(d => d.status === 'rascunho').length,
+  }
+
+  const filteredDiario = diarioEntradas.filter(d => {
+    if (diarioFiltroMes) {
+      const entryMonth = d.data?.substring(0, 7)
+      if (entryMonth !== diarioFiltroMes) return false
+    }
+    return true
+  })
+
+  const diarioMonths = [...new Set(diarioEntradas.map(d => d.data?.substring(0, 7)).filter(Boolean))].sort().reverse()
 
   // ============================================
   // RELATORIOS: STATE
@@ -631,87 +768,370 @@ export default function AcompanhamentoTab({ obraId, activeSubtab, currentUser })
   )
 
   // ============================================
-  // RENDER: DIARIO
+  // RENDER: DIARIO DE OBRA
   // ============================================
+  const getWeatherInfo = (key) => WEATHER_OPTIONS.find(w => w.key === key) || WEATHER_OPTIONS[0]
+
   const renderDiarioTab = () => (
     <div>
+      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <span style={{ padding: '6px 14px', background: colors.background, borderRadius: 8, fontSize: 13, color: colors.textMuted }}>{diarioEntradas.length} entrada{diarioEntradas.length !== 1 ? 's' : ''}</span>
-        <button onClick={() => setShowDiarioModal(true)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px', background: colors.primary, color: '#fff', border: 'none', borderRadius: 10, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}><Plus size={16} /> Nova Entrada</button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <select value={diarioFiltroMes} onChange={e => setDiarioFiltroMes(e.target.value)} style={{ padding: '8px 12px', border: `1px solid ${colors.border}`, borderRadius: 8, fontSize: 13 }}>
+            <option value="">Todos os meses</option>
+            {diarioMonths.map(m => <option key={m} value={m}>{new Date(m + '-01').toLocaleDateString('pt-PT', { month: 'long', year: 'numeric' })}</option>)}
+          </select>
+        </div>
+        <button onClick={() => openDiarioModal()} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px', background: colors.primary, color: '#fff', border: 'none', borderRadius: 10, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+          <Plus size={16} /> Nova Entrada
+        </button>
       </div>
-      <div style={{ background: colors.white, borderRadius: 12, border: `1px solid ${colors.border}`, overflow: 'hidden' }}>
-        {diarioLoading ? <div style={{ textAlign: 'center', padding: 48, color: colors.textMuted }}>A carregar...</div>
-        : diarioEntradas.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 48 }}>
-            <BookOpen size={48} style={{ color: colors.textMuted, opacity: 0.3, marginBottom: 16 }} />
-            <p style={{ color: colors.textMuted }}>Nenhuma entrada no diario</p>
-          </div>
-        ) : diarioEntradas.map((d, i) => (
-          <div key={d.id} style={{ padding: '16px 20px', borderBottom: i < diarioEntradas.length - 1 ? `1px solid ${colors.border}` : 'none' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: colors.textMuted }}>{d.codigo}</span>
-              <span style={{ fontSize: 14, fontWeight: 600, color: colors.text }}>{d.titulo}</span>
-              {d.impacto_prazo !== 'nenhum' && <span style={{ padding: '2px 8px', borderRadius: 6, fontSize: 10, background: '#E3F2FD', color: '#1976D2' }}>Prazo: {d.impacto_prazo}</span>}
-              {d.impacto_custo !== 'nenhum' && <span style={{ padding: '2px 8px', borderRadius: 6, fontSize: 10, background: '#F3E5F5', color: '#7B1FA2' }}>Custo: {d.impacto_custo}</span>}
-            </div>
-            {d.descricao && <p style={{ margin: '0 0 6px', fontSize: 13, color: colors.textMuted }}>{d.descricao}</p>}
-            <div style={{ display: 'flex', gap: 12, fontSize: 12, color: colors.textMuted }}>
-              <span>{new Date(d.data_evento).toLocaleDateString('pt-PT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
-              {d.responsavel_accao && <span>Resp: {d.responsavel_accao}</span>}
-              {d.data_limite && <span>Prazo: {new Date(d.data_limite).toLocaleDateString('pt-PT')}</span>}
-            </div>
+
+      {/* Stats */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 16 }}>
+        {[
+          { label: 'Total', value: diarioStats.total, color: colors.primary, bg: colors.background },
+          { label: 'Submetidos', value: diarioStats.submetidos, color: '#10B981', bg: '#D1FAE5' },
+          { label: 'Rascunhos', value: diarioStats.rascunhos, color: '#F59E0B', bg: '#FEF3C7' },
+        ].map(s => (
+          <div key={s.label} style={{ padding: 14, background: s.bg, borderRadius: 10, textAlign: 'center' }}>
+            <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
+            <div style={{ fontSize: 11, color: s.color, marginTop: 2 }}>{s.label}</div>
           </div>
         ))}
       </div>
+
+      {/* Timeline */}
+      {diarioLoading ? (
+        <div style={{ textAlign: 'center', padding: 48, color: colors.textMuted }}>A carregar...</div>
+      ) : filteredDiario.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 48, background: colors.white, borderRadius: 12, border: `1px solid ${colors.border}` }}>
+          <BookOpen size={48} style={{ color: colors.textMuted, opacity: 0.3, marginBottom: 16 }} />
+          <p style={{ color: colors.textMuted }}>Nenhuma entrada no diário</p>
+          <button onClick={() => openDiarioModal()} style={{ marginTop: 8, padding: '8px 16px', background: colors.primary, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, cursor: 'pointer' }}>
+            <Plus size={14} style={{ verticalAlign: -2, marginRight: 6 }} />Criar entrada
+          </button>
+        </div>
+      ) : (
+        <div style={{ position: 'relative', paddingLeft: 28 }}>
+          {/* Vertical line */}
+          <div style={{ position: 'absolute', left: 5, top: 6, bottom: 0, width: 2, background: colors.border }} />
+
+          {filteredDiario.map((d, i) => {
+            const weather = getWeatherInfo(d.condicoes_meteo)
+            const WeatherIcon = weather.icon
+            const isExpanded = expandedDiario === d.id
+            const statusInfo = d.status === 'submetido'
+              ? { label: 'Submetido', color: '#10B981', bg: '#D1FAE5' }
+              : { label: 'Rascunho', color: '#F59E0B', bg: '#FEF3C7' }
+            const trabCount = (d.trabalhadores_gavinho || 0) + (d.trabalhadores_subempreiteiros || 0)
+            const tarefasCount = (d.tarefas || []).length
+            const fotosCount = (d.fotos || []).length
+            const ocorrenciasCount = (d.ocorrencias || []).length
+
+            return (
+              <div key={d.id} style={{ marginBottom: i < filteredDiario.length - 1 ? 12 : 0 }}>
+                {/* Date dot */}
+                <div style={{ position: 'absolute', left: -1, marginTop: 16, width: 12, height: 12, borderRadius: '50%', background: d.status === 'submetido' ? '#10B981' : colors.primary, border: `2px solid ${colors.white}`, boxShadow: `0 0 0 2px ${colors.border}`, zIndex: 1 }} />
+
+                {/* Entry card */}
+                <div style={{ background: colors.white, borderRadius: 12, border: `1px solid ${colors.border}`, overflow: 'hidden' }}>
+                  {/* Card header — clickable */}
+                  <div
+                    onClick={() => setExpandedDiario(isExpanded ? null : d.id)}
+                    style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}
+                  >
+                    {/* Weather icon */}
+                    <div style={{ width: 44, height: 44, borderRadius: 10, background: colors.background, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <WeatherIcon size={22} style={{ color: weather.color }} />
+                    </div>
+
+                    {/* Info */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: colors.text }}>
+                          {new Date(d.data + 'T00:00:00').toLocaleDateString('pt-PT', { weekday: 'short', day: 'numeric', month: 'short' })}
+                        </span>
+                        {d.temperatura && (
+                          <span style={{ fontSize: 12, color: colors.textMuted }}>
+                            {d.temperatura}°C
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', gap: 10, marginTop: 4, fontSize: 12, color: colors.textMuted, flexWrap: 'wrap' }}>
+                        {trabCount > 0 && <span><Users size={11} style={{ verticalAlign: -1, marginRight: 3 }} />{trabCount} trab.</span>}
+                        {tarefasCount > 0 && <span>{tarefasCount} tarefa{tarefasCount > 1 ? 's' : ''}</span>}
+                        {fotosCount > 0 && <span><Camera size={11} style={{ verticalAlign: -1, marginRight: 3 }} />{fotosCount}</span>}
+                        {ocorrenciasCount > 0 && <span style={{ color: colors.warning }}><AlertTriangle size={11} style={{ verticalAlign: -1, marginRight: 3 }} />{ocorrenciasCount}</span>}
+                      </div>
+                    </div>
+
+                    {/* Status + chevron */}
+                    <span style={{ padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, color: statusInfo.color, background: statusInfo.bg }}>{statusInfo.label}</span>
+                    <ChevronDown size={18} style={{ color: colors.textMuted, transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }} />
+                  </div>
+
+                  {/* Expanded detail */}
+                  {isExpanded && (
+                    <div style={{ padding: '0 20px 16px', borderTop: `1px solid ${colors.border}` }}>
+                      {/* Weather detail */}
+                      <div style={{ display: 'flex', gap: 12, paddingTop: 16, marginBottom: 16, flexWrap: 'wrap' }}>
+                        <span style={{ padding: '6px 12px', borderRadius: 8, fontSize: 12, background: colors.background, color: colors.text, display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <WeatherIcon size={14} style={{ color: weather.color }} /> {weather.label}
+                        </span>
+                        {d.temperatura && <span style={{ padding: '6px 12px', borderRadius: 8, fontSize: 12, background: colors.background, color: colors.text }}><Thermometer size={14} style={{ verticalAlign: -2, marginRight: 4 }} />{d.temperatura}°C</span>}
+                        {d.funcao && <span style={{ padding: '6px 12px', borderRadius: 8, fontSize: 12, background: colors.background, color: colors.textMuted }}>{d.funcao}</span>}
+                      </div>
+                      {d.observacoes_meteo && <p style={{ margin: '0 0 16px', fontSize: 13, color: colors.textMuted, fontStyle: 'italic' }}>{d.observacoes_meteo}</p>}
+
+                      {/* Workers */}
+                      {(d.trabalhadores || []).length > 0 && (
+                        <div style={{ marginBottom: 16 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: colors.text, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Trabalhadores ({d.trabalhadores.length})</div>
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            {d.trabalhadores.map((t, ti) => (
+                              <span key={ti} style={{ padding: '4px 10px', borderRadius: 6, fontSize: 12, background: t.estado === 'PRESENTE' ? '#D1FAE5' : '#FEE2E2', color: t.estado === 'PRESENTE' ? '#065F46' : '#991B1B' }}>
+                                {t.nome} <span style={{ opacity: 0.6 }}>({t.funcao})</span>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Tasks */}
+                      {(d.tarefas || []).length > 0 && (
+                        <div style={{ marginBottom: 16 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: colors.text, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Tarefas</div>
+                          {d.tarefas.map((t, ti) => (
+                            <div key={ti} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: ti < d.tarefas.length - 1 ? `1px solid ${colors.border}` : 'none' }}>
+                              <div style={{ width: 18, height: 18, borderRadius: 4, background: t.concluida ? colors.success : colors.border, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                {t.concluida && <Check size={12} color="#fff" />}
+                              </div>
+                              <span style={{ flex: 1, fontSize: 13, color: colors.text }}>{t.titulo || t.texto || t}</span>
+                              {t.percentagem && <span style={{ fontSize: 11, color: colors.textMuted }}>{t.percentagem}%</span>}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Occurrences */}
+                      {(d.ocorrencias || []).length > 0 && (
+                        <div style={{ marginBottom: 16 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: colors.text, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Ocorrências</div>
+                          {d.ocorrencias.map((o, oi) => {
+                            const sevColor = o.severidade === 'Alta' ? colors.error : o.severidade === 'Média' ? colors.warning : colors.success
+                            return (
+                              <div key={oi} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '6px 0' }}>
+                                <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 600, color: sevColor, background: `${sevColor}18`, flexShrink: 0 }}>{o.severidade}</span>
+                                <span style={{ fontSize: 13, color: colors.text }}>{o.descricao}</span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+
+                      {/* Photos */}
+                      {(d.fotos || []).length > 0 && (
+                        <div style={{ marginBottom: 16 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: colors.text, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Fotos ({d.fotos.length})</div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 8 }}>
+                            {d.fotos.map((f, fi) => (
+                              <div key={fi} style={{ paddingBottom: '75%', position: 'relative', borderRadius: 8, overflow: 'hidden', background: colors.background }}>
+                                <img src={f.url || f} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Next steps */}
+                      {(d.proximos_passos || []).length > 0 && (
+                        <div style={{ marginBottom: 16 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: colors.text, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Próximos Passos</div>
+                          {d.proximos_passos.map((p, pi) => (
+                            <div key={pi} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '4px 0' }}>
+                              <ArrowRight size={12} style={{ color: colors.primary, flexShrink: 0 }} />
+                              <span style={{ fontSize: 13, color: colors.text }}>{p.texto || p}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Action buttons */}
+                      <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                        <button onClick={() => openDiarioModal(d)} style={{ padding: '6px 14px', background: colors.background, border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', color: colors.text }}>
+                          <Edit size={12} style={{ verticalAlign: -2, marginRight: 4 }} />Editar
+                        </button>
+                        {d.status === 'rascunho' && (
+                          <button onClick={() => { handleDiarioSave.call(null); /* handled via modal */ openDiarioModal(d) }} style={{ padding: '6px 14px', background: '#D1FAE5', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#10B981' }}>
+                            <Send size={12} style={{ verticalAlign: -2, marginRight: 4 }} />Submeter
+                          </button>
+                        )}
+                        <button onClick={() => handleDiarioDelete(d.id)} style={{ padding: '6px 14px', background: '#FFEBEE', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#F44336' }}>
+                          <Trash2 size={12} style={{ verticalAlign: -2, marginRight: 4 }} />Apagar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* New/Edit Modal */}
       {showDiarioModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ background: colors.white, borderRadius: 16, width: '100%', maxWidth: 520, maxHeight: '90vh', overflow: 'auto' }}>
+          <div style={{ background: colors.white, borderRadius: 16, width: '100%', maxWidth: 640, maxHeight: '90vh', overflow: 'auto' }}>
+            {/* Modal header */}
             <div style={{ padding: 20, borderBottom: `1px solid ${colors.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 style={{ margin: 0, fontSize: 18, color: colors.text }}>Nova Entrada</h2>
+              <h2 style={{ margin: 0, fontSize: 18, color: colors.text }}>{diarioEditId ? 'Editar Entrada' : 'Nova Entrada'}</h2>
               <button onClick={() => setShowDiarioModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.textMuted }}><X size={20} /></button>
             </div>
+
             <div style={{ padding: 20 }}>
-              <div style={{ marginBottom: 14 }}>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6, color: colors.text }}>Titulo *</label>
-                <input type="text" value={diarioForm.titulo} onChange={e => setDiarioForm({ ...diarioForm, titulo: e.target.value })} style={{ width: '100%', padding: '10px 12px', border: `1px solid ${colors.border}`, borderRadius: 8, fontSize: 14, boxSizing: 'border-box' }} />
-              </div>
-              <div style={{ marginBottom: 14 }}>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6, color: colors.text }}>Descricao</label>
-                <textarea value={diarioForm.descricao} onChange={e => setDiarioForm({ ...diarioForm, descricao: e.target.value })} rows={3} style={{ width: '100%', padding: '10px 12px', border: `1px solid ${colors.border}`, borderRadius: 8, fontSize: 14, boxSizing: 'border-box', resize: 'vertical' }} />
-              </div>
+              {/* Date + Role */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6, color: colors.text }}>Impacto prazo</label>
-                  <select value={diarioForm.impacto_prazo} onChange={e => setDiarioForm({ ...diarioForm, impacto_prazo: e.target.value })} style={{ width: '100%', padding: '10px 12px', border: `1px solid ${colors.border}`, borderRadius: 8, fontSize: 13, boxSizing: 'border-box' }}>
-                    <option value="nenhum">Nenhum</option><option value="menor">Menor</option><option value="significativo">Significativo</option>
-                  </select>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: colors.text, marginBottom: 6 }}>Data *</label>
+                  <input type="date" value={diarioForm.data} onChange={e => setDiarioForm({ ...diarioForm, data: e.target.value })} style={{ width: '100%', padding: '10px 12px', border: `1px solid ${colors.border}`, borderRadius: 8, fontSize: 14, boxSizing: 'border-box' }} />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6, color: colors.text }}>Impacto custo</label>
-                  <select value={diarioForm.impacto_custo} onChange={e => setDiarioForm({ ...diarioForm, impacto_custo: e.target.value })} style={{ width: '100%', padding: '10px 12px', border: `1px solid ${colors.border}`, borderRadius: 8, fontSize: 13, boxSizing: 'border-box' }}>
-                    <option value="nenhum">Nenhum</option><option value="menor">Menor</option><option value="significativo">Significativo</option>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: colors.text, marginBottom: 6 }}>Função</label>
+                  <select value={diarioForm.funcao} onChange={e => setDiarioForm({ ...diarioForm, funcao: e.target.value })} style={{ width: '100%', padding: '10px 12px', border: `1px solid ${colors.border}`, borderRadius: 8, fontSize: 13, boxSizing: 'border-box' }}>
+                    {DIARIO_FUNCOES.map(f => <option key={f} value={f}>{f}</option>)}
                   </select>
                 </div>
               </div>
+
+              {/* Weather */}
               <div style={{ marginBottom: 14 }}>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6, color: colors.text }}>Acoes requeridas</label>
-                <textarea value={diarioForm.accoes_requeridas} onChange={e => setDiarioForm({ ...diarioForm, accoes_requeridas: e.target.value })} rows={2} style={{ width: '100%', padding: '10px 12px', border: `1px solid ${colors.border}`, borderRadius: 8, fontSize: 14, boxSizing: 'border-box', resize: 'vertical' }} />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6, color: colors.text }}>Responsavel</label>
-                  <input type="text" value={diarioForm.responsavel_accao} onChange={e => setDiarioForm({ ...diarioForm, responsavel_accao: e.target.value })} style={{ width: '100%', padding: '10px 12px', border: `1px solid ${colors.border}`, borderRadius: 8, fontSize: 13, boxSizing: 'border-box' }} />
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: colors.text, marginBottom: 6 }}>Meteorologia</label>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                  {WEATHER_OPTIONS.map(w => {
+                    const WIcon = w.icon
+                    const sel = diarioForm.condicoes_meteo === w.key
+                    return (
+                      <button key={w.key} onClick={() => setDiarioForm({ ...diarioForm, condicoes_meteo: w.key })} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '10px 14px', background: sel ? colors.background : colors.white, border: sel ? `2px solid ${colors.primary}` : `1px solid ${colors.border}`, borderRadius: 10, cursor: 'pointer' }}>
+                        <WIcon size={20} style={{ color: sel ? w.color : colors.textMuted }} />
+                        <span style={{ fontSize: 11, color: sel ? colors.text : colors.textMuted }}>{w.label}</span>
+                      </button>
+                    )
+                  })}
                 </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6, color: colors.text }}>Prazo</label>
-                  <input type="date" value={diarioForm.data_limite} onChange={e => setDiarioForm({ ...diarioForm, data_limite: e.target.value })} style={{ width: '100%', padding: '10px 12px', border: `1px solid ${colors.border}`, borderRadius: 8, fontSize: 13, boxSizing: 'border-box' }} />
+                <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 10 }}>
+                  <input type="number" value={diarioForm.temperatura} onChange={e => setDiarioForm({ ...diarioForm, temperatura: e.target.value })} placeholder="°C" style={{ padding: '10px 12px', border: `1px solid ${colors.border}`, borderRadius: 8, fontSize: 14, boxSizing: 'border-box' }} />
+                  <input type="text" value={diarioForm.observacoes_meteo} onChange={e => setDiarioForm({ ...diarioForm, observacoes_meteo: e.target.value })} placeholder="Observações meteo..." style={{ padding: '10px 12px', border: `1px solid ${colors.border}`, borderRadius: 8, fontSize: 14, boxSizing: 'border-box' }} />
+                </div>
+              </div>
+
+              {/* Workers */}
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: colors.text, marginBottom: 6 }}>Trabalhadores ({diarioForm.trabalhadores.length})</label>
+                {diarioForm.trabalhadores.length > 0 && (
+                  <div style={{ marginBottom: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {diarioForm.trabalhadores.map((t, ti) => (
+                      <span key={ti} style={{ padding: '4px 10px', borderRadius: 6, fontSize: 12, background: t.estado === 'PRESENTE' ? '#D1FAE5' : '#FEE2E2', color: t.estado === 'PRESENTE' ? '#065F46' : '#991B1B', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {t.nome} ({t.funcao})
+                        <X size={12} style={{ cursor: 'pointer' }} onClick={() => setDiarioForm({ ...diarioForm, trabalhadores: diarioForm.trabalhadores.filter((_, j) => j !== ti) })} />
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1fr auto', gap: 6 }}>
+                  <input type="text" value={diarioTempTrab.nome} onChange={e => setDiarioTempTrab({ ...diarioTempTrab, nome: e.target.value })} placeholder="Nome" style={{ padding: '8px 10px', border: `1px solid ${colors.border}`, borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} />
+                  <input type="text" value={diarioTempTrab.funcao} onChange={e => setDiarioTempTrab({ ...diarioTempTrab, funcao: e.target.value })} placeholder="Função" style={{ padding: '8px 10px', border: `1px solid ${colors.border}`, borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} />
+                  <select value={diarioTempTrab.tipo} onChange={e => setDiarioTempTrab({ ...diarioTempTrab, tipo: e.target.value })} style={{ padding: '8px 6px', border: `1px solid ${colors.border}`, borderRadius: 6, fontSize: 11, boxSizing: 'border-box' }}>
+                    <option value="Equipa">Equipa</option>
+                    <option value="Subempreiteiro">Sub.</option>
+                  </select>
+                  <button onClick={() => { if (!diarioTempTrab.nome) return; setDiarioForm({ ...diarioForm, trabalhadores: [...diarioForm.trabalhadores, { ...diarioTempTrab, id: Date.now() }] }); setDiarioTempTrab({ nome: '', funcao: '', tipo: 'Equipa', estado: 'PRESENTE' }) }} style={{ padding: '8px 12px', background: colors.primary, color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}><Plus size={14} /></button>
+                </div>
+              </div>
+
+              {/* Tasks */}
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: colors.text, marginBottom: 6 }}>Tarefas ({diarioForm.tarefas.length})</label>
+                {diarioForm.tarefas.map((t, ti) => (
+                  <div key={ti} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0' }}>
+                    <span style={{ flex: 1, fontSize: 13, color: colors.text }}>{t.titulo || t.texto || t}</span>
+                    <X size={14} style={{ cursor: 'pointer', color: colors.textMuted }} onClick={() => setDiarioForm({ ...diarioForm, tarefas: diarioForm.tarefas.filter((_, j) => j !== ti) })} />
+                  </div>
+                ))}
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input type="text" value={diarioTempTarefa} onChange={e => setDiarioTempTarefa(e.target.value)} placeholder="Adicionar tarefa..." onKeyDown={e => { if (e.key === 'Enter' && diarioTempTarefa) { setDiarioForm({ ...diarioForm, tarefas: [...diarioForm.tarefas, { id: Date.now(), titulo: diarioTempTarefa, concluida: false }] }); setDiarioTempTarefa('') } }} style={{ flex: 1, padding: '8px 10px', border: `1px solid ${colors.border}`, borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }} />
+                  <button onClick={() => { if (!diarioTempTarefa) return; setDiarioForm({ ...diarioForm, tarefas: [...diarioForm.tarefas, { id: Date.now(), titulo: diarioTempTarefa, concluida: false }] }); setDiarioTempTarefa('') }} style={{ padding: '8px 12px', background: colors.primary, color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}><Plus size={14} /></button>
+                </div>
+              </div>
+
+              {/* Occurrences */}
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: colors.text, marginBottom: 6 }}>Ocorrências ({diarioForm.ocorrencias.length})</label>
+                {diarioForm.ocorrencias.map((o, oi) => (
+                  <div key={oi} style={{ display: 'flex', gap: 6, alignItems: 'flex-start', padding: '4px 0' }}>
+                    <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 600, color: o.severidade === 'Alta' ? colors.error : o.severidade === 'Média' ? colors.warning : colors.success, background: `${o.severidade === 'Alta' ? colors.error : o.severidade === 'Média' ? colors.warning : colors.success}18` }}>{o.severidade}</span>
+                    <span style={{ flex: 1, fontSize: 13, color: colors.text }}>{o.descricao}</span>
+                    <X size={14} style={{ cursor: 'pointer', color: colors.textMuted }} onClick={() => setDiarioForm({ ...diarioForm, ocorrencias: diarioForm.ocorrencias.filter((_, j) => j !== oi) })} />
+                  </div>
+                ))}
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <select value={diarioTempOcorrencia.severidade} onChange={e => setDiarioTempOcorrencia({ ...diarioTempOcorrencia, severidade: e.target.value })} style={{ padding: '8px 6px', border: `1px solid ${colors.border}`, borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }}>
+                    <option value="Baixa">Baixa</option><option value="Média">Média</option><option value="Alta">Alta</option>
+                  </select>
+                  <input type="text" value={diarioTempOcorrencia.descricao} onChange={e => setDiarioTempOcorrencia({ ...diarioTempOcorrencia, descricao: e.target.value })} placeholder="Descrever ocorrência..." onKeyDown={e => { if (e.key === 'Enter' && diarioTempOcorrencia.descricao) { setDiarioForm({ ...diarioForm, ocorrencias: [...diarioForm.ocorrencias, { ...diarioTempOcorrencia, id: Date.now() }] }); setDiarioTempOcorrencia({ severidade: 'Baixa', descricao: '' }) } }} style={{ flex: 1, padding: '8px 10px', border: `1px solid ${colors.border}`, borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }} />
+                  <button onClick={() => { if (!diarioTempOcorrencia.descricao) return; setDiarioForm({ ...diarioForm, ocorrencias: [...diarioForm.ocorrencias, { ...diarioTempOcorrencia, id: Date.now() }] }); setDiarioTempOcorrencia({ severidade: 'Baixa', descricao: '' }) }} style={{ padding: '8px 12px', background: colors.primary, color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}><Plus size={14} /></button>
+                </div>
+              </div>
+
+              {/* Photos */}
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: colors.text, marginBottom: 6 }}>Fotos ({diarioForm.fotos.length + diarioPhotoPreviews.length})</label>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                  {diarioForm.fotos.map((f, fi) => (
+                    <div key={fi} style={{ width: 72, height: 54, borderRadius: 6, overflow: 'hidden', position: 'relative' }}>
+                      <img src={f.url || f} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <button onClick={() => setDiarioForm({ ...diarioForm, fotos: diarioForm.fotos.filter((_, j) => j !== fi) })} style={{ position: 'absolute', top: 2, right: 2, width: 18, height: 18, borderRadius: '50%', background: 'rgba(0,0,0,0.6)', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}><X size={10} /></button>
+                    </div>
+                  ))}
+                  {diarioPhotoPreviews.map((p, pi) => (
+                    <div key={`new-${pi}`} style={{ width: 72, height: 54, borderRadius: 6, overflow: 'hidden', position: 'relative', border: `2px solid ${colors.primary}` }}>
+                      <img src={p} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <button onClick={() => { setDiarioPhotoFiles(prev => prev.filter((_, j) => j !== pi)); setDiarioPhotoPreviews(prev => prev.filter((_, j) => j !== pi)) }} style={{ position: 'absolute', top: 2, right: 2, width: 18, height: 18, borderRadius: '50%', background: 'rgba(0,0,0,0.6)', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}><X size={10} /></button>
+                    </div>
+                  ))}
+                </div>
+                <input ref={diarioPhotoRef} type="file" accept="image/*" multiple onChange={handleDiarioPhotoSelect} style={{ display: 'none' }} />
+                <button onClick={() => diarioPhotoRef.current?.click()} style={{ padding: '8px 14px', border: `1px dashed ${colors.border}`, borderRadius: 8, background: colors.background, cursor: 'pointer', fontSize: 12, color: colors.textMuted }}>
+                  <Camera size={14} style={{ verticalAlign: -2, marginRight: 6 }} />Adicionar fotos
+                </button>
+              </div>
+
+              {/* Next steps */}
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: colors.text, marginBottom: 6 }}>Próximos Passos ({diarioForm.proximos_passos.length})</label>
+                {diarioForm.proximos_passos.map((p, pi) => (
+                  <div key={pi} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0' }}>
+                    <ArrowRight size={12} style={{ color: colors.primary }} />
+                    <span style={{ flex: 1, fontSize: 13 }}>{p.texto || p}</span>
+                    <X size={14} style={{ cursor: 'pointer', color: colors.textMuted }} onClick={() => setDiarioForm({ ...diarioForm, proximos_passos: diarioForm.proximos_passos.filter((_, j) => j !== pi) })} />
+                  </div>
+                ))}
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input type="text" value={diarioTempPasso} onChange={e => setDiarioTempPasso(e.target.value)} placeholder="Próximo passo..." onKeyDown={e => { if (e.key === 'Enter' && diarioTempPasso) { setDiarioForm({ ...diarioForm, proximos_passos: [...diarioForm.proximos_passos, { id: Date.now(), texto: diarioTempPasso }] }); setDiarioTempPasso('') } }} style={{ flex: 1, padding: '8px 10px', border: `1px solid ${colors.border}`, borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }} />
+                  <button onClick={() => { if (!diarioTempPasso) return; setDiarioForm({ ...diarioForm, proximos_passos: [...diarioForm.proximos_passos, { id: Date.now(), texto: diarioTempPasso }] }); setDiarioTempPasso('') }} style={{ padding: '8px 12px', background: colors.primary, color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}><Plus size={14} /></button>
                 </div>
               </div>
             </div>
+
+            {/* Modal footer */}
             <div style={{ padding: 20, borderTop: `1px solid ${colors.border}`, display: 'flex', gap: 12 }}>
               <button onClick={() => setShowDiarioModal(false)} style={{ flex: 1, padding: 12, background: 'transparent', border: `1px solid ${colors.border}`, borderRadius: 8, fontSize: 14, cursor: 'pointer' }}>Cancelar</button>
-              <button onClick={handleDiarioSave} disabled={!diarioForm.titulo || diarioSaving} style={{ flex: 1, padding: 12, background: colors.primary, color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer', opacity: !diarioForm.titulo ? 0.5 : 1 }}>
-                {diarioSaving ? 'A guardar...' : 'Criar Entrada'}
+              <button onClick={() => handleDiarioSave('rascunho')} disabled={diarioSaving} style={{ flex: 1, padding: 12, background: colors.background, border: `1px solid ${colors.border}`, borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer', color: colors.text }}>
+                {diarioSaving ? 'A guardar...' : 'Guardar Rascunho'}
+              </button>
+              <button onClick={() => handleDiarioSave('submetido')} disabled={diarioSaving} style={{ flex: 1, padding: 12, background: colors.primary, color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+                {diarioSaving ? 'A guardar...' : 'Submeter'}
               </button>
             </div>
           </div>
