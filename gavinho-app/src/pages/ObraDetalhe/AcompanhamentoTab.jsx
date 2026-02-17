@@ -1,12 +1,35 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
 import {
   Plus, X, Camera, BookOpen, FileText, AlertTriangle,
   Upload, Trash2, Edit, Send, FileCheck, ChevronDown,
-  ChevronLeft, ChevronRight
+  ChevronLeft, ChevronRight, Clock, Users, Download,
+  Calendar, MapPin, Edit2
 } from 'lucide-react'
 import { colors } from './constants'
 import { formatDate } from './utils'
+
+const FONTS = {
+  heading: "'Cormorant Garamond', Georgia, serif",
+  body: "'Quattrocento Sans', -apple-system, BlinkMacSystemFont, sans-serif",
+  mono: "'SF Mono', 'Fira Code', 'Consolas', monospace",
+}
+
+const CL = {
+  success: '#5B7B6A', warning: '#C4956A', danger: '#A65D57',
+  info: '#7A8B9E', dark: '#2C2C2B', muted: '#9A978A',
+  light: '#6B6B6B', border: '#E5E2D9', cream: '#F5F3EB',
+  white: '#FFFFFF', bg: '#FAF8F4',
+}
+
+const MESES_PT = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
+const DIAS_PT = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado']
+
+const IMPACT_STYLES = {
+  nenhum: null,
+  menor: { bg: 'rgba(196,149,106,0.10)', color: '#B8834A', label: 'Menor' },
+  significativo: { bg: 'rgba(166,93,87,0.10)', color: '#A65D57', label: 'Significativo' },
+}
 
 export default function AcompanhamentoTab({ obraId, activeSubtab, currentUser }) {
   // ============================================
@@ -631,86 +654,536 @@ export default function AcompanhamentoTab({ obraId, activeSubtab, currentUser })
   )
 
   // ============================================
-  // RENDER: DIARIO
+  // DIARIO: Group entries by date
+  // ============================================
+  const diarioGrouped = useMemo(() => {
+    const groups = {}
+    diarioEntradas.forEach(d => {
+      const dateKey = d.data_evento ? d.data_evento.split('T')[0] : 'sem-data'
+      if (!groups[dateKey]) groups[dateKey] = []
+      groups[dateKey].push(d)
+    })
+    return Object.entries(groups)
+      .sort(([a], [b]) => b.localeCompare(a))
+      .map(([date, entries]) => ({ date, entries }))
+  }, [diarioEntradas])
+
+  const diarioCalMonth = useMemo(() => new Date().getMonth(), [])
+  const diarioCalYear = useMemo(() => new Date().getFullYear(), [])
+  const diarioEntryDates = useMemo(() => new Set(diarioEntradas.map(d => d.data_evento?.split('T')[0])), [diarioEntradas])
+  const diarioCalDays = useMemo(() => {
+    const first = new Date(diarioCalYear, diarioCalMonth, 1)
+    const last = new Date(diarioCalYear, diarioCalMonth + 1, 0)
+    const start = first.getDay() === 0 ? 6 : first.getDay() - 1
+    const days = []
+    for (let i = 0; i < start; i++) days.push(null)
+    for (let d = 1; d <= last.getDate(); d++) days.push(d)
+    return days
+  }, [diarioCalMonth, diarioCalYear])
+
+  // Week summary for diary
+  const diarioWeekSummary = useMemo(() => {
+    const now = new Date()
+    const startWeek = new Date(now)
+    startWeek.setDate(now.getDate() - now.getDay() + 1)
+    const endWeek = new Date(startWeek)
+    endWeek.setDate(startWeek.getDate() + 4)
+    const weekEntries = diarioEntradas.filter(d => {
+      const dt = new Date(d.data_evento)
+      return dt >= startWeek && dt <= endWeek
+    })
+    return {
+      dias: weekEntries.length,
+      total: 5,
+      impactos: weekEntries.filter(d => d.impacto_prazo !== 'nenhum' || d.impacto_custo !== 'nenhum').length,
+      acoes: weekEntries.filter(d => d.accoes_requeridas).length,
+    }
+  }, [diarioEntradas])
+
+  // Pending actions from diary
+  const diarioPendentes = useMemo(() => {
+    return diarioEntradas
+      .filter(d => d.accoes_requeridas || d.impacto_prazo === 'significativo' || d.impacto_custo === 'significativo')
+      .slice(0, 4)
+      .map(d => ({
+        code: d.codigo,
+        text: d.accoes_requeridas || d.titulo,
+        date: d.data_evento,
+        color: d.impacto_prazo === 'significativo' || d.impacto_custo === 'significativo' ? CL.danger : CL.warning,
+        type: d.impacto_prazo === 'significativo' ? 'Prazo' : d.impacto_custo === 'significativo' ? 'Custo' : 'Ação',
+      }))
+  }, [diarioEntradas])
+
+  // ============================================
+  // RENDER: DIARIO (Timeline View)
   // ============================================
   const renderDiarioTab = () => (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <span style={{ padding: '6px 14px', background: colors.background, borderRadius: 8, fontSize: 13, color: colors.textMuted }}>{diarioEntradas.length} entrada{diarioEntradas.length !== 1 ? 's' : ''}</span>
-        <button onClick={() => setShowDiarioModal(true)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px', background: colors.primary, color: '#fff', border: 'none', borderRadius: 10, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}><Plus size={16} /> Nova Entrada</button>
-      </div>
-      <div style={{ background: colors.white, borderRadius: 12, border: `1px solid ${colors.border}`, overflow: 'hidden' }}>
-        {diarioLoading ? <div style={{ textAlign: 'center', padding: 48, color: colors.textMuted }}>A carregar...</div>
-        : diarioEntradas.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 48 }}>
-            <BookOpen size={48} style={{ color: colors.textMuted, opacity: 0.3, marginBottom: 16 }} />
-            <p style={{ color: colors.textMuted }}>Nenhuma entrada no diario</p>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '24px' }}>
+      {/* Left: Timeline */}
+      <div>
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <span style={{
+            fontFamily: FONTS.body, fontSize: '13px', color: CL.light,
+          }}>
+            {diarioEntradas.length} entrada{diarioEntradas.length !== 1 ? 's' : ''} registada{diarioEntradas.length !== 1 ? 's' : ''}
+          </span>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button style={{
+              display: 'flex', alignItems: 'center', gap: '6px',
+              padding: '8px 14px', background: CL.white,
+              border: `1px solid ${CL.border}`, borderRadius: '8px',
+              fontFamily: FONTS.body, fontSize: '12px', fontWeight: 500,
+              color: CL.light, cursor: 'pointer',
+            }}>
+              <Download size={13} /> Exportar
+            </button>
+            <button onClick={() => setShowDiarioModal(true)} style={{
+              display: 'flex', alignItems: 'center', gap: '6px',
+              padding: '8px 18px', background: CL.dark,
+              border: 'none', borderRadius: '8px',
+              fontFamily: FONTS.body, fontSize: '12px', fontWeight: 600,
+              color: CL.white, cursor: 'pointer',
+            }}>
+              <Plus size={13} /> Nova Entrada
+            </button>
           </div>
-        ) : diarioEntradas.map((d, i) => (
-          <div key={d.id} style={{ padding: '16px 20px', borderBottom: i < diarioEntradas.length - 1 ? `1px solid ${colors.border}` : 'none' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: colors.textMuted }}>{d.codigo}</span>
-              <span style={{ fontSize: 14, fontWeight: 600, color: colors.text }}>{d.titulo}</span>
-              {d.impacto_prazo !== 'nenhum' && <span style={{ padding: '2px 8px', borderRadius: 6, fontSize: 10, background: '#E3F2FD', color: '#1976D2' }}>Prazo: {d.impacto_prazo}</span>}
-              {d.impacto_custo !== 'nenhum' && <span style={{ padding: '2px 8px', borderRadius: 6, fontSize: 10, background: '#F3E5F5', color: '#7B1FA2' }}>Custo: {d.impacto_custo}</span>}
-            </div>
-            {d.descricao && <p style={{ margin: '0 0 6px', fontSize: 13, color: colors.textMuted }}>{d.descricao}</p>}
-            <div style={{ display: 'flex', gap: 12, fontSize: 12, color: colors.textMuted }}>
-              <span>{new Date(d.data_evento).toLocaleDateString('pt-PT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
-              {d.responsavel_accao && <span>Resp: {d.responsavel_accao}</span>}
-              {d.data_limite && <span>Prazo: {new Date(d.data_limite).toLocaleDateString('pt-PT')}</span>}
+        </div>
+
+        {/* Timeline */}
+        {diarioLoading ? (
+          <div style={{ padding: '48px', textAlign: 'center' }}>
+            <div style={{
+              width: '32px', height: '32px', border: `3px solid ${CL.border}`,
+              borderTopColor: CL.success, borderRadius: '50%', animation: 'spin 1s linear infinite',
+              margin: '0 auto 12px',
+            }} />
+            <p style={{ fontFamily: FONTS.body, fontSize: '13px', color: CL.light }}>A carregar...</p>
+          </div>
+        ) : diarioEntradas.length === 0 ? (
+          <div style={{
+            padding: '64px 24px', textAlign: 'center',
+            background: CL.white, borderRadius: '14px', border: `1px solid ${CL.border}`,
+          }}>
+            <BookOpen size={40} style={{ color: CL.border, marginBottom: '12px' }} />
+            <p style={{ fontFamily: FONTS.body, fontSize: '14px', color: CL.light, marginBottom: '16px' }}>
+              Sem registos no diário de obra
+            </p>
+            <button onClick={() => setShowDiarioModal(true)} style={{
+              display: 'inline-flex', alignItems: 'center', gap: '6px',
+              padding: '10px 20px', background: CL.dark,
+              border: 'none', borderRadius: '8px',
+              fontFamily: FONTS.body, fontSize: '13px', fontWeight: 600,
+              color: CL.white, cursor: 'pointer',
+            }}>
+              <Plus size={14} /> Criar Primeira Entrada
+            </button>
+          </div>
+        ) : (
+          <div style={{ position: 'relative', paddingLeft: '28px' }}>
+            {/* Timeline vertical line */}
+            <div style={{
+              position: 'absolute', left: '8px', top: '6px', bottom: '0',
+              width: '2px', background: CL.border,
+            }} />
+
+            {diarioGrouped.map((group, gIdx) => {
+              const d = new Date(group.date + 'T00:00:00')
+              const dayNum = d.getDate()
+              const monthName = MESES_PT[d.getMonth()]
+              const weekday = DIAS_PT[d.getDay()]?.toUpperCase()
+              const isFirst = gIdx === 0
+
+              return (
+                <div key={group.date} style={{ position: 'relative', marginBottom: '24px' }}>
+                  {/* Timeline dot */}
+                  <div style={{
+                    position: 'absolute', left: '-24px', top: '6px',
+                    width: '12px', height: '12px', borderRadius: '50%',
+                    background: isFirst ? CL.success : CL.white,
+                    border: isFirst ? `2px solid ${CL.success}` : `2px solid ${CL.border}`,
+                    zIndex: 1,
+                  }} />
+
+                  {/* Day card */}
+                  <div style={{
+                    background: CL.white, borderRadius: '14px',
+                    border: `1px solid ${CL.border}`, overflow: 'hidden',
+                    boxShadow: isFirst ? '0 2px 8px rgba(0,0,0,0.04)' : 'none',
+                  }}>
+                    {/* Date header */}
+                    <div style={{
+                      padding: '16px 20px',
+                      borderBottom: `1px solid ${CL.border}`,
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    }}>
+                      <div>
+                        <h3 style={{
+                          fontFamily: FONTS.heading, fontSize: '22px', fontWeight: 600,
+                          color: CL.dark, margin: 0, lineHeight: 1.2,
+                        }}>
+                          {dayNum} {monthName}
+                        </h3>
+                        <span style={{
+                          fontFamily: FONTS.body, fontSize: '10px', fontWeight: 700,
+                          textTransform: 'uppercase', letterSpacing: '0.08em', color: CL.muted,
+                        }}>
+                          {weekday}
+                        </span>
+                      </div>
+                      <span style={{
+                        fontFamily: FONTS.body, fontSize: '12px', color: CL.light,
+                        display: 'flex', alignItems: 'center', gap: '5px',
+                      }}>
+                        <FileText size={13} style={{ color: CL.muted }} />
+                        {group.entries.length} entrada{group.entries.length !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+
+                    {/* Entries for this day */}
+                    {group.entries.map((entry, eIdx) => {
+                      const prazoStyle = IMPACT_STYLES[entry.impacto_prazo]
+                      const custoStyle = IMPACT_STYLES[entry.impacto_custo]
+                      return (
+                        <div key={entry.id} style={{
+                          padding: '14px 20px',
+                          borderBottom: eIdx < group.entries.length - 1 ? `1px solid ${CL.border}` : 'none',
+                        }}>
+                          {/* Entry header */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
+                            <span style={{
+                              fontFamily: FONTS.mono, fontSize: '10px', fontWeight: 700,
+                              color: CL.muted, letterSpacing: '0.04em',
+                              padding: '2px 8px', background: CL.cream, borderRadius: '4px',
+                            }}>
+                              {entry.codigo}
+                            </span>
+                            <span style={{
+                              fontFamily: FONTS.body, fontSize: '14px', fontWeight: 600, color: CL.dark,
+                            }}>
+                              {entry.titulo}
+                            </span>
+                            {prazoStyle && (
+                              <span style={{
+                                padding: '2px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 600,
+                                background: prazoStyle.bg, color: prazoStyle.color,
+                                fontFamily: FONTS.body,
+                              }}>
+                                Prazo: {prazoStyle.label}
+                              </span>
+                            )}
+                            {custoStyle && (
+                              <span style={{
+                                padding: '2px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 600,
+                                background: custoStyle.bg, color: custoStyle.color,
+                                fontFamily: FONTS.body,
+                              }}>
+                                Custo: {custoStyle.label}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Description */}
+                          {entry.descricao && (
+                            <p style={{
+                              fontFamily: FONTS.body, fontSize: '13px', color: CL.light,
+                              margin: '0 0 8px', lineHeight: 1.5,
+                            }}>
+                              {entry.descricao}
+                            </p>
+                          )}
+
+                          {/* Actions required alert */}
+                          {entry.accoes_requeridas && (
+                            <div style={{
+                              padding: '8px 12px', borderRadius: '8px',
+                              background: 'rgba(196,149,106,0.06)',
+                              borderLeft: `3px solid ${CL.warning}`,
+                              marginBottom: '8px',
+                            }}>
+                              <span style={{
+                                fontFamily: FONTS.body, fontSize: '10px', fontWeight: 700,
+                                textTransform: 'uppercase', letterSpacing: '0.05em',
+                                color: CL.warning, display: 'block', marginBottom: '3px',
+                              }}>
+                                AÇÕES REQUERIDAS
+                              </span>
+                              <span style={{ fontFamily: FONTS.body, fontSize: '12px', color: CL.dark }}>
+                                {entry.accoes_requeridas}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Metadata footer */}
+                          <div style={{
+                            display: 'flex', gap: '14px', fontSize: '11px',
+                            fontFamily: FONTS.body, color: CL.muted, marginTop: '6px',
+                          }}>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <Clock size={11} />
+                              {new Date(entry.data_evento).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                            {entry.responsavel_accao && (
+                              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <Users size={11} />
+                                {entry.responsavel_accao}
+                              </span>
+                            )}
+                            {entry.data_limite && (
+                              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <Calendar size={11} />
+                                Prazo: {new Date(entry.data_limite).toLocaleDateString('pt-PT')}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Right: Sidebar */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        {/* Week Summary */}
+        <div style={{
+          background: CL.white, borderRadius: '14px',
+          border: `1px solid ${CL.border}`, padding: '18px',
+        }}>
+          <span style={{
+            fontFamily: FONTS.body, fontSize: '10px', fontWeight: 700,
+            textTransform: 'uppercase', letterSpacing: '0.06em',
+            color: CL.muted, display: 'block', marginBottom: '14px',
+          }}>
+            RESUMO DA SEMANA
+          </span>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            {[
+              { label: 'ENTRADAS', value: `${diarioWeekSummary.dias}/${diarioWeekSummary.total}`, color: CL.dark },
+              { label: 'IMPACTOS', value: diarioWeekSummary.impactos, color: diarioWeekSummary.impactos > 0 ? CL.danger : CL.dark },
+              { label: 'TOTAL REG.', value: diarioEntradas.length, color: CL.dark },
+              { label: 'AÇÕES PEND.', value: diarioWeekSummary.acoes, color: diarioWeekSummary.acoes > 0 ? CL.warning : CL.dark },
+            ].map(item => (
+              <div key={item.label}>
+                <span style={{
+                  fontFamily: FONTS.body, fontSize: '9px', fontWeight: 700,
+                  textTransform: 'uppercase', letterSpacing: '0.05em',
+                  color: CL.muted, display: 'block', marginBottom: '4px',
+                }}>
+                  {item.label}
+                </span>
+                <span style={{
+                  fontFamily: FONTS.body, fontSize: '22px', fontWeight: 700,
+                  color: item.color, letterSpacing: '-0.5px',
+                }}>
+                  {item.value}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Mini Calendar */}
+        <div style={{
+          background: CL.white, borderRadius: '14px',
+          border: `1px solid ${CL.border}`, padding: '18px',
+        }}>
+          <span style={{
+            fontFamily: FONTS.body, fontSize: '12px', fontWeight: 700,
+            textTransform: 'uppercase', letterSpacing: '0.06em',
+            color: CL.dark, display: 'block', marginBottom: '12px', textAlign: 'center',
+          }}>
+            {MESES_PT[diarioCalMonth].toUpperCase()} {diarioCalYear}
+          </span>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', marginBottom: '4px' }}>
+            {['S', 'T', 'Q', 'Q', 'S', 'S', 'D'].map((d, i) => (
+              <div key={i} style={{
+                textAlign: 'center', fontFamily: FONTS.body,
+                fontSize: '10px', fontWeight: 700, color: CL.muted, padding: '4px 0',
+              }}>
+                {d}
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px' }}>
+            {diarioCalDays.map((day, i) => {
+              if (!day) return <div key={i} />
+              const ds = `${diarioCalYear}-${String(diarioCalMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+              const hasEntry = diarioEntryDates.has(ds)
+              const isToday = ds === new Date().toISOString().split('T')[0]
+              return (
+                <div key={i} style={{
+                  textAlign: 'center', padding: '5px 0', borderRadius: '6px',
+                  background: isToday ? CL.dark : 'transparent',
+                }}>
+                  <span style={{
+                    fontFamily: FONTS.body, fontSize: '11px',
+                    fontWeight: isToday || hasEntry ? 600 : 400,
+                    color: isToday ? CL.white : hasEntry ? CL.dark : CL.muted,
+                  }}>
+                    {day}
+                  </span>
+                  {hasEntry && (
+                    <div style={{
+                      width: '4px', height: '4px', borderRadius: '50%',
+                      background: isToday ? CL.white : CL.success,
+                      margin: '2px auto 0',
+                    }} />
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Pending items */}
+        {diarioPendentes.length > 0 && (
+          <div style={{
+            background: CL.white, borderRadius: '14px',
+            border: `1px solid ${CL.border}`, padding: '18px',
+          }}>
+            <span style={{
+              fontFamily: FONTS.body, fontSize: '10px', fontWeight: 700,
+              textTransform: 'uppercase', letterSpacing: '0.06em',
+              color: CL.muted, display: 'block', marginBottom: '12px',
+            }}>
+              AÇÕES PENDENTES
+            </span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {diarioPendentes.map((item, idx) => (
+                <div key={idx} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                  <div style={{
+                    width: '8px', height: '8px', borderRadius: '50%',
+                    background: item.color, flexShrink: 0, marginTop: '5px',
+                  }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{
+                        fontFamily: FONTS.body, fontSize: '10px', fontWeight: 700,
+                        textTransform: 'uppercase', letterSpacing: '0.04em', color: item.color,
+                      }}>
+                        {item.type}
+                      </span>
+                      <span style={{
+                        fontFamily: FONTS.mono, fontSize: '9px', color: CL.muted,
+                      }}>
+                        {item.code}
+                      </span>
+                    </div>
+                    <p style={{
+                      fontFamily: FONTS.body, fontSize: '12px',
+                      color: CL.dark, margin: '2px 0 0', lineHeight: 1.4,
+                    }}>
+                      {item.text}
+                    </p>
+                    <span style={{ fontFamily: FONTS.body, fontSize: '10px', color: CL.muted }}>
+                      {new Date(item.date).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' })}
+                    </span>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
-        ))}
+        )}
       </div>
+
+      {/* Modal: Nova Entrada */}
       {showDiarioModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ background: colors.white, borderRadius: 16, width: '100%', maxWidth: 520, maxHeight: '90vh', overflow: 'auto' }}>
-            <div style={{ padding: 20, borderBottom: `1px solid ${colors.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 style={{ margin: 0, fontSize: 18, color: colors.text }}>Nova Entrada</h2>
-              <button onClick={() => setShowDiarioModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.textMuted }}><X size={20} /></button>
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+          zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px',
+        }}>
+          <div style={{
+            background: CL.white, borderRadius: '16px',
+            width: '100%', maxWidth: '600px', maxHeight: '90vh', overflow: 'auto',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
+          }}>
+            {/* Modal header */}
+            <div style={{
+              padding: '20px 24px', borderBottom: `1px solid ${CL.border}`,
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            }}>
+              <h3 style={{
+                margin: 0, fontSize: '20px', fontWeight: 600,
+                fontFamily: FONTS.heading, color: CL.dark,
+              }}>
+                Nova Entrada
+              </h3>
+              <button onClick={() => setShowDiarioModal(false)} style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: CL.muted, padding: '4px', borderRadius: '6px',
+              }}>
+                <X size={20} />
+              </button>
             </div>
-            <div style={{ padding: 20 }}>
-              <div style={{ marginBottom: 14 }}>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6, color: colors.text }}>Titulo *</label>
-                <input type="text" value={diarioForm.titulo} onChange={e => setDiarioForm({ ...diarioForm, titulo: e.target.value })} style={{ width: '100%', padding: '10px 12px', border: `1px solid ${colors.border}`, borderRadius: 8, fontSize: 14, boxSizing: 'border-box' }} />
+
+            {/* Modal body */}
+            <div style={{ padding: '24px' }}>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={diarioLabelStyle}>TÍTULO *</label>
+                <input type="text" value={diarioForm.titulo} onChange={e => setDiarioForm({ ...diarioForm, titulo: e.target.value })} placeholder="Ex: Reunião de obra — atraso caixilharia" style={diarioInputStyle} />
               </div>
-              <div style={{ marginBottom: 14 }}>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6, color: colors.text }}>Descricao</label>
-                <textarea value={diarioForm.descricao} onChange={e => setDiarioForm({ ...diarioForm, descricao: e.target.value })} rows={3} style={{ width: '100%', padding: '10px 12px', border: `1px solid ${colors.border}`, borderRadius: 8, fontSize: 14, boxSizing: 'border-box', resize: 'vertical' }} />
+              <div style={{ marginBottom: '16px' }}>
+                <label style={diarioLabelStyle}>DESCRIÇÃO</label>
+                <textarea value={diarioForm.descricao} onChange={e => setDiarioForm({ ...diarioForm, descricao: e.target.value })} rows={3} placeholder="Detalhes da entrada..." style={{ ...diarioInputStyle, resize: 'vertical' }} />
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '16px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6, color: colors.text }}>Impacto prazo</label>
-                  <select value={diarioForm.impacto_prazo} onChange={e => setDiarioForm({ ...diarioForm, impacto_prazo: e.target.value })} style={{ width: '100%', padding: '10px 12px', border: `1px solid ${colors.border}`, borderRadius: 8, fontSize: 13, boxSizing: 'border-box' }}>
-                    <option value="nenhum">Nenhum</option><option value="menor">Menor</option><option value="significativo">Significativo</option>
+                  <label style={diarioLabelStyle}>IMPACTO PRAZO</label>
+                  <select value={diarioForm.impacto_prazo} onChange={e => setDiarioForm({ ...diarioForm, impacto_prazo: e.target.value })} style={diarioInputStyle}>
+                    <option value="nenhum">Nenhum</option>
+                    <option value="menor">Menor</option>
+                    <option value="significativo">Significativo</option>
                   </select>
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6, color: colors.text }}>Impacto custo</label>
-                  <select value={diarioForm.impacto_custo} onChange={e => setDiarioForm({ ...diarioForm, impacto_custo: e.target.value })} style={{ width: '100%', padding: '10px 12px', border: `1px solid ${colors.border}`, borderRadius: 8, fontSize: 13, boxSizing: 'border-box' }}>
-                    <option value="nenhum">Nenhum</option><option value="menor">Menor</option><option value="significativo">Significativo</option>
+                  <label style={diarioLabelStyle}>IMPACTO CUSTO</label>
+                  <select value={diarioForm.impacto_custo} onChange={e => setDiarioForm({ ...diarioForm, impacto_custo: e.target.value })} style={diarioInputStyle}>
+                    <option value="nenhum">Nenhum</option>
+                    <option value="menor">Menor</option>
+                    <option value="significativo">Significativo</option>
                   </select>
                 </div>
               </div>
-              <div style={{ marginBottom: 14 }}>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6, color: colors.text }}>Acoes requeridas</label>
-                <textarea value={diarioForm.accoes_requeridas} onChange={e => setDiarioForm({ ...diarioForm, accoes_requeridas: e.target.value })} rows={2} style={{ width: '100%', padding: '10px 12px', border: `1px solid ${colors.border}`, borderRadius: 8, fontSize: 14, boxSizing: 'border-box', resize: 'vertical' }} />
+              <div style={{ marginBottom: '16px' }}>
+                <label style={diarioLabelStyle}>AÇÕES REQUERIDAS</label>
+                <textarea value={diarioForm.accoes_requeridas} onChange={e => setDiarioForm({ ...diarioForm, accoes_requeridas: e.target.value })} rows={2} placeholder="Ações a tomar..." style={{ ...diarioInputStyle, resize: 'vertical' }} />
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6, color: colors.text }}>Responsavel</label>
-                  <input type="text" value={diarioForm.responsavel_accao} onChange={e => setDiarioForm({ ...diarioForm, responsavel_accao: e.target.value })} style={{ width: '100%', padding: '10px 12px', border: `1px solid ${colors.border}`, borderRadius: 8, fontSize: 13, boxSizing: 'border-box' }} />
+                  <label style={diarioLabelStyle}>RESPONSÁVEL</label>
+                  <input type="text" value={diarioForm.responsavel_accao} onChange={e => setDiarioForm({ ...diarioForm, responsavel_accao: e.target.value })} placeholder="Nome" style={diarioInputStyle} />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6, color: colors.text }}>Prazo</label>
-                  <input type="date" value={diarioForm.data_limite} onChange={e => setDiarioForm({ ...diarioForm, data_limite: e.target.value })} style={{ width: '100%', padding: '10px 12px', border: `1px solid ${colors.border}`, borderRadius: 8, fontSize: 13, boxSizing: 'border-box' }} />
+                  <label style={diarioLabelStyle}>PRAZO</label>
+                  <input type="date" value={diarioForm.data_limite} onChange={e => setDiarioForm({ ...diarioForm, data_limite: e.target.value })} style={diarioInputStyle} />
                 </div>
               </div>
             </div>
-            <div style={{ padding: 20, borderTop: `1px solid ${colors.border}`, display: 'flex', gap: 12 }}>
-              <button onClick={() => setShowDiarioModal(false)} style={{ flex: 1, padding: 12, background: 'transparent', border: `1px solid ${colors.border}`, borderRadius: 8, fontSize: 14, cursor: 'pointer' }}>Cancelar</button>
-              <button onClick={handleDiarioSave} disabled={!diarioForm.titulo || diarioSaving} style={{ flex: 1, padding: 12, background: colors.primary, color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer', opacity: !diarioForm.titulo ? 0.5 : 1 }}>
+
+            {/* Modal footer */}
+            <div style={{
+              padding: '16px 24px', borderTop: `1px solid ${CL.border}`,
+              display: 'flex', justifyContent: 'flex-end', gap: '10px',
+            }}>
+              <button onClick={() => setShowDiarioModal(false)} style={{
+                padding: '10px 18px', background: 'transparent',
+                border: `1px solid ${CL.border}`, borderRadius: '8px',
+                cursor: 'pointer', fontFamily: FONTS.body, fontSize: '13px',
+                color: CL.dark, fontWeight: 500,
+              }}>
+                Cancelar
+              </button>
+              <button onClick={handleDiarioSave} disabled={!diarioForm.titulo || diarioSaving} style={{
+                padding: '10px 22px', background: CL.dark, color: CL.white,
+                border: 'none', borderRadius: '8px', cursor: 'pointer',
+                fontFamily: FONTS.body, fontSize: '13px', fontWeight: 600,
+                opacity: !diarioForm.titulo ? 0.5 : 1,
+              }}>
                 {diarioSaving ? 'A guardar...' : 'Criar Entrada'}
               </button>
             </div>
@@ -1038,4 +1511,19 @@ export default function AcompanhamentoTab({ obraId, activeSubtab, currentUser })
       {activeSubtab === 'nao-conformidades' && renderNaoConformidadesTab()}
     </>
   )
+}
+
+const diarioLabelStyle = {
+  display: 'block', fontSize: '10px', fontWeight: 700,
+  textTransform: 'uppercase', letterSpacing: '0.05em',
+  color: '#9A978A', marginBottom: '5px',
+  fontFamily: "'Quattrocento Sans', sans-serif",
+}
+
+const diarioInputStyle = {
+  width: '100%', padding: '9px 12px',
+  border: '1px solid #E5E2D9', borderRadius: '8px',
+  boxSizing: 'border-box', fontSize: '13px',
+  fontFamily: "'Quattrocento Sans', sans-serif",
+  color: '#2C2C2B', outline: 'none', background: '#FFFFFF',
 }
