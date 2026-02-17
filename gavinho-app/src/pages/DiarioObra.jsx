@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import {
   Sun, Cloud, CloudRain, Wind, CloudFog,
   Plus, Trash2, Edit2, Check, X, Upload, ChevronRight,
-  Save, Send, Clock, Users, AlertTriangle, Camera, ArrowRight
+  Save, Send, Clock, Users, AlertTriangle, Camera, ArrowRight,
+  Loader2
 } from 'lucide-react'
 
 const WEATHER_OPTIONS = [
@@ -72,6 +73,10 @@ export default function DiarioObra() {
 
   // Secção 6: Fotos
   const [fotos, setFotos] = useState([])
+  const [photoFiles, setPhotoFiles] = useState([])
+  const [photoPreviews, setPhotoPreviews] = useState([])
+  const [uploadingPhotos, setUploadingPhotos] = useState(false)
+  const fileInputRef = useRef(null)
 
   // Secção 7: Próximos Passos
   const [proximosPassos, setProximosPassos] = useState([])
@@ -232,20 +237,48 @@ export default function DiarioObra() {
     setNaoConformidades(naoConformidades.filter(nc => nc.id !== id))
   }
 
-  // Handlers de Fotos
+  // Handlers de Fotos — upload para Supabase Storage (bucket: obra-fotos)
   const handleAddFoto = async (e) => {
-    const files = Array.from(e.target.files)
-    for (const file of files) {
+    const files = Array.from(e.target.files || [])
+    const validFiles = files.filter(f => {
+      if (!f.type.startsWith('image/')) return false
+      if (f.size > 10 * 1024 * 1024) return false
+      return true
+    })
+    if (validFiles.length < files.length) {
+      alert('Algumas imagens foram ignoradas (formato inválido ou > 10MB)')
+    }
+    setPhotoFiles(prev => [...prev, ...validFiles])
+    validFiles.forEach(file => {
       const reader = new FileReader()
       reader.onload = (ev) => {
-        setFotos(prev => [...prev, {
-          id: Date.now() + Math.random(),
-          url: ev.target.result,
-          descricao: ''
-        }])
+        setPhotoPreviews(prev => [...prev, ev.target.result])
       }
       reader.readAsDataURL(file)
+    })
+    if (e.target) e.target.value = ''
+  }
+
+  const uploadPendingPhotos = async () => {
+    const urls = []
+    for (const file of photoFiles) {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `diario/${selectedObra}/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`
+      const { error } = await supabase.storage
+        .from('obra-fotos')
+        .upload(fileName, file)
+      if (error) throw error
+      const { data: { publicUrl } } = supabase.storage
+        .from('obra-fotos')
+        .getPublicUrl(fileName)
+      urls.push(publicUrl)
     }
+    return urls
+  }
+
+  const removeNewPhoto = (index) => {
+    setPhotoFiles(prev => prev.filter((_, i) => i !== index))
+    setPhotoPreviews(prev => prev.filter((_, i) => i !== index))
   }
 
   const handleFotoDescricao = (id, descricao) => {
@@ -268,45 +301,20 @@ export default function DiarioObra() {
     setProximosPassos(proximosPassos.filter(p => p.id !== id))
   }
 
-  // Guardar Rascunho
-  const handleSaveRascunho = async () => {
-    if (!selectedObra) return
-    setSaving(true)
-
-    const diarioData = {
-      obra_id: selectedObra,
-      data,
-      funcao,
-      condicoes_meteo: condicaoMeteo,
-      temperatura: temperatura ? parseFloat(temperatura) : null,
-      observacoes_meteo: observacoesMeteo,
-      trabalhadores,
-      tarefas,
-      ocorrencias,
-      nao_conformidades: naoConformidades,
-      fotos,
-      proximos_passos: proximosPassos,
-      status: 'rascunho',
-      updated_at: new Date().toISOString()
+  // Helper: build diario payload + upload pending photos
+  const buildDiarioPayload = async (status) => {
+    let allFotos = [...fotos]
+    if (photoFiles.length > 0) {
+      setUploadingPhotos(true)
+      const newUrls = await uploadPendingPhotos()
+      allFotos = [...allFotos, ...newUrls.map((url, i) => ({ id: Date.now() + i, url, descricao: '' }))]
+      setPhotoFiles([])
+      setPhotoPreviews([])
+      setUploadingPhotos(false)
     }
+    setFotos(allFotos)
 
-    if (diarioId) {
-      await supabase.from('obra_diario').update(diarioData).eq('id', diarioId)
-    } else {
-      const { data: newDiario } = await supabase.from('obra_diario').insert([diarioData]).select().single()
-      if (newDiario) setDiarioId(newDiario.id)
-    }
-
-    setLastSaved(new Date())
-    setSaving(false)
-  }
-
-  // Submeter Registo
-  const handleSubmit = async () => {
-    if (!selectedObra) return
-    setSaving(true)
-
-    const diarioData = {
+    return {
       obra_id: selectedObra,
       data,
       funcao,
@@ -319,20 +327,74 @@ export default function DiarioObra() {
       tarefas,
       ocorrencias,
       nao_conformidades: naoConformidades,
-      fotos,
+      fotos: allFotos,
       proximos_passos: proximosPassos,
-      status: 'submetido',
+      status,
       updated_at: new Date().toISOString()
     }
+  }
 
-    if (diarioId) {
-      await supabase.from('obra_diario').update(diarioData).eq('id', diarioId)
-    } else {
-      await supabase.from('obra_diario').insert([diarioData])
+  // Guardar Rascunho
+  const handleSaveRascunho = async () => {
+    if (!selectedObra) return
+    setSaving(true)
+    try {
+      const diarioData = await buildDiarioPayload('rascunho')
+      if (diarioId) {
+        const { error } = await supabase.from('obra_diario').update(diarioData).eq('id', diarioId)
+        if (error) throw error
+      } else {
+        const { data: newDiario, error } = await supabase.from('obra_diario').insert([diarioData]).select().single()
+        if (error) throw error
+        if (newDiario) setDiarioId(newDiario.id)
+      }
+      setLastSaved(new Date())
+    } catch (err) {
+      console.error('Erro ao guardar rascunho:', err)
+      alert('Erro ao guardar: ' + (err.message || 'Erro desconhecido'))
+    } finally {
+      setSaving(false)
     }
+  }
 
-    setSaving(false)
-    navigate(`/obras/${selectedObra}`)
+  // Submeter Registo
+  const handleSubmit = async () => {
+    if (!selectedObra) return
+    setSaving(true)
+    try {
+      const diarioData = await buildDiarioPayload('submetido')
+      if (diarioId) {
+        const { error } = await supabase.from('obra_diario').update(diarioData).eq('id', diarioId)
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from('obra_diario').insert([diarioData])
+        if (error) throw error
+      }
+      navigate(`/obras/${selectedObra}`)
+    } catch (err) {
+      console.error('Erro ao submeter:', err)
+      alert('Erro ao submeter: ' + (err.message || 'Erro desconhecido'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Apagar Registo
+  const handleDelete = async () => {
+    if (!diarioId) return
+    if (!window.confirm('Tem a certeza que deseja apagar este registo? Esta ação não pode ser revertida.')) return
+    setSaving(true)
+    try {
+      const { error } = await supabase.from('obra_diario').delete().eq('id', diarioId)
+      if (error) throw error
+      resetForm()
+      setLastSaved(null)
+    } catch (err) {
+      console.error('Erro ao apagar:', err)
+      alert('Erro ao apagar: ' + (err.message || 'Erro desconhecido'))
+    } finally {
+      setSaving(false)
+    }
   }
 
   if (loading && selectedObra) {
@@ -821,9 +883,16 @@ export default function DiarioObra() {
 
       {/* Secção 6: Registo Fotográfico */}
       <SectionCard number={6} title="Registo Fotográfico" subtitle="Fotografias dos trabalhos e situações relevantes">
+        {uploadingPhotos && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 12, background: 'var(--cream)', borderRadius: 8, marginBottom: 16 }}>
+            <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+            <span style={{ fontSize: 13, color: 'var(--brown)' }}>A carregar fotos...</span>
+          </div>
+        )}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+          {/* Existing uploaded photos */}
           {fotos.map(f => (
-            <div key={f.id} style={{ position: 'relative' }}>
+            <div key={f.id || f.url} style={{ position: 'relative' }}>
               <div style={{ aspectRatio: '4/3', borderRadius: 12, overflow: 'hidden', marginBottom: 8 }}>
                 <img src={f.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 <button
@@ -850,13 +919,55 @@ export default function DiarioObra() {
               <div>
                 <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--brown-light)', marginBottom: 4, display: 'block' }}>DESCRIÇÃO</label>
                 <textarea
-                  value={f.descricao}
+                  value={f.descricao || ''}
                   onChange={(e) => handleFotoDescricao(f.id, e.target.value)}
                   className="textarea"
                   rows={3}
                   placeholder="Descreva a foto..."
                   style={{ fontSize: 13 }}
                 />
+              </div>
+            </div>
+          ))}
+
+          {/* Pending new photo previews (not yet uploaded) */}
+          {photoPreviews.map((preview, idx) => (
+            <div key={`new-${idx}`} style={{ position: 'relative' }}>
+              <div style={{ aspectRatio: '4/3', borderRadius: 12, overflow: 'hidden', marginBottom: 8, border: '2px solid var(--olive-gray)' }}>
+                <img src={preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <button
+                  onClick={() => removeNewPhoto(idx)}
+                  style={{
+                    position: 'absolute',
+                    top: 8,
+                    right: 8,
+                    width: 28,
+                    height: 28,
+                    borderRadius: '50%',
+                    background: 'rgba(0,0,0,0.6)',
+                    border: 'none',
+                    color: 'white',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <X size={16} />
+                </button>
+                <div style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  background: 'rgba(0,0,0,0.5)',
+                  color: 'white',
+                  fontSize: 11,
+                  textAlign: 'center',
+                  padding: '4px 0'
+                }}>
+                  Pendente
+                </div>
               </div>
             </div>
           ))}
@@ -875,7 +986,7 @@ export default function DiarioObra() {
             background: 'var(--white)',
             transition: 'all 0.2s ease'
           }}>
-            <input type="file" accept="image/*" multiple onChange={handleAddFoto} style={{ display: 'none' }} />
+            <input type="file" accept="image/*" multiple onChange={handleAddFoto} style={{ display: 'none' }} ref={fileInputRef} />
             <Upload size={24} color="var(--brown-light)" />
             <span style={{ fontSize: 13, color: 'var(--brown-light)' }}>Adicionar foto</span>
           </label>
@@ -928,16 +1039,24 @@ export default function DiarioObra() {
         justifyContent: 'space-between',
         alignItems: 'center'
       }}>
-        <div style={{ fontSize: 13, color: 'var(--brown-light)' }}>
-          Última gravação: {lastSaved ? (
-            <strong style={{ color: 'var(--brown)' }}>Rascunho às {lastSaved.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}</strong>
-          ) : (
-            <span>Não guardado</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div style={{ fontSize: 13, color: 'var(--brown-light)' }}>
+            Última gravação: {lastSaved ? (
+              <strong style={{ color: 'var(--brown)' }}>Rascunho às {lastSaved.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}</strong>
+            ) : (
+              <span>Não guardado</span>
+            )}
+          </div>
+          {diarioId && (
+            <button onClick={handleDelete} disabled={saving} className="btn btn-ghost" style={{ gap: 6, color: 'var(--error)', fontSize: 13 }}>
+              <Trash2 size={14} /> Apagar
+            </button>
           )}
         </div>
         <div style={{ display: 'flex', gap: 12 }}>
           <button onClick={handleSaveRascunho} disabled={saving || !selectedObra} className="btn btn-outline" style={{ gap: 8 }}>
-            <Save size={16} /> Guardar Rascunho
+            {saving ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={16} />}
+            {saving ? 'A guardar...' : 'Guardar Rascunho'}
           </button>
           <button onClick={handleSubmit} disabled={saving || !selectedObra} className="btn btn-primary" style={{ gap: 8, background: 'var(--olive-gray)' }}>
             <Send size={16} /> Submeter Registo

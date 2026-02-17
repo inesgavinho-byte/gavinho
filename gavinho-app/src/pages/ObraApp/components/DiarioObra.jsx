@@ -10,7 +10,7 @@ import {
   Calendar, Plus, ChevronLeft, ChevronRight, Sun, Cloud,
   CloudRain, CloudSnow, Wind, Loader2, Camera, X, Save,
   AlertTriangle, CheckCircle2, Clock, Users, Copy,
-  FileText, Image as ImageIcon, Thermometer
+  FileText, Image as ImageIcon, Thermometer, Trash2
 } from 'lucide-react'
 import { styles, colors } from '../styles'
 import { formatDate, formatDateTime } from '../utils'
@@ -265,6 +265,23 @@ export default function DiarioObra({ obra, user }) {
       alert('Erro ao guardar registo: ' + (err.message || 'Erro desconhecido'))
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleDelete = async (entryId) => {
+    if (!window.confirm('Tem a certeza que deseja apagar este registo?')) return
+    try {
+      const { error } = await supabase.from('obra_diario').delete().eq('id', entryId)
+      if (error) throw error
+      if (diarioId === entryId) {
+        resetForm()
+        setShowForm(false)
+      }
+      setSelectedEntry(null)
+      loadEntries()
+    } catch (err) {
+      console.error('Erro ao apagar:', err)
+      alert('Erro ao apagar: ' + (err.message || 'Erro desconhecido'))
     }
   }
 
@@ -802,10 +819,18 @@ export default function DiarioObra({ obra, user }) {
               <h3 style={diarioStyles.formTitle}>
                 {diarioId ? 'Editar' : 'Novo'} Registo - {formatDate(new Date())}
               </h3>
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <button onClick={copyYesterday} style={diarioStyles.copyButton}>
                   <Copy size={14} /> Copiar ontem
                 </button>
+                {diarioId && (
+                  <button
+                    onClick={() => handleDelete(diarioId)}
+                    style={{ ...diarioStyles.copyButton, color: '#ef4444', background: '#fef2f2' }}
+                  >
+                    <Trash2 size={14} /> Apagar
+                  </button>
+                )}
                 <button
                   onClick={() => setShowForm(false)}
                   style={{ background: 'none', border: 'none', cursor: 'pointer' }}
@@ -1041,12 +1066,20 @@ export default function DiarioObra({ obra, user }) {
                   year: 'numeric'
                 })}
               </h3>
-              <button
-                onClick={() => setSelectedEntry(null)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer' }}
-              >
-                <X size={24} color="#6b7280" />
-              </button>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <button
+                  onClick={() => handleDelete(selectedEntry.id)}
+                  style={{ ...diarioStyles.copyButton, color: '#ef4444', background: '#fef2f2' }}
+                >
+                  <Trash2 size={14} /> Apagar
+                </button>
+                <button
+                  onClick={() => setSelectedEntry(null)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+                >
+                  <X size={24} color="#6b7280" />
+                </button>
+              </div>
             </div>
 
             <div style={diarioStyles.formBody}>
