@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useEffect, useState, lazy, Suspense } from 'react'
 import { AuthProvider } from './contexts/AuthContext'
 import { NotificationProvider } from './contexts/NotificationContext'
@@ -198,6 +198,17 @@ function OAuthCallbackHandler({ children }) {
   }
 
   return children
+}
+
+// =====================================================
+// CATCH-ALL: redirect unmatched routes
+// =====================================================
+function CatchAll() {
+  const { pathname } = useLocation()
+  if (pathname.startsWith('/portal')) {
+    return <Navigate to="/portal/login" replace />
+  }
+  return <Navigate to="/login" replace />
 }
 
 // =====================================================
@@ -555,6 +566,9 @@ function App() {
                     </Suspense>
                   } />
                 </Route>
+
+                {/* Catch-all: redirect unmatched routes */}
+                <Route path="*" element={<CatchAll />} />
                 </Routes>
               </NotificationProvider>
             </AuthProvider>
