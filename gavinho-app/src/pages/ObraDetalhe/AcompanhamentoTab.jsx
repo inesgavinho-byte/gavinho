@@ -6,7 +6,7 @@ import {
   ChevronLeft, ChevronRight, Sun, Cloud, CloudRain, Wind, CloudFog,
   Users, Save, Check, Loader2, ArrowRight, Thermometer, Clock,
   MapPin, Info, AlertCircle, Calendar, Download, BarChart3,
-  Circle, CheckCircle2, XCircle, Flag, User
+  Circle, CheckCircle2, XCircle, Flag, User, Ban, RefreshCw, Image
 } from 'lucide-react'
 import { colors } from './constants'
 import { formatDate } from './utils'
@@ -33,6 +33,15 @@ const ESPECIALIDADE_COLORS = {
   'Estrutura': '#8B5E5E', 'Impermeabilização': '#5E8B7A', 'Caixilharia': '#5E6B8B',
   'Vidros': '#6B8B9A', 'Gás': '#9A7A5E', 'Paisagismo': '#6B8B5E', 'Piscina': '#5E7A8B',
 }
+
+const TASK_ESTADOS = [
+  { key: 'em_curso', label: 'Em Curso', color: '#5E7A8B', bg: 'rgba(94,122,139,0.12)', icon: RefreshCw },
+  { key: 'concluida', label: 'Concluída', color: '#7A8B6E', bg: 'rgba(122,139,110,0.12)', icon: CheckCircle2 },
+  { key: 'bloqueado', label: 'Bloqueado', color: '#9A6B5B', bg: 'rgba(154,107,91,0.12)', icon: Ban },
+  { key: 'nao_conforme', label: 'Não Conforme', color: '#C9A86C', bg: 'rgba(201,168,108,0.12)', icon: AlertTriangle },
+]
+
+function getTaskEstado(key) { return TASK_ESTADOS.find(e => e.key === key) || TASK_ESTADOS[0] }
 
 function getEspecColor(nome) { return ESPECIALIDADE_COLORS[nome] || '#8B8670' }
 function formatDatePT(dateStr) { const d = new Date(dateStr + 'T12:00:00'); return `${d.getDate()} ${MONTHS_PT[d.getMonth()]}` }
@@ -193,6 +202,14 @@ export default function AcompanhamentoTab({ obra, obraId, activeSubtab, currentU
     proximos_passos: [],
     status: 'rascunho'
   })
+  // Task photo upload state (per-task photos in modal)
+  const [taskPhotoUploading, setTaskPhotoUploading] = useState(null) // index of atividade being uploaded
+  const taskPhotoInputRef = useRef(null)
+
+  // Pendentes state (from obra_pendentes table)
+  const [pendentes, setPendentes] = useState([])
+  const [pendentesLoading, setPendentesLoading] = useState(false)
+
   // Temp fields for inline adds
   const [diarioTempTrab, setDiarioTempTrab] = useState({ nome: '', funcao: '', tipo: 'Equipa', estado: 'PRESENTE' })
   const [diarioTempTarefa, setDiarioTempTarefa] = useState('')
@@ -221,9 +238,65 @@ export default function AcompanhamentoTab({ obra, obraId, activeSubtab, currentU
     if ((activeSubtab === 'diario' || activeSubtab === 'resumo') && obraId) loadDiario()
   }, [activeSubtab, obraId, loadDiario])
 
+  // Load pendentes from obra_pendentes table
+  const loadPendentes = useCallback(async () => {
+    if (!obraId) return
+    setPendentesLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from('obra_pendentes')
+        .select('*')
+        .eq('obra_id', obraId)
+        .eq('estado', 'aberto')
+        .order('data_criacao', { ascending: false })
+      if (error) throw error
+      setPendentes(data || [])
+    } catch (err) {
+      // Table may not exist yet — fallback silently
+      console.warn('obra_pendentes:', err.message)
+      setPendentes([])
+    } finally { setPendentesLoading(false) }
+  }, [obraId])
+
+  useEffect(() => {
+    if ((activeSubtab === 'diario' || activeSubtab === 'resumo') && obraId) loadPendentes()
+  }, [activeSubtab, obraId, loadPendentes])
+
+  // Handle photo upload for a specific task (atividade) in the modal
+  const handleTaskPhotoUpload = async (taskIndex, files) => {
+    if (!files.length || !obraId) return
+    setTaskPhotoUploading(taskIndex)
+    try {
+      const newPhotos = []
+      for (const file of files) {
+        if (!file.type.startsWith('image/') || file.size > 10 * 1024 * 1024) continue
+        const ext = file.name.split('.').pop()
+        const fileName = `diario/${obraId}/tarefa_${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+        const { error: upErr } = await supabase.storage.from('obra-fotos').upload(fileName, file)
+        if (upErr) throw upErr
+        const { data: urlData } = supabase.storage.from('obra-fotos').getPublicUrl(fileName)
+        newPhotos.push({ url: urlData.publicUrl, descricao: '' })
+      }
+      const updatedAtividades = [...(diarioForm.atividades || [])]
+      const ativ = { ...updatedAtividades[taskIndex] }
+      ativ.fotos = [...(ativ.fotos || []), ...newPhotos]
+      updatedAtividades[taskIndex] = ativ
+      setDiarioForm({ ...diarioForm, atividades: updatedAtividades })
+    } catch (err) {
+      console.error('Erro upload foto tarefa:', err)
+      alert('Erro ao fazer upload: ' + err.message)
+    } finally { setTaskPhotoUploading(null) }
+  }
+
   const openDiarioModal = (entry = null) => {
     if (entry) {
       setDiarioEditId(entry.id)
+      // Ensure atividades have estado field (migrate old data)
+      const atividades = (entry.atividades || []).map(a => ({
+        ...a,
+        estado: a.estado || 'em_curso',
+        fotos: a.fotos || []
+      }))
       setDiarioForm({
         data: entry.data || new Date().toISOString().split('T')[0],
         funcao: entry.funcao || 'Encarregado de Obra',
@@ -235,7 +308,7 @@ export default function AcompanhamentoTab({ obra, obraId, activeSubtab, currentU
         trabalhadores: entry.trabalhadores || [],
         trabalhadores_gavinho: entry.trabalhadores_gavinho || 0,
         trabalhadores_subempreiteiros: entry.trabalhadores_subempreiteiros || 0,
-        atividades: entry.atividades || [],
+        atividades,
         tarefas: entry.tarefas || [],
         ocorrencias: entry.ocorrencias || [],
         nao_conformidades: entry.nao_conformidades || [],
@@ -355,6 +428,80 @@ export default function AcompanhamentoTab({ obra, obraId, activeSubtab, currentU
       setShowDiarioModal(false)
       setExpandedDiario(null)
       loadDiario()
+
+      // Auto-create/resolve pendentes based on task estado
+      try {
+        // Get the saved entry ID (for new entries we need to fetch it)
+        let entryId = diarioEditId
+        if (!entryId) {
+          const { data: lastEntry } = await supabase
+            .from('obra_diario')
+            .select('id')
+            .eq('obra_id', obraId)
+            .eq('data', diarioForm.data)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single()
+          entryId = lastEntry?.id
+        }
+
+        const atividades = diarioForm.atividades || []
+        for (let idx = 0; idx < atividades.length; idx++) {
+          const ativ = atividades[idx]
+          const estado = ativ.estado || 'em_curso'
+
+          if (estado === 'bloqueado' || estado === 'nao_conforme') {
+            // Create a pendente if not already exists for this task
+            const tipo = estado === 'bloqueado' ? 'bloqueio' : 'nao_conforme'
+            const { data: existing } = await supabase
+              .from('obra_pendentes')
+              .select('id')
+              .eq('obra_id', obraId)
+              .eq('diario_entrada_id', entryId)
+              .eq('tarefa_index', idx)
+              .eq('estado', 'aberto')
+              .limit(1)
+            if (!existing?.length) {
+              await supabase.from('obra_pendentes').insert({
+                obra_id: obraId,
+                diario_entrada_id: entryId,
+                tarefa_index: idx,
+                tipo,
+                descricao: ativ.descricao || '',
+                especialidade: ativ.especialidade_nome || null,
+                zona: ativ.zona || null,
+                data_criacao: diarioForm.data,
+              })
+            }
+          } else if (estado === 'concluida') {
+            // If a task is marked as concluida, resolve any open pendentes
+            // matching the same obra + especialidade + similar description
+            const matchDesc = (ativ.descricao || '').substring(0, 50)
+            if (matchDesc) {
+              const { data: openPendentes } = await supabase
+                .from('obra_pendentes')
+                .select('id, descricao')
+                .eq('obra_id', obraId)
+                .eq('estado', 'aberto')
+                .ilike('descricao', `%${matchDesc.substring(0, 30)}%`)
+              if (openPendentes?.length) {
+                for (const p of openPendentes) {
+                  await supabase.from('obra_pendentes').update({
+                    estado: 'resolvido',
+                    data_resolucao: diarioForm.data,
+                    resolved_by_diario_id: entryId,
+                    resolved_by_user: diarioForm.funcao,
+                  }).eq('id', p.id)
+                }
+              }
+            }
+          }
+        }
+        loadPendentes()
+      } catch (pendErr) {
+        // Pendentes sync is non-critical, don't block save
+        console.warn('Pendentes sync:', pendErr.message)
+      }
     } catch (err) {
       console.error('Erro diario:', err)
       alert('Erro ao guardar: ' + err.message)
@@ -894,7 +1041,7 @@ export default function AcompanhamentoTab({ obra, obraId, activeSubtab, currentU
             const trabPresentes = trabArray.filter?.(t => t.estado === 'PRESENTE')?.length
             const workerCount = trabPresentes || (d.trabalhadores_gavinho || 0) + (d.trabalhadores_subempreiteiros || 0)
             const atividades = d.atividades || []
-            const displayAtividades = atividades.length > 0 ? atividades : (d.tarefas || []).map(t => ({ especialidade_nome: t._especialidade || 'Geral', zona: t._zona || '', descricao: t._especialidade ? (t.titulo || '').replace(/^\[[^\]]*\]\s*(?:[^—]*—\s*)?/, '') : (t.descricao || t.titulo || t.texto || (typeof t === 'string' ? t : '')), fotos: t._fotos || [], alerta: t._alerta || null, nota: t._nota || '' }))
+            const displayAtividades = atividades.length > 0 ? atividades : (d.tarefas || []).map(t => ({ especialidade_nome: t._especialidade || 'Geral', zona: t._zona || '', descricao: t._especialidade ? (t.titulo || '').replace(/^\[[^\]]*\]\s*(?:[^—]*—\s*)?/, '') : (t.descricao || t.titulo || t.texto || (typeof t === 'string' ? t : '')), fotos: t._fotos || [], alerta: t._alerta || null, nota: t._nota || '', estado: t.estado || 'em_curso' }))
             const ativFotos = atividades.reduce((s, a) => s + (a.fotos?.length || 0), 0)
             const photoCount = (d.fotos?.length || 0) + ativFotos
             const allEntryPhotos = [...(d.fotos || []), ...atividades.flatMap(a => (a.fotos || []))]
@@ -962,12 +1109,21 @@ export default function AcompanhamentoTab({ obra, obraId, activeSubtab, currentU
                       const extra = aFotos.length > maxThumbs ? aFotos.length - maxThumbs : 0
                       return (
                         <div key={idx} style={{ padding: '14px 0', borderBottom: idx < displayAtividades.length - 1 ? `1px solid ${colors.border}` : 'none' }}>
-                          {/* Category tag + location */}
+                          {/* Category tag + location + estado badge */}
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                             <span style={{ padding: '3px 10px', borderRadius: 4, fontSize: FONT_SIZES.xs, fontWeight: 700, letterSpacing: '0.04em', background: `${espColor}14`, color: espColor, textTransform: 'uppercase', fontFamily: FONTS.body }}>
                               {ativ.especialidade_nome || 'Geral'}
                             </span>
                             {ativ.zona && <span style={{ fontSize: FONT_SIZES.sm, color: '#8B8670', fontFamily: FONTS.body }}>{ativ.zona}</span>}
+                            {(() => {
+                              const te = getTaskEstado(ativ.estado || 'em_curso')
+                              const TIcon = te.icon
+                              return (
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 4, fontSize: FONT_SIZES.xs, fontWeight: 600, background: te.bg, color: te.color, fontFamily: FONTS.body, marginLeft: 'auto' }}>
+                                  <TIcon size={11} /> {te.label}
+                                </span>
+                              )
+                            })()}
                           </div>
                           <p style={{ margin: 0, fontSize: FONT_SIZES.base, color: '#3D3326', lineHeight: 1.65, fontFamily: FONTS.body }}>{ativ.descricao}</p>
                           {ativ.alerta && (
@@ -1135,14 +1291,54 @@ export default function AcompanhamentoTab({ obra, obraId, activeSubtab, currentU
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: colors.textMuted, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>Atividades por Especialidade</label>
                 {(diarioForm.atividades || []).map((ativ, idx) => {
                   const espColor = getEspecColor(ativ.especialidade_nome)
+                  const te = getTaskEstado(ativ.estado || 'em_curso')
+                  const aFotos = ativ.fotos || []
                   return (
                     <div key={idx} style={{ padding: 12, background: colors.background, borderRadius: 10, marginBottom: 8 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                         <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: `${espColor}18`, color: espColor, textTransform: 'uppercase' }}>{ativ.especialidade_nome || 'Geral'}</span>
                         {ativ.zona && <span style={{ fontSize: 11, color: colors.textMuted }}>{ativ.zona}</span>}
-                        <X size={14} style={{ marginLeft: 'auto', cursor: 'pointer', color: colors.textMuted }} onClick={() => setDiarioForm({ ...diarioForm, atividades: diarioForm.atividades.filter((_, j) => j !== idx) })} />
+                        {/* Estado selector */}
+                        <select
+                          value={ativ.estado || 'em_curso'}
+                          onChange={e => {
+                            const updated = [...(diarioForm.atividades || [])]
+                            updated[idx] = { ...updated[idx], estado: e.target.value }
+                            setDiarioForm({ ...diarioForm, atividades: updated })
+                          }}
+                          style={{ marginLeft: 'auto', padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 600, border: `1px solid ${te.color}30`, background: te.bg, color: te.color, cursor: 'pointer' }}
+                        >
+                          {TASK_ESTADOS.map(e => <option key={e.key} value={e.key}>{e.label}</option>)}
+                        </select>
+                        <X size={14} style={{ cursor: 'pointer', color: colors.textMuted }} onClick={() => setDiarioForm({ ...diarioForm, atividades: diarioForm.atividades.filter((_, j) => j !== idx) })} />
                       </div>
                       <p style={{ margin: 0, fontSize: 13, color: colors.text, lineHeight: 1.5 }}>{ativ.descricao}</p>
+                      {/* Task photos */}
+                      {aFotos.length > 0 && (
+                        <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+                          {aFotos.map((foto, fi) => (
+                            <div key={fi} style={{ width: 60, height: 60, borderRadius: 6, overflow: 'hidden', position: 'relative' }}>
+                              <img src={typeof foto === 'string' ? foto : foto.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
+                              <button onClick={() => {
+                                const updated = [...(diarioForm.atividades || [])]
+                                updated[idx] = { ...updated[idx], fotos: aFotos.filter((_, j) => j !== fi) }
+                                setDiarioForm({ ...diarioForm, atividades: updated })
+                              }} style={{ position: 'absolute', top: 2, right: 2, width: 16, height: 16, borderRadius: '50%', background: 'rgba(0,0,0,0.6)', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}><X size={8} /></button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {/* Add photo button */}
+                      <button
+                        onClick={() => {
+                          taskPhotoInputRef.current?.setAttribute('data-task-index', idx)
+                          taskPhotoInputRef.current?.click()
+                        }}
+                        disabled={taskPhotoUploading === idx}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 8, padding: '4px 10px', border: `1px dashed ${colors.border}`, borderRadius: 6, background: 'transparent', cursor: 'pointer', fontSize: 11, color: colors.textMuted }}
+                      >
+                        <Camera size={12} /> {taskPhotoUploading === idx ? 'A enviar...' : 'Adicionar foto'}
+                      </button>
                     </div>
                   )
                 })}
@@ -1155,11 +1351,26 @@ export default function AcompanhamentoTab({ obra, obraId, activeSubtab, currentU
                     <input type="text" value={typeof diarioTempTarefa === 'object' ? (diarioTempTarefa.zona || '') : ''} onChange={e => setDiarioTempTarefa(typeof diarioTempTarefa === 'object' ? { ...diarioTempTarefa, zona: e.target.value } : { especialidade: '', zona: e.target.value, descricao: '' })} placeholder="Zona / Localização" style={{ padding: '8px 10px', border: `1px solid ${colors.border}`, borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} />
                   </div>
                   <div style={{ display: 'flex', gap: 6 }}>
-                    <input type="text" value={typeof diarioTempTarefa === 'object' ? (diarioTempTarefa.descricao || '') : diarioTempTarefa} onChange={e => setDiarioTempTarefa(typeof diarioTempTarefa === 'object' ? { ...diarioTempTarefa, descricao: e.target.value } : { especialidade: '', zona: '', descricao: e.target.value })} placeholder="Descreva os trabalhos realizados..." onKeyDown={e => { if (e.key === 'Enter') { const t = typeof diarioTempTarefa === 'object' ? diarioTempTarefa : { descricao: diarioTempTarefa }; if (!t.descricao) return; setDiarioForm({ ...diarioForm, atividades: [...(diarioForm.atividades || []), { especialidade_nome: t.especialidade || 'Geral', zona: t.zona || '', descricao: t.descricao, fotos: [] }] }); setDiarioTempTarefa({ especialidade: '', zona: '', descricao: '' }) } }} style={{ flex: 1, padding: '8px 10px', border: `1px solid ${colors.border}`, borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }} />
-                    <button onClick={() => { const t = typeof diarioTempTarefa === 'object' ? diarioTempTarefa : { descricao: diarioTempTarefa }; if (!t.descricao) return; setDiarioForm({ ...diarioForm, atividades: [...(diarioForm.atividades || []), { especialidade_nome: t.especialidade || 'Geral', zona: t.zona || '', descricao: t.descricao, fotos: [] }] }); setDiarioTempTarefa({ especialidade: '', zona: '', descricao: '' }) }} style={{ padding: '8px 12px', background: colors.primary, color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}><Plus size={14} /></button>
+                    <input type="text" value={typeof diarioTempTarefa === 'object' ? (diarioTempTarefa.descricao || '') : diarioTempTarefa} onChange={e => setDiarioTempTarefa(typeof diarioTempTarefa === 'object' ? { ...diarioTempTarefa, descricao: e.target.value } : { especialidade: '', zona: '', descricao: e.target.value })} placeholder="Descreva os trabalhos realizados..." onKeyDown={e => { if (e.key === 'Enter') { const t = typeof diarioTempTarefa === 'object' ? diarioTempTarefa : { descricao: diarioTempTarefa }; if (!t.descricao) return; setDiarioForm({ ...diarioForm, atividades: [...(diarioForm.atividades || []), { especialidade_nome: t.especialidade || 'Geral', zona: t.zona || '', descricao: t.descricao, fotos: [], estado: 'em_curso' }] }); setDiarioTempTarefa({ especialidade: '', zona: '', descricao: '' }) } }} style={{ flex: 1, padding: '8px 10px', border: `1px solid ${colors.border}`, borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }} />
+                    <button onClick={() => { const t = typeof diarioTempTarefa === 'object' ? diarioTempTarefa : { descricao: diarioTempTarefa }; if (!t.descricao) return; setDiarioForm({ ...diarioForm, atividades: [...(diarioForm.atividades || []), { especialidade_nome: t.especialidade || 'Geral', zona: t.zona || '', descricao: t.descricao, fotos: [], estado: 'em_curso' }] }); setDiarioTempTarefa({ especialidade: '', zona: '', descricao: '' }) }} style={{ padding: '8px 12px', background: colors.primary, color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}><Plus size={14} /></button>
                   </div>
                 </div>
               </div>
+
+              {/* Hidden input for task photo uploads */}
+              <input
+                ref={taskPhotoInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                style={{ display: 'none' }}
+                onChange={e => {
+                  const idx = parseInt(taskPhotoInputRef.current?.getAttribute('data-task-index') || '0')
+                  const files = Array.from(e.target.files || [])
+                  if (files.length) handleTaskPhotoUpload(idx, files)
+                  if (e.target) e.target.value = ''
+                }}
+              />
 
               {/* Occurrences */}
               <div style={{ marginBottom: 14 }}>
@@ -1629,14 +1840,35 @@ export default function AcompanhamentoTab({ obra, obraId, activeSubtab, currentU
           </div>
         </div>
 
-        {/* PENDENTES card — colored dots, title bold, description, date */}
+        {/* PENDENTES card — from obra_pendentes table + NCs */}
         <div style={{ background: colors.white, borderRadius: 10, border: `1px solid ${colors.border}`, padding: 20 }}>
           <h3 style={{ margin: '0 0 14px', fontSize: FONT_SIZES.xs, fontWeight: 700, color: '#B0ADA3', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: FONTS.body }}>Pendentes nesta Obra</h3>
-          {openNcs.length === 0 && criticalOcorrencias.length === 0 ? (
+          {pendentes.length === 0 && openNcs.length === 0 && criticalOcorrencias.length === 0 ? (
             <p style={{ fontSize: FONT_SIZES.base, color: '#B0ADA3', margin: 0, fontFamily: FONTS.body }}>Sem pendentes activos</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {openNcs.slice(0, 5).map(nc => {
+              {/* Pendentes from obra_pendentes table (task-level) */}
+              {pendentes.slice(0, 8).map(p => {
+                const dotColor = p.tipo === 'bloqueio' ? '#9A6B5B' : '#C9A86C'
+                const typeLabel = p.tipo === 'bloqueio' ? 'Bloqueio' : 'Não Conforme'
+                const dataCriacao = p.data_criacao ? new Date(p.data_criacao + 'T00:00:00').toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' }) : ''
+                return (
+                  <div key={p.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: dotColor, flexShrink: 0, marginTop: 5 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: FONT_SIZES.sm, fontWeight: 600, color: '#2C2C2B', fontFamily: FONTS.body }}>
+                        {typeLabel}{p.especialidade ? ` · ${p.especialidade}` : ''}
+                      </div>
+                      <div style={{ fontSize: FONT_SIZES.xs, color: '#8B8670', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1, fontFamily: FONTS.body }}>{p.descricao}</div>
+                      {dataCriacao && (
+                        <div style={{ fontSize: FONT_SIZES.xs, color: '#B0ADA3', marginTop: 2, fontFamily: FONTS.body }}>Desde {dataCriacao}</div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+              {/* NCs still shown */}
+              {openNcs.slice(0, 3).map(nc => {
                 const isAberta = nc.estado === 'aberta'
                 const dotColor = nc.gravidade === 'critica' ? '#9A6B5B' : (isAberta ? '#C9A86C' : '#5E7A8B')
                 const typeLabel = nc.gravidade === 'critica' ? 'Bloqueio' : (isAberta ? 'NC' : 'Decisão')
