@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gavinho Sidebar — Visual Study</title>
+<!--
+  MOCKUP DE REFERÊNCIA — Sidebar Study
+  Fundo: glass translúcido (backdrop-filter blur)
+  Item activo: fundo #2C2C2B, texto branco
+  Section titles: 10px uppercase, cinza claro
+  Items: 13px, sem bold, cinza médio
+  Hover: subtil, neutro
+  Logo: quadrado preto com G branco
+  Este ficheiro é APENAS referência visual; a implementação real é em React.
+-->
+<link href="https://fonts.googleapis.com/css2?family=Quattrocento+Sans:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Quattrocento Sans', sans-serif;
+    /* Background image/gradient to show glass effect */
+    background: linear-gradient(135deg, #E8E4D8 0%, #D4CFC3 30%, #C8C3B5 60%, #F2F0E7 100%);
+    min-height: 100vh;
+    display: flex;
+  }
+
+  /* ── SIDEBAR ── glass panel ────────────────────── */
+  .sidebar {
+    width: 240px;
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    left: 0;
+    /* GLASS: translucent warm cream with blur */
+    background: rgba(248, 246, 240, 0.55);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border-right: 1px solid rgba(229, 226, 217, 0.6);
+    display: flex;
+    flex-direction: column;
+    padding: 16px 10px;
+    font-family: 'Quattrocento Sans', sans-serif;
+  }
+
+  /* ── LOGO ──────────────────────────────────────── */
+  .sidebar-header {
+    padding: 8px 12px 24px;
+  }
+
+  .sidebar-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+  }
+
+  /* Logo: black square, white G */
+  .logo-mark {
+    width: 32px;
+    height: 32px;
+    background: #2C2C2B;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #FFFFFF;
+    font-family: 'Quattrocento Sans', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+  }
+
+  /* GAVINHO text */
+  .logo-text {
+    font-family: 'Quattrocento Sans', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #2C2C2B;
+  }
+
+  /* ── NAVIGATION ────────────────────────────────── */
+  .sidebar-nav {
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  .nav-section {
+    margin-bottom: 20px;
+  }
+
+  /* Section titles: 10px uppercase, light gray */
+  .nav-section-title {
+    font-family: 'Quattrocento Sans', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #B0ADA3;
+    padding: 0 12px;
+    margin-bottom: 6px;
+  }
+
+  /* Nav items: 13px, NO bold, medium gray */
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    margin-bottom: 1px;
+    text-decoration: none;
+    color: #6B6B6B;
+    font-family: 'Quattrocento Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 400;
+  }
+
+  /* Hover: very subtle neutral tint — NOT green/olive */
+  .nav-item:hover {
+    background: rgba(45, 45, 43, 0.06);
+    color: #3D3D3D;
+  }
+
+  /* Active: solid BLACK bg, white text */
+  .nav-item.active {
+    background: #2C2C2B;
+    color: #FFFFFF;
+    font-weight: 400;
+  }
+
+  /* Icon placeholder */
+  .nav-icon {
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+    opacity: 0.7;
+  }
+
+  .nav-item.active .nav-icon {
+    opacity: 1;
+  }
+
+  /* ── FOOTER ────────────────────────────────────── */
+  .sidebar-footer {
+    padding-top: 16px;
+    border-top: 1px solid rgba(229, 226, 217, 0.6);
+  }
+
+  .user-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+
+  .user-card:hover {
+    background: rgba(45, 45, 43, 0.06);
+  }
+
+  .user-avatar {
+    width: 34px;
+    height: 34px;
+    background: linear-gradient(135deg, #D5D2C9 0%, #9A978A 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: #FFFFFF;
+  }
+
+  .user-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: #3D3D3D;
+  }
+
+  .user-role {
+    font-size: 11px;
+    color: #B0ADA3;
+  }
+
+  /* ── CONTENT AREA (just to show glass effect) ──── */
+  .content {
+    margin-left: 240px;
+    padding: 48px;
+    flex: 1;
+  }
+
+  .content h1 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 36px;
+    font-weight: 600;
+    color: #2D2D2D;
+  }
+
+  .content p {
+    font-size: 14px;
+    color: #6B6B6B;
+    margin-top: 8px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══ SIDEBAR ═══ -->
+<aside class="sidebar">
+  <!-- Logo -->
+  <div class="sidebar-header">
+    <a href="#" class="sidebar-logo">
+      <div class="logo-mark">G</div>
+      <span class="logo-text">GAVINHO</span>
+    </a>
+  </div>
+
+  <!-- Navigation -->
+  <nav class="sidebar-nav">
+    <!-- Calendário (global, no section title) -->
+    <div class="nav-section">
+      <a href="#" class="nav-item">
+        <span class="nav-icon">📅</span>
+        <span>Calendário</span>
+      </a>
+    </div>
+
+    <!-- Projetos -->
+    <div class="nav-section">
+      <div class="nav-section-title">Projetos</div>
+      <a href="#" class="nav-item active">
+        <span class="nav-icon">📊</span>
+        <span>Dashboard Projetos</span>
+      </a>
+      <a href="#" class="nav-item">
+        <span class="nav-icon">📁</span>
+        <span>Projetos</span>
+      </a>
+      <a href="#" class="nav-item">
+        <span class="nav-icon">💬</span>
+        <span>Teams</span>
+      </a>
+      <a href="#" class="nav-item">
+        <span class="nav-icon">📚</span>
+        <span>Biblioteca</span>
+      </a>
+    </div>
+
+    <!-- Obras -->
+    <div class="nav-section">
+      <div class="nav-section-title">Obras</div>
+      <a href="#" class="nav-item">
+        <span class="nav-icon">🏗</span>
+        <span>Dashboard Obras</span>
+      </a>
+      <a href="#" class="nav-item">
+        <span class="nav-icon">🏢</span>
+        <span>Obras</span>
+      </a>
+      <a href="#" class="nav-item">
+        <span class="nav-icon">💬</span>
+        <span>Chat</span>
+      </a>
+      <a href="#" class="nav-item">
+        <span class="nav-icon">👷</span>
+        <span>Equipa & SubEmpreiteiros</span>
+      </a>
+    </div>
+
+    <!-- Gestão Projeto -->
+    <div class="nav-section">
+      <div class="nav-section-title">Gestão Projeto</div>
+      <a href="#" class="nav-item">
+        <span class="nav-icon">👥</span>
+        <span>Clientes</span>
+      </a>
+      <a href="#" class="nav-item">
+        <span class="nav-icon">🔍</span>
+        <span>Viabilidade</span>
+      </a>
+      <a href="#" class="nav-item">
+        <span class="nav-icon">📈</span>
+        <span>Leads</span>
+      </a>
+      <a href="#" class="nav-item">
+        <span class="nav-icon">📁</span>
+        <span>Projetos em Curso</span>
+      </a>
+      <a href="#" class="nav-item">
+        <span class="nav-icon">📋</span>
+        <span>Projetos Concluídos</span>
+      </a>
+      <a href="#" class="nav-item">
+        <span class="nav-icon">🔗</span>
+        <span>Gestão Integrada</span>
+      </a>
+      <a href="#" class="nav-item">
+        <span class="nav-icon">🚚</span>
+        <span>Fornecedores</span>
+      </a>
+    </div>
+
+    <!-- Financeiro -->
+    <div class="nav-section">
+      <div class="nav-section-title">Financeiro</div>
+      <a href="#" class="nav-item">
+        <span class="nav-icon">💳</span>
+        <span>Custos Fixos</span>
+      </a>
+      <a href="#" class="nav-item">
+        <span class="nav-icon">📄</span>
+        <span>Faturação</span>
+      </a>
+      <a href="#" class="nav-item">
+        <span class="nav-icon">🛒</span>
+        <span>Compras</span>
+      </a>
+    </div>
+
+    <!-- Administrativo -->
+    <div class="nav-section">
+      <div class="nav-section-title">Administrativo</div>
+      <a href="#" class="nav-item">
+        <span class="nav-icon">✉️</span>
+        <span>Emails</span>
+      </a>
+      <a href="#" class="nav-item">
+        <span class="nav-icon">👥</span>
+        <span>Recursos Humanos</span>
+      </a>
+      <a href="#" class="nav-item">
+        <span class="nav-icon">🗄</span>
+        <span>Seed de Dados</span>
+      </a>
+      <a href="#" class="nav-item">
+        <span class="nav-icon">⚙️</span>
+        <span>Configurações</span>
+      </a>
+    </div>
+  </nav>
+
+  <!-- Footer -->
+  <div class="sidebar-footer">
+    <div class="user-card">
+      <div class="user-avatar">IG</div>
+      <div>
+        <div class="user-name">Inês Gavinho</div>
+        <div class="user-role">Diretora Criativa</div>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- Content area - shows that sidebar is transparent -->
+<div class="content">
+  <h1>Dashboard</h1>
+  <p>A sidebar é glass translúcida — o conteúdo por trás é parcialmente visível.</p>
+  <div style="margin-top:40px; padding:24px; background:#fff; border-radius:16px; border:1px solid #E5E2D9; max-width:600px;">
+    <h3 style="font-size:15px;margin-bottom:12px;">Especificações da Sidebar</h3>
+    <ul style="font-size:13px; color:#6B6B6B; line-height:2;">
+      <li><b>Fundo:</b> rgba(248, 246, 240, 0.55) + backdrop-filter: blur(18px)</li>
+      <li><b>Border:</b> rgba(229, 226, 217, 0.6)</li>
+      <li><b>Logo:</b> #2C2C2B quadrado, G branco</li>
+      <li><b>Section title:</b> 10px uppercase, #B0ADA3</li>
+      <li><b>Nav items:</b> 13px, font-weight: 400, color: #6B6B6B</li>
+      <li><b>Hover:</b> rgba(45, 45, 43, 0.06)</li>
+      <li><b>Active:</b> #2C2C2B fundo, #FFFFFF texto, font-weight: 400</li>
+    </ul>
+  </div>
+</div>
+
+</body>
+</html>

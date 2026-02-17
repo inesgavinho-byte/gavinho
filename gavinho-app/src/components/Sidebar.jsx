@@ -190,7 +190,7 @@ export default function Sidebar({ isOpen, onClose, isMobile, collapsed, onToggle
             `nav-item nav-item-collapsed ${isActive ? 'active' : ''} ${item.highlight ? 'nav-item-highlight' : ''}`
           }
         >
-          <item.icon size={20} />
+          <item.icon size={18} />
           <span className="nav-tooltip">{item.name}</span>
         </NavLink>
       )
@@ -215,7 +215,7 @@ export default function Sidebar({ isOpen, onClose, isMobile, collapsed, onToggle
             />
           </div>
           {isExpanded && (
-            <div style={{ marginLeft: '12px', borderLeft: '1px solid var(--stone)', marginTop: '4px' }}>
+            <div style={{ marginLeft: '12px', borderLeft: '1px solid var(--sidebar-border)', marginTop: '4px' }}>
               {item.subItems.map(subItem => (
                 <NavLink
                   key={subItem.name}
@@ -277,7 +277,7 @@ export default function Sidebar({ isOpen, onClose, isMobile, collapsed, onToggle
           display: 'flex',
           justifyContent: 'center',
           padding: '8px',
-          borderBottom: '1px solid var(--stone)'
+          borderBottom: '1px solid var(--sidebar-border)'
         }}>
           <NotificationBell collapsed={true} />
         </div>
@@ -297,8 +297,8 @@ export default function Sidebar({ isOpen, onClose, isMobile, collapsed, onToggle
             width: '28px',
             height: '28px',
             borderRadius: '50%',
-            background: 'var(--brown)',
-            border: '2px solid var(--cream)',
+            background: '#2C2C2B',
+            border: '2px solid rgba(250, 250, 248, 0.72)',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
@@ -373,7 +373,7 @@ export default function Sidebar({ isOpen, onClose, isMobile, collapsed, onToggle
         }}>
           <ThemeToggle size={collapsed ? 'sm' : 'md'} />
           {!collapsed && (
-            <span style={{ fontSize: '12px', color: 'var(--brown-light)', fontWeight: 500 }}>
+            <span style={{ fontSize: '12px', color: 'var(--sidebar-item-color)', fontWeight: 400 }}>
               Tema
             </span>
           )}
