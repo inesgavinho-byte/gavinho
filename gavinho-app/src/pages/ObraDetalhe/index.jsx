@@ -24,7 +24,7 @@ export default function ObraDetalhe() {
   const [loading, setLoading] = useState(true)
   const [activeMainTab, setActiveMainTab] = useState('tracking')
   const [activeTrackingSubtab, setActiveTrackingSubtab] = useState('mqt')
-  const [activeAcompanhamentoSubtab, setActiveAcompanhamentoSubtab] = useState('fotografias')
+  const [activeAcompanhamentoSubtab, setActiveAcompanhamentoSubtab] = useState('resumo')
   const [activeFiscalizacaoSubtab, setActiveFiscalizacaoSubtab] = useState('hso')
   const [activeEquipasSubtab, setActiveEquipasSubtab] = useState('equipa')
   const [checklistCount, setChecklistCount] = useState(0)
