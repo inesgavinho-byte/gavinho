@@ -67,7 +67,14 @@ export default function AcompanhamentoTab({ obraId, activeSubtab, currentUser })
       if (fotosRes.error) throw fotosRes.error
       setFotos(fotosRes.data || [])
       setZonas(zonasRes.data || [])
-      setEspecialidades(especRes.data || [])
+      // Deduplicate especialidades by nome (DB may have duplicates)
+      const seen = new Set()
+      const uniqueEspec = (especRes.data || []).filter(e => {
+        if (seen.has(e.nome)) return false
+        seen.add(e.nome)
+        return true
+      })
+      setEspecialidades(uniqueEspec)
     } catch (err) { console.error('Erro fotos:', err) }
     finally { setFotosLoading(false) }
   }, [obraId])
@@ -277,6 +284,21 @@ export default function AcompanhamentoTab({ obraId, activeSubtab, currentUser })
         allFotos.push({ id: Date.now() + Math.random(), url: urlData.publicUrl, descricao: '' })
       }
 
+      // Convert atividades to tarefas format for backward compat
+      const atividades = diarioForm.atividades || []
+      const tarefasFromAtiv = atividades.map(a => ({
+        id: Date.now() + Math.random(),
+        titulo: `[${a.especialidade_nome || 'Geral'}]${a.zona ? ' ' + a.zona + ' —' : ''} ${a.descricao}`,
+        concluida: false,
+        _especialidade: a.especialidade_nome,
+        _zona: a.zona,
+        _fotos: a.fotos,
+        _alerta: a.alerta,
+        _nota: a.nota
+      }))
+      const allTarefas = [...(diarioForm.tarefas || []), ...tarefasFromAtiv]
+
+      // Base payload (columns that always exist)
       const payload = {
         obra_id: obraId,
         data: diarioForm.data,
@@ -284,28 +306,48 @@ export default function AcompanhamentoTab({ obraId, activeSubtab, currentUser })
         condicoes_meteo: diarioForm.condicoes_meteo,
         temperatura: diarioForm.temperatura ? parseFloat(diarioForm.temperatura) : null,
         observacoes_meteo: diarioForm.observacoes_meteo || null,
-        hora_inicio: diarioForm.hora_inicio || null,
-        hora_fim: diarioForm.hora_fim || null,
         trabalhadores: diarioForm.trabalhadores,
         trabalhadores_gavinho: diarioForm.trabalhadores_gavinho || diarioForm.trabalhadores.filter(t => t.tipo === 'Equipa' && t.estado === 'PRESENTE').length,
         trabalhadores_subempreiteiros: diarioForm.trabalhadores_subempreiteiros || diarioForm.trabalhadores.filter(t => t.tipo === 'Subempreiteiro' && t.estado === 'PRESENTE').length,
-        atividades: diarioForm.atividades || [],
-        tarefas: diarioForm.tarefas,
+        tarefas: allTarefas,
         ocorrencias: diarioForm.ocorrencias,
         nao_conformidades: diarioForm.nao_conformidades,
         fotos: allFotos,
         proximos_passos: diarioForm.proximos_passos,
-        registado_por_nome: diarioForm.funcao,
         status,
         updated_at: new Date().toISOString()
       }
 
+      // New columns (from migration 20260217_obra_diario_atividades)
+      const newCols = {
+        atividades,
+        hora_inicio: diarioForm.hora_inicio || null,
+        hora_fim: diarioForm.hora_fim || null,
+        registado_por_nome: diarioForm.funcao,
+      }
+
+      // Try with new columns, fallback without if migration not applied
+      const fullPayload = { ...payload, ...newCols }
+      let saveErr
       if (diarioEditId) {
-        const { error } = await supabase.from('obra_diario').update(payload).eq('id', diarioEditId)
-        if (error) throw error
+        const { error } = await supabase.from('obra_diario').update(fullPayload).eq('id', diarioEditId)
+        saveErr = error
       } else {
-        const { error } = await supabase.from('obra_diario').insert([payload])
-        if (error) throw error
+        const { error } = await supabase.from('obra_diario').insert([fullPayload])
+        saveErr = error
+      }
+
+      // Fallback: save without new columns if schema error
+      if (saveErr && saveErr.message?.includes('schema cache')) {
+        if (diarioEditId) {
+          const { error } = await supabase.from('obra_diario').update(payload).eq('id', diarioEditId)
+          if (error) throw error
+        } else {
+          const { error } = await supabase.from('obra_diario').insert([payload])
+          if (error) throw error
+        }
+      } else if (saveErr) {
+        throw saveErr
       }
 
       setShowDiarioModal(false)
@@ -835,7 +877,7 @@ export default function AcompanhamentoTab({ obraId, activeSubtab, currentUser })
             const trabPresentes = trabArray.filter?.(t => t.estado === 'PRESENTE')?.length
             const workerCount = trabPresentes || (d.trabalhadores_gavinho || 0) + (d.trabalhadores_subempreiteiros || 0)
             const atividades = d.atividades || []
-            const displayAtividades = atividades.length > 0 ? atividades : (d.tarefas || []).map(t => ({ especialidade_nome: 'Geral', zona: '', descricao: t.descricao || t.titulo || t.texto || (typeof t === 'string' ? t : ''), fotos: [] }))
+            const displayAtividades = atividades.length > 0 ? atividades : (d.tarefas || []).map(t => ({ especialidade_nome: t._especialidade || 'Geral', zona: t._zona || '', descricao: t._especialidade ? (t.titulo || '').replace(/^\[[^\]]*\]\s*(?:[^—]*—\s*)?/, '') : (t.descricao || t.titulo || t.texto || (typeof t === 'string' ? t : '')), fotos: t._fotos || [], alerta: t._alerta || null, nota: t._nota || '' }))
             const ativFotos = atividades.reduce((s, a) => s + (a.fotos?.length || 0), 0)
             const photoCount = (d.fotos?.length || 0) + ativFotos
             const horaInicio = d.hora_inicio ? d.hora_inicio.substring(0, 5) : null
