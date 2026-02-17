@@ -521,10 +521,12 @@ function DayEntry({ entry, onEdit, onDelete }) {
 
   // Fallback: convert old tarefas to atividades format for display
   const displayAtividades = atividades.length > 0 ? atividades : (entry.tarefas || []).map(t => ({
-    especialidade_nome: 'Geral',
-    zona: '',
-    descricao: t.descricao || t.titulo || '',
-    fotos: []
+    especialidade_nome: t._especialidade || 'Geral',
+    zona: t._zona || '',
+    descricao: t._especialidade ? t.titulo.replace(/^\[[^\]]*\]\s*(?:[^—]*—\s*)?/, '') : (t.descricao || t.titulo || ''),
+    fotos: t._fotos || [],
+    alerta: t._alerta || null,
+    nota: t._nota || ''
   }))
 
   // Time display
@@ -1236,6 +1238,19 @@ function EntryFormModal({ obra, entry, especialidades, zonas, onClose, onSaved }
         })
       }
 
+      // Convert atividades to tarefas for backward compat (if migration not applied)
+      const tarefasFromAtiv = processedAtividades.map(a => ({
+        id: Date.now() + Math.random(),
+        titulo: `[${a.especialidade_nome || 'Geral'}]${a.zona ? ' ' + a.zona + ' —' : ''} ${a.descricao}`,
+        concluida: false,
+        _especialidade: a.especialidade_nome,
+        _zona: a.zona,
+        _fotos: a.fotos,
+        _alerta: a.alerta,
+        _nota: a.nota
+      }))
+
+      // Base payload (columns that always exist)
       const payload = {
         obra_id: obra.id,
         data,
@@ -1243,25 +1258,45 @@ function EntryFormModal({ obra, entry, especialidades, zonas, onClose, onSaved }
         condicoes_meteo: condicaoMeteo,
         temperatura: temperatura ? parseFloat(temperatura) : null,
         observacoes_meteo: observacoesMeteo,
-        hora_inicio: horaInicio || null,
-        hora_fim: horaFim || null,
         trabalhadores_gavinho: parseInt(trabGavinho) || 0,
         trabalhadores_subempreiteiros: parseInt(trabSubs) || 0,
-        atividades: processedAtividades,
+        tarefas: tarefasFromAtiv,
         nao_conformidades: naoConformidades,
-        pendentes,
         fotos: allFotos,
-        registado_por_nome: funcao,
         status,
         updated_at: new Date().toISOString()
       }
 
+      // New columns (from migration 20260217_obra_diario_atividades)
+      const newCols = {
+        atividades: processedAtividades,
+        hora_inicio: horaInicio || null,
+        hora_fim: horaFim || null,
+        registado_por_nome: funcao,
+        pendentes,
+      }
+
+      // Try with new columns, fallback without if migration not applied
+      const fullPayload = { ...payload, ...newCols }
+      let saveErr
       if (entry?.id) {
-        const { error } = await supabase.from('obra_diario').update(payload).eq('id', entry.id)
-        if (error) throw error
+        const { error } = await supabase.from('obra_diario').update(fullPayload).eq('id', entry.id)
+        saveErr = error
       } else {
-        const { error } = await supabase.from('obra_diario').insert([payload])
-        if (error) throw error
+        const { error } = await supabase.from('obra_diario').insert([fullPayload])
+        saveErr = error
+      }
+
+      if (saveErr && saveErr.message?.includes('schema cache')) {
+        if (entry?.id) {
+          const { error } = await supabase.from('obra_diario').update(payload).eq('id', entry.id)
+          if (error) throw error
+        } else {
+          const { error } = await supabase.from('obra_diario').insert([payload])
+          if (error) throw error
+        }
+      } else if (saveErr) {
+        throw saveErr
       }
 
       onSaved()
