@@ -66,7 +66,14 @@
   --radius-full: 980px;
   
   /* Layout */
-  --sidebar-width: 260px;
+  --sidebar-width: 240px;
+
+  /* Sidebar tokens */
+  --sidebar-bg: rgba(248, 246, 240, 0.72);
+  --sidebar-blur: 16px;
+  --sidebar-bg-hover: rgba(122, 139, 110, 0.10);
+  --sidebar-bg-active: var(--brown-dark);
+  --sidebar-text-active: #FFFFFF;
 }
 
 /* ========================================
@@ -110,6 +117,13 @@
   /* Accent - brighter olive for visibility */
   --accent-olive: #96B888;
   --accent-olive-dark: #84A676;
+
+  /* Sidebar - dark mode */
+  --sidebar-bg: rgba(28, 27, 25, 0.78);
+  --sidebar-blur: 16px;
+  --sidebar-bg-hover: rgba(150, 184, 136, 0.12);
+  --sidebar-bg-active: #F2EFE6;
+  --sidebar-text-active: #1C1B19;
 
   /* Shadows - deeper in dark mode */
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.35);
@@ -326,11 +340,12 @@ h4 { font-size: 17px; }
 /* ========================================
    SIDEBAR
    ======================================== */
+/* ── Sidebar ── glass effect with backdrop blur ── */
 .sidebar {
   width: var(--sidebar-width);
-  background: rgba(250, 249, 247, 0.95);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: var(--sidebar-bg);
+  backdrop-filter: blur(var(--sidebar-blur));
+  -webkit-backdrop-filter: blur(var(--sidebar-blur));
   display: flex;
   flex-direction: column;
   padding: 16px 10px;
@@ -341,6 +356,7 @@ h4 { font-size: 17px; }
   bottom: 0;
   z-index: 100;
   transition: width 0.2s ease, padding 0.2s ease;
+  font-family: 'Quattrocento Sans', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 .sidebar-header {
@@ -354,24 +370,29 @@ h4 { font-size: 17px; }
   text-decoration: none;
 }
 
+/* Logo: dark square with "G" */
 .logo-mark {
   width: 32px;
   height: 32px;
-  background: linear-gradient(135deg, var(--brown) 0%, var(--brown-dark) 100%);
+  background: var(--brown-dark);
   border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--sandy-beach);
+  color: #FFFFFF;
+  font-family: 'Quattrocento Sans', sans-serif;
   font-weight: 700;
   font-size: 14px;
 }
 
+/* Logo text: GAVINHO uppercase, letter-spacing 0.12em */
 .logo-text {
-  font-size: 17px;
-  font-weight: 600;
-  letter-spacing: 1px;
-  color: var(--brown);
+  font-family: 'Quattrocento Sans', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--brown-dark);
 }
 
 .sidebar-nav {
@@ -380,60 +401,67 @@ h4 { font-size: 17px; }
 }
 
 .nav-section {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
+/* Section titles: 10px uppercase, letter-spacing 0.1em, tertiary color */
 .nav-section-title {
+  font-family: 'Quattrocento Sans', sans-serif;
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 0.1em;
   color: var(--blush-dark);
   padding: 0 12px;
   margin-bottom: 6px;
 }
 
+/* Nav items: 13px body font, icons 18px stroke 1.5 */
 .nav-item {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 12px;
+  padding: 7px 12px;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: all 0.2s ease;
-  margin-bottom: 2px;
+  transition: all 0.15s ease;
+  margin-bottom: 1px;
   text-decoration: none;
   color: var(--brown-light);
+  font-family: 'Quattrocento Sans', sans-serif;
   font-size: 13px;
   font-weight: 500;
 }
 
+/* Hover: subtle bg-hover */
 .nav-item:hover {
-  background: rgba(122, 139, 110, 0.12);
-  color: var(--accent-olive-dark);
+  background: var(--sidebar-bg-hover);
+  color: var(--brown);
 }
 
+/* Active: dark background, inverse text */
 .nav-item.active {
-  background: var(--accent-olive);
-  color: var(--white);
+  background: var(--sidebar-bg-active);
+  color: var(--sidebar-text-active);
   font-weight: 600;
-  box-shadow: 0 2px 8px rgba(122, 139, 110, 0.3);
 }
 
+/* Icons: 18px, stroke-width 1.5 */
 .nav-item svg {
   width: 18px;
   height: 18px;
   stroke: currentColor;
-  stroke-width: 1.75;
+  stroke-width: 1.5;
   fill: none;
   flex-shrink: 0;
 }
 
 .nav-item.active svg {
-  stroke: var(--white);
+  stroke: var(--sidebar-text-active);
 }
 
 .nav-item-badge {
+  font-family: 'Quattrocento Sans', sans-serif;
   font-size: 11px;
   font-weight: 600;
   color: var(--brown-light);
@@ -444,8 +472,8 @@ h4 { font-size: 17px; }
 }
 
 .nav-item.active .nav-item-badge {
-  background: rgba(255, 255, 255, 0.25);
-  color: var(--white);
+  background: rgba(255, 255, 255, 0.2);
+  color: var(--sidebar-text-active);
 }
 
 .sidebar-footer {
@@ -454,6 +482,7 @@ h4 { font-size: 17px; }
   overflow: hidden;
 }
 
+/* User card */
 .user-card {
   display: flex;
   align-items: center;
@@ -461,23 +490,25 @@ h4 { font-size: 17px; }
   padding: 10px 12px;
   border-radius: 10px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
 }
 
 .user-card:hover {
-  background: rgba(195, 186, 175, 0.2);
+  background: var(--sidebar-bg-hover);
 }
 
+/* User avatar: gradient circle */
 .user-avatar {
-  width: 36px;
-  height: 36px;
-  background: linear-gradient(135deg, var(--blush) 0%, var(--blush-dark) 100%);
+  width: 34px;
+  height: 34px;
+  background: linear-gradient(135deg, var(--stone-dark) 0%, var(--blush-dark) 100%);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
-  font-weight: 600;
+  font-family: 'Quattrocento Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
   color: var(--brown-dark);
 }
 
@@ -486,12 +517,14 @@ h4 { font-size: 17px; }
 }
 
 .user-name {
+  font-family: 'Quattrocento Sans', sans-serif;
   font-size: 13px;
   font-weight: 600;
   color: var(--brown);
 }
 
 .user-role {
+  font-family: 'Quattrocento Sans', sans-serif;
   font-size: 11px;
   color: var(--brown-light);
 }
@@ -1488,13 +1521,12 @@ tbody tr:last-child td {
 }
 
 .sidebar.collapsed .nav-item:hover {
-  background: rgba(122, 139, 110, 0.15);
+  background: var(--sidebar-bg-hover);
 }
 
 .sidebar.collapsed .nav-item.active {
-  background: var(--accent-olive);
-  color: var(--white);
-  box-shadow: 0 2px 8px rgba(122, 139, 110, 0.35);
+  background: var(--sidebar-bg-active);
+  color: var(--sidebar-text-active);
 }
 
 .sidebar.collapsed .nav-item span:not(.nav-tooltip) {
@@ -1674,36 +1706,35 @@ tbody tr:last-child td {
 
 /* Nav item highlight (Workspace) - expanded mode */
 .nav-item.nav-item-highlight {
-  background: rgba(122, 139, 110, 0.1);
+  background: var(--sidebar-bg-hover);
   border-left: 3px solid var(--accent-olive);
 }
 
 .nav-item.nav-item-highlight:hover {
-  background: rgba(122, 139, 110, 0.2);
+  background: rgba(122, 139, 110, 0.18);
 }
 
 .nav-item.nav-item-highlight.active {
-  background: var(--accent-olive-dark);
-  color: var(--white);
-  border-left: 3px solid var(--accent-olive-dark);
-  box-shadow: 0 2px 8px rgba(107, 122, 95, 0.35);
+  background: var(--sidebar-bg-active);
+  color: var(--sidebar-text-active);
+  border-left: 3px solid var(--sidebar-bg-active);
 }
 
 /* Nav item highlight (Workspace) - collapsed mode */
 .sidebar.collapsed .nav-item.nav-item-highlight {
   border-left: none;
-  background: rgba(139, 155, 123, 0.15);
+  background: var(--sidebar-bg-hover);
   box-shadow: inset 0 0 0 2px var(--accent-olive);
 }
 
 .sidebar.collapsed .nav-item.nav-item-highlight:hover {
-  background: rgba(139, 155, 123, 0.25);
+  background: rgba(122, 139, 110, 0.22);
 }
 
 .sidebar.collapsed .nav-item.nav-item-highlight.active {
-  background: var(--accent-olive);
-  color: var(--white);
-  box-shadow: 0 4px 12px rgba(163, 177, 138, 0.4);
+  background: var(--sidebar-bg-active);
+  color: var(--sidebar-text-active);
+  box-shadow: none;
 }
 
 /* Sidebar collapse button hover */
@@ -3921,7 +3952,7 @@ tbody tr:last-child td {
    ======================================== */
 
 [data-theme="dark"] .sidebar {
-  background: var(--cream);
+  background: var(--sidebar-bg);
   border-right-color: var(--stone);
 }
 
@@ -3981,7 +4012,7 @@ tbody tr:last-child td {
 
   /* Reduce sidebar width for tablets */
   .sidebar:not(.collapsed) {
-    width: 220px;
+    width: 210px;
   }
 
   .main-content {
