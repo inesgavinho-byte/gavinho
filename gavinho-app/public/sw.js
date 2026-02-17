@@ -2,7 +2,7 @@
 // Service Worker — GAVINHO Platform + Obras PWA
 // Handles: caching, offline, push notifications
 // =====================================================
-const CACHE_NAME = 'gavinho-v3';
+const CACHE_NAME = 'gavinho-v4';
 
 // Precache app shell
 const PRECACHE_URLS = [
