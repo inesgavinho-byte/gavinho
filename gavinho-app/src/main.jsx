@@ -16,8 +16,26 @@ if ('serviceWorker' in navigator) {
     }
     navigator.serviceWorker.register('/sw.js')
       .then((reg) => {
-        // Check for updates every 60 minutes
-        setInterval(() => reg.update(), 60 * 60 * 1000)
+        // Force check for update immediately, then every 30 minutes
+        reg.update()
+        setInterval(() => reg.update(), 30 * 60 * 1000)
+
+        // When a new SW is found, tell it to skip waiting and take over
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing
+          if (newWorker) {
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'activated') {
+                window.location.reload()
+              }
+            })
+          }
+        })
+
+        // If there's already a waiting worker, activate it
+        if (reg.waiting) {
+          reg.waiting.postMessage({ type: 'SKIP_WAITING' })
+        }
       })
       .catch((err) => console.warn('[PWA] SW registration failed:', err))
   })
