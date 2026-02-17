@@ -304,6 +304,53 @@ export default function DiarioObra() {
     fetchEntries()
   }
 
+  const handleUpdateActivity = async (entryId, ativIdx, updatedAtiv) => {
+    const entry = entries.find(e => e.id === entryId)
+    if (!entry) return
+    const newAtividades = [...(entry.atividades || [])]
+    newAtividades[ativIdx] = { ...newAtividades[ativIdx], ...updatedAtiv }
+    // Also sync tarefas for backward compat
+    const tarefasFromAtiv = newAtividades.map(a => ({
+      id: Date.now() + Math.random(),
+      titulo: `[${a.especialidade_nome || 'Geral'}]${a.zona ? ' ' + a.zona + ' —' : ''} ${a.descricao}`,
+      concluida: false,
+      _especialidade: a.especialidade_nome,
+      _zona: a.zona,
+      _fotos: a.fotos,
+      _alerta: a.alerta,
+      _nota: a.nota
+    }))
+    const { error } = await supabase.from('obra_diario').update({
+      atividades: newAtividades,
+      tarefas: tarefasFromAtiv,
+      updated_at: new Date().toISOString()
+    }).eq('id', entryId)
+    if (!error) fetchEntries()
+  }
+
+  const handleDeleteActivity = async (entryId, ativIdx) => {
+    if (!window.confirm('Apagar esta atividade?')) return
+    const entry = entries.find(e => e.id === entryId)
+    if (!entry) return
+    const newAtividades = (entry.atividades || []).filter((_, i) => i !== ativIdx)
+    const tarefasFromAtiv = newAtividades.map(a => ({
+      id: Date.now() + Math.random(),
+      titulo: `[${a.especialidade_nome || 'Geral'}]${a.zona ? ' ' + a.zona + ' —' : ''} ${a.descricao}`,
+      concluida: false,
+      _especialidade: a.especialidade_nome,
+      _zona: a.zona,
+      _fotos: a.fotos,
+      _alerta: a.alerta,
+      _nota: a.nota
+    }))
+    const { error } = await supabase.from('obra_diario').update({
+      atividades: newAtividades,
+      tarefas: tarefasFromAtiv,
+      updated_at: new Date().toISOString()
+    }).eq('id', entryId)
+    if (!error) fetchEntries()
+  }
+
   // =====================================================
   // LOADING / SELECTION
   // =====================================================
@@ -433,6 +480,10 @@ export default function DiarioObra() {
               entries={entries}
               onEdit={handleEditEntry}
               onDelete={handleDeleteEntry}
+              onUpdateActivity={handleUpdateActivity}
+              onDeleteActivity={handleDeleteActivity}
+              especialidades={especialidades}
+              zonas={zonas}
             />
           )}
           {activeTab === 'resumo' && (
@@ -483,7 +534,7 @@ export default function DiarioObra() {
 // DIARIO TIMELINE (Phase 1 + Phase 3)
 // =====================================================
 
-function DiarioTimeline({ entries, onEdit, onDelete }) {
+function DiarioTimeline({ entries, onEdit, onDelete, onUpdateActivity, onDeleteActivity, especialidades, zonas }) {
   if (entries.length === 0) {
     return (
       <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--brown-light)' }}>
@@ -497,13 +548,22 @@ function DiarioTimeline({ entries, onEdit, onDelete }) {
   return (
     <div>
       {entries.map(entry => (
-        <DayEntry key={entry.id} entry={entry} onEdit={onEdit} onDelete={onDelete} />
+        <DayEntry
+          key={entry.id}
+          entry={entry}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onUpdateActivity={onUpdateActivity}
+          onDeleteActivity={onDeleteActivity}
+          especialidades={especialidades}
+          zonas={zonas}
+        />
       ))}
     </div>
   )
 }
 
-function DayEntry({ entry, onEdit, onDelete }) {
+function DayEntry({ entry, onEdit, onDelete, onUpdateActivity, onDeleteActivity, especialidades, zonas }) {
   const weather = WEATHER_OPTIONS.find(w => w.id === (entry.condicoes_meteo || '').toLowerCase())
   const WeatherIcon = weather?.icon || Sun
 
@@ -600,7 +660,15 @@ function DayEntry({ entry, onEdit, onDelete }) {
       {/* Activities */}
       <div style={{ padding: '0 24px' }}>
         {displayAtividades.map((ativ, idx) => (
-          <ActivityEntry key={idx} atividade={ativ} isLast={idx === displayAtividades.length - 1} />
+          <ActivityEntry
+            key={idx}
+            atividade={ativ}
+            isLast={idx === displayAtividades.length - 1}
+            onUpdate={(updated) => onUpdateActivity(entry.id, idx, updated)}
+            onDelete={() => onDeleteActivity(entry.id, idx)}
+            especialidades={especialidades}
+            zonas={zonas}
+          />
         ))}
 
         {/* Occurrences as inline alerts */}
@@ -643,18 +711,105 @@ function DayEntry({ entry, onEdit, onDelete }) {
 // ACTIVITY ENTRY (Per specialty, Phase 1 + Phase 3)
 // =====================================================
 
-function ActivityEntry({ atividade, isLast }) {
+function ActivityEntry({ atividade, isLast, onUpdate, onDelete, especialidades, zonas }) {
+  const [editing, setEditing] = useState(false)
+  const [editData, setEditData] = useState({})
+  const [saving, setSaving] = useState(false)
+
   const color = getEspecialidadeColor(atividade.especialidade_nome)
   const fotos = atividade.fotos || []
   const maxThumbs = 3
   const extraPhotos = fotos.length > maxThumbs ? fotos.length - maxThumbs : 0
+
+  const startEdit = () => {
+    setEditData({
+      especialidade_nome: atividade.especialidade_nome || '',
+      zona: atividade.zona || '',
+      descricao: atividade.descricao || '',
+      nota: atividade.nota || ''
+    })
+    setEditing(true)
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editData.descricao) return
+    setSaving(true)
+    await onUpdate(editData)
+    setSaving(false)
+    setEditing(false)
+  }
+
+  if (editing) {
+    return (
+      <div style={{
+        padding: '16px 0',
+        borderBottom: isLast ? 'none' : '1px solid var(--stone)'
+      }}>
+        <div style={{ padding: 16, background: 'var(--cream)', borderRadius: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <div>
+              <FieldLabel small>Especialidade</FieldLabel>
+              <select
+                value={editData.especialidade_nome}
+                onChange={e => setEditData({ ...editData, especialidade_nome: e.target.value })}
+                className="select"
+                style={{ width: '100%' }}
+              >
+                <option value="">Selecionar...</option>
+                {(especialidades || []).map(esp => <option key={esp.id} value={esp.nome}>{esp.nome}</option>)}
+              </select>
+            </div>
+            <div>
+              <FieldLabel small>Zona / Localização</FieldLabel>
+              <select
+                value={editData.zona}
+                onChange={e => setEditData({ ...editData, zona: e.target.value })}
+                className="select"
+                style={{ width: '100%' }}
+              >
+                <option value="">Selecionar...</option>
+                {(zonas || []).map(z => <option key={z.id} value={`${z.piso || ''} ${z.piso ? '·' : ''} ${z.nome}`.trim()}>{z.piso ? `${z.piso} · ` : ''}{z.nome}</option>)}
+                <option value="__custom">Outro (escrever)...</option>
+              </select>
+            </div>
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <FieldLabel small>Descrição</FieldLabel>
+            <textarea
+              value={editData.descricao}
+              onChange={e => setEditData({ ...editData, descricao: e.target.value })}
+              className="textarea"
+              rows={3}
+            />
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <FieldLabel small>Nota (opcional)</FieldLabel>
+            <input
+              type="text"
+              value={editData.nota}
+              onChange={e => setEditData({ ...editData, nota: e.target.value })}
+              className="input"
+              placeholder="Ex: Amostra aprovada pelo cliente"
+            />
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={handleSaveEdit} disabled={saving} className="btn btn-primary" style={{ gap: 6, fontSize: 13 }}>
+              {saving ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={14} />}
+              Guardar
+            </button>
+            <button onClick={() => setEditing(false)} className="btn btn-ghost" style={{ fontSize: 13 }}>Cancelar</button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div style={{
       padding: '16px 0',
       borderBottom: isLast ? 'none' : '1px solid var(--stone)'
     }}>
-      {/* Specialty Tag + Location */}
+      {/* Specialty Tag + Location + Action Buttons */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
         <span style={{
           padding: '3px 10px',
@@ -673,6 +828,28 @@ function ActivityEntry({ atividade, isLast }) {
             {atividade.zona}
           </span>
         )}
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
+          <button
+            onClick={startEdit}
+            title="Editar atividade"
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 4,
+              color: 'var(--brown-light)', display: 'flex', alignItems: 'center'
+            }}
+          >
+            <Edit2 size={13} />
+          </button>
+          <button
+            onClick={onDelete}
+            title="Apagar atividade"
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 4,
+              color: 'var(--brown-light)', display: 'flex', alignItems: 'center'
+            }}
+          >
+            <Trash2 size={13} />
+          </button>
+        </div>
       </div>
 
       {/* Description */}
