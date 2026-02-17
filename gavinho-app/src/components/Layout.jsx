@@ -61,7 +61,6 @@ export default function Layout() {
         isMobile={isMobile}
         collapsed={sidebarCollapsed && !isMobile}
         onToggleCollapse={toggleCollapsed}
-        isWorkspace={isWorkspace}
       />
       <main className={`main-content ${isWorkspace ? 'workspace-mode' : ''}`}>
         <Outlet />

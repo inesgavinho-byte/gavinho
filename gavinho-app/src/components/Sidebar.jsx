@@ -1,141 +1,62 @@
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import ThemeToggle from './ui/ThemeToggle'
-import { NotificationBell } from './ui/NotificationPanel'
-import { useInstallPrompt } from '../hooks/useInstallPrompt'
 import {
   LayoutDashboard,
   FolderKanban,
   Users,
   HardHat,
-  Calendar,
   Truck,
   Settings,
   LogOut,
   ChevronDown,
-  ChevronRight,
-  ChevronLeft,
   User,
   UsersRound,
-  Receipt,
-  ShoppingCart,
-  PieChart,
-  Wallet,
   Library,
-  Database,
-  Shield,
   FileSearch,
-  Mail,
-  MessageSquare,
-  Eye,
-  EyeOff,
-  Check,
-  Handshake,
-  ClipboardList,
-  FileCheck,
-  Layers,
-  TrendingUp,
-  CreditCard,
   FileText,
-  Building2,
-  MessagesSquare,
-  Download
+  Sparkles,
+  PanelLeftClose,
+  PanelLeftOpen
 } from 'lucide-react'
 import { useState } from 'react'
-
-// Calendário global - visível para todos, fora dos módulos
-const globalItems = [
-  { name: 'Calendário', href: '/calendario', icon: Calendar }
-]
 
 const navigation = [
   {
     section: 'Projetos',
     items: [
-      { name: 'Dashboard Projetos', href: '/dashboard-projetos', icon: LayoutDashboard },
-      { name: 'Projetos', href: '/projetos', icon: FolderKanban },
-      { name: 'Teams', href: '/chat', icon: MessagesSquare },
+      { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+      { name: 'Projetos', href: '/projetos', icon: FolderKanban, badge: 14 },
+      { name: 'Clientes', href: '/clientes', icon: Users, badge: 2 },
       { name: 'Biblioteca', href: '/biblioteca', icon: Library },
     ]
   },
   {
     section: 'Obras',
     items: [
-      { name: 'Dashboard Obras', href: '/obras', icon: HardHat },
-      { name: 'Obras', href: '/obras-lista', icon: Building2 },
-      { name: 'Chat', href: '/obras-chat', icon: MessageSquare },
-      { name: 'Equipa & SubEmpreiteiros', href: '/gestao-obras', icon: UsersRound },
-    ]
-  },
-  {
-    section: 'Gestão Projeto',
-    adminOnly: true,
-    items: [
-      { name: 'Clientes', href: '/clientes', icon: Users },
-      { name: 'Viabilidade', href: '/viabilidade', icon: FileSearch },
-      { name: 'Leads', href: '/leads', icon: TrendingUp },
-      {
-        name: 'Projetos em Curso',
-        href: '/gestao-projeto/em-curso',
-        icon: FolderKanban,
-        subItems: [
-          { name: 'Procurement', href: '/gestao-projeto/em-curso/procurement', icon: Handshake },
-          { name: 'Compras', href: '/gestao-projeto/em-curso/compras', icon: ShoppingCart },
-          { name: 'Controlo Executado', href: '/gestao-projeto/em-curso/controlo', icon: PieChart },
-          { name: 'Autos Projeto', href: '/gestao-projeto/em-curso/autos', icon: FileCheck },
-        ]
-      },
-      {
-        name: 'Projetos Concluídos',
-        href: '/gestao-projeto/concluidos',
-        icon: ClipboardList,
-        subItems: [
-          { name: 'Procurement', href: '/gestao-projeto/concluidos/procurement', icon: Handshake },
-          { name: 'Compras', href: '/gestao-projeto/concluidos/compras', icon: ShoppingCart },
-          { name: 'Controlo Executado', href: '/gestao-projeto/concluidos/controlo', icon: PieChart },
-          { name: 'Autos Obra', href: '/gestao-projeto/concluidos/autos', icon: FileCheck },
-        ]
-      },
-      { name: 'Gestão Integrada', href: '/gestao-projeto/integrada', icon: Layers },
+      { name: 'Obras', href: '/obras', icon: HardHat, badge: 3 },
       { name: 'Fornecedores', href: '/fornecedores', icon: Truck },
     ]
   },
   {
-    section: 'Financeiro',
-    adminOnly: true,
+    section: 'Equipa',
     items: [
-      { name: 'Custos Fixos', href: '/financeiro/custos-fixos', icon: CreditCard },
-      { name: 'Faturação', href: '/financeiro/faturacao', icon: FileText },
-      { name: 'Compras', href: '/financeiro/compras', icon: ShoppingCart },
+      { name: 'Equipa & Tarefas', href: '/equipa', icon: UsersRound, badge: 8 },
     ]
   },
   {
-    section: 'Administrativo',
-    adminOnly: true,
+    section: 'Ferramentas',
     items: [
-      { name: 'Emails', href: '/emails', icon: Mail },
-      { name: 'Recursos Humanos', href: '/equipa', icon: UsersRound },
-      { name: 'Seed de Dados', href: '/admin/seed', icon: Database },
-      { name: 'Configurações', href: '/configuracoes', icon: Settings },
+      { name: 'Viabilidade', href: '/viabilidade', icon: FileSearch },
+      { name: 'Documentos', href: '/biblioteca', icon: FileText },
     ]
   }
 ]
 
-export default function Sidebar({ isOpen, onClose, isMobile, collapsed, onToggleCollapse, isWorkspace }) {
-  const { user, signOut, getUserName, getUserInitials, getUserAvatar, isAdmin } = useAuth()
+export default function Sidebar({ isOpen, onClose, isMobile, collapsed, onToggleCollapse }) {
+  const { user, signOut, getUserName, getUserInitials, getUserAvatar } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [showUserMenu, setShowUserMenu] = useState(false)
-  const [expandedItems, setExpandedItems] = useState({})
-  const [viewAsRole, setViewAsRole] = useState(null) // null = normal, 'user' = ver como utilizador normal
-  const [showViewAsMenu, setShowViewAsMenu] = useState(false)
-  const { canInstall, install } = useInstallPrompt()
-
-  // Verificar se deve mostrar como admin (real ou simulado)
-  const shouldShowAsAdmin = () => {
-    if (viewAsRole === 'user') return false
-    return isAdmin()
-  }
 
   const handleLogout = async () => {
     try {
@@ -146,7 +67,6 @@ export default function Sidebar({ isOpen, onClose, isMobile, collapsed, onToggle
     }
   }
 
-  // Get user role from email domain or metadata
   const getUserRole = () => {
     if (!user) return 'Utilizador'
     const email = user.email || ''
@@ -161,24 +81,7 @@ export default function Sidebar({ isOpen, onClose, isMobile, collapsed, onToggle
     }
   }
 
-  const toggleExpanded = (itemName) => {
-    setExpandedItems(prev => ({
-      ...prev,
-      [itemName]: !prev[itemName]
-    }))
-  }
-
-  const isItemActive = (item) => {
-    const basePath = item.href.split('?')[0]
-    return location.pathname === basePath || location.pathname.startsWith(basePath + '/')
-  }
-
   const renderNavItem = (item) => {
-    const hasSubItems = item.subItems && item.subItems.length > 0
-    const isExpanded = expandedItems[item.name]
-    const isActive = isItemActive(item)
-
-    // Collapsed mode - show only icons with custom tooltip
     if (collapsed) {
       return (
         <NavLink
@@ -187,53 +90,12 @@ export default function Sidebar({ isOpen, onClose, isMobile, collapsed, onToggle
           end={item.href === '/'}
           onClick={handleNavClick}
           className={({ isActive }) =>
-            `nav-item nav-item-collapsed ${isActive ? 'active' : ''} ${item.highlight ? 'nav-item-highlight' : ''}`
+            `nav-item nav-item-collapsed ${isActive ? 'active' : ''}`
           }
         >
           <item.icon size={18} />
           <span className="nav-tooltip">{item.name}</span>
         </NavLink>
-      )
-    }
-
-    if (hasSubItems) {
-      return (
-        <div key={item.name}>
-          <div
-            onClick={() => toggleExpanded(item.name)}
-            className={`nav-item ${isActive ? 'active' : ''}`}
-            style={{ cursor: 'pointer' }}
-          >
-            <item.icon size={18} />
-            <span style={{ flex: 1 }}>{item.name}</span>
-            <ChevronRight
-              size={16}
-              style={{
-                transition: 'transform 0.2s',
-                transform: isExpanded ? 'rotate(90deg)' : 'rotate(0)'
-              }}
-            />
-          </div>
-          {isExpanded && (
-            <div style={{ marginLeft: '12px', borderLeft: '1px solid var(--sidebar-border)', marginTop: '4px' }}>
-              {item.subItems.map(subItem => (
-                <NavLink
-                  key={subItem.name}
-                  to={subItem.href}
-                  onClick={handleNavClick}
-                  className="nav-item nav-subitem"
-                  style={{
-                    paddingLeft: '20px',
-                    fontSize: '13px'
-                  }}
-                >
-                  <subItem.icon size={16} />
-                  <span style={{ flex: 1 }}>{subItem.name}</span>
-                </NavLink>
-              ))}
-            </div>
-          )}
-        </div>
       )
     }
 
@@ -244,7 +106,7 @@ export default function Sidebar({ isOpen, onClose, isMobile, collapsed, onToggle
         end={item.href === '/'}
         onClick={handleNavClick}
         className={({ isActive }) =>
-          `nav-item ${isActive ? 'active' : ''} ${item.highlight ? 'nav-item-highlight' : ''}`
+          `nav-item ${isActive ? 'active' : ''}`
         }
       >
         <item.icon size={18} />
@@ -258,71 +120,42 @@ export default function Sidebar({ isOpen, onClose, isMobile, collapsed, onToggle
 
   return (
     <aside className={`sidebar ${isOpen ? 'open' : ''} ${collapsed ? 'collapsed' : ''}`}>
-      {/* Logo */}
-      <div className="sidebar-header" style={collapsed ? { justifyContent: 'center', padding: '16px 8px' } : {}}>
-        <NavLink to="/" className="sidebar-logo" onClick={handleNavClick} style={collapsed ? { gap: 0 } : {}}>
+      {/* Header: Logo + Toggle */}
+      <div className="sidebar-header">
+        <NavLink to="/" className="sidebar-logo" onClick={handleNavClick}>
           <div className="logo-mark">G</div>
           {!collapsed && <span className="logo-text">GAVINHO</span>}
         </NavLink>
-        {!collapsed && (
-          <div style={{ marginLeft: 'auto' }}>
-            <NotificationBell collapsed={false} />
-          </div>
+        {!isMobile && (
+          <button
+            onClick={onToggleCollapse}
+            className="sidebar-toggle-btn"
+            title={collapsed ? 'Expandir sidebar' : 'Colapsar sidebar'}
+          >
+            {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+          </button>
         )}
       </div>
 
-      {/* Notification Bell - Collapsed Mode */}
-      {collapsed && (
-        <div style={{
-          display: 'flex',
-          justifyContent: 'center',
-          padding: '8px',
-          borderBottom: '1px solid var(--sidebar-border)'
-        }}>
-          <NotificationBell collapsed={true} />
-        </div>
-      )}
-
-      {/* Collapse Toggle Button */}
-      {!isMobile && (
-        <button
-          onClick={onToggleCollapse}
-          className="sidebar-collapse-btn"
-          title={collapsed ? 'Expandir sidebar' : 'Colapsar sidebar'}
-          style={{
-            position: 'absolute',
-            top: collapsed ? '72px' : '28px',
-            right: collapsed ? '50%' : '-14px',
-            transform: collapsed ? 'translateX(50%)' : 'none',
-            width: '28px',
-            height: '28px',
-            borderRadius: '50%',
-            background: '#2C2C2B',
-            border: '2px solid rgba(250, 250, 248, 0.72)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'white',
-            zIndex: 10,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-            transition: 'all 0.25s ease'
-          }}
-        >
-          {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
-        </button>
-      )}
+      {/* G.A.R.V.I.S. AI Assistant */}
+      <NavLink
+        to="/workspace"
+        onClick={handleNavClick}
+        className={`garvis-block ${collapsed ? 'garvis-collapsed' : ''} ${location.pathname === '/workspace' ? 'active' : ''}`}
+      >
+        <Sparkles size={collapsed ? 18 : 16} />
+        {!collapsed && (
+          <div className="garvis-text">
+            <span className="garvis-title">G.A.R.V.I.S.</span>
+            <span className="garvis-subtitle">Assistente IA</span>
+          </div>
+        )}
+        {collapsed && <span className="nav-tooltip">G.A.R.V.I.S.</span>}
+      </NavLink>
 
       {/* Navigation */}
       <nav className="sidebar-nav">
-        {/* Calendário global - sempre visível */}
-        <div className="nav-section">
-          {globalItems.map((item) => renderNavItem(item))}
-        </div>
-
-        {navigation
-          .filter(group => !group.adminOnly || shouldShowAsAdmin())
-          .map((group, index) => (
+        {navigation.map((group) => (
           <div key={group.section} className="nav-section">
             {!collapsed && <div className="nav-section-title">{group.section}</div>}
             {collapsed && <div className="nav-section-divider" />}
@@ -332,186 +165,34 @@ export default function Sidebar({ isOpen, onClose, isMobile, collapsed, onToggle
       </nav>
 
       {/* Footer */}
-      <div className="sidebar-footer" style={collapsed ? { padding: '12px 8px' } : {}}>
-        {/* Install App */}
-        {canInstall && (
-          <button
-            onClick={install}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: collapsed ? 0 : '8px',
-              justifyContent: collapsed ? 'center' : 'flex-start',
-              width: '100%',
-              padding: collapsed ? '8px' : '8px 12px',
-              marginBottom: collapsed ? '8px' : '10px',
-              background: 'linear-gradient(135deg, var(--accent-olive), var(--accent-olive-dark, #5a7a4e))',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '12px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              transition: 'opacity 0.2s'
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
-            onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
-            title="Instalar como app"
-          >
-            <Download size={collapsed ? 16 : 14} />
-            {!collapsed && 'Instalar App'}
-          </button>
-        )}
+      <div className="sidebar-footer">
+        {/* Definições */}
+        <NavLink
+          to="/configuracoes"
+          onClick={handleNavClick}
+          className={({ isActive }) =>
+            `nav-item sidebar-settings ${isActive ? 'active' : ''} ${collapsed ? 'nav-item-collapsed' : ''}`
+          }
+        >
+          <Settings size={18} />
+          {!collapsed && <span>Definições</span>}
+          {collapsed && <span className="nav-tooltip">Definições</span>}
+        </NavLink>
 
-        {/* Theme Toggle */}
-        <div style={{
-          marginBottom: collapsed ? '8px' : '12px',
-          display: 'flex',
-          justifyContent: collapsed ? 'center' : 'flex-start',
-          alignItems: 'center',
-          gap: '8px'
-        }}>
-          <ThemeToggle size={collapsed ? 'sm' : 'md'} />
-          {!collapsed && (
-            <span style={{ fontSize: '12px', color: 'var(--sidebar-item-color)', fontWeight: 400 }}>
-              Tema
-            </span>
-          )}
-        </div>
-
-        {/* View As indicator - collapsed mode */}
-        {isAdmin() && collapsed && (
-          <div
-            className="view-as-indicator"
-            onClick={() => setViewAsRole(viewAsRole ? null : 'user')}
-            style={{
-              background: viewAsRole ? 'rgba(239, 68, 68, 0.15)' : 'var(--cream)',
-              border: viewAsRole ? '2px solid rgba(239, 68, 68, 0.4)' : '1px solid var(--stone)',
-              color: viewAsRole ? '#dc2626' : 'var(--brown-light)'
-            }}
-            title={viewAsRole ? 'A ver como: Utilizador - Clique para voltar ao normal' : 'Visualizar como utilizador normal'}
-          >
-            {viewAsRole ? <EyeOff size={16} /> : <Eye size={16} />}
-            <div className="user-tooltip" style={{ minWidth: '160px' }}>
-              <div className="tooltip-name">{viewAsRole ? 'Modo: Utilizador' : 'Visualizar como...'}</div>
-              <div className="tooltip-role">{viewAsRole ? 'Clique para voltar ao normal' : 'Clique para simular utilizador'}</div>
-            </div>
-          </div>
-        )}
-
-        {/* View As - apenas para admins reais */}
-        {isAdmin() && !collapsed && (
-          <div style={{ marginBottom: '12px', position: 'relative' }}>
-            <button
-              onClick={() => setShowViewAsMenu(!showViewAsMenu)}
-              style={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '8px',
-                padding: '10px 12px',
-                background: viewAsRole ? 'rgba(239, 68, 68, 0.1)' : 'var(--cream)',
-                border: viewAsRole ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid var(--stone)',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontSize: '12px',
-                color: viewAsRole ? '#dc2626' : 'var(--brown)',
-                fontWeight: 500
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                {viewAsRole ? <EyeOff size={14} /> : <Eye size={14} />}
-                <span>{viewAsRole ? 'A ver como: Utilizador' : 'Visualizar como...'}</span>
-              </div>
-              <ChevronDown size={14} style={{ transform: showViewAsMenu ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
-            </button>
-
-            {showViewAsMenu && (
-              <div style={{
-                position: 'absolute',
-                bottom: '100%',
-                left: 0,
-                minWidth: '220px',
-                marginBottom: '4px',
-                background: 'var(--white)',
-                borderRadius: '8px',
-                boxShadow: 'var(--shadow-lg)',
-                overflow: 'hidden',
-                zIndex: 1000
-              }}>
-                <div style={{ padding: '8px 12px', fontSize: '11px', color: 'var(--brown-light)', borderBottom: '1px solid var(--stone)' }}>
-                  Visualizar plataforma como:
-                </div>
-                <button
-                  onClick={() => { setViewAsRole(null); setShowViewAsMenu(false); }}
-                  style={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '10px 12px',
-                    background: !viewAsRole ? 'var(--cream)' : 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontSize: '13px',
-                    color: 'var(--brown)',
-                    textAlign: 'left'
-                  }}
-                >
-                  <Shield size={14} />
-                  Administrador (normal)
-                  {!viewAsRole && <Check size={14} style={{ marginLeft: 'auto', color: 'var(--success)' }} />}
-                </button>
-                <button
-                  onClick={() => { setViewAsRole('user'); setShowViewAsMenu(false); }}
-                  style={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '10px 12px',
-                    background: viewAsRole === 'user' ? 'var(--cream)' : 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontSize: '13px',
-                    color: 'var(--brown)',
-                    textAlign: 'left'
-                  }}
-                >
-                  <User size={14} />
-                  Utilizador normal
-                  {viewAsRole === 'user' && <Check size={14} style={{ marginLeft: 'auto', color: 'var(--success)' }} />}
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* User Card with Dropdown */}
+        {/* User Card */}
         <div style={{ position: 'relative' }}>
           <div
             className={`user-card ${collapsed ? 'user-card-collapsed' : ''}`}
             onClick={() => setShowUserMenu(!showUserMenu)}
-            style={collapsed ? {
-              cursor: 'pointer',
-              justifyContent: 'center',
-              padding: '8px'
-            } : { cursor: 'pointer' }}
           >
             {getUserAvatar() ? (
               <img
                 src={getUserAvatar()}
                 alt={getUserName()}
-                style={{
-                  width: collapsed ? '32px' : '36px',
-                  height: collapsed ? '32px' : '36px',
-                  borderRadius: '50%',
-                  objectFit: 'cover'
-                }}
+                className="user-avatar-img"
               />
             ) : (
-              <div className="user-avatar" style={collapsed ? { width: '32px', height: '32px', fontSize: '11px' } : {}}>
+              <div className="user-avatar">
                 {getUserInitials()}
               </div>
             )}
@@ -524,7 +205,7 @@ export default function Sidebar({ isOpen, onClose, isMobile, collapsed, onToggle
                 <ChevronDown
                   size={16}
                   style={{
-                    color: 'var(--brown-light)',
+                    color: 'var(--sidebar-item-color)',
                     transform: showUserMenu ? 'rotate(180deg)' : 'rotate(0)',
                     transition: 'transform 0.2s'
                   }}
@@ -541,73 +222,21 @@ export default function Sidebar({ isOpen, onClose, isMobile, collapsed, onToggle
 
           {/* User Menu Dropdown */}
           {showUserMenu && (
-            <div
-              style={{
-                position: 'absolute',
-                bottom: '100%',
-                left: collapsed ? '0' : '0',
-                right: collapsed ? 'auto' : '0',
-                minWidth: '220px',
-                marginBottom: '8px',
-                background: 'var(--white)',
-                borderRadius: '12px',
-                boxShadow: 'var(--shadow-lg)',
-                zIndex: 1000
-              }}
-            >
-              <div
-                style={{
-                  padding: '12px 16px',
-                  borderBottom: '1px solid var(--stone)',
-                  fontSize: '12px',
-                  color: 'var(--brown-light)',
-                  borderRadius: '12px 12px 0 0',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap'
-                }}
-              >
+            <div className="user-menu-dropdown">
+              <div className="user-menu-email">
                 {user?.email}
               </div>
               <NavLink
                 to="/perfil"
                 onClick={() => { setShowUserMenu(false); handleNavClick(); }}
-                style={{
-                  width: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  padding: '12px 16px',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--brown)',
-                  fontSize: '13px',
-                  fontWeight: 500,
-                  textDecoration: 'none'
-                }}
+                className="user-menu-item"
               >
                 <User size={16} />
                 O Meu Perfil
               </NavLink>
               <button
                 onClick={handleLogout}
-                style={{
-                  width: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  padding: '12px 16px',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--error)',
-                  fontSize: '13px',
-                  fontWeight: 500,
-                  transition: 'background 0.2s'
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.background = 'var(--cream)'}
-                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                className="user-menu-item user-menu-logout"
               >
                 <LogOut size={16} />
                 Terminar Sessão
