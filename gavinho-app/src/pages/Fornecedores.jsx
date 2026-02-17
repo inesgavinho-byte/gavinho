@@ -20,16 +20,42 @@ import { getTopRecommendations } from '../services/garvisMatching'
 import {
   Plus, Search, Edit2, Trash2, Phone, Mail,
   Star, X, Loader2, Upload, Download,
-  AlertTriangle, TrendingUp, Users
+  AlertTriangle, TrendingUp, Users, Sparkles
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 
-const STATUS_FORNECEDOR = {
-  ativo: { label: 'Ativo', color: '#16a34a', bg: '#dcfce7' },
-  preferencial: { label: 'Preferencial', color: '#2563eb', bg: '#dbeafe' },
-  inativo: { label: 'Inativo', color: '#78716c', bg: '#f5f5f4' },
-  bloqueado: { label: 'Bloqueado', color: '#dc2626', bg: '#fee2e2' }
+const FONTS = {
+  heading: "'Cormorant Garamond', Georgia, serif",
+  body: "'Quattrocento Sans', -apple-system, BlinkMacSystemFont, sans-serif",
+  mono: "'SF Mono', 'Fira Code', 'Consolas', monospace",
 }
+
+const C = {
+  success: '#5B7B6A',
+  warning: '#C4956A',
+  danger: '#A65D57',
+  info: '#7A8B9E',
+  dark: '#2C2C2B',
+  muted: '#9A978A',
+  light: '#6B6B6B',
+  border: '#E5E2D9',
+  cream: '#F5F3EB',
+  white: '#FFFFFF',
+}
+
+const STATUS_FORNECEDOR = {
+  ativo: { label: 'Ativo', color: C.success, bg: 'rgba(91,123,106,0.10)' },
+  preferencial: { label: 'Preferencial', color: C.info, bg: 'rgba(122,139,158,0.10)' },
+  inativo: { label: 'Inativo', color: C.muted, bg: 'rgba(154,151,138,0.10)' },
+  bloqueado: { label: 'Bloqueado', color: C.danger, bg: 'rgba(166,93,87,0.10)' }
+}
+
+const statusTabs = [
+  { key: '', label: 'Todos' },
+  { key: 'ativo', label: 'Ativos' },
+  { key: 'preferencial', label: 'Preferenciais' },
+  { key: 'inativo', label: 'Inativos' },
+]
 
 
 export default function Fornecedores() {
@@ -57,7 +83,7 @@ export default function Fornecedores() {
   const [filtroStatus, setFiltroStatus] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [editingFornecedor, setEditingFornecedor] = useState(null)
-  const [showGarvis, setShowGarvis] = useState(true)
+  const [showGarvis, setShowGarvis] = useState(false)
   const [dismissedAlert, setDismissedAlert] = useState(false)
 
   // Deal Room Modal state
@@ -196,15 +222,8 @@ export default function Fornecedores() {
   }
 
   // Deal Room handlers
-  const handleCreateDealRoom = () => {
-    setSelectedDealRoom(null)
-    setShowDealRoomModal(true)
-  }
-
-  const handleOpenDealRoom = (dr) => {
-    setSelectedDealRoom(dr)
-    setShowDealRoomModal(true)
-  }
+  const handleCreateDealRoom = () => { setSelectedDealRoom(null); setShowDealRoomModal(true) }
+  const handleOpenDealRoom = (dr) => { setSelectedDealRoom(dr); setShowDealRoomModal(true) }
 
   const handleSaveDealRoom = async (data, existingId) => {
     if (existingId) {
@@ -251,7 +270,19 @@ export default function Fornecedores() {
 
   const especialidadesUnicas = [...new Set(fornecedores.map(f => f.especialidade).filter(Boolean))]
 
-  // Real KPI data from hooks
+  // Counts per status for tab badges
+  const statusCounts = {
+    ativo: fornecedores.filter(f => f.status === 'ativo').length,
+    preferencial: fornecedores.filter(f => f.status === 'preferencial').length,
+    inativo: fornecedores.filter(f => f.status === 'inativo').length,
+  }
+
+  // KPI data
+  const avgRating = fornecedores.filter(f => f.rating).length > 0
+    ? (fornecedores.filter(f => f.rating).reduce((s, f) => s + f.rating, 0) / fornecedores.filter(f => f.rating).length).toFixed(1)
+    : '—'
+
+  // G.A.R.V.I.S. KPI data (for the panel)
   const kpis = {
     total: garvisKPIs.totalFornecedores || fornecedores.length,
     volumeYTD: garvisKPIs.volumeYTDFormatted || '€0',
@@ -263,392 +294,422 @@ export default function Fornecedores() {
   if (loading && fornecedores.length === 0) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
-        <Loader2 size={32} className="spin" style={{ color: 'var(--brown-light)' }} />
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            width: '40px', height: '40px',
+            border: `3px solid ${C.border}`,
+            borderTopColor: C.success,
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto 16px'
+          }} />
+          <p style={{ color: C.light, fontFamily: FONTS.body, fontSize: '14px' }}>A carregar...</p>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="fade-in" style={{ display: 'flex', height: 'calc(100vh - 60px)', overflow: 'hidden' }}>
-      {/* Main Content */}
-      <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-        {/* Alert Banner - Real data from GARVIS */}
-        {!dismissedAlert && topAlert && (
-          <div style={{
-            background: topAlert.prioridade === 'critico'
-              ? 'linear-gradient(90deg, #FEE2E2 0%, #FECACA 100%)'
-              : 'linear-gradient(90deg, #FEF3C7 0%, #FDE68A 100%)',
-            padding: '12px 24px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            borderBottom: topAlert.prioridade === 'critico' ? '1px solid #dc2626' : '1px solid #F59E0B'
+    <div style={{ maxWidth: '1200px' }}>
+      {/* ═══ HEADER ═══ */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '20px' }}>
+        <div>
+          <h1 style={{
+            fontFamily: FONTS.heading,
+            fontSize: '36px',
+            fontWeight: 600,
+            color: C.dark,
+            letterSpacing: '-0.5px',
+            margin: 0,
+            lineHeight: 1.1
           }}>
-            <AlertTriangle size={18} style={{ color: topAlert.prioridade === 'critico' ? '#991b1b' : '#92400E', flexShrink: 0 }} />
-            <div style={{ flex: 1 }}>
-              <span style={{ fontWeight: 600, color: topAlert.prioridade === 'critico' ? '#991b1b' : '#92400E', fontSize: '13px' }}>
-                {topAlert.titulo}
-              </span>
-              <span style={{ color: topAlert.prioridade === 'critico' ? '#7f1d1d' : '#78350F', fontSize: '13px', marginLeft: '8px' }}>
-                {topAlert.mensagem}
-              </span>
-            </div>
-            {topAlert.acao_label && (
-              <button
-                onClick={() => topAlert.acao_sugerida && navigate(topAlert.acao_sugerida)}
-                style={{
-                  padding: '6px 14px',
-                  background: topAlert.prioridade === 'critico' ? '#991b1b' : '#92400E',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  fontWeight: 600
-                }}
-              >
-                {topAlert.acao_label}
-              </button>
-            )}
-            <button style={{
-              padding: '6px 14px',
-              background: 'rgba(146, 64, 14, 0.1)',
-              color: topAlert.prioridade === 'critico' ? '#991b1b' : '#92400E',
-              border: '1px solid rgba(146, 64, 14, 0.2)',
-              borderRadius: '6px',
+            Fornecedores
+          </h1>
+          <p style={{
+            fontFamily: FONTS.body,
+            fontSize: '14px',
+            color: C.light,
+            marginTop: '6px'
+          }}>
+            Gestão de fornecedores e procurement
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            onClick={() => setShowGarvis(!showGarvis)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '6px',
+              padding: '10px 16px',
+              background: C.white,
+              border: `1px solid ${C.border}`,
+              borderRadius: '10px',
+              fontFamily: FONTS.body,
+              fontSize: '13px',
+              fontWeight: 600,
+              color: C.dark,
               cursor: 'pointer',
-              fontSize: '12px',
-              fontWeight: 500
             }}
-              onClick={() => setDismissedAlert(true)}
-            >
-              Ver Mais Tarde
-            </button>
-          </div>
-        )}
-
-        <div style={{ padding: '24px 32px', flex: 1 }}>
-          {/* Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
-            <div>
-              <h1 style={{
-                fontFamily: "'Cormorant Garamond', Georgia, serif",
-                fontSize: '32px',
-                fontWeight: 700,
-                margin: 0,
-                color: 'var(--brown)',
-                letterSpacing: '-0.5px'
-              }}>
-                Fornecedores
-              </h1>
-              <p style={{ fontSize: '13px', color: 'var(--brown-light)', margin: '4px 0 0' }}>
-                {fornecedores.length} fornecedores · {kpis.dealRooms} deal rooms ativos · {kpis.orcamentos} orçamentos pendentes
-              </p>
-            </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <input type="file" ref={fileInputRef} onChange={handleImportExcel} accept=".xlsx,.xls" style={{ display: 'none' }} />
-              <button
-                onClick={handleCreateDealRoom}
-                style={{
-                  padding: '8px 16px',
-                  background: 'var(--brown)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-              >
-                <Plus size={14} /> Novo Deal Room
-              </button>
-            </div>
-          </div>
-
-          {/* G.A.R.V.I.S. Recommendation Card */}
-          <GarvisRecommendation
-            fornecedores={fornecedores}
-            activeDealRooms={activeDealRooms}
-            onCreateDealRoom={handleCreateDealRoom}
-          />
-
-          {/* KPI Cards */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(5, 1fr)',
-            gap: isMobile ? '10px' : '16px',
-            marginBottom: '24px'
-          }}>
-            <KPICard value={kpis.total} label="Total Fornecedores" />
-            <KPICard value={kpis.volumeYTD} label="Volume YTD" />
-            <KPICard value={kpis.dealRooms} label="Deal Rooms Ativos" />
-            <KPICard value={kpis.orcamentos} label="Orçamentos Pendentes" />
-            <KPICard value={kpis.alertas} label="Alertas Críticos" />
-          </div>
-
-          {/* Active Deal Rooms strip */}
-          {activeDealRooms.length > 0 && (
-            <div style={{
-              display: 'flex',
-              gap: '8px',
-              marginBottom: '16px',
-              overflowX: 'auto',
-              paddingBottom: '4px'
-            }}>
-              <span style={{
-                fontSize: '11px',
-                fontWeight: 700,
-                color: 'var(--brown-light)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px',
-                whiteSpace: 'nowrap',
-                alignSelf: 'center'
-              }}>
-                <Users size={12} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
-                Deal Rooms:
-              </span>
-              {activeDealRooms.map(dr => (
-                <button
-                  key={dr.id}
-                  onClick={() => handleOpenDealRoom(dr)}
-                  style={{
-                    padding: '6px 12px',
-                    background: 'var(--white)',
-                    border: '1px solid var(--stone)',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    color: 'var(--brown)',
-                    whiteSpace: 'nowrap',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  {dr.titulo}
-                  {dr.badge && (
-                    <span style={{
-                      fontSize: '10px',
-                      padding: '1px 6px',
-                      borderRadius: '6px',
-                      background: dr.badgeColor === 'olive' ? 'var(--success-bg)' : 'var(--warning-bg)',
-                      color: dr.badgeColor === 'olive' ? 'var(--success)' : 'var(--warning)',
-                      fontWeight: 600
-                    }}>
-                      {dr.badge}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Filters */}
-          <div style={{
-            display: 'flex',
-            gap: '12px',
-            alignItems: 'center',
-            marginBottom: '16px',
-            flexWrap: 'wrap'
-          }}>
-            <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
-              <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--brown-light)' }} />
-              <input
-                type="text"
-                placeholder="Pesquisar fornecedor..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px 10px 10px 38px',
-                  border: '1px solid var(--stone)',
-                  borderRadius: '8px',
-                  fontSize: '13px',
-                  background: 'var(--white)',
-                  boxSizing: 'border-box',
-                  outline: 'none'
-                }}
-              />
-            </div>
-            <select value={filtroEspecialidade} onChange={e => setFiltroEspecialidade(e.target.value)}
-              style={{ padding: '10px 12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '13px', background: 'var(--white)' }}>
-              <option value="">Todas Especialidades</option>
-              {especialidadesUnicas.map(e => <option key={e} value={e}>{e}</option>)}
-            </select>
-            <select value={filtroStatus} onChange={e => setFiltroStatus(e.target.value)}
-              style={{ padding: '10px 12px', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '13px', background: 'var(--white)' }}>
-              <option value="">Todos Status</option>
-              {Object.entries(STATUS_FORNECEDOR).map(([key, val]) => <option key={key} value={key}>{val.label}</option>)}
-            </select>
-            <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px' }}>
-              <button onClick={() => fileInputRef.current?.click()} style={{
-                padding: '8px 12px', background: 'transparent', border: '1px solid var(--stone)',
-                borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: 'var(--brown-light)',
-                display: 'flex', alignItems: 'center', gap: '4px'
-              }}>
-                <Upload size={14} /> Importar
-              </button>
-              <button onClick={exportarExcel} style={{
-                padding: '8px 12px', background: 'transparent', border: '1px solid var(--stone)',
-                borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: 'var(--brown-light)',
-                display: 'flex', alignItems: 'center', gap: '4px'
-              }}>
-                <Download size={14} /> Exportar
-              </button>
-              <button onClick={() => { resetForm(); setEditingFornecedor(null); setShowModal(true) }} style={{
-                padding: '8px 12px', background: 'var(--accent-olive)', color: 'white',
-                border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px',
-                fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px'
-              }}>
-                <Plus size={14} /> Novo Fornecedor
-              </button>
-            </div>
-          </div>
-
-          {/* Supplier Table */}
-          <div style={{
-            background: 'var(--white)',
-            borderRadius: '12px',
-            border: '1px solid var(--stone)',
-            overflow: 'hidden'
-          }}>
-           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', minWidth: '600px' }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid var(--stone)' }}>
-                  <th style={thStyle}>FORNECEDOR</th>
-                  <th style={thStyle}>ESPECIALIDADE</th>
-                  <th style={{ ...thStyle, textAlign: 'center' }}>RATING</th>
-                  <th style={thStyle}>CONTACTO</th>
-                  <th style={{ ...thStyle, textAlign: 'center' }}>STATUS</th>
-                  <th style={{ ...thStyle, textAlign: 'center', width: '60px' }}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {fornecedoresFiltrados.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} style={{ padding: '40px', textAlign: 'center', color: 'var(--brown-light)' }}>
-                      Nenhum fornecedor encontrado
-                    </td>
-                  </tr>
-                ) : (
-                  fornecedoresFiltrados.map(f => {
-                    const statusConf = STATUS_FORNECEDOR[f.status] || STATUS_FORNECEDOR.ativo
-                    return (
-                      <tr key={f.id} style={{ borderBottom: '1px solid var(--stone)', cursor: 'pointer' }}
-                        onClick={() => navigate(`/fornecedores/${f.id}`)}
-                        onMouseEnter={e => e.currentTarget.style.background = 'var(--cream)'}
-                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                      >
-                        <td style={tdStyle}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <div style={{
-                              width: '36px', height: '36px',
-                              borderRadius: '8px',
-                              background: f.logo_url ? 'transparent' : 'var(--cream)',
-                              border: '1px solid var(--stone)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: '12px',
-                              fontWeight: 700,
-                              color: 'var(--brown-light)',
-                              flexShrink: 0
-                            }}>
-                              {f.nome?.substring(0, 2).toUpperCase()}
-                            </div>
-                            <div>
-                              <div style={{ fontWeight: 600, color: 'var(--brown)', fontSize: '13px' }}>{f.nome}</div>
-                              {f.responsavel && (
-                                <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>{f.responsavel}</div>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                        <td style={tdStyle}>
-                          {f.especialidade ? (
-                            <span style={{
-                              padding: '3px 8px',
-                              background: 'var(--cream)',
-                              borderRadius: '4px',
-                              fontSize: '11px',
-                              color: 'var(--brown-light)',
-                              fontWeight: 500
-                            }}>
-                              {f.especialidade}
-                            </span>
-                          ) : (
-                            <span style={{ color: 'var(--stone-dark)', fontSize: '12px' }}>—</span>
-                          )}
-                        </td>
-                        <td style={{ ...tdStyle, textAlign: 'center' }}>
-                          {f.rating ? (
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px' }}>
-                              <Star size={12} fill="var(--warning)" stroke="var(--warning)" />
-                              <span style={{ fontWeight: 600, fontSize: '12px' }}>{f.rating}</span>
-                            </div>
-                          ) : (
-                            <span style={{ color: 'var(--stone-dark)', fontSize: '12px' }}>—</span>
-                          )}
-                        </td>
-                        <td style={tdStyle}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '11px' }}>
-                            {f.email && (
-                              <span style={{ color: 'var(--brown-light)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                <Mail size={11} /> {f.email}
-                              </span>
-                            )}
-                            {(f.telefone || f.telemovel) && (
-                              <span style={{ color: 'var(--brown-light)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                <Phone size={11} /> {f.telemovel || f.telefone}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td style={{ ...tdStyle, textAlign: 'center' }}>
-                          <span style={{
-                            padding: '3px 10px',
-                            borderRadius: '10px',
-                            fontSize: '10px',
-                            fontWeight: 600,
-                            background: statusConf.bg,
-                            color: statusConf.color
-                          }}>
-                            {statusConf.label}
-                          </span>
-                        </td>
-                        <td style={{ ...tdStyle, textAlign: 'center' }} onClick={e => e.stopPropagation()}>
-                          <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
-                            <button onClick={() => handleEdit(f)} style={actionBtnStyle}>
-                              <Edit2 size={13} />
-                            </button>
-                            <button onClick={() => handleDelete(f)} style={{ ...actionBtnStyle, color: 'var(--error)' }}>
-                              <Trash2 size={13} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })
-                )}
-              </tbody>
-            </table>
-           </div>
-          </div>
+          >
+            <Sparkles size={14} style={{ color: '#C9A86C' }} />
+            G.A.R.V.I.S.
+          </button>
+          <button
+            onClick={() => { resetForm(); setEditingFornecedor(null); setShowModal(true) }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '6px',
+              padding: '10px 20px',
+              background: C.dark,
+              border: 'none',
+              borderRadius: '10px',
+              fontFamily: FONTS.body,
+              fontSize: '13px',
+              fontWeight: 600,
+              color: C.white,
+              cursor: 'pointer',
+            }}
+          >
+            <Plus size={14} />
+            Novo Fornecedor
+          </button>
         </div>
       </div>
 
-      {/* G.A.R.V.I.S. Side Panel */}
+      {/* ═══ TAB BAR ═══ */}
+      <div style={{
+        display: 'flex',
+        gap: '4px',
+        marginBottom: '24px',
+        borderBottom: `1px solid ${C.border}`,
+      }}>
+        {statusTabs.map(t => {
+          const count = t.key ? statusCounts[t.key] || 0 : fornecedores.length
+          return (
+            <button
+              key={t.key}
+              onClick={() => setFiltroStatus(t.key)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '6px',
+                padding: '10px 16px',
+                background: 'none',
+                border: 'none',
+                borderBottom: filtroStatus === t.key ? `2px solid ${C.dark}` : '2px solid transparent',
+                fontFamily: FONTS.body,
+                fontSize: '13px',
+                fontWeight: filtroStatus === t.key ? 700 : 400,
+                color: filtroStatus === t.key ? C.dark : C.light,
+                cursor: 'pointer',
+                transition: 'all 0.15s',
+                marginBottom: '-1px',
+              }}
+            >
+              {t.label}
+              <span style={{
+                background: filtroStatus === t.key ? C.dark : 'rgba(0,0,0,0.06)',
+                color: filtroStatus === t.key ? C.white : C.light,
+                fontSize: '10px',
+                fontWeight: 700,
+                padding: '2px 7px',
+                borderRadius: '10px',
+                lineHeight: '14px',
+              }}>
+                {count}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* ═══ KPI ROW ═══ */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(4, 1fr)',
+        gap: '16px',
+        marginBottom: '24px',
+      }}>
+        {[
+          { label: 'TOTAL', value: fornecedores.length, detail: `${statusCounts.ativo} ativos` },
+          { label: 'ATIVOS', value: statusCounts.ativo, detail: `${statusCounts.preferencial} preferenciais` },
+          { label: 'RATING MÉDIO', value: avgRating, detail: `${fornecedores.filter(f => f.rating).length} com avaliação`, icon: true },
+          { label: 'ESPECIALIDADES', value: especialidadesUnicas.length, detail: `${kpis.dealRooms} deal rooms` },
+        ].map(kpi => (
+          <div key={kpi.label} style={{
+            background: C.white,
+            borderRadius: '14px',
+            padding: '20px 22px',
+            border: `1px solid ${C.border}`,
+            boxShadow: '0 1px 4px rgba(0,0,0,0.03)',
+          }}>
+            <span style={{
+              fontFamily: FONTS.body, fontSize: '11px', fontWeight: 700,
+              textTransform: 'uppercase', letterSpacing: '0.06em',
+              color: C.muted,
+            }}>
+              {kpi.label}
+            </span>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '6px',
+              marginTop: '8px',
+            }}>
+              <span style={{
+                fontFamily: FONTS.body, fontSize: '38px', fontWeight: 700,
+                color: C.dark, lineHeight: 1, letterSpacing: '-1px',
+              }}>
+                {kpi.value}
+              </span>
+              {kpi.icon && <Star size={18} fill={C.warning} stroke={C.warning} style={{ marginBottom: '-4px' }} />}
+            </div>
+            <span style={{
+              fontFamily: FONTS.body, fontSize: '12px',
+              color: C.light, marginTop: '6px', display: 'block',
+            }}>
+              {kpi.detail}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* ═══ SEARCH + FILTERS ═══ */}
+      <div style={{
+        display: 'flex',
+        gap: '12px',
+        alignItems: 'center',
+        marginBottom: '16px',
+        flexWrap: 'wrap',
+      }}>
+        <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
+          <Search size={15} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: C.muted }} />
+          <input
+            type="text"
+            placeholder="Pesquisar fornecedor, responsável ou especialidade..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '10px 10px 10px 40px',
+              border: `1px solid ${C.border}`,
+              borderRadius: '10px',
+              fontSize: '13px',
+              fontFamily: FONTS.body,
+              background: C.white,
+              boxSizing: 'border-box',
+              outline: 'none',
+              color: C.dark,
+            }}
+          />
+        </div>
+        <select
+          value={filtroEspecialidade}
+          onChange={e => setFiltroEspecialidade(e.target.value)}
+          style={{
+            padding: '10px 14px',
+            border: `1px solid ${C.border}`,
+            borderRadius: '10px',
+            fontSize: '13px',
+            fontFamily: FONTS.body,
+            background: C.white,
+            color: C.dark,
+            cursor: 'pointer',
+          }}
+        >
+          <option value="">Todas Especialidades</option>
+          {especialidadesUnicas.map(e => <option key={e} value={e}>{e}</option>)}
+        </select>
+        <input type="file" ref={fileInputRef} onChange={handleImportExcel} accept=".xlsx,.xls" style={{ display: 'none' }} />
+        <div style={{ display: 'flex', gap: '6px', marginLeft: 'auto' }}>
+          <button onClick={() => fileInputRef.current?.click()} style={{
+            padding: '9px 14px', background: C.white, border: `1px solid ${C.border}`,
+            borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontFamily: FONTS.body,
+            color: C.light, display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 500,
+          }}>
+            <Upload size={13} /> Importar
+          </button>
+          <button onClick={exportarExcel} style={{
+            padding: '9px 14px', background: C.white, border: `1px solid ${C.border}`,
+            borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontFamily: FONTS.body,
+            color: C.light, display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 500,
+          }}>
+            <Download size={13} /> Exportar
+          </button>
+        </div>
+      </div>
+
+      {/* ═══ SUPPLIER TABLE ═══ */}
+      <div style={{
+        background: C.white,
+        borderRadius: '14px',
+        border: `1px solid ${C.border}`,
+        overflow: 'hidden',
+      }}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', fontFamily: FONTS.body, minWidth: '700px' }}>
+            <thead>
+              <tr>
+                <th style={thStyle}>FORNECEDOR</th>
+                <th style={thStyle}>ESPECIALIDADE</th>
+                <th style={{ ...thStyle, textAlign: 'center' }}>RATING</th>
+                <th style={thStyle}>CONTACTO</th>
+                <th style={{ ...thStyle, textAlign: 'center' }}>STATUS</th>
+                <th style={{ ...thStyle, textAlign: 'center', width: '70px' }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {fornecedoresFiltrados.length === 0 ? (
+                <tr>
+                  <td colSpan={6} style={{
+                    padding: '48px', textAlign: 'center', color: C.light, fontFamily: FONTS.body,
+                  }}>
+                    Nenhum fornecedor encontrado
+                  </td>
+                </tr>
+              ) : (
+                fornecedoresFiltrados.map((f, idx) => {
+                  const statusConf = STATUS_FORNECEDOR[f.status] || STATUS_FORNECEDOR.ativo
+                  return (
+                    <tr
+                      key={f.id}
+                      onClick={() => navigate(`/fornecedores/${f.id}`)}
+                      style={{
+                        borderTop: `1px solid ${C.border}`,
+                        cursor: 'pointer',
+                        transition: 'background 0.15s',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = C.cream}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    >
+                      {/* Fornecedor */}
+                      <td style={tdStyle}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{
+                            width: '38px', height: '38px',
+                            borderRadius: '10px',
+                            background: C.cream,
+                            border: `1px solid ${C.border}`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            color: C.muted,
+                            flexShrink: 0,
+                          }}>
+                            {f.nome?.substring(0, 2).toUpperCase()}
+                          </div>
+                          <div>
+                            <div style={{
+                              fontFamily: FONTS.heading,
+                              fontWeight: 600,
+                              color: C.dark,
+                              fontSize: '14px',
+                            }}>
+                              {f.nome}
+                            </div>
+                            {f.responsavel && (
+                              <div style={{ fontSize: '12px', color: C.light, marginTop: '1px' }}>
+                                {f.responsavel}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Especialidade */}
+                      <td style={tdStyle}>
+                        {f.especialidade ? (
+                          <span style={{
+                            padding: '4px 10px',
+                            background: C.cream,
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            color: C.light,
+                            fontWeight: 500,
+                          }}>
+                            {f.especialidade}
+                          </span>
+                        ) : (
+                          <span style={{ color: C.muted, fontSize: '12px' }}>—</span>
+                        )}
+                      </td>
+
+                      {/* Rating */}
+                      <td style={{ ...tdStyle, textAlign: 'center' }}>
+                        {f.rating ? (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                            <Star size={13} fill={C.warning} stroke={C.warning} />
+                            <span style={{ fontWeight: 700, fontSize: '13px', color: C.dark }}>{f.rating}</span>
+                          </div>
+                        ) : (
+                          <span style={{ color: C.muted, fontSize: '12px' }}>—</span>
+                        )}
+                      </td>
+
+                      {/* Contacto */}
+                      <td style={tdStyle}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                          {f.email && (
+                            <span style={{ color: C.light, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                              <Mail size={11} style={{ color: C.muted }} /> {f.email}
+                            </span>
+                          )}
+                          {(f.telefone || f.telemovel) && (
+                            <span style={{ color: C.light, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                              <Phone size={11} style={{ color: C.muted }} /> {f.telemovel || f.telefone}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Status */}
+                      <td style={{ ...tdStyle, textAlign: 'center' }}>
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', gap: '5px',
+                          padding: '4px 12px',
+                          borderRadius: '20px',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          background: statusConf.bg,
+                          color: statusConf.color,
+                        }}>
+                          <div style={{
+                            width: '6px', height: '6px', borderRadius: '50%',
+                            background: statusConf.color,
+                          }} />
+                          {statusConf.label}
+                        </span>
+                      </td>
+
+                      {/* Actions */}
+                      <td style={{ ...tdStyle, textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                          <button onClick={() => handleEdit(f)} style={actionBtnStyle}>
+                            <Edit2 size={14} />
+                          </button>
+                          <button onClick={() => handleDelete(f)} style={{ ...actionBtnStyle, color: C.danger }}>
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ═══ G.A.R.V.I.S. Side Panel (toggled) ═══ */}
       {showGarvis && (
-        <GarvisPanel
-          onClose={() => setShowGarvis(false)}
-          fornecedores={fornecedores}
-          kpis={kpis}
-          onOpenDealRoom={handleOpenDealRoom}
-        />
+        <div style={{
+          position: 'fixed', top: 0, right: 0, bottom: 0, width: '380px',
+          zIndex: 200, boxShadow: '-4px 0 24px rgba(0,0,0,0.1)',
+        }}>
+          <GarvisPanel
+            onClose={() => setShowGarvis(false)}
+            fornecedores={fornecedores}
+            kpis={kpis}
+            onOpenDealRoom={handleOpenDealRoom}
+          />
+        </div>
       )}
 
       {/* Deal Room Modal */}
@@ -665,18 +726,40 @@ export default function Fornecedores() {
 
       {/* Modal - Novo/Editar Fornecedor */}
       {showModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
-          <div style={{ background: 'white', borderRadius: '16px', width: '100%', maxWidth: '700px', maxHeight: '90vh', overflow: 'auto' }}>
-            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--stone)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600, fontFamily: "'Cormorant Garamond', Georgia, serif" }}>
+        <div style={{
+          position: 'fixed', inset: 0,
+          background: 'rgba(0,0,0,0.4)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 1000, padding: '20px',
+        }}>
+          <div style={{
+            background: C.white, borderRadius: '16px',
+            width: '100%', maxWidth: '700px', maxHeight: '90vh', overflow: 'auto',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
+          }}>
+            {/* Modal header */}
+            <div style={{
+              padding: '20px 24px',
+              borderBottom: `1px solid ${C.border}`,
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            }}>
+              <h3 style={{
+                margin: 0, fontSize: '20px', fontWeight: 600,
+                fontFamily: FONTS.heading, color: C.dark,
+              }}>
                 {editingFornecedor ? 'Editar Fornecedor' : 'Novo Fornecedor'}
               </h3>
-              <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--brown-light)' }}>
+              <button onClick={() => setShowModal(false)} style={{
+                background: 'none', border: 'none', cursor: 'pointer', color: C.muted,
+                padding: '4px', borderRadius: '6px',
+              }}>
                 <X size={20} />
               </button>
             </div>
+
+            {/* Modal body */}
             <div style={{ padding: '24px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
                 <div style={{ gridColumn: 'span 2' }}>
                   <label style={labelStyle}>Nome da Empresa *</label>
                   <input type="text" value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} style={inputStyle} />
@@ -690,8 +773,14 @@ export default function Fornecedores() {
                   <input type="text" value={form.especialidade} onChange={e => setForm({ ...form, especialidade: e.target.value })} placeholder="Ex: Caixilharia, Cantaria..." style={inputStyle} />
                 </div>
               </div>
-              <h4 style={{ fontSize: '13px', fontWeight: 600, marginBottom: '12px', color: 'var(--brown-light)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Contactos</h4>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+
+              <h4 style={{
+                fontSize: '11px', fontWeight: 700, marginBottom: '14px',
+                color: C.muted, textTransform: 'uppercase', letterSpacing: '0.06em',
+              }}>
+                Contactos
+              </h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
                 <div>
                   <label style={labelStyle}>Responsável</label>
                   <input type="text" value={form.responsavel} onChange={e => setForm({ ...form, responsavel: e.target.value })} style={inputStyle} />
@@ -709,7 +798,13 @@ export default function Fornecedores() {
                   <input type="text" value={form.telemovel} onChange={e => setForm({ ...form, telemovel: e.target.value })} style={inputStyle} />
                 </div>
               </div>
-              <h4 style={{ fontSize: '13px', fontWeight: 600, marginBottom: '12px', color: 'var(--brown-light)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Status e Condições</h4>
+
+              <h4 style={{
+                fontSize: '11px', fontWeight: 700, marginBottom: '14px',
+                color: C.muted, textTransform: 'uppercase', letterSpacing: '0.06em',
+              }}>
+                Status e Condições
+              </h4>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '20px' }}>
                 <div>
                   <label style={labelStyle}>Status</label>
@@ -735,17 +830,25 @@ export default function Fornecedores() {
                   style={{ ...inputStyle, resize: 'vertical' }} />
               </div>
             </div>
-            <div style={{ padding: '16px 24px', borderTop: '1px solid var(--stone)', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+
+            {/* Modal footer */}
+            <div style={{
+              padding: '16px 24px',
+              borderTop: `1px solid ${C.border}`,
+              display: 'flex', justifyContent: 'flex-end', gap: '12px',
+            }}>
               <button onClick={() => setShowModal(false)} style={{
-                padding: '8px 16px', background: 'transparent', border: '1px solid var(--stone)',
-                borderRadius: '8px', cursor: 'pointer', fontSize: '13px', color: 'var(--brown)'
+                padding: '10px 20px', background: 'transparent', border: `1px solid ${C.border}`,
+                borderRadius: '10px', cursor: 'pointer', fontSize: '13px', fontFamily: FONTS.body,
+                color: C.dark, fontWeight: 500,
               }}>
                 Cancelar
               </button>
               <button onClick={handleSave} disabled={saving} style={{
-                padding: '8px 20px', background: 'var(--brown)', color: 'white',
-                border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px',
-                fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px'
+                padding: '10px 24px', background: C.dark, color: C.white,
+                border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '13px',
+                fontFamily: FONTS.body, fontWeight: 600,
+                display: 'flex', alignItems: 'center', gap: '6px',
               }}>
                 {saving && <Loader2 size={14} className="spin" />}
                 {editingFornecedor ? 'Guardar' : 'Criar Fornecedor'}
@@ -768,333 +871,52 @@ export default function Fornecedores() {
   )
 }
 
-// G.A.R.V.I.S. Recommendation Component - Dynamic with matching
-function GarvisRecommendation({ fornecedores, activeDealRooms, onCreateDealRoom }) {
-  const [recommendation, setRecommendation] = useState(null)
-  const [alternatives, setAlternatives] = useState([])
-  const [showAlternatives, setShowAlternatives] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const navigate = useNavigate()
-
-  useEffect(() => {
-    if (fornecedores.length >= 3) {
-      loadRecommendation()
-    }
-  }, [fornecedores])
-
-  const loadRecommendation = async () => {
-    setLoading(true)
-    try {
-      // Get the most common specialty
-      const specs = fornecedores.map(f => f.especialidade).filter(Boolean)
-      const specCount = {}
-      specs.forEach(s => { specCount[s] = (specCount[s] || 0) + 1 })
-      const topSpec = Object.entries(specCount).sort((a, b) => b[1] - a[1])[0]?.[0]
-
-      if (topSpec) {
-        const top = await getTopRecommendations(fornecedores, topSpec, 4)
-        if (top.length > 0) {
-          setRecommendation({ ...top[0], especialidade: topSpec })
-          setAlternatives(top.slice(1))
-        }
-      }
-
-      // Fallback to highest rated
-      if (!recommendation) {
-        const topRated = fornecedores
-          .filter(f => f.rating && f.rating >= 4 && (f.status === 'ativo' || f.status === 'preferencial'))
-          .sort((a, b) => (b.rating || 0) - (a.rating || 0))
-
-        if (topRated.length > 0) {
-          const best = topRated[0]
-          setRecommendation({
-            fornecedor: best,
-            score: Math.min(70 + (best.rating || 0) * 5, 99),
-            justificacao: [
-              best.especialidade && `Especialista em ${best.especialidade}`,
-              `Rating ${best.rating}/5`,
-              best.is_preferencial && 'Fornecedor preferencial'
-            ].filter(Boolean),
-            especialidade: best.especialidade
-          })
-          setAlternatives(topRated.slice(1, 4).map(f => ({
-            fornecedor: f,
-            score: Math.min(60 + (f.rating || 0) * 5, 95),
-            justificacao: [f.especialidade, `Rating ${f.rating}/5`].filter(Boolean)
-          })))
-        }
-      }
-    } catch {
-      // Silent - recommendation is non-critical
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  if (fornecedores.length < 3) {
-    return (
-      <div style={{
-        background: 'var(--white)',
-        borderRadius: '16px',
-        border: '1px solid var(--stone)',
-        padding: '24px',
-        marginBottom: '24px',
-        textAlign: 'center'
-      }}>
-        <div style={{
-          width: '48px', height: '48px', borderRadius: '50%', margin: '0 auto 12px',
-          background: 'linear-gradient(135deg, var(--blush) 0%, var(--blush-dark) 100%)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '18px', fontWeight: 700, color: 'var(--brown-dark)'
-        }}>G</div>
-        <div style={{
-          fontFamily: "'Cormorant Garamond', Georgia, serif",
-          fontSize: '16px', fontWeight: 600, color: 'var(--brown)', marginBottom: '8px'
-        }}>
-          G.A.R.V.I.S. a analisar...
-        </div>
-        <p style={{ fontSize: '13px', color: 'var(--brown-light)', margin: 0, lineHeight: 1.5 }}>
-          Adicione mais fornecedores com ratings e especialidades para ativar as recomendações inteligentes.
-        </p>
-      </div>
-    )
-  }
-
-  if (loading || !recommendation) return null
-
-  const f = recommendation.fornecedor
-  const initials = f.nome?.substring(0, 2).toUpperCase() || '??'
-
-  return (
-    <div style={{
-      background: 'var(--white)',
-      borderRadius: '16px',
-      border: '1px solid var(--stone)',
-      padding: '24px',
-      marginBottom: '24px',
-      position: 'relative'
-    }}>
-      <div style={{
-        position: 'absolute', top: '-8px', right: '20px',
-        background: 'var(--accent-olive)', color: 'white', borderRadius: '12px',
-        width: '24px', height: '24px', display: 'flex', alignItems: 'center',
-        justifyContent: 'center', fontSize: '11px', fontWeight: 700
-      }}>1</div>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-        <div style={{
-          width: '32px', height: '32px', borderRadius: '50%',
-          background: 'linear-gradient(135deg, var(--blush) 0%, var(--blush-dark) 100%)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '12px', fontWeight: 700, color: 'var(--brown-dark)'
-        }}>G</div>
-        <span style={{
-          fontFamily: "'Cormorant Garamond', Georgia, serif",
-          fontSize: '16px', fontWeight: 600, color: 'var(--brown)'
-        }}>
-          Recomendação G.A.R.V.I.S.
-        </span>
-        {recommendation.especialidade && (
-          <div style={{ marginLeft: 'auto' }}>
-            <span style={{
-              fontSize: '12px', padding: '4px 12px', background: 'var(--cream)',
-              borderRadius: '8px', color: 'var(--brown-light)', fontWeight: 500
-            }}>
-              Especialidade: {recommendation.especialidade}
-            </span>
-          </div>
-        )}
-      </div>
-
-      <p style={{ fontSize: '13px', color: 'var(--brown-light)', margin: '0 0 16px', lineHeight: 1.5 }}>
-        Baseado no algoritmo de matching, ratings e histórico de colaborações:
-      </p>
-
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: '16px', padding: '16px',
-        background: 'var(--cream)', borderRadius: '12px', marginBottom: '12px'
-      }}>
-        <div style={{
-          width: '48px', height: '48px', borderRadius: '12px', background: 'var(--brown-dark)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: 'var(--accent-olive)', fontWeight: 700, fontSize: '14px', flexShrink: 0
-        }}>{initials}</div>
-        <div style={{ flex: 1 }}>
-          <div style={{
-            fontFamily: "'Cormorant Garamond', Georgia, serif",
-            fontSize: '18px', fontWeight: 700, color: 'var(--brown)'
-          }}>{f.nome}</div>
-          <div style={{ fontSize: '12px', color: 'var(--brown-light)' }}>
-            {f.especialidade || 'Geral'} · Rating {f.rating}/5
-            {f.responsavel ? ` · ${f.responsavel}` : ''}
-          </div>
-        </div>
-        <div style={{ textAlign: 'right' }}>
-          <div style={{
-            fontFamily: "'Cormorant Garamond', Georgia, serif",
-            fontSize: '32px', fontWeight: 700, color: 'var(--accent-olive)', lineHeight: 1
-          }}>{recommendation.score}%</div>
-          <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>match</div>
-        </div>
-      </div>
-
-      {recommendation.justificacao?.length > 0 && (
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '16px' }}>
-          {recommendation.justificacao.map((tag, i) => (
-            <span key={i} style={{
-              fontSize: '11px', padding: '4px 10px', borderRadius: '6px',
-              border: '1px solid rgba(122, 139, 110, 0.3)',
-              color: 'var(--accent-olive)',
-              background: 'rgba(122, 139, 110, 0.06)',
-              display: 'flex', alignItems: 'center', gap: '4px'
-            }}>
-              ✓ {tag}
-            </span>
-          ))}
-        </div>
-      )}
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-        <button
-          onClick={onCreateDealRoom}
-          style={{
-            padding: '12px', background: 'var(--blush)', color: 'var(--white)',
-            border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600
-          }}
-        >
-          Criar Deal Room
-        </button>
-        <button
-          onClick={() => setShowAlternatives(!showAlternatives)}
-          style={{
-            padding: '12px', background: 'transparent', color: 'var(--brown)',
-            border: '1px solid var(--stone)', borderRadius: '8px', cursor: 'pointer',
-            fontSize: '13px', fontWeight: 500
-          }}
-        >
-          {showAlternatives ? 'Esconder' : 'Ver alternativas'}
-        </button>
-      </div>
-
-      {/* Alternatives */}
-      {showAlternatives && alternatives.length > 0 && (
-        <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {alternatives.map((alt, i) => {
-            const af = alt.fornecedor
-            return (
-              <div key={af.id}
-                onClick={() => navigate(`/fornecedores/${af.id}`)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px',
-                  background: 'var(--cream)', borderRadius: '10px', cursor: 'pointer',
-                  transition: 'all 0.15s'
-                }}
-                onMouseEnter={e => e.currentTarget.style.background = 'var(--stone)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'var(--cream)'}
-              >
-                <div style={{
-                  width: '24px', height: '24px', borderRadius: '6px', background: 'var(--brown-dark)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: 'var(--accent-olive)', fontWeight: 700, fontSize: '10px', flexShrink: 0
-                }}>{i + 2}</div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--brown)' }}>{af.nome}</div>
-                  <div style={{ fontSize: '11px', color: 'var(--brown-light)' }}>
-                    {af.especialidade || 'Geral'} {af.rating ? `· ${af.rating}/5` : ''}
-                  </div>
-                </div>
-                <div style={{
-                  fontFamily: "'Cormorant Garamond', Georgia, serif",
-                  fontSize: '18px', fontWeight: 700,
-                  color: alt.score >= 60 ? 'var(--accent-olive)' : 'var(--brown-light)'
-                }}>
-                  {alt.score}%
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
-      {showAlternatives && alternatives.length === 0 && (
-        <div style={{ marginTop: '12px', fontSize: '12px', color: 'var(--brown-light)', textAlign: 'center', padding: '8px' }}>
-          Sem alternativas suficientes. Adicione mais fornecedores com a mesma especialidade.
-        </div>
-      )}
-    </div>
-  )
-}
-
-// KPI Card Component
-function KPICard({ value, label }) {
-  return (
-    <div style={{
-      background: 'var(--white)',
-      borderRadius: '12px',
-      border: '1px solid var(--stone)',
-      padding: '20px 16px',
-      textAlign: 'center'
-    }}>
-      <div style={{
-        fontFamily: "'Cormorant Garamond', Georgia, serif",
-        fontSize: '28px',
-        fontWeight: 700,
-        color: 'var(--brown)',
-        lineHeight: 1.1,
-        marginBottom: '4px'
-      }}>
-        {value}
-      </div>
-      <div style={{ fontSize: '11px', color: 'var(--brown-light)', fontWeight: 500 }}>
-        {label}
-      </div>
-    </div>
-  )
-}
-
 // Styles
 const thStyle = {
-  padding: '10px 16px',
+  padding: '12px 16px',
   textAlign: 'left',
-  fontWeight: 600,
+  fontWeight: 700,
   fontSize: '10px',
   textTransform: 'uppercase',
-  letterSpacing: '0.5px',
-  color: 'var(--brown-light)',
-  background: 'var(--cream)',
-  borderBottom: '1px solid var(--stone)'
+  letterSpacing: '0.06em',
+  color: '#9A978A',
+  background: '#F5F3EB',
+  fontFamily: "'Quattrocento Sans', sans-serif",
 }
 
 const tdStyle = {
-  padding: '10px 16px',
-  verticalAlign: 'middle'
+  padding: '12px 16px',
+  verticalAlign: 'middle',
 }
 
 const actionBtnStyle = {
-  padding: '5px',
+  padding: '6px',
   background: 'transparent',
   border: 'none',
-  borderRadius: '4px',
+  borderRadius: '6px',
   cursor: 'pointer',
-  color: 'var(--brown-light)',
-  transition: 'all 0.15s'
+  color: '#9A978A',
+  transition: 'all 0.15s',
 }
 
 const labelStyle = {
   display: 'block',
   fontSize: '12px',
-  fontWeight: 500,
-  marginBottom: '4px',
-  color: 'var(--brown-light)'
+  fontWeight: 600,
+  marginBottom: '5px',
+  color: '#6B6B6B',
+  fontFamily: "'Quattrocento Sans', sans-serif",
 }
 
 const inputStyle = {
   width: '100%',
-  padding: '10px',
-  border: '1px solid var(--stone)',
-  borderRadius: '6px',
+  padding: '10px 12px',
+  border: '1px solid #E5E2D9',
+  borderRadius: '8px',
   boxSizing: 'border-box',
   fontSize: '13px',
-  color: 'var(--brown)',
+  fontFamily: "'Quattrocento Sans', sans-serif",
+  color: '#2C2C2B',
   outline: 'none',
-  background: 'var(--white)'
+  background: '#FFFFFF',
 }
