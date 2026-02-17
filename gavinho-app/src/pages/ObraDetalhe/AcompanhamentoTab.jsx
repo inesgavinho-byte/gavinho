@@ -5,7 +5,8 @@ import {
   Upload, Trash2, Edit, Send, FileCheck, ChevronDown,
   ChevronLeft, ChevronRight, Sun, Cloud, CloudRain, Wind, CloudFog,
   Users, Save, Check, Loader2, ArrowRight, Thermometer, Clock,
-  MapPin, Info, AlertCircle
+  MapPin, Info, AlertCircle, Calendar, Download, BarChart3,
+  Circle, CheckCircle2, XCircle, Flag
 } from 'lucide-react'
 import { colors } from './constants'
 import { formatDate } from './utils'
@@ -80,7 +81,7 @@ export default function AcompanhamentoTab({ obraId, activeSubtab, currentUser })
   }, [obraId])
 
   useEffect(() => {
-    if (activeSubtab === 'fotografias' && obraId) loadFotos()
+    if ((activeSubtab === 'fotografias' || activeSubtab === 'resumo') && obraId) loadFotos()
   }, [activeSubtab, obraId, loadFotos])
 
   const handleFotoUpload = async () => {
@@ -216,7 +217,7 @@ export default function AcompanhamentoTab({ obraId, activeSubtab, currentUser })
   }, [obraId])
 
   useEffect(() => {
-    if (activeSubtab === 'diario' && obraId) loadDiario()
+    if ((activeSubtab === 'diario' || activeSubtab === 'resumo') && obraId) loadDiario()
   }, [activeSubtab, obraId, loadDiario])
 
   const openDiarioModal = (entry = null) => {
@@ -542,7 +543,7 @@ export default function AcompanhamentoTab({ obraId, activeSubtab, currentUser })
   }, [obraId])
 
   useEffect(() => {
-    if (activeSubtab === 'nao-conformidades' && obraId) loadNcs()
+    if ((activeSubtab === 'nao-conformidades' || activeSubtab === 'resumo') && obraId) loadNcs()
   }, [activeSubtab, obraId, loadNcs])
 
   const getNextNcCodigo = () => {
@@ -845,19 +846,31 @@ export default function AcompanhamentoTab({ obraId, activeSubtab, currentUser })
   const renderDiarioTab = () => (
     <div>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <div style={{ display: 'flex', gap: 10 }}>
-          <select value={diarioFiltroMes} onChange={e => setDiarioFiltroMes(e.target.value)} style={{ padding: '8px 12px', border: `1px solid ${colors.border}`, borderRadius: 8, fontSize: 13 }}>
+          <select value={diarioFiltroMes} onChange={e => setDiarioFiltroMes(e.target.value)} style={{ padding: '8px 12px', border: `1px solid ${colors.border}`, borderRadius: 8, fontSize: 13, background: colors.white }}>
             <option value="">Todos os meses</option>
             {diarioMonths.map(m => <option key={m} value={m}>{new Date(m + '-01').toLocaleDateString('pt-PT', { month: 'long', year: 'numeric' })}</option>)}
           </select>
         </div>
-        <button onClick={() => openDiarioModal()} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px', background: colors.primary, color: '#fff', border: 'none', borderRadius: 10, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
-          <Plus size={16} /> Nova Entrada
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', background: colors.white, border: `1px solid ${colors.border}`, borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer', color: colors.text }}>
+            <Download size={14} /> Exportar
+          </button>
+          <button onClick={() => openDiarioModal()} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', background: colors.primary, color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+            <Plus size={14} /> Nova Entrada
+          </button>
+        </div>
       </div>
 
-      {/* Timeline */}
+      {/* Stats bar */}
+      <div style={{ display: 'flex', gap: 12, marginBottom: 20, fontSize: 13, color: colors.textMuted }}>
+        <span style={{ padding: '5px 12px', background: colors.background, borderRadius: 6 }}>{diarioStats.total} entrada{diarioStats.total !== 1 ? 's' : ''}</span>
+        <span style={{ padding: '5px 12px', background: '#D1FAE5', borderRadius: 6, color: '#059669' }}>{diarioStats.submetidos} submetido{diarioStats.submetidos !== 1 ? 's' : ''}</span>
+        {diarioStats.rascunhos > 0 && <span style={{ padding: '5px 12px', background: '#FEF3C7', borderRadius: 6, color: '#D97706' }}>{diarioStats.rascunhos} rascunho{diarioStats.rascunhos !== 1 ? 's' : ''}</span>}
+      </div>
+
+      {/* Timeline with dots */}
       {diarioLoading ? (
         <div style={{ textAlign: 'center', padding: 48, color: colors.textMuted }}>A carregar...</div>
       ) : filteredDiario.length === 0 ? (
@@ -869,8 +882,11 @@ export default function AcompanhamentoTab({ obraId, activeSubtab, currentUser })
           </button>
         </div>
       ) : (
-        <div>
-          {filteredDiario.map((d) => {
+        <div style={{ position: 'relative', paddingLeft: 32 }}>
+          {/* Vertical timeline line */}
+          <div style={{ position: 'absolute', left: 7, top: 8, bottom: 0, width: 2, background: colors.border }} />
+
+          {filteredDiario.map((d, di) => {
             const weather = getWeatherInfo(d.condicoes_meteo)
             const WeatherIcon = weather.icon
             const trabArray = d.trabalhadores || []
@@ -882,92 +898,129 @@ export default function AcompanhamentoTab({ obraId, activeSubtab, currentUser })
             const photoCount = (d.fotos?.length || 0) + ativFotos
             const horaInicio = d.hora_inicio ? d.hora_inicio.substring(0, 5) : null
             const horaFim = d.hora_fim ? d.hora_fim.substring(0, 5) : null
+            const isToday = d.data === new Date().toISOString().split('T')[0]
 
             return (
-              <div key={d.id} style={{ background: colors.white, borderRadius: 12, border: `1px solid ${colors.border}`, overflow: 'hidden', marginBottom: 16 }}>
-                {/* Date Header */}
-                <div style={{ padding: '12px 20px', background: colors.background, borderBottom: `1px solid ${colors.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: 15, fontWeight: 700, color: colors.text }}>{formatDatePT(d.data)}</span>
-                    <span style={{ fontSize: 11, fontWeight: 600, color: colors.textMuted, letterSpacing: 0.5 }}>{getDayOfWeek(d.data)}</span>
+              <div key={d.id} style={{ position: 'relative', marginBottom: di < filteredDiario.length - 1 ? 24 : 0 }}>
+                {/* Timeline dot */}
+                <div style={{
+                  position: 'absolute', left: -32, top: 6,
+                  width: 16, height: 16, borderRadius: '50%',
+                  background: isToday ? colors.primary : (d.status === 'submetido' ? '#10B981' : colors.white),
+                  border: `3px solid ${isToday ? colors.primary : (d.status === 'submetido' ? '#10B981' : colors.border)}`,
+                  zIndex: 1
+                }} />
+
+                {/* Date header row */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+                    <span style={{ fontSize: 18, fontWeight: 700, color: colors.text }}>{formatDatePT(d.data)}</span>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: colors.textMuted, letterSpacing: 1, textTransform: 'uppercase' }}>{getDayOfWeek(d.data)}</span>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, color: d.status === 'submetido' ? '#10B981' : '#F59E0B', background: d.status === 'submetido' ? '#D1FAE5' : '#FEF3C7' }}>
-                      {d.status === 'submetido' ? 'Submetido' : 'Rascunho'}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, color: colors.text }}>
+                      <WeatherIcon size={16} style={{ color: weather.color }} />
+                      {d.temperatura ? `${d.temperatura}°C` : ''}{d.temperatura && d.observacoes_meteo ? ' · ' : ''}{d.observacoes_meteo || (!d.temperatura ? weather.label : '')}
                     </span>
-                    <button onClick={() => openDiarioModal(d)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: colors.textMuted }} title="Editar"><Edit size={14} /></button>
-                    <button onClick={() => handleDiarioDelete(d.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: colors.error }} title="Apagar"><Trash2 size={14} /></button>
+                    <div style={{ display: 'flex', gap: 2 }}>
+                      <button onClick={() => openDiarioModal(d)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: colors.textMuted }} title="Editar"><Edit size={14} /></button>
+                      <button onClick={() => handleDiarioDelete(d.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: colors.textMuted }} title="Apagar"><Trash2 size={14} /></button>
+                    </div>
                   </div>
                 </div>
 
-                {/* Weather + Stats Bar */}
-                <div style={{ padding: '10px 20px', borderBottom: `1px solid ${colors.border}`, display: 'flex', alignItems: 'center', gap: 18, fontSize: 13, color: colors.textMuted }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <WeatherIcon size={15} style={{ color: weather.color }} />
-                    <span style={{ color: colors.text }}>{d.temperatura ? `${d.temperatura}°C · ` : ''}{weather.label}</span>
-                  </span>
-                  {workerCount > 0 && <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Users size={13} /> {workerCount} em obra</span>}
-                  {(horaInicio || horaFim) && <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Clock size={13} /> {horaInicio || '—'} – {horaFim || '—'}</span>}
-                  {photoCount > 0 && <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Camera size={13} /> {photoCount} fotos</span>}
+                {/* Stats pills bar */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 14, fontSize: 13, color: colors.textMuted }}>
+                  {workerCount > 0 && (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <Users size={13} /> <strong style={{ color: colors.text }}>{workerCount}</strong> em obra
+                    </span>
+                  )}
+                  {workerCount > 0 && (horaInicio || horaFim) && <span style={{ margin: '0 10px', color: colors.border }}>|</span>}
+                  {(horaInicio || horaFim) && (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <Clock size={13} /> {horaInicio || '—'} — {horaFim || '—'}
+                    </span>
+                  )}
+                  {(horaInicio || horaFim || workerCount > 0) && photoCount > 0 && <span style={{ margin: '0 10px', color: colors.border }}>|</span>}
+                  {photoCount > 0 && (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <Camera size={13} /> <strong style={{ color: colors.text }}>{photoCount}</strong> fotos
+                    </span>
+                  )}
+                  {d.status && (
+                    <>
+                      <span style={{ margin: '0 10px', color: colors.border }}>|</span>
+                      <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600, color: d.status === 'submetido' ? '#10B981' : '#D97706', background: d.status === 'submetido' ? '#D1FAE5' : '#FEF3C7' }}>
+                        {d.status === 'submetido' ? 'Submetido' : 'Rascunho'}
+                      </span>
+                    </>
+                  )}
                 </div>
 
-                {/* Activities by Specialty */}
-                <div style={{ padding: '0 20px' }}>
-                  {displayAtividades.map((ativ, idx) => {
-                    const espColor = getEspecColor(ativ.especialidade_nome)
-                    const aFotos = ativ.fotos || []
-                    const maxThumbs = 3
-                    const extra = aFotos.length > maxThumbs ? aFotos.length - maxThumbs : 0
-                    return (
-                      <div key={idx} style={{ padding: '14px 0', borderBottom: idx < displayAtividades.length - 1 ? `1px solid ${colors.border}` : 'none' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
-                          <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: 0.5, background: `${espColor}18`, color: espColor, textTransform: 'uppercase' }}>
-                            {ativ.especialidade_nome || 'Geral'}
-                          </span>
-                          {ativ.zona && <span style={{ fontSize: 12, color: colors.textMuted }}>{ativ.zona}</span>}
+                {/* Activities card */}
+                <div style={{ background: colors.white, borderRadius: 12, border: `1px solid ${colors.border}`, overflow: 'hidden' }}>
+                  <div style={{ padding: '0 20px' }}>
+                    {displayAtividades.map((ativ, idx) => {
+                      const espColor = getEspecColor(ativ.especialidade_nome)
+                      const aFotos = ativ.fotos || []
+                      const maxThumbs = 3
+                      const extra = aFotos.length > maxThumbs ? aFotos.length - maxThumbs : 0
+                      return (
+                        <div key={idx} style={{ padding: '14px 0', borderBottom: idx < displayAtividades.length - 1 ? `1px solid ${colors.border}` : 'none' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+                            <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: 0.5, background: `${espColor}18`, color: espColor, textTransform: 'uppercase' }}>
+                              {ativ.especialidade_nome || 'Geral'}
+                            </span>
+                            {ativ.zona && <span style={{ fontSize: 12, color: colors.textMuted }}>{ativ.zona}</span>}
+                          </div>
+                          <p style={{ margin: 0, fontSize: 13, color: colors.text, lineHeight: 1.6 }}>{ativ.descricao}</p>
+                          {ativ.alerta && (
+                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 10px', marginTop: 8, background: (ativ.alerta.tipo || '') === 'bloqueio' ? `${colors.error}12` : '#FEF3C7', borderRadius: 6, borderLeft: `3px solid ${(ativ.alerta.tipo || '') === 'bloqueio' ? colors.error : colors.warning}` }}>
+                              <AlertTriangle size={13} color={(ativ.alerta.tipo || '') === 'bloqueio' ? colors.error : colors.warning} style={{ flexShrink: 0, marginTop: 1 }} />
+                              <span style={{ fontSize: 12, color: colors.text }}>{typeof ativ.alerta === 'string' ? ativ.alerta : ativ.alerta.descricao}</span>
+                            </div>
+                          )}
+                          {ativ.nota && (
+                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, padding: '6px 10px', marginTop: 8, background: colors.background, borderRadius: 6 }}>
+                              <Info size={12} color={colors.textMuted} style={{ flexShrink: 0, marginTop: 1 }} />
+                              <span style={{ fontSize: 12, color: colors.textMuted }}>{ativ.nota}</span>
+                            </div>
+                          )}
+                          {aFotos.length > 0 && (
+                            <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+                              {aFotos.slice(0, maxThumbs).map((foto, fi) => (
+                                <div key={fi} style={{ width: 56, height: 42, borderRadius: 5, overflow: 'hidden', flexShrink: 0 }}>
+                                  <img src={typeof foto === 'string' ? foto : foto.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
+                                </div>
+                              ))}
+                              {extra > 0 && (
+                                <div style={{ width: 56, height: 42, borderRadius: 5, background: colors.background, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 600, color: colors.textMuted, flexShrink: 0 }}>+{extra}</div>
+                              )}
+                            </div>
+                          )}
                         </div>
-                        <p style={{ margin: 0, fontSize: 13, color: colors.text, lineHeight: 1.6 }}>{ativ.descricao}</p>
-                        {ativ.alerta && (
-                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 10px', marginTop: 8, background: (ativ.alerta.tipo || '') === 'bloqueio' ? `${colors.error}12` : '#FEF3C7', borderRadius: 6, borderLeft: `3px solid ${(ativ.alerta.tipo || '') === 'bloqueio' ? colors.error : colors.warning}` }}>
-                            <AlertTriangle size={13} color={(ativ.alerta.tipo || '') === 'bloqueio' ? colors.error : colors.warning} style={{ flexShrink: 0, marginTop: 1 }} />
-                            <span style={{ fontSize: 12, color: colors.text }}>{typeof ativ.alerta === 'string' ? ativ.alerta : ativ.alerta.descricao}</span>
-                          </div>
-                        )}
-                        {ativ.nota && (
-                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, padding: '6px 10px', marginTop: 8, background: colors.background, borderRadius: 6 }}>
-                            <Info size={12} color={colors.textMuted} style={{ flexShrink: 0, marginTop: 1 }} />
-                            <span style={{ fontSize: 12, color: colors.textMuted }}>{ativ.nota}</span>
-                          </div>
-                        )}
-                        {aFotos.length > 0 && (
-                          <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
-                            {aFotos.slice(0, maxThumbs).map((foto, fi) => (
-                              <div key={fi} style={{ width: 56, height: 42, borderRadius: 5, overflow: 'hidden', flexShrink: 0 }}>
-                                <img src={typeof foto === 'string' ? foto : foto.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
-                              </div>
-                            ))}
-                            {extra > 0 && (
-                              <div style={{ width: 56, height: 42, borderRadius: 5, background: colors.background, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 600, color: colors.textMuted, flexShrink: 0 }}>+{extra}</div>
-                            )}
-                          </div>
-                        )}
+                      )
+                    })}
+
+                    {/* Inline alerts from ocorrencias */}
+                    {(d.ocorrencias || []).map((oc, oi) => (
+                      <div key={`oc-${oi}`} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '10px 12px', margin: '6px 0', background: oc.severidade === 'Alta' ? `${colors.error}12` : '#FEF3C7', borderRadius: 6, borderLeft: `3px solid ${oc.severidade === 'Alta' ? colors.error : colors.warning}` }}>
+                        <AlertTriangle size={14} color={oc.severidade === 'Alta' ? colors.error : colors.warning} style={{ flexShrink: 0, marginTop: 1 }} />
+                        <span style={{ fontSize: 13, color: colors.text, lineHeight: 1.4 }}>{oc.descricao}</span>
                       </div>
-                    )
-                  })}
+                    ))}
 
-                  {/* Inline alerts from ocorrencias */}
-                  {(d.ocorrencias || []).map((oc, oi) => (
-                    <div key={`oc-${oi}`} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '10px 12px', margin: '6px 0', background: oc.severidade === 'Alta' ? `${colors.error}12` : '#FEF3C7', borderRadius: 6, borderLeft: `3px solid ${oc.severidade === 'Alta' ? colors.error : colors.warning}` }}>
-                      <AlertTriangle size={14} color={oc.severidade === 'Alta' ? colors.error : colors.warning} style={{ flexShrink: 0, marginTop: 1 }} />
-                      <span style={{ fontSize: 13, color: colors.text, lineHeight: 1.4 }}>{oc.descricao}</span>
-                    </div>
-                  ))}
-                </div>
+                    {displayAtividades.length === 0 && (d.ocorrencias || []).length === 0 && (
+                      <div style={{ padding: '16px 0', color: colors.textMuted, fontSize: 13 }}>Sem atividades registadas</div>
+                    )}
+                  </div>
 
-                {/* Registered By Footer */}
-                <div style={{ padding: '10px 20px', borderTop: `1px solid ${colors.border}`, fontSize: 12, color: colors.textMuted }}>
-                  Registado por <strong style={{ color: colors.text }}>{d.registado_por_nome || d.funcao || 'Utilizador'}</strong>
-                  {d.updated_at && <> · {new Date(d.updated_at).toLocaleDateString('pt-PT')} {new Date(d.updated_at).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}</>}
+                  {/* Registered By Footer */}
+                  <div style={{ padding: '10px 20px', borderTop: `1px solid ${colors.border}`, fontSize: 12, color: colors.textMuted, background: colors.background }}>
+                    Registado por <strong style={{ color: colors.text }}>{d.registado_por_nome || d.funcao || 'Utilizador'}</strong>
+                    {d.updated_at && <> · {new Date(d.updated_at).toLocaleDateString('pt-PT')} {new Date(d.updated_at).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}</>}
+                  </div>
                 </div>
               </div>
             )
@@ -1442,14 +1495,272 @@ export default function AcompanhamentoTab({ obraId, activeSubtab, currentUser })
   )
 
   // ============================================
-  // MAIN RETURN
+  // SIDEBAR: Week Summary + Calendar + Pendentes
   // ============================================
+  const renderSidebar = () => {
+    // Week summary stats
+    const now = new Date()
+    const startOfWeek = new Date(now)
+    startOfWeek.setDate(now.getDate() - now.getDay() + 1) // Monday
+    const endOfWeek = new Date(startOfWeek)
+    endOfWeek.setDate(startOfWeek.getDate() + 6)
+    const startStr = startOfWeek.toISOString().split('T')[0]
+    const endStr = endOfWeek.toISOString().split('T')[0]
+
+    const weekEntries = diarioEntradas.filter(d => d.data >= startStr && d.data <= endStr)
+    const weekDays = weekEntries.length
+    const weekWorkers = weekEntries.reduce((s, d) => {
+      const wc = (d.trabalhadores_gavinho || 0) + (d.trabalhadores_subempreiteiros || 0)
+      return s + wc
+    }, 0)
+    const avgWorkers = weekEntries.length > 0 ? (weekWorkers / weekEntries.length).toFixed(1) : '0'
+    const weekPhotos = weekEntries.reduce((s, d) => s + (d.fotos?.length || 0) + (d.atividades || []).reduce((a, at) => a + (at.fotos?.length || 0), 0), 0)
+    const weekIncidents = weekEntries.reduce((s, d) => s + (d.ocorrencias?.length || 0), 0)
+
+    // Calendar
+    const calYear = now.getFullYear()
+    const calMonth = now.getMonth()
+    const firstDay = new Date(calYear, calMonth, 1).getDay()
+    const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate()
+    const today = now.getDate()
+    const calStartDay = firstDay === 0 ? 6 : firstDay - 1 // Monday start
+    const entryDates = new Set(diarioEntradas.map(d => d.data))
+
+    // Pendentes from NCs
+    const openNcs = ncs.filter(n => ['aberta', 'em_resolucao'].includes(n.estado))
+    const criticalOcorrencias = diarioEntradas.flatMap(d => (d.ocorrencias || []).filter(o => o.severidade === 'Alta'))
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {/* RESUMO DA SEMANA card */}
+        <div style={{ background: colors.white, borderRadius: 12, border: `1px solid ${colors.border}`, padding: 20 }}>
+          <h3 style={{ margin: '0 0 16px', fontSize: 12, fontWeight: 700, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 1 }}>Resumo da Semana</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div style={{ textAlign: 'center', padding: 12, background: colors.background, borderRadius: 8 }}>
+              <div style={{ fontSize: 22, fontWeight: 700, color: colors.primary }}>{weekDays}<span style={{ fontSize: 13, fontWeight: 400, color: colors.textMuted }}>/5</span></div>
+              <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>Dias Registados</div>
+            </div>
+            <div style={{ textAlign: 'center', padding: 12, background: colors.background, borderRadius: 8 }}>
+              <div style={{ fontSize: 22, fontWeight: 700, color: colors.primary }}>{avgWorkers}</div>
+              <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>Media em Obra</div>
+            </div>
+            <div style={{ textAlign: 'center', padding: 12, background: colors.background, borderRadius: 8 }}>
+              <div style={{ fontSize: 22, fontWeight: 700, color: colors.primary }}>{weekPhotos}</div>
+              <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>Fotografias</div>
+            </div>
+            <div style={{ textAlign: 'center', padding: 12, background: weekIncidents > 0 ? '#FEF2F2' : colors.background, borderRadius: 8 }}>
+              <div style={{ fontSize: 22, fontWeight: 700, color: weekIncidents > 0 ? colors.error : colors.primary }}>{weekIncidents}</div>
+              <div style={{ fontSize: 11, color: weekIncidents > 0 ? colors.error : colors.textMuted, marginTop: 2 }}>Incidentes</div>
+            </div>
+          </div>
+        </div>
+
+        {/* CALENDAR card */}
+        <div style={{ background: colors.white, borderRadius: 12, border: `1px solid ${colors.border}`, padding: 20 }}>
+          <h3 style={{ margin: '0 0 12px', fontSize: 12, fontWeight: 700, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 1 }}>
+            {MONTHS_PT[calMonth]} {calYear}
+          </h3>
+          {/* Weekday headers */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, textAlign: 'center', marginBottom: 4 }}>
+            {['S', 'T', 'Q', 'Q', 'S', 'S', 'D'].map((d, i) => (
+              <div key={i} style={{ fontSize: 10, fontWeight: 600, color: colors.textMuted, padding: '4px 0' }}>{d}</div>
+            ))}
+          </div>
+          {/* Days grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, textAlign: 'center' }}>
+            {Array.from({ length: calStartDay }).map((_, i) => <div key={`e-${i}`} />)}
+            {Array.from({ length: daysInMonth }).map((_, i) => {
+              const day = i + 1
+              const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+              const hasEntry = entryDates.has(dateStr)
+              const isToday = day === today
+              return (
+                <div key={day} style={{
+                  position: 'relative', width: 28, height: 28, lineHeight: '28px',
+                  borderRadius: '50%', fontSize: 11, fontWeight: isToday ? 700 : 400, margin: '0 auto',
+                  background: isToday ? colors.primary : 'transparent',
+                  color: isToday ? '#fff' : (hasEntry ? colors.text : colors.textMuted),
+                  cursor: hasEntry ? 'pointer' : 'default'
+                }}>
+                  {day}
+                  {hasEntry && !isToday && (
+                    <div style={{ position: 'absolute', bottom: 1, left: '50%', transform: 'translateX(-50%)', width: 4, height: 4, borderRadius: '50%', background: colors.primary }} />
+                  )}
+                  {hasEntry && isToday && (
+                    <div style={{ position: 'absolute', bottom: 1, left: '50%', transform: 'translateX(-50%)', width: 4, height: 4, borderRadius: '50%', background: '#fff' }} />
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* PENDENTES card */}
+        <div style={{ background: colors.white, borderRadius: 12, border: `1px solid ${colors.border}`, padding: 20 }}>
+          <h3 style={{ margin: '0 0 12px', fontSize: 12, fontWeight: 700, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 1 }}>Pendentes nesta Obra</h3>
+          {openNcs.length === 0 && criticalOcorrencias.length === 0 ? (
+            <p style={{ fontSize: 13, color: colors.textMuted, margin: 0 }}>Sem pendentes activos</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {openNcs.slice(0, 5).map(nc => {
+                const isAberta = nc.estado === 'aberta'
+                return (
+                  <div key={nc.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: nc.gravidade === 'critica' ? colors.error : (isAberta ? colors.warning : '#3B82F6'), flexShrink: 0, marginTop: 5 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: colors.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {nc.gravidade === 'critica' ? 'NC Critica' : (isAberta ? 'NC Aberta' : 'NC em Resolucao')}
+                      </div>
+                      <div style={{ fontSize: 11, color: colors.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nc.titulo}</div>
+                    </div>
+                  </div>
+                )
+              })}
+              {criticalOcorrencias.slice(0, 3).map((oc, i) => (
+                <div key={`oc-${i}`} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: colors.error, flexShrink: 0, marginTop: 5 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: colors.text }}>Ocorrencia Alta</div>
+                    <div style={{ fontSize: 11, color: colors.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{oc.descricao}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // ============================================
+  // RENDER: RESUMO TAB (overview)
+  // ============================================
+  const renderResumoTab = () => {
+    const recentEntries = diarioEntradas.slice(0, 5)
+    const totalPhotos = diarioEntradas.reduce((s, d) => s + (d.fotos?.length || 0) + (d.atividades || []).reduce((a, at) => a + (at.fotos?.length || 0), 0), 0)
+    const totalWorkerDays = diarioEntradas.reduce((s, d) => s + (d.trabalhadores_gavinho || 0) + (d.trabalhadores_subempreiteiros || 0), 0)
+    const totalIncidents = diarioEntradas.reduce((s, d) => s + (d.ocorrencias?.length || 0), 0)
+
+    return (
+      <div>
+        {/* KPI row */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
+          {[
+            { label: 'Entradas Diario', value: diarioEntradas.length, icon: BookOpen, color: colors.primary },
+            { label: 'Fotografias Total', value: totalPhotos + fotos.length, icon: Camera, color: '#0891b2' },
+            { label: 'Homens/Dia Total', value: totalWorkerDays, icon: Users, color: '#059669' },
+            { label: 'Incidentes', value: totalIncidents, icon: AlertTriangle, color: totalIncidents > 0 ? colors.error : colors.textMuted },
+          ].map((kpi, i) => {
+            const Icon = kpi.icon
+            return (
+              <div key={i} style={{ background: colors.white, borderRadius: 12, border: `1px solid ${colors.border}`, padding: 20 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 8, background: `${kpi.color}12`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Icon size={18} style={{ color: kpi.color }} />
+                  </div>
+                </div>
+                <div style={{ fontSize: 26, fontWeight: 700, color: colors.text }}>{kpi.value}</div>
+                <div style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>{kpi.label}</div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Recent entries */}
+        <h3 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 700, color: colors.text }}>Ultimas Entradas</h3>
+        {recentEntries.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 40, background: colors.white, borderRadius: 12, border: `1px solid ${colors.border}` }}>
+            <BookOpen size={40} style={{ color: colors.textMuted, opacity: 0.3, marginBottom: 12 }} />
+            <p style={{ color: colors.textMuted, fontSize: 13 }}>Sem entradas no diario</p>
+            <button onClick={() => openDiarioModal()} style={{ marginTop: 8, padding: '8px 16px', background: colors.primary, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, cursor: 'pointer' }}>
+              <Plus size={14} style={{ verticalAlign: -2, marginRight: 6 }} />Criar entrada
+            </button>
+          </div>
+        ) : (
+          <div style={{ background: colors.white, borderRadius: 12, border: `1px solid ${colors.border}`, overflow: 'hidden' }}>
+            {recentEntries.map((d, i) => {
+              const weather = getWeatherInfo(d.condicoes_meteo)
+              const WeatherIcon = weather.icon
+              const wc = (d.trabalhadores_gavinho || 0) + (d.trabalhadores_subempreiteiros || 0)
+              const ativCount = (d.atividades?.length || 0) || (d.tarefas?.length || 0)
+              return (
+                <div key={d.id} style={{ padding: '14px 20px', borderBottom: i < recentEntries.length - 1 ? `1px solid ${colors.border}` : 'none', display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: d.status === 'submetido' ? '#10B981' : colors.warning, flexShrink: 0 }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 14, fontWeight: 600, color: colors.text }}>{formatDatePT(d.data)}</span>
+                      <span style={{ fontSize: 11, color: colors.textMuted }}>{getDayOfWeek(d.data)}</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 12, marginTop: 3, fontSize: 12, color: colors.textMuted }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><WeatherIcon size={12} style={{ color: weather.color }} /> {d.temperatura ? `${d.temperatura}°C` : weather.label}</span>
+                      {wc > 0 && <span>{wc} trabalhadores</span>}
+                      {ativCount > 0 && <span>{ativCount} atividade{ativCount !== 1 ? 's' : ''}</span>}
+                    </div>
+                  </div>
+                  <span style={{ padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, color: d.status === 'submetido' ? '#10B981' : '#D97706', background: d.status === 'submetido' ? '#D1FAE5' : '#FEF3C7' }}>
+                    {d.status === 'submetido' ? 'Submetido' : 'Rascunho'}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* NCs summary */}
+        {ncs.length > 0 && (
+          <>
+            <h3 style={{ margin: '24px 0 12px', fontSize: 14, fontWeight: 700, color: colors.text }}>Nao Conformidades</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10 }}>
+              {[
+                { label: 'Abertas', value: ncStats.abertas, color: '#F44336', bg: '#FFEBEE' },
+                { label: 'Em Resolucao', value: ncStats.emResolucao, color: '#FF9800', bg: '#FFF3E0' },
+                { label: 'Resolvidas', value: ncStats.resolvidas, color: '#4CAF50', bg: '#E8F5E9' },
+              ].map(s => (
+                <div key={s.label} style={{ padding: 14, background: s.bg, borderRadius: 10, textAlign: 'center' }}>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
+                  <div style={{ fontSize: 11, color: s.color, marginTop: 2 }}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    )
+  }
+
+  // ============================================
+  // RENDER: DOCUMENTOS TAB (placeholder)
+  // ============================================
+  const renderDocumentosTab = () => (
+    <div style={{ textAlign: 'center', padding: 48, background: colors.white, borderRadius: 12, border: `1px solid ${colors.border}` }}>
+      <FileText size={48} style={{ color: colors.textMuted, opacity: 0.3, marginBottom: 16 }} />
+      <p style={{ color: colors.textMuted, fontSize: 14 }}>Documentos da obra</p>
+      <p style={{ color: colors.textMuted, fontSize: 12, marginTop: 4 }}>Em desenvolvimento</p>
+    </div>
+  )
+
+  // ============================================
+  // MAIN RETURN — 2-column layout with sidebar
+  // ============================================
+  const showSidebar = activeSubtab === 'resumo' || activeSubtab === 'diario'
+
   return (
-    <>
-      {activeSubtab === 'fotografias' && renderFotografiasTab()}
-      {activeSubtab === 'diario' && renderDiarioTab()}
-      {activeSubtab === 'relatorios' && renderRelatoriosTab()}
-      {activeSubtab === 'nao-conformidades' && renderNaoConformidadesTab()}
-    </>
+    <div style={{ display: 'grid', gridTemplateColumns: showSidebar ? '1fr 320px' : '1fr', gap: 24, alignItems: 'start' }}>
+      {/* Main content column */}
+      <div style={{ minWidth: 0 }}>
+        {activeSubtab === 'resumo' && renderResumoTab()}
+        {activeSubtab === 'diario' && renderDiarioTab()}
+        {activeSubtab === 'fotografias' && renderFotografiasTab()}
+        {activeSubtab === 'nao-conformidades' && renderNaoConformidadesTab()}
+        {activeSubtab === 'documentos' && renderDocumentosTab()}
+      </div>
+
+      {/* Sidebar — visible on Resumo + Diario */}
+      {showSidebar && (
+        <div style={{ position: 'sticky', top: 16 }}>
+          {renderSidebar()}
+        </div>
+      )}
+    </div>
   )
 }

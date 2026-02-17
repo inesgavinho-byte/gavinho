@@ -1,7 +1,7 @@
 import {
   FileText, Calculator, Receipt, ShoppingCart,
   TrendingUp, ClipboardList, Users,
-  AlertTriangle, Camera, BookOpen,
+  AlertTriangle, Camera, BookOpen, Download,
   Shield, Truck, Grid3X3, BarChart3, MessageSquare
 } from 'lucide-react'
 
@@ -30,10 +30,11 @@ export const trackingSubtabs = [
 
 // Sub-tabs de Acompanhamento
 export const acompanhamentoSubtabs = [
+  { id: 'resumo', label: 'Resumo', icon: BarChart3 },
+  { id: 'diario', label: 'Diário', icon: BookOpen },
   { id: 'fotografias', label: 'Fotografias', icon: Camera },
-  { id: 'diario', label: 'Diário de Obra', icon: BookOpen },
-  { id: 'relatorios', label: 'Relatórios', icon: FileText },
   { id: 'nao-conformidades', label: 'Não Conformidades', icon: AlertTriangle },
+  { id: 'documentos', label: 'Documentos', icon: Download },
 ]
 
 // Sub-tabs de Fiscalização
