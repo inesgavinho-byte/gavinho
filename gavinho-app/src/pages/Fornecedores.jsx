@@ -20,7 +20,9 @@ import { getTopRecommendations } from '../services/garvisMatching'
 import {
   Plus, Search, Edit2, Trash2, Phone, Mail,
   Star, X, Loader2, Upload, Download,
-  AlertTriangle, TrendingUp, Users, Sparkles
+  AlertTriangle, TrendingUp, Users, Sparkles,
+  LayoutGrid, List, MapPin, Clock, Shield, CreditCard,
+  Heart, Briefcase, Calendar
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 
@@ -41,6 +43,7 @@ const C = {
   border: '#E5E2D9',
   cream: '#F5F3EB',
   white: '#FFFFFF',
+  bg: '#FAF8F4',
 }
 
 const STATUS_FORNECEDOR = {
@@ -50,11 +53,11 @@ const STATUS_FORNECEDOR = {
   bloqueado: { label: 'Bloqueado', color: C.danger, bg: 'rgba(166,93,87,0.10)' }
 }
 
-const statusTabs = [
+const filterPills = [
   { key: '', label: 'Todos' },
-  { key: 'ativo', label: 'Ativos' },
-  { key: 'preferencial', label: 'Preferenciais' },
-  { key: 'inativo', label: 'Inativos' },
+  { key: 'preferencial', label: 'Preferidos' },
+  { key: 'com_obra', label: 'Com obra ativa' },
+  { key: 'orcamento', label: 'Orçamento pendente' },
 ]
 
 
@@ -81,6 +84,7 @@ export default function Fornecedores() {
   const [search, setSearch] = useState('')
   const [filtroEspecialidade, setFiltroEspecialidade] = useState('')
   const [filtroStatus, setFiltroStatus] = useState('')
+  const [viewMode, setViewMode] = useState('cards') // 'cards' | 'lista'
   const [showModal, setShowModal] = useState(false)
   const [editingFornecedor, setEditingFornecedor] = useState(null)
   const [showGarvis, setShowGarvis] = useState(false)
@@ -264,13 +268,19 @@ export default function Fornecedores() {
         !f.responsavel?.toLowerCase().includes(search.toLowerCase()) &&
         !f.especialidade?.toLowerCase().includes(search.toLowerCase())) return false
     if (filtroEspecialidade && f.especialidade !== filtroEspecialidade) return false
-    if (filtroStatus && f.status !== filtroStatus) return false
+    if (filtroStatus === 'preferencial' && f.status !== 'preferencial') return false
+    if (filtroStatus === 'com_obra') return f.status === 'ativo'
+    if (filtroStatus === 'orcamento') return false // placeholder filter
     return true
   })
 
   const especialidadesUnicas = [...new Set(fornecedores.map(f => f.especialidade).filter(Boolean))]
+  const especialidadeCounts = especialidadesUnicas.reduce((acc, esp) => {
+    acc[esp] = fornecedores.filter(f => f.especialidade === esp).length
+    return acc
+  }, {})
 
-  // Counts per status for tab badges
+  // Counts
   const statusCounts = {
     ativo: fornecedores.filter(f => f.status === 'ativo').length,
     preferencial: fornecedores.filter(f => f.status === 'preferencial').length,
@@ -309,10 +319,23 @@ export default function Fornecedores() {
     )
   }
 
+  // Get year supplier was created
+  const getDesdeYear = (f) => {
+    if (f.created_at) return new Date(f.created_at).getFullYear()
+    return '—'
+  }
+
+  // Get alert text for a supplier
+  const getSupplierAlert = (f) => {
+    if (f.status === 'bloqueado') return { text: 'Bloqueado — não disponível para novos projetos', color: C.danger, bg: 'rgba(166,93,87,0.08)' }
+    if (f.rating && f.rating <= 2) return { text: 'Rating baixo — avaliar continuidade', color: C.warning, bg: 'rgba(196,149,106,0.08)' }
+    return null
+  }
+
   return (
     <div style={{ maxWidth: '1200px' }}>
       {/* ═══ HEADER ═══ */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '20px' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '28px' }}>
         <div>
           <h1 style={{
             fontFamily: FONTS.heading,
@@ -374,75 +397,31 @@ export default function Fornecedores() {
         </div>
       </div>
 
-      {/* ═══ TAB BAR ═══ */}
-      <div style={{
-        display: 'flex',
-        gap: '4px',
-        marginBottom: '24px',
-        borderBottom: `1px solid ${C.border}`,
-      }}>
-        {statusTabs.map(t => {
-          const count = t.key ? statusCounts[t.key] || 0 : fornecedores.length
-          return (
-            <button
-              key={t.key}
-              onClick={() => setFiltroStatus(t.key)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '6px',
-                padding: '10px 16px',
-                background: 'none',
-                border: 'none',
-                borderBottom: filtroStatus === t.key ? `2px solid ${C.dark}` : '2px solid transparent',
-                fontFamily: FONTS.body,
-                fontSize: '13px',
-                fontWeight: filtroStatus === t.key ? 700 : 400,
-                color: filtroStatus === t.key ? C.dark : C.light,
-                cursor: 'pointer',
-                transition: 'all 0.15s',
-                marginBottom: '-1px',
-              }}
-            >
-              {t.label}
-              <span style={{
-                background: filtroStatus === t.key ? C.dark : 'rgba(0,0,0,0.06)',
-                color: filtroStatus === t.key ? C.white : C.light,
-                fontSize: '10px',
-                fontWeight: 700,
-                padding: '2px 7px',
-                borderRadius: '10px',
-                lineHeight: '14px',
-              }}>
-                {count}
-              </span>
-            </button>
-          )
-        })}
-      </div>
-
-      {/* ═══ KPI ROW ═══ */}
+      {/* ═══ KPI ROW — 5 cards ═══ */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(4, 1fr)',
-        gap: '16px',
+        gridTemplateColumns: 'repeat(5, 1fr)',
+        gap: '14px',
         marginBottom: '24px',
       }}>
         {[
-          { label: 'TOTAL', value: fornecedores.length, detail: `${statusCounts.ativo} ativos` },
-          { label: 'ATIVOS', value: statusCounts.ativo, detail: `${statusCounts.preferencial} preferenciais` },
-          { label: 'RATING MÉDIO', value: avgRating, detail: `${fornecedores.filter(f => f.rating).length} com avaliação`, icon: true },
-          { label: 'ESPECIALIDADES', value: especialidadesUnicas.length, detail: `${kpis.dealRooms} deal rooms` },
+          { label: 'TOTAL', value: fornecedores.length, detail: `${statusCounts.ativo + statusCounts.preferencial} disponíveis`, color: C.dark },
+          { label: 'ATIVOS', value: statusCounts.ativo, detail: `${statusCounts.preferencial} preferenciais`, color: C.success },
+          { label: 'ORÇAMENTOS PENDENTES', value: kpis.orcamentos, detail: `${kpis.dealRooms} deal rooms`, color: C.warning },
+          { label: 'RATING MÉDIO', value: avgRating, detail: `${fornecedores.filter(f => f.rating).length} avaliados`, color: C.dark, icon: true },
+          { label: 'INCIDENTES', value: kpis.alertas, detail: `${fornecedores.filter(f => f.status === 'bloqueado').length} bloqueados`, color: C.danger },
         ].map(kpi => (
           <div key={kpi.label} style={{
             background: C.white,
             borderRadius: '14px',
-            padding: '20px 22px',
+            padding: '18px 20px',
             border: `1px solid ${C.border}`,
             boxShadow: '0 1px 4px rgba(0,0,0,0.03)',
           }}>
             <span style={{
-              fontFamily: FONTS.body, fontSize: '11px', fontWeight: 700,
+              fontFamily: FONTS.body, fontSize: '10px', fontWeight: 700,
               textTransform: 'uppercase', letterSpacing: '0.06em',
-              color: C.muted,
+              color: C.muted, display: 'block',
             }}>
               {kpi.label}
             </span>
@@ -451,15 +430,15 @@ export default function Fornecedores() {
               marginTop: '8px',
             }}>
               <span style={{
-                fontFamily: FONTS.body, fontSize: '38px', fontWeight: 700,
-                color: C.dark, lineHeight: 1, letterSpacing: '-1px',
+                fontFamily: FONTS.body, fontSize: '34px', fontWeight: 700,
+                color: kpi.color, lineHeight: 1, letterSpacing: '-1px',
               }}>
                 {kpi.value}
               </span>
-              {kpi.icon && <Star size={18} fill={C.warning} stroke={C.warning} style={{ marginBottom: '-4px' }} />}
+              {kpi.icon && <Star size={16} fill={C.warning} stroke={C.warning} style={{ marginBottom: '-2px' }} />}
             </div>
             <span style={{
-              fontFamily: FONTS.body, fontSize: '12px',
+              fontFamily: FONTS.body, fontSize: '11px',
               color: C.light, marginTop: '6px', display: 'block',
             }}>
               {kpi.detail}
@@ -468,15 +447,10 @@ export default function Fornecedores() {
         ))}
       </div>
 
-      {/* ═══ SEARCH + FILTERS ═══ */}
-      <div style={{
-        display: 'flex',
-        gap: '12px',
-        alignItems: 'center',
-        marginBottom: '16px',
-        flexWrap: 'wrap',
-      }}>
-        <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
+      {/* ═══ SEARCH + FILTER PILLS ═══ */}
+      <div style={{ marginBottom: '16px' }}>
+        {/* Search bar */}
+        <div style={{ position: 'relative', marginBottom: '12px' }}>
           <Search size={15} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: C.muted }} />
           <input
             type="text"
@@ -485,7 +459,7 @@ export default function Fornecedores() {
             onChange={e => setSearch(e.target.value)}
             style={{
               width: '100%',
-              padding: '10px 10px 10px 40px',
+              padding: '11px 10px 11px 40px',
               border: `1px solid ${C.border}`,
               borderRadius: '10px',
               fontSize: '13px',
@@ -497,72 +471,497 @@ export default function Fornecedores() {
             }}
           />
         </div>
-        <select
-          value={filtroEspecialidade}
-          onChange={e => setFiltroEspecialidade(e.target.value)}
+
+        {/* Filter pills row */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          {filterPills.map(pill => {
+            const isActive = filtroStatus === pill.key
+            return (
+              <button
+                key={pill.key}
+                onClick={() => setFiltroStatus(pill.key)}
+                style={{
+                  padding: '6px 16px',
+                  borderRadius: '20px',
+                  border: isActive ? 'none' : `1px solid ${C.border}`,
+                  background: isActive ? C.dark : C.white,
+                  color: isActive ? C.white : C.light,
+                  fontFamily: FONTS.body,
+                  fontSize: '12px',
+                  fontWeight: isActive ? 600 : 400,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                }}
+              >
+                {pill.label}
+              </button>
+            )
+          })}
+
+          {/* Import/Export buttons */}
+          <input type="file" ref={fileInputRef} onChange={handleImportExcel} accept=".xlsx,.xls" style={{ display: 'none' }} />
+          <div style={{ display: 'flex', gap: '6px', marginLeft: 'auto' }}>
+            <button onClick={() => fileInputRef.current?.click()} style={{
+              padding: '6px 12px', background: C.white, border: `1px solid ${C.border}`,
+              borderRadius: '8px', cursor: 'pointer', fontSize: '11px', fontFamily: FONTS.body,
+              color: C.light, display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 500,
+            }}>
+              <Upload size={12} /> Importar
+            </button>
+            <button onClick={exportarExcel} style={{
+              padding: '6px 12px', background: C.white, border: `1px solid ${C.border}`,
+              borderRadius: '8px', cursor: 'pointer', fontSize: '11px', fontFamily: FONTS.body,
+              color: C.light, display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 500,
+            }}>
+              <Download size={12} /> Exportar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ═══ SPECIALTY TAGS ROW ═══ */}
+      <div style={{
+        display: 'flex',
+        gap: '8px',
+        flexWrap: 'wrap',
+        marginBottom: '16px',
+        alignItems: 'center',
+      }}>
+        <button
+          onClick={() => setFiltroEspecialidade('')}
           style={{
-            padding: '10px 14px',
-            border: `1px solid ${C.border}`,
-            borderRadius: '10px',
-            fontSize: '13px',
+            padding: '5px 14px',
+            borderRadius: '8px',
+            border: !filtroEspecialidade ? 'none' : `1px solid ${C.border}`,
+            background: !filtroEspecialidade ? C.dark : C.white,
+            color: !filtroEspecialidade ? C.white : C.light,
             fontFamily: FONTS.body,
-            background: C.white,
-            color: C.dark,
+            fontSize: '12px',
+            fontWeight: 600,
             cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
           }}
         >
-          <option value="">Todas Especialidades</option>
-          {especialidadesUnicas.map(e => <option key={e} value={e}>{e}</option>)}
-        </select>
-        <input type="file" ref={fileInputRef} onChange={handleImportExcel} accept=".xlsx,.xls" style={{ display: 'none' }} />
-        <div style={{ display: 'flex', gap: '6px', marginLeft: 'auto' }}>
-          <button onClick={() => fileInputRef.current?.click()} style={{
-            padding: '9px 14px', background: C.white, border: `1px solid ${C.border}`,
-            borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontFamily: FONTS.body,
-            color: C.light, display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 500,
+          Todas
+          <span style={{
+            fontSize: '11px',
+            fontWeight: 700,
+            opacity: !filtroEspecialidade ? 0.7 : 0.5,
           }}>
-            <Upload size={13} /> Importar
+            {fornecedores.length}
+          </span>
+        </button>
+        {especialidadesUnicas.map(esp => {
+          const isActive = filtroEspecialidade === esp
+          return (
+            <button
+              key={esp}
+              onClick={() => setFiltroEspecialidade(esp)}
+              style={{
+                padding: '5px 14px',
+                borderRadius: '8px',
+                border: isActive ? 'none' : `1px solid ${C.border}`,
+                background: isActive ? C.dark : C.white,
+                color: isActive ? C.white : C.light,
+                fontFamily: FONTS.body,
+                fontSize: '12px',
+                fontWeight: isActive ? 600 : 400,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.15s',
+              }}
+            >
+              {esp}
+              <span style={{
+                fontSize: '11px',
+                fontWeight: 700,
+                opacity: isActive ? 0.7 : 0.5,
+              }}>
+                {especialidadeCounts[esp]}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* ═══ VIEW TOGGLE: Cards / Lista ═══ */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: '16px',
+      }}>
+        <span style={{
+          fontFamily: FONTS.body,
+          fontSize: '13px',
+          color: C.light,
+        }}>
+          {fornecedoresFiltrados.length} fornecedor{fornecedoresFiltrados.length !== 1 ? 'es' : ''}
+        </span>
+        <div style={{
+          display: 'flex',
+          background: C.cream,
+          borderRadius: '8px',
+          padding: '2px',
+        }}>
+          <button
+            onClick={() => setViewMode('cards')}
+            style={{
+              padding: '6px 12px',
+              borderRadius: '6px',
+              border: 'none',
+              background: viewMode === 'cards' ? C.white : 'transparent',
+              color: viewMode === 'cards' ? C.dark : C.muted,
+              fontFamily: FONTS.body,
+              fontSize: '12px',
+              fontWeight: viewMode === 'cards' ? 600 : 400,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              boxShadow: viewMode === 'cards' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+            }}
+          >
+            <LayoutGrid size={13} />
+            Cards
           </button>
-          <button onClick={exportarExcel} style={{
-            padding: '9px 14px', background: C.white, border: `1px solid ${C.border}`,
-            borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontFamily: FONTS.body,
-            color: C.light, display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 500,
-          }}>
-            <Download size={13} /> Exportar
+          <button
+            onClick={() => setViewMode('lista')}
+            style={{
+              padding: '6px 12px',
+              borderRadius: '6px',
+              border: 'none',
+              background: viewMode === 'lista' ? C.white : 'transparent',
+              color: viewMode === 'lista' ? C.dark : C.muted,
+              fontFamily: FONTS.body,
+              fontSize: '12px',
+              fontWeight: viewMode === 'lista' ? 600 : 400,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              boxShadow: viewMode === 'lista' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+            }}
+          >
+            <List size={13} />
+            Lista
           </button>
         </div>
       </div>
 
-      {/* ═══ SUPPLIER TABLE ═══ */}
-      <div style={{
-        background: C.white,
-        borderRadius: '14px',
-        border: `1px solid ${C.border}`,
-        overflow: 'hidden',
-      }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', fontFamily: FONTS.body, minWidth: '700px' }}>
-            <thead>
-              <tr>
-                <th style={thStyle}>FORNECEDOR</th>
-                <th style={thStyle}>ESPECIALIDADE</th>
-                <th style={{ ...thStyle, textAlign: 'center' }}>RATING</th>
-                <th style={thStyle}>CONTACTO</th>
-                <th style={{ ...thStyle, textAlign: 'center' }}>STATUS</th>
-                <th style={{ ...thStyle, textAlign: 'center', width: '70px' }}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {fornecedoresFiltrados.length === 0 ? (
-                <tr>
-                  <td colSpan={6} style={{
-                    padding: '48px', textAlign: 'center', color: C.light, fontFamily: FONTS.body,
+      {/* ═══ SUPPLIER CARDS GRID ═══ */}
+      {fornecedoresFiltrados.length === 0 ? (
+        <div style={{
+          padding: '64px 24px', textAlign: 'center',
+          background: C.white, borderRadius: '14px', border: `1px solid ${C.border}`,
+        }}>
+          <Users size={40} style={{ color: C.border, marginBottom: '12px' }} />
+          <p style={{ fontFamily: FONTS.body, fontSize: '14px', color: C.light }}>
+            Nenhum fornecedor encontrado
+          </p>
+        </div>
+      ) : viewMode === 'cards' ? (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: '16px',
+        }}>
+          {fornecedoresFiltrados.map(f => {
+            const statusConf = STATUS_FORNECEDOR[f.status] || STATUS_FORNECEDOR.ativo
+            const alert = getSupplierAlert(f)
+            return (
+              <div
+                key={f.id}
+                onClick={() => navigate(`/fornecedores/${f.id}`)}
+                style={{
+                  background: C.white,
+                  borderRadius: '14px',
+                  border: `1px solid ${C.border}`,
+                  overflow: 'hidden',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  boxShadow: '0 1px 4px rgba(0,0,0,0.03)',
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)'
+                  e.currentTarget.style.transform = 'translateY(-1px)'
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.03)'
+                  e.currentTarget.style.transform = 'translateY(0)'
+                }}
+              >
+                {/* Card header - Name, location, status */}
+                <div style={{ padding: '20px 20px 0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                    <div style={{ flex: 1 }}>
+                      <h3 style={{
+                        fontFamily: FONTS.heading,
+                        fontSize: '20px',
+                        fontWeight: 600,
+                        color: C.dark,
+                        margin: 0,
+                        lineHeight: 1.2,
+                      }}>
+                        {f.nome}
+                      </h3>
+                      {(f.cidade || f.morada) && (
+                        <div style={{
+                          display: 'flex', alignItems: 'center', gap: '4px',
+                          marginTop: '4px',
+                        }}>
+                          <MapPin size={11} style={{ color: C.muted }} />
+                          <span style={{ fontFamily: FONTS.body, fontSize: '12px', color: C.light }}>
+                            {f.cidade || f.morada}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    {/* Edit/Delete actions */}
+                    <div style={{ display: 'flex', gap: '2px' }} onClick={e => e.stopPropagation()}>
+                      <button onClick={() => handleEdit(f)} style={cardActionBtn}>
+                        <Edit2 size={13} />
+                      </button>
+                      <button onClick={() => handleDelete(f)} style={{ ...cardActionBtn, color: C.danger }}>
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Specialty tags */}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '14px' }}>
+                    {f.especialidade ? (
+                      <span style={{
+                        padding: '3px 10px',
+                        background: C.cream,
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        fontWeight: 500,
+                        color: C.light,
+                        fontFamily: FONTS.body,
+                      }}>
+                        {f.especialidade}
+                      </span>
+                    ) : null}
+                    <span style={{
+                      padding: '3px 10px',
+                      background: statusConf.bg,
+                      borderRadius: '6px',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      color: statusConf.color,
+                      fontFamily: FONTS.body,
+                    }}>
+                      {statusConf.label}
+                    </span>
+                  </div>
+
+                  {/* Stats row: PROJETOS / DESDE */}
+                  <div style={{
+                    display: 'flex', gap: '24px',
+                    paddingBottom: '14px',
+                    borderBottom: `1px solid ${C.border}`,
                   }}>
-                    Nenhum fornecedor encontrado
-                  </td>
+                    <div>
+                      <span style={{
+                        fontFamily: FONTS.body, fontSize: '10px', fontWeight: 700,
+                        textTransform: 'uppercase', letterSpacing: '0.06em',
+                        color: C.muted, display: 'block',
+                      }}>
+                        PROJETOS
+                      </span>
+                      <span style={{
+                        fontFamily: FONTS.body, fontSize: '18px', fontWeight: 700,
+                        color: C.dark,
+                      }}>
+                        {f.projetos_count || '—'}
+                      </span>
+                    </div>
+                    <div>
+                      <span style={{
+                        fontFamily: FONTS.body, fontSize: '10px', fontWeight: 700,
+                        textTransform: 'uppercase', letterSpacing: '0.06em',
+                        color: C.muted, display: 'block',
+                      }}>
+                        DESDE
+                      </span>
+                      <span style={{
+                        fontFamily: FONTS.body, fontSize: '18px', fontWeight: 700,
+                        color: C.dark,
+                      }}>
+                        {getDesdeYear(f)}
+                      </span>
+                    </div>
+                    {f.rating && (
+                      <div>
+                        <span style={{
+                          fontFamily: FONTS.body, fontSize: '10px', fontWeight: 700,
+                          textTransform: 'uppercase', letterSpacing: '0.06em',
+                          color: C.muted, display: 'block',
+                        }}>
+                          RATING
+                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                          <Star size={13} fill={C.warning} stroke={C.warning} />
+                          <span style={{
+                            fontFamily: FONTS.body, fontSize: '18px', fontWeight: 700,
+                            color: C.dark,
+                          }}>
+                            {f.rating}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Alert bar (conditional) */}
+                {alert && (
+                  <div style={{
+                    padding: '8px 20px',
+                    background: alert.bg,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}>
+                    <AlertTriangle size={12} style={{ color: alert.color, flexShrink: 0 }} />
+                    <span style={{
+                      fontFamily: FONTS.body,
+                      fontSize: '11px',
+                      color: alert.color,
+                      fontWeight: 500,
+                    }}>
+                      {alert.text}
+                    </span>
+                  </div>
+                )}
+
+                {/* Contact info row */}
+                {(f.email || f.telefone || f.telemovel) && (
+                  <div style={{
+                    padding: '10px 20px',
+                    borderTop: alert ? 'none' : `1px solid ${C.border}`,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                  }}>
+                    {f.responsavel && (
+                      <span style={{ fontFamily: FONTS.body, fontSize: '12px', color: C.dark, fontWeight: 500 }}>
+                        {f.responsavel}
+                      </span>
+                    )}
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                      {f.email && (
+                        <span style={{
+                          fontFamily: FONTS.body, fontSize: '11px', color: C.light,
+                          display: 'flex', alignItems: 'center', gap: '4px',
+                        }}>
+                          <Mail size={10} style={{ color: C.muted }} />
+                          {f.email}
+                        </span>
+                      )}
+                      {(f.telefone || f.telemovel) && (
+                        <span style={{
+                          fontFamily: FONTS.body, fontSize: '11px', color: C.light,
+                          display: 'flex', alignItems: 'center', gap: '4px',
+                        }}>
+                          <Phone size={10} style={{ color: C.muted }} />
+                          {f.telemovel || f.telefone}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Footer: PAGAMENTO / LEAD TIME / GARANTIA */}
+                <div style={{
+                  padding: '12px 20px',
+                  background: C.cream,
+                  borderTop: `1px solid ${C.border}`,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                }}>
+                  <div style={{ textAlign: 'center', flex: 1 }}>
+                    <span style={{
+                      fontFamily: FONTS.body, fontSize: '9px', fontWeight: 700,
+                      textTransform: 'uppercase', letterSpacing: '0.05em',
+                      color: C.muted, display: 'block', marginBottom: '2px',
+                    }}>
+                      PAGAMENTO
+                    </span>
+                    <span style={{
+                      fontFamily: FONTS.body, fontSize: '12px', fontWeight: 600,
+                      color: C.dark, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px',
+                    }}>
+                      <CreditCard size={11} style={{ color: C.muted }} />
+                      {f.prazo_pagamento || 30}d
+                    </span>
+                  </div>
+                  <div style={{ width: '1px', background: C.border }} />
+                  <div style={{ textAlign: 'center', flex: 1 }}>
+                    <span style={{
+                      fontFamily: FONTS.body, fontSize: '9px', fontWeight: 700,
+                      textTransform: 'uppercase', letterSpacing: '0.05em',
+                      color: C.muted, display: 'block', marginBottom: '2px',
+                    }}>
+                      LEAD TIME
+                    </span>
+                    <span style={{
+                      fontFamily: FONTS.body, fontSize: '12px', fontWeight: 600,
+                      color: C.dark, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px',
+                    }}>
+                      <Clock size={11} style={{ color: C.muted }} />
+                      {f.lead_time || '—'}
+                    </span>
+                  </div>
+                  <div style={{ width: '1px', background: C.border }} />
+                  <div style={{ textAlign: 'center', flex: 1 }}>
+                    <span style={{
+                      fontFamily: FONTS.body, fontSize: '9px', fontWeight: 700,
+                      textTransform: 'uppercase', letterSpacing: '0.05em',
+                      color: C.muted, display: 'block', marginBottom: '2px',
+                    }}>
+                      GARANTIA
+                    </span>
+                    <span style={{
+                      fontFamily: FONTS.body, fontSize: '12px', fontWeight: 600,
+                      color: C.dark, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px',
+                    }}>
+                      <Shield size={11} style={{ color: C.muted }} />
+                      {f.garantia || '—'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      ) : (
+        /* ═══ LIST VIEW (table fallback) ═══ */
+        <div style={{
+          background: C.white,
+          borderRadius: '14px',
+          border: `1px solid ${C.border}`,
+          overflow: 'hidden',
+        }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', fontFamily: FONTS.body, minWidth: '700px' }}>
+              <thead>
+                <tr>
+                  <th style={thStyle}>FORNECEDOR</th>
+                  <th style={thStyle}>ESPECIALIDADE</th>
+                  <th style={{ ...thStyle, textAlign: 'center' }}>RATING</th>
+                  <th style={thStyle}>CONTACTO</th>
+                  <th style={{ ...thStyle, textAlign: 'center' }}>STATUS</th>
+                  <th style={{ ...thStyle, textAlign: 'center', width: '70px' }}></th>
                 </tr>
-              ) : (
-                fornecedoresFiltrados.map((f, idx) => {
+              </thead>
+              <tbody>
+                {fornecedoresFiltrados.map(f => {
                   const statusConf = STATUS_FORNECEDOR[f.status] || STATUS_FORNECEDOR.ativo
                   return (
                     <tr
@@ -576,52 +975,31 @@ export default function Fornecedores() {
                       onMouseEnter={e => e.currentTarget.style.background = C.cream}
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                     >
-                      {/* Fornecedor */}
                       <td style={tdStyle}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                           <div style={{
-                            width: '38px', height: '38px',
-                            borderRadius: '10px',
-                            background: C.cream,
-                            border: `1px solid ${C.border}`,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '12px',
-                            fontWeight: 700,
-                            color: C.muted,
-                            flexShrink: 0,
+                            width: '38px', height: '38px', borderRadius: '10px',
+                            background: C.cream, border: `1px solid ${C.border}`,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: '12px', fontWeight: 700, color: C.muted, flexShrink: 0,
                           }}>
                             {f.nome?.substring(0, 2).toUpperCase()}
                           </div>
                           <div>
-                            <div style={{
-                              fontFamily: FONTS.heading,
-                              fontWeight: 600,
-                              color: C.dark,
-                              fontSize: '14px',
-                            }}>
+                            <div style={{ fontFamily: FONTS.heading, fontWeight: 600, color: C.dark, fontSize: '14px' }}>
                               {f.nome}
                             </div>
                             {f.responsavel && (
-                              <div style={{ fontSize: '12px', color: C.light, marginTop: '1px' }}>
-                                {f.responsavel}
-                              </div>
+                              <div style={{ fontSize: '12px', color: C.light, marginTop: '1px' }}>{f.responsavel}</div>
                             )}
                           </div>
                         </div>
                       </td>
-
-                      {/* Especialidade */}
                       <td style={tdStyle}>
                         {f.especialidade ? (
                           <span style={{
-                            padding: '4px 10px',
-                            background: C.cream,
-                            borderRadius: '6px',
-                            fontSize: '12px',
-                            color: C.light,
-                            fontWeight: 500,
+                            padding: '4px 10px', background: C.cream, borderRadius: '6px',
+                            fontSize: '12px', color: C.light, fontWeight: 500,
                           }}>
                             {f.especialidade}
                           </span>
@@ -629,8 +1007,6 @@ export default function Fornecedores() {
                           <span style={{ color: C.muted, fontSize: '12px' }}>—</span>
                         )}
                       </td>
-
-                      {/* Rating */}
                       <td style={{ ...tdStyle, textAlign: 'center' }}>
                         {f.rating ? (
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
@@ -641,8 +1017,6 @@ export default function Fornecedores() {
                           <span style={{ color: C.muted, fontSize: '12px' }}>—</span>
                         )}
                       </td>
-
-                      {/* Contacto */}
                       <td style={tdStyle}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                           {f.email && (
@@ -657,45 +1031,30 @@ export default function Fornecedores() {
                           )}
                         </div>
                       </td>
-
-                      {/* Status */}
                       <td style={{ ...tdStyle, textAlign: 'center' }}>
                         <span style={{
                           display: 'inline-flex', alignItems: 'center', gap: '5px',
-                          padding: '4px 12px',
-                          borderRadius: '20px',
-                          fontSize: '11px',
-                          fontWeight: 600,
-                          background: statusConf.bg,
-                          color: statusConf.color,
+                          padding: '4px 12px', borderRadius: '20px', fontSize: '11px',
+                          fontWeight: 600, background: statusConf.bg, color: statusConf.color,
                         }}>
-                          <div style={{
-                            width: '6px', height: '6px', borderRadius: '50%',
-                            background: statusConf.color,
-                          }} />
+                          <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: statusConf.color }} />
                           {statusConf.label}
                         </span>
                       </td>
-
-                      {/* Actions */}
                       <td style={{ ...tdStyle, textAlign: 'center' }} onClick={e => e.stopPropagation()}>
                         <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
-                          <button onClick={() => handleEdit(f)} style={actionBtnStyle}>
-                            <Edit2 size={14} />
-                          </button>
-                          <button onClick={() => handleDelete(f)} style={{ ...actionBtnStyle, color: C.danger }}>
-                            <Trash2 size={14} />
-                          </button>
+                          <button onClick={() => handleEdit(f)} style={listActionBtn}><Edit2 size={14} /></button>
+                          <button onClick={() => handleDelete(f)} style={{ ...listActionBtn, color: C.danger }}><Trash2 size={14} /></button>
                         </div>
                       </td>
                     </tr>
                   )
-                })
-              )}
-            </tbody>
-          </table>
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ═══ G.A.R.V.I.S. Side Panel (toggled) ═══ */}
       {showGarvis && (
@@ -872,6 +1231,16 @@ export default function Fornecedores() {
 }
 
 // Styles
+const cardActionBtn = {
+  padding: '5px',
+  background: 'transparent',
+  border: 'none',
+  borderRadius: '6px',
+  cursor: 'pointer',
+  color: '#9A978A',
+  transition: 'all 0.15s',
+}
+
 const thStyle = {
   padding: '12px 16px',
   textAlign: 'left',
@@ -889,7 +1258,7 @@ const tdStyle = {
   verticalAlign: 'middle',
 }
 
-const actionBtnStyle = {
+const listActionBtn = {
   padding: '6px',
   background: 'transparent',
   border: 'none',
