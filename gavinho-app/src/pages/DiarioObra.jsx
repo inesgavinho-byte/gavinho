@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { exportDiarioToPDF } from '../utils/exportDiarioToPDF'
 import {
   Sun, Cloud, CloudRain, Wind, CloudFog,
   Plus, Trash2, Edit2, Check, X, Upload, ChevronRight, ChevronLeft,
@@ -115,6 +116,9 @@ export default function DiarioObra() {
   // Delete confirmation modal
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState(null)
+
+  // Export state
+  const [exporting, setExporting] = useState(false)
 
   // Pendentes from DB (obra_pendentes table)
   const [pendentesDB, setPendentesDB] = useState([])
@@ -376,6 +380,30 @@ export default function DiarioObra() {
     setShowEntryForm(true)
   }
 
+  const handleExportPDF = async () => {
+    if (exporting || !obra) return
+    setExporting(true)
+    try {
+      // Export the most recent entry, or all entries for the current month
+      const target = entries[0]
+      if (!target) {
+        alert('Sem entradas para exportar')
+        return
+      }
+      await exportDiarioToPDF(target, obra, {
+        equipa: target.trabalhadores || [],
+        tarefas: target.atividades || target.tarefas || [],
+        ocorrencias: target.ocorrencias || [],
+        naoConformidades: target.nao_conformidades || []
+      })
+    } catch (err) {
+      console.error('Erro ao exportar PDF:', err)
+      alert('Erro ao exportar PDF: ' + (err.message || 'Erro desconhecido'))
+    } finally {
+      setExporting(false)
+    }
+  }
+
   const handleDeleteEntry = (entryId) => {
     const entry = entries.find(e => e.id === entryId)
     setDeleteTarget(entry || { id: entryId })
@@ -569,8 +597,8 @@ export default function DiarioObra() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
-            <button className="btn btn-outline" style={{ gap: 6, fontSize: 13 }}>
-              <Download size={15} /> Exportar
+            <button onClick={handleExportPDF} disabled={exporting || entries.length === 0} className="btn btn-outline" style={{ gap: 6, fontSize: 13 }}>
+              {exporting ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> : <Download size={15} />} Exportar
             </button>
             <button
               onClick={handleCopyYesterday}
