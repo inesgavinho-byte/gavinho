@@ -112,6 +112,10 @@ export default function DiarioObra() {
   const [showEntryForm, setShowEntryForm] = useState(false)
   const [editingEntry, setEditingEntry] = useState(null)
 
+  // Delete confirmation modal
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+
   // =====================================================
   // DATA FETCHING
   // =====================================================
@@ -303,9 +307,47 @@ export default function DiarioObra() {
     fetchEntries()
   }
 
-  const handleDeleteEntry = async (entryId) => {
-    if (!window.confirm('Tem a certeza que deseja apagar este registo?')) return
+  const handleDeleteEntry = (entryId) => {
+    const entry = entries.find(e => e.id === entryId)
+    setDeleteTarget(entry || { id: entryId })
+    setShowDeleteModal(true)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return
+    const entryId = deleteTarget.id
+
+    // 1. Delete fotos from Storage (global + per-activity)
+    const allStoragePaths = []
+    const entryFotos = deleteTarget.fotos || []
+    entryFotos.forEach(f => {
+      const url = typeof f === 'string' ? f : f.url
+      if (url && url.includes('obra-fotos/')) {
+        const path = url.split('obra-fotos/').pop()
+        if (path) allStoragePaths.push(path)
+      }
+    })
+    ;(deleteTarget.atividades || []).forEach(a => {
+      (a.fotos || []).forEach(f => {
+        const url = typeof f === 'string' ? f : f.url
+        if (url && url.includes('obra-fotos/')) {
+          const path = url.split('obra-fotos/').pop()
+          if (path) allStoragePaths.push(path)
+        }
+      })
+    })
+    if (allStoragePaths.length > 0) {
+      await supabase.storage.from('obra-fotos').remove(allStoragePaths)
+    }
+
+    // 2. Delete pendentes associated with this entry
+    await supabase.from('obra_pendentes').delete().eq('diario_entrada_id', entryId)
+
+    // 3. Delete the diary entry itself
     await supabase.from('obra_diario').delete().eq('id', entryId)
+
+    setShowDeleteModal(false)
+    setDeleteTarget(null)
     fetchEntries()
   }
 
@@ -519,6 +561,46 @@ export default function DiarioObra() {
           <SidebarEspecialidades especialidades={activeEspecialidades} />
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && deleteTarget && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.5)', zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20
+        }} onClick={() => { setShowDeleteModal(false); setDeleteTarget(null) }}>
+          <div style={{
+            background: 'var(--white)', borderRadius: 16, width: '100%', maxWidth: 420, padding: 28
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 10, background: 'var(--error-bg)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}>
+                <Trash2 size={20} color="var(--error)" />
+              </div>
+              <h3 style={{ fontSize: 17, fontWeight: 600, color: 'var(--brown)', margin: 0 }}>Apagar entrada</h3>
+            </div>
+            <p style={{ fontSize: 14, color: 'var(--brown)', lineHeight: 1.6, margin: '0 0 8px 0' }}>
+              Apagar entrada de <strong>{deleteTarget.data ? formatDatePT(deleteTarget.data) : '—'}</strong>?
+            </p>
+            <p style={{ fontSize: 13, color: 'var(--brown-light)', lineHeight: 1.5, margin: '0 0 24px 0' }}>
+              Serão apagadas as fotografias associadas e os pendentes gerados por esta entrada. Esta ação é irreversível.
+            </p>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button onClick={() => { setShowDeleteModal(false); setDeleteTarget(null) }} className="btn btn-ghost" style={{ fontSize: 13 }}>
+                Cancelar
+              </button>
+              <button onClick={handleConfirmDelete} className="btn" style={{
+                fontSize: 13, gap: 6, background: 'var(--error)', color: 'white', border: 'none',
+                padding: '8px 18px', borderRadius: 8, cursor: 'pointer', fontWeight: 600
+              }}>
+                <Trash2 size={14} /> Apagar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Entry Form Modal */}
       {showEntryForm && (
