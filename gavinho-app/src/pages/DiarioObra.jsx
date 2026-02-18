@@ -210,13 +210,17 @@ export default function DiarioObra() {
   }
 
   const fetchPendentesDB = async () => {
-    const { data } = await supabase
-      .from('obra_pendentes')
-      .select('*')
-      .eq('obra_id', selectedObra)
-      .eq('estado', 'aberto')
-      .order('data_criacao', { ascending: false })
-    if (data) setPendentesDB(data)
+    try {
+      const { data, error } = await supabase
+        .from('obra_pendentes')
+        .select('*')
+        .eq('obra_id', selectedObra)
+        .eq('estado', 'aberto')
+        .order('data_criacao', { ascending: false })
+      if (!error && data) setPendentesDB(data)
+    } catch {
+      // Table may not exist yet — migration not applied
+    }
   }
 
   // =====================================================
