@@ -104,6 +104,7 @@ export default function DiarioObra() {
   // Timeline data
   const [entries, setEntries] = useState([])
   const [especialidades, setEspecialidades] = useState([])
+  const [filterCategoria, setFilterCategoria] = useState('')
   const [zonas, setZonas] = useState([])
 
   // Calendar state
@@ -306,6 +307,13 @@ export default function DiarioObra() {
     })
     return Array.from(names)
   }, [entries])
+
+  const filteredEntries = useMemo(() => {
+    if (!filterCategoria) return entries
+    return entries.filter(e =>
+      (e.atividades || []).some(a => a.especialidade_nome === filterCategoria)
+    )
+  }, [entries, filterCategoria])
 
   const calendarDots = useMemo(() => {
     const dots = new Set()
@@ -650,15 +658,38 @@ export default function DiarioObra() {
         {/* Main Content */}
         <div>
           {activeTab === 'diario' && (
-            <DiarioTimeline
-              entries={entries}
-              onEdit={handleEditEntry}
-              onDelete={handleDeleteEntry}
-              onUpdateActivity={handleUpdateActivity}
-              onDeleteActivity={handleDeleteActivity}
-              especialidades={especialidades}
-              zonas={zonas}
-            />
+            <>
+              {/* Category Filter */}
+              {activeEspecialidades.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                  <select
+                    value={filterCategoria}
+                    onChange={e => setFilterCategoria(e.target.value)}
+                    className="select"
+                    style={{ minWidth: 200, fontSize: 13 }}
+                  >
+                    <option value="">Todas as categorias</option>
+                    {activeEspecialidades.map(name => (
+                      <option key={name} value={name}>{name}</option>
+                    ))}
+                  </select>
+                  {filterCategoria && (
+                    <span style={{ fontSize: 12, color: 'var(--brown-light)' }}>
+                      {filteredEntries.length} entrada{filteredEntries.length !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </div>
+              )}
+              <DiarioTimeline
+                entries={filteredEntries}
+                onEdit={handleEditEntry}
+                onDelete={handleDeleteEntry}
+                onUpdateActivity={handleUpdateActivity}
+                onDeleteActivity={handleDeleteActivity}
+                especialidades={especialidades}
+                zonas={zonas}
+              />
+            </>
           )}
           {activeTab === 'resumo' && (
             <ResumoTab entries={entries} obra={obra} weekSummary={weekSummary} />
