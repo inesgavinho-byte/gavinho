@@ -6,7 +6,7 @@ import {
   Plus, Trash2, Edit2, Check, X, Upload, ChevronRight, ChevronLeft,
   Save, Send, Clock, Users, AlertTriangle, Camera, ArrowRight,
   Loader2, Download, Image as ImageIcon, MapPin, Calendar,
-  AlertCircle, Info
+  AlertCircle, Info, UserPlus, User
 } from 'lucide-react'
 
 // =====================================================
@@ -57,6 +57,11 @@ const FUNCOES = [
   'Engenheiro',
   'Técnico de Segurança',
   'Fiscal de Obra'
+]
+
+const TIPOS_TRABALHADOR = [
+  { id: 'gavinho', label: 'Gavinho' },
+  { id: 'subempreiteiro', label: 'Subempreiteiro' },
 ]
 
 const SEVERIDADES_NC = ['MENOR', 'MAIOR', 'CRÍTICA']
@@ -564,13 +569,14 @@ function DiarioTimeline({ entries, onEdit, onDelete, onUpdateActivity, onDeleteA
 }
 
 function DayEntry({ entry, onEdit, onDelete, onUpdateActivity, onDeleteActivity, especialidades, zonas }) {
+  const [showWorkerNames, setShowWorkerNames] = useState(false)
   const weather = WEATHER_OPTIONS.find(w => w.id === (entry.condicoes_meteo || '').toLowerCase())
   const WeatherIcon = weather?.icon || Sun
 
   // Count workers
   const trabArray = entry.trabalhadores || []
-  const trabPresentes = trabArray.filter?.(t => t.estado === 'PRESENTE')?.length
-  const workerCount = trabPresentes || (entry.trabalhadores_gavinho || 0) + (entry.trabalhadores_subempreiteiros || 0)
+  const trabPresentes = trabArray.filter?.(t => t.estado === 'PRESENTE')
+  const workerCount = trabPresentes?.length || (entry.trabalhadores_gavinho || 0) + (entry.trabalhadores_subempreiteiros || 0)
 
   // Count photos across atividades and fotos
   const ativFotos = (entry.atividades || []).reduce((s, a) => s + (a.fotos?.length || 0), 0)
@@ -641,8 +647,14 @@ function DayEntry({ entry, onEdit, onDelete, onUpdateActivity, onDeleteActivity,
           </span>
         )}
         {workerCount > 0 && (
-          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span
+            style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: trabPresentes?.length > 0 ? 'pointer' : 'default' }}
+            onClick={() => trabPresentes?.length > 0 && setShowWorkerNames(!showWorkerNames)}
+          >
             <Users size={14} /> {workerCount} em obra
+            {trabPresentes?.length > 0 && (
+              <ChevronRight size={12} style={{ transform: showWorkerNames ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }} />
+            )}
           </span>
         )}
         {(horaInicio || horaFim) && (
@@ -657,6 +669,27 @@ function DayEntry({ entry, onEdit, onDelete, onUpdateActivity, onDeleteActivity,
         )}
       </div>
 
+      {/* Worker Names (expandable) */}
+      {showWorkerNames && trabPresentes?.length > 0 && (
+        <div style={{ padding: '10px 24px', borderBottom: '1px solid var(--stone)', background: 'var(--cream)' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {trabPresentes.map((t, idx) => (
+              <span key={t.id || idx} style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                padding: '4px 10px', borderRadius: 6, fontSize: 12,
+                background: t.tipo === 'gavinho' ? 'var(--olive-gray)' : 'var(--stone)',
+                color: t.tipo === 'gavinho' ? 'white' : 'var(--brown)',
+                fontWeight: 500
+              }}>
+                <User size={11} />
+                {t.nome}
+                {t.funcao && <span style={{ opacity: 0.7, fontWeight: 400 }}>· {t.funcao}</span>}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Activities */}
       <div style={{ padding: '0 24px' }}>
         {displayAtividades.map((ativ, idx) => (
@@ -668,6 +701,7 @@ function DayEntry({ entry, onEdit, onDelete, onUpdateActivity, onDeleteActivity,
             onDelete={() => onDeleteActivity(entry.id, idx)}
             especialidades={especialidades}
             zonas={zonas}
+            trabPresentes={trabPresentes}
           />
         ))}
 
@@ -711,7 +745,7 @@ function DayEntry({ entry, onEdit, onDelete, onUpdateActivity, onDeleteActivity,
 // ACTIVITY ENTRY (Per specialty, Phase 1 + Phase 3)
 // =====================================================
 
-function ActivityEntry({ atividade, isLast, onUpdate, onDelete, especialidades, zonas }) {
+function ActivityEntry({ atividade, isLast, onUpdate, onDelete, especialidades, zonas, trabPresentes }) {
   const [editing, setEditing] = useState(false)
   const [editData, setEditData] = useState({})
   const [saving, setSaving] = useState(false)
@@ -726,7 +760,8 @@ function ActivityEntry({ atividade, isLast, onUpdate, onDelete, especialidades, 
       especialidade_nome: atividade.especialidade_nome || '',
       zona: atividade.zona || '',
       descricao: atividade.descricao || '',
-      nota: atividade.nota || ''
+      nota: atividade.nota || '',
+      executante: atividade.executante || ''
     })
     setEditing(true)
   }
@@ -782,15 +817,29 @@ function ActivityEntry({ atividade, isLast, onUpdate, onDelete, especialidades, 
               rows={3}
             />
           </div>
-          <div style={{ marginBottom: 12 }}>
-            <FieldLabel small>Nota (opcional)</FieldLabel>
-            <input
-              type="text"
-              value={editData.nota}
-              onChange={e => setEditData({ ...editData, nota: e.target.value })}
-              className="input"
-              placeholder="Ex: Amostra aprovada pelo cliente"
-            />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <div>
+              <FieldLabel small>Executante</FieldLabel>
+              <select
+                value={editData.executante || ''}
+                onChange={e => setEditData({ ...editData, executante: e.target.value })}
+                className="select"
+                style={{ width: '100%' }}
+              >
+                <option value="">Selecionar...</option>
+                {(trabPresentes || []).map((t, i) => <option key={t.id || i} value={t.nome}>{t.nome}{t.funcao ? ` (${t.funcao})` : ''}</option>)}
+              </select>
+            </div>
+            <div>
+              <FieldLabel small>Nota (opcional)</FieldLabel>
+              <input
+                type="text"
+                value={editData.nota}
+                onChange={e => setEditData({ ...editData, nota: e.target.value })}
+                className="input"
+                placeholder="Ex: Amostra aprovada pelo cliente"
+              />
+            </div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={handleSaveEdit} disabled={saving} className="btn btn-primary" style={{ gap: 6, fontSize: 13 }}>
@@ -826,6 +875,11 @@ function ActivityEntry({ atividade, isLast, onUpdate, onDelete, especialidades, 
         {atividade.zona && (
           <span style={{ fontSize: 13, color: 'var(--brown-light)' }}>
             {atividade.zona}
+          </span>
+        )}
+        {atividade.executante && (
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--brown-light)' }}>
+            <User size={12} /> {atividade.executante}
           </span>
         )}
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
@@ -1275,14 +1329,22 @@ function EntryFormModal({ obra, entry, especialidades, zonas, onClose, onSaved }
   const [horaInicio, setHoraInicio] = useState(entry?.hora_inicio?.substring(0, 5) || '')
   const [horaFim, setHoraFim] = useState(entry?.hora_fim?.substring(0, 5) || '')
 
-  // Workers
-  const [trabGavinho, setTrabGavinho] = useState(entry?.trabalhadores_gavinho || 0)
-  const [trabSubs, setTrabSubs] = useState(entry?.trabalhadores_subempreiteiros || 0)
+  // Workers (named list)
+  const [trabalhadores, setTrabalhadores] = useState(() => {
+    if (entry?.trabalhadores?.length) return entry.trabalhadores
+    return []
+  })
+  const [showAddTrab, setShowAddTrab] = useState(false)
+  const [novoTrab, setNovoTrab] = useState({ nome: '', funcao: '', tipo: 'gavinho', estado: 'PRESENTE' })
+
+  // Derived counts for backward compat
+  const trabGavinho = trabalhadores.filter(t => t.tipo === 'gavinho' && t.estado === 'PRESENTE').length
+  const trabSubs = trabalhadores.filter(t => t.tipo === 'subempreiteiro' && t.estado === 'PRESENTE').length
 
   // Atividades (by specialty)
   const [atividades, setAtividades] = useState(entry?.atividades || [])
   const [showAddAtiv, setShowAddAtiv] = useState(false)
-  const [novaAtiv, setNovaAtiv] = useState({ especialidade_nome: '', zona: '', descricao: '', fotos: [], alerta: null, nota: '' })
+  const [novaAtiv, setNovaAtiv] = useState({ especialidade_nome: '', zona: '', descricao: '', fotos: [], alerta: null, nota: '', executante: '' })
 
   // Non-conformities
   const [naoConformidades, setNaoConformidades] = useState(entry?.nao_conformidades || [])
@@ -1385,6 +1447,25 @@ function EntryFormModal({ obra, entry, especialidades, zonas, onClose, onSaved }
     setPendentes(pendentes.filter((_, i) => i !== idx))
   }
 
+  // ---- Worker handlers ----
+  const handleAddTrabalhador = () => {
+    if (!novoTrab.nome.trim()) return
+    setTrabalhadores([...trabalhadores, { ...novoTrab, id: Date.now() }])
+    setNovoTrab({ nome: '', funcao: '', tipo: 'gavinho', estado: 'PRESENTE' })
+    setShowAddTrab(false)
+  }
+
+  const handleRemoveTrabalhador = (idx) => {
+    setTrabalhadores(trabalhadores.filter((_, i) => i !== idx))
+  }
+
+  const handleToggleTrabEstado = (idx) => {
+    setTrabalhadores(trabalhadores.map((t, i) => i === idx ? { ...t, estado: t.estado === 'PRESENTE' ? 'AUSENTE' : 'PRESENTE' } : t))
+  }
+
+  // Worker names for executante dropdown
+  const trabPresentes = trabalhadores.filter(t => t.estado === 'PRESENTE')
+
   // ---- Save ----
   const handleSave = async (status) => {
     setSaving(true)
@@ -1411,7 +1492,8 @@ function EntryFormModal({ obra, entry, especialidades, zonas, onClose, onSaved }
           descricao: ativ.descricao,
           fotos: [...existingPhotos.map(f => typeof f === 'string' ? f : f.url), ...newUrls],
           alerta: ativ.alerta || null,
-          nota: ativ.nota || ''
+          nota: ativ.nota || '',
+          executante: ativ.executante || ''
         })
       }
 
@@ -1435,8 +1517,9 @@ function EntryFormModal({ obra, entry, especialidades, zonas, onClose, onSaved }
         condicoes_meteo: condicaoMeteo,
         temperatura: temperatura ? parseFloat(temperatura) : null,
         observacoes_meteo: observacoesMeteo,
-        trabalhadores_gavinho: parseInt(trabGavinho) || 0,
-        trabalhadores_subempreiteiros: parseInt(trabSubs) || 0,
+        trabalhadores: trabalhadores,
+        trabalhadores_gavinho: trabGavinho,
+        trabalhadores_subempreiteiros: trabSubs,
         tarefas: tarefasFromAtiv,
         nao_conformidades: naoConformidades,
         fotos: allFotos,
@@ -1581,17 +1664,85 @@ function EntryFormModal({ obra, entry, especialidades, zonas, onClose, onSaved }
 
           {/* Workers */}
           <div style={{ marginBottom: 24 }}>
-            <FieldLabel>Trabalhadores em Obra</FieldLabel>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div>
-                <FieldLabel small>Equipa Gavinho</FieldLabel>
-                <input type="number" min="0" value={trabGavinho} onChange={e => setTrabGavinho(e.target.value)} className="input" />
-              </div>
-              <div>
-                <FieldLabel small>Subempreiteiros</FieldLabel>
-                <input type="number" min="0" value={trabSubs} onChange={e => setTrabSubs(e.target.value)} className="input" />
-              </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <FieldLabel style={{ marginBottom: 0 }}>Trabalhadores em Obra</FieldLabel>
+              {trabalhadores.length > 0 && (
+                <span style={{ fontSize: 12, color: 'var(--brown-light)' }}>
+                  {trabGavinho > 0 && <>{trabGavinho} Gavinho</>}
+                  {trabGavinho > 0 && trabSubs > 0 && ' · '}
+                  {trabSubs > 0 && <>{trabSubs} Sub.</>}
+                  {' · '}{trabGavinho + trabSubs} total
+                </span>
+              )}
             </div>
+
+            {trabalhadores.map((trab, idx) => (
+              <div key={trab.id || idx} style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '10px 14px', background: 'var(--cream)', borderRadius: 10, marginBottom: 6
+              }}>
+                <span style={{
+                  width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                  background: trab.estado === 'PRESENTE' ? 'var(--success)' : 'var(--brown-light)',
+                  cursor: 'pointer'
+                }} onClick={() => handleToggleTrabEstado(idx)} title={trab.estado === 'PRESENTE' ? 'Presente — clicar para marcar ausente' : 'Ausente — clicar para marcar presente'} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: trab.estado === 'PRESENTE' ? 'var(--brown)' : 'var(--brown-light)', textDecoration: trab.estado === 'AUSENTE' ? 'line-through' : 'none' }}>
+                    {trab.nome}
+                  </span>
+                  {trab.funcao && (
+                    <span style={{ fontSize: 12, color: 'var(--brown-light)', marginLeft: 8 }}>{trab.funcao}</span>
+                  )}
+                </div>
+                <span style={{
+                  padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700,
+                  background: trab.tipo === 'gavinho' ? 'var(--olive-gray)' : 'var(--stone)',
+                  color: trab.tipo === 'gavinho' ? 'white' : 'var(--brown)',
+                  textTransform: 'uppercase', letterSpacing: 0.3, flexShrink: 0
+                }}>
+                  {trab.tipo === 'gavinho' ? 'GH' : 'SUB'}
+                </span>
+                <button onClick={() => handleRemoveTrabalhador(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--brown-light)', padding: 4, flexShrink: 0 }}>
+                  <X size={14} />
+                </button>
+              </div>
+            ))}
+
+            {showAddTrab ? (
+              <div style={{ padding: 14, background: 'var(--cream)', borderRadius: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                  <div>
+                    <FieldLabel small>Nome</FieldLabel>
+                    <input type="text" value={novoTrab.nome} onChange={e => setNovoTrab({ ...novoTrab, nome: e.target.value })} className="input" placeholder="Nome do trabalhador" autoFocus />
+                  </div>
+                  <div>
+                    <FieldLabel small>Função (opcional)</FieldLabel>
+                    <input type="text" value={novoTrab.funcao} onChange={e => setNovoTrab({ ...novoTrab, funcao: e.target.value })} className="input" placeholder="Ex: Pedreiro, Eletricista" />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
+                  <FieldLabel small style={{ marginBottom: 0 }}>Tipo:</FieldLabel>
+                  {TIPOS_TRABALHADOR.map(t => (
+                    <button key={t.id} onClick={() => setNovoTrab({ ...novoTrab, tipo: t.id })} style={{
+                      padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                      border: novoTrab.tipo === t.id ? 'none' : '2px solid var(--stone)',
+                      background: novoTrab.tipo === t.id ? 'var(--olive-gray)' : 'var(--white)',
+                      color: novoTrab.tipo === t.id ? 'white' : 'var(--brown)'
+                    }}>
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={handleAddTrabalhador} className="btn btn-primary" style={{ fontSize: 13 }}>Adicionar</button>
+                  <button onClick={() => setShowAddTrab(false)} className="btn btn-ghost" style={{ fontSize: 13 }}>Cancelar</button>
+                </div>
+              </div>
+            ) : (
+              <button onClick={() => setShowAddTrab(true)} className="btn btn-outline" style={{ gap: 6, fontSize: 13 }}>
+                <UserPlus size={14} /> Adicionar Trabalhador
+              </button>
+            )}
           </div>
 
           {/* Atividades por Especialidade */}
@@ -1610,6 +1761,11 @@ function EntryFormModal({ obra, entry, especialidades, zonas, onClose, onSaved }
                       {ativ.especialidade_nome || 'Geral'}
                     </span>
                     {ativ.zona && <span style={{ fontSize: 12, color: 'var(--brown-light)' }}>{ativ.zona}</span>}
+                    {ativ.executante && (
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--brown-light)' }}>
+                        <User size={11} /> {ativ.executante}
+                      </span>
+                    )}
                     <button onClick={() => handleRemoveAtividade(idx)} style={{
                       marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--brown-light)', padding: 4
                     }}>
@@ -1671,15 +1827,24 @@ function EntryFormModal({ obra, entry, especialidades, zonas, onClose, onSaved }
                     placeholder="Descreva os trabalhos realizados..."
                   />
                 </div>
-                <div style={{ marginBottom: 12 }}>
-                  <FieldLabel small>Nota (opcional)</FieldLabel>
-                  <input
-                    type="text"
-                    value={novaAtiv.nota}
-                    onChange={e => setNovaAtiv({ ...novaAtiv, nota: e.target.value })}
-                    className="input"
-                    placeholder="Ex: Amostra aprovada pelo cliente"
-                  />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                  <div>
+                    <FieldLabel small>Executante</FieldLabel>
+                    <select value={novaAtiv.executante || ''} onChange={e => setNovaAtiv({ ...novaAtiv, executante: e.target.value })} className="select" style={{ width: '100%' }}>
+                      <option value="">Selecionar...</option>
+                      {trabPresentes.map((t, i) => <option key={t.id || i} value={t.nome}>{t.nome}{t.funcao ? ` (${t.funcao})` : ''}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <FieldLabel small>Nota (opcional)</FieldLabel>
+                    <input
+                      type="text"
+                      value={novaAtiv.nota}
+                      onChange={e => setNovaAtiv({ ...novaAtiv, nota: e.target.value })}
+                      className="input"
+                      placeholder="Ex: Amostra aprovada pelo cliente"
+                    />
+                  </div>
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={handleAddAtividade} className="btn btn-primary" style={{ fontSize: 13 }}>Adicionar</button>
