@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { exportDiarioToPDF } from '../utils/exportDiarioToPDF'
+import { FONTS, FONT_SIZES } from '../styles/designTokens'
 import {
   Sun, Cloud, CloudRain, Wind, CloudFog,
   Plus, Trash2, Edit2, Check, X, Upload, ChevronRight, ChevronLeft,
   Save, Send, Clock, Users, AlertTriangle, Camera, ArrowRight,
   Loader2, Download, Image as ImageIcon, MapPin, Calendar,
-  AlertCircle, Info, UserPlus, User
+  AlertCircle, Info, UserPlus, User, Copy
 } from 'lucide-react'
 
 // =====================================================
@@ -22,25 +24,25 @@ const WEATHER_OPTIONS = [
 ]
 
 const ESPECIALIDADE_COLORS = {
-  'Carpintaria': '#2563eb',
-  'Eletricidade': '#d97706',
-  'Elétrico': '#d97706',
-  'Pedra Natural': '#78716c',
-  'Revestimentos': '#78716c',
-  'AVAC': '#059669',
-  'Canalização': '#0891b2',
-  'Hidráulica': '#0891b2',
-  'Serralharia': '#475569',
-  'Alvenaria': '#92400e',
-  'Alvenarias': '#92400e',
-  'Pintura': '#7c3aed',
-  'Estrutura': '#dc2626',
-  'Impermeabilização': '#0d9488',
-  'Caixilharia': '#4f46e5',
-  'Vidros': '#06b6d4',
-  'Gás': '#ea580c',
-  'Paisagismo': '#16a34a',
-  'Piscina': '#0284c7',
+  'Carpintaria': '#7A8B6E',      // olive
+  'Eletricidade': '#C9A86C',     // warm gold
+  'Elétrico': '#C9A86C',         // warm gold
+  'Pedra Natural': '#9A8B7A',    // sage stone
+  'Revestimentos': '#9A8B7A',    // sage stone
+  'AVAC': '#7A9E7A',             // green sage
+  'Canalização': '#7A8B9E',      // steel blue
+  'Hidráulica': '#7A8B9E',       // steel blue
+  'Serralharia': '#6B6B6B',      // charcoal
+  'Alvenaria': '#9A6B5B',        // terracotta
+  'Alvenarias': '#9A6B5B',       // terracotta
+  'Pintura': '#8A7B9E',          // muted purple
+  'Estrutura': '#9A6B5B',        // terracotta
+  'Impermeabilização': '#6B8B7A', // teal sage
+  'Caixilharia': '#7A7B9E',     // muted indigo
+  'Vidros': '#7A9E9E',          // teal
+  'Gás': '#C9886C',             // warm orange
+  'Paisagismo': '#7A8B6E',      // olive
+  'Piscina': '#7A8B9E',         // steel blue
 }
 
 const TABS = [
@@ -103,6 +105,7 @@ export default function DiarioObra() {
   // Timeline data
   const [entries, setEntries] = useState([])
   const [especialidades, setEspecialidades] = useState([])
+  const [filterCategoria, setFilterCategoria] = useState('')
   const [zonas, setZonas] = useState([])
 
   // Calendar state
@@ -111,6 +114,22 @@ export default function DiarioObra() {
   // Modal state
   const [showEntryForm, setShowEntryForm] = useState(false)
   const [editingEntry, setEditingEntry] = useState(null)
+
+  // Delete confirmation modal
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+
+  // Export state
+  const [exporting, setExporting] = useState(false)
+
+  // Pendentes from DB (obra_pendentes table)
+  const [pendentesDB, setPendentesDB] = useState([])
+
+  // Resolve pendente modal
+  const [showResolveModal, setShowResolveModal] = useState(false)
+  const [resolveTarget, setResolveTarget] = useState(null)
+  const [resolveText, setResolveText] = useState('')
+  const [resolveDate, setResolveDate] = useState(new Date().toISOString().split('T')[0])
 
   // =====================================================
   // DATA FETCHING
@@ -126,6 +145,7 @@ export default function DiarioObra() {
       fetchObraDetails()
       fetchEntries()
       fetchZonas()
+      fetchPendentesDB()
     }
   }, [selectedObra])
 
@@ -189,6 +209,16 @@ export default function DiarioObra() {
     if (data) setZonas(data)
   }
 
+  const fetchPendentesDB = async () => {
+    const { data } = await supabase
+      .from('obra_pendentes')
+      .select('*')
+      .eq('obra_id', selectedObra)
+      .eq('estado', 'aberto')
+      .order('data_criacao', { ascending: false })
+    if (data) setPendentesDB(data)
+  }
+
   // =====================================================
   // COMPUTED VALUES
   // =====================================================
@@ -225,13 +255,21 @@ export default function DiarioObra() {
   }, [entries])
 
   const pendentes = useMemo(() => {
+    // Prefer DB pendentes if available
+    if (pendentesDB.length > 0) {
+      return pendentesDB.map(p => ({
+        ...p,
+        _fromDB: true,
+        data_registo: p.data_criacao,
+        data_entrada: p.data_criacao
+      })).slice(0, 8)
+    }
+    // Fallback: collect from entry JSONB fields
     const items = []
     entries.forEach(e => {
-      // Collect from pendentes field
       if (e.pendentes?.length) {
         e.pendentes.forEach(p => items.push({ ...p, data_entrada: e.data }))
       }
-      // Collect from atividades with alerts
       if (e.atividades?.length) {
         e.atividades.forEach(a => {
           if (a.alerta) {
@@ -244,7 +282,6 @@ export default function DiarioObra() {
           }
         })
       }
-      // Collect NCs
       if (e.nao_conformidades?.length) {
         e.nao_conformidades.forEach(nc => {
           items.push({
@@ -257,8 +294,8 @@ export default function DiarioObra() {
         })
       }
     })
-    return items.slice(0, 6)
-  }, [entries])
+    return items.slice(0, 8)
+  }, [entries, pendentesDB])
 
   const activeEspecialidades = useMemo(() => {
     const names = new Set()
@@ -271,6 +308,13 @@ export default function DiarioObra() {
     })
     return Array.from(names)
   }, [entries])
+
+  const filteredEntries = useMemo(() => {
+    if (!filterCategoria) return entries
+    return entries.filter(e =>
+      (e.atividades || []).some(a => a.especialidade_nome === filterCategoria)
+    )
+  }, [entries, filterCategoria])
 
   const calendarDots = useMemo(() => {
     const dots = new Set()
@@ -301,11 +345,136 @@ export default function DiarioObra() {
     setShowEntryForm(false)
     setEditingEntry(null)
     fetchEntries()
+    fetchPendentesDB()
   }
 
-  const handleDeleteEntry = async (entryId) => {
-    if (!window.confirm('Tem a certeza que deseja apagar este registo?')) return
+  // Get yesterday's entry for "Copiar ontem" feature
+  const yesterdayEntry = useMemo(() => {
+    const yesterday = new Date()
+    yesterday.setDate(yesterday.getDate() - 1)
+    const yStr = yesterday.toISOString().split('T')[0]
+    return entries.find(e => e.data === yStr) || null
+  }, [entries])
+
+  const handleCopyYesterday = () => {
+    if (!yesterdayEntry) return
+    // Copy structure without fotos, states, or detailed descriptions
+    const copiedAtividades = (yesterdayEntry.atividades || []).map(a => ({
+      especialidade_nome: a.especialidade_nome || '',
+      zona: a.zona || '',
+      descricao: '',
+      fotos: [],
+      alerta: null,
+      nota: '',
+      executante: a.executante || ''
+    }))
+    const copiedTrabalhadores = (yesterdayEntry.trabalhadores || []).map(t => ({
+      ...t,
+      id: Date.now() + Math.random(),
+      estado: 'PRESENTE'
+    }))
+    setEditingEntry({
+      data: new Date().toISOString().split('T')[0],
+      funcao: yesterdayEntry.funcao || 'Encarregado de Obra',
+      condicoes_meteo: yesterdayEntry.condicoes_meteo || 'sol',
+      hora_inicio: yesterdayEntry.hora_inicio || null,
+      hora_fim: yesterdayEntry.hora_fim || null,
+      trabalhadores: copiedTrabalhadores,
+      atividades: copiedAtividades,
+      pendentes: [],
+      nao_conformidades: [],
+      fotos: [],
+      _isCopy: true
+    })
+    setShowEntryForm(true)
+  }
+
+  const handleExportPDF = async () => {
+    if (exporting || !obra) return
+    setExporting(true)
+    try {
+      // Export the most recent entry, or all entries for the current month
+      const target = entries[0]
+      if (!target) {
+        alert('Sem entradas para exportar')
+        return
+      }
+      await exportDiarioToPDF(target, obra, {
+        equipa: target.trabalhadores || [],
+        tarefas: target.atividades || target.tarefas || [],
+        ocorrencias: target.ocorrencias || [],
+        naoConformidades: target.nao_conformidades || []
+      })
+    } catch (err) {
+      console.error('Erro ao exportar PDF:', err)
+      alert('Erro ao exportar PDF: ' + (err.message || 'Erro desconhecido'))
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const handleDeleteEntry = (entryId) => {
+    const entry = entries.find(e => e.id === entryId)
+    setDeleteTarget(entry || { id: entryId })
+    setShowDeleteModal(true)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return
+    const entryId = deleteTarget.id
+
+    // 1. Delete fotos from Storage (global + per-activity)
+    const allStoragePaths = []
+    const entryFotos = deleteTarget.fotos || []
+    entryFotos.forEach(f => {
+      const url = typeof f === 'string' ? f : f.url
+      if (url && url.includes('obra-fotos/')) {
+        const path = url.split('obra-fotos/').pop()
+        if (path) allStoragePaths.push(path)
+      }
+    })
+    ;(deleteTarget.atividades || []).forEach(a => {
+      (a.fotos || []).forEach(f => {
+        const url = typeof f === 'string' ? f : f.url
+        if (url && url.includes('obra-fotos/')) {
+          const path = url.split('obra-fotos/').pop()
+          if (path) allStoragePaths.push(path)
+        }
+      })
+    })
+    if (allStoragePaths.length > 0) {
+      await supabase.storage.from('obra-fotos').remove(allStoragePaths)
+    }
+
+    // 2. Delete pendentes associated with this entry
+    await supabase.from('obra_pendentes').delete().eq('diario_entrada_id', entryId)
+
+    // 3. Delete the diary entry itself
     await supabase.from('obra_diario').delete().eq('id', entryId)
+
+    setShowDeleteModal(false)
+    setDeleteTarget(null)
+    fetchEntries()
+    fetchPendentesDB()
+  }
+
+  const handleResolvePendente = async () => {
+    if (!resolveTarget) return
+    if (resolveTarget._fromDB && resolveTarget.id) {
+      // Resolve in DB table
+      await supabase.from('obra_pendentes').update({
+        estado: 'resolvido',
+        data_resolucao: resolveDate,
+        resolucao_descricao: resolveText || null,
+        resolved_by_user: 'user',
+        updated_at: new Date().toISOString()
+      }).eq('id', resolveTarget.id)
+    }
+    setShowResolveModal(false)
+    setResolveTarget(null)
+    setResolveText('')
+    setResolveDate(new Date().toISOString().split('T')[0])
+    fetchPendentesDB()
     fetchEntries()
   }
 
@@ -416,7 +585,7 @@ export default function DiarioObra() {
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-                <h1 style={{ fontSize: 24, fontWeight: 700, color: 'var(--brown)', margin: 0 }}>{obra.codigo}</h1>
+                <h1 style={{ fontSize: FONT_SIZES['2xl'], fontFamily: FONTS.heading, fontWeight: 600, color: 'var(--brown)', margin: 0 }}>{obra.codigo}</h1>
                 <span style={{
                   width: 10, height: 10, borderRadius: '50%',
                   background: obra.status === 'em_curso' ? 'var(--success)' : obra.status === 'concluida' ? 'var(--info)' : 'var(--warning)',
@@ -437,8 +606,17 @@ export default function DiarioObra() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
-            <button className="btn btn-outline" style={{ gap: 6, fontSize: 13 }}>
-              <Download size={15} /> Exportar
+            <button onClick={handleExportPDF} disabled={exporting || entries.length === 0} className="btn btn-outline" style={{ gap: 6, fontSize: 13 }}>
+              {exporting ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> : <Download size={15} />} Exportar
+            </button>
+            <button
+              onClick={handleCopyYesterday}
+              disabled={!yesterdayEntry}
+              title={yesterdayEntry ? 'Copiar estrutura do dia anterior' : 'Sem entrada ontem'}
+              className="btn btn-outline"
+              style={{ gap: 6, fontSize: 13, opacity: yesterdayEntry ? 1 : 0.4 }}
+            >
+              <Copy size={15} /> Copiar ontem
             </button>
             <button onClick={handleNewEntry} className="btn btn-primary" style={{ gap: 6, fontSize: 13, background: 'var(--olive-gray)' }}>
               <Plus size={15} /> Nova Entrada
@@ -481,15 +659,38 @@ export default function DiarioObra() {
         {/* Main Content */}
         <div>
           {activeTab === 'diario' && (
-            <DiarioTimeline
-              entries={entries}
-              onEdit={handleEditEntry}
-              onDelete={handleDeleteEntry}
-              onUpdateActivity={handleUpdateActivity}
-              onDeleteActivity={handleDeleteActivity}
-              especialidades={especialidades}
-              zonas={zonas}
-            />
+            <>
+              {/* Category Filter */}
+              {activeEspecialidades.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                  <select
+                    value={filterCategoria}
+                    onChange={e => setFilterCategoria(e.target.value)}
+                    className="select"
+                    style={{ minWidth: 200, fontSize: 13 }}
+                  >
+                    <option value="">Todas as categorias</option>
+                    {activeEspecialidades.map(name => (
+                      <option key={name} value={name}>{name}</option>
+                    ))}
+                  </select>
+                  {filterCategoria && (
+                    <span style={{ fontSize: 12, color: 'var(--brown-light)' }}>
+                      {filteredEntries.length} entrada{filteredEntries.length !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </div>
+              )}
+              <DiarioTimeline
+                entries={filteredEntries}
+                onEdit={handleEditEntry}
+                onDelete={handleDeleteEntry}
+                onUpdateActivity={handleUpdateActivity}
+                onDeleteActivity={handleDeleteActivity}
+                especialidades={especialidades}
+                zonas={zonas}
+              />
+            </>
           )}
           {activeTab === 'resumo' && (
             <ResumoTab entries={entries} obra={obra} weekSummary={weekSummary} />
@@ -515,10 +716,107 @@ export default function DiarioObra() {
             today={new Date().getDate()}
             currentMonth={new Date().getMonth() === calendarMonth.getMonth() && new Date().getFullYear() === calendarMonth.getFullYear()}
           />
-          <SidebarPendentes pendentes={pendentes} />
+          <SidebarPendentes pendentes={pendentes} onResolve={(p) => {
+            setResolveTarget(p)
+            setResolveText('')
+            setResolveDate(new Date().toISOString().split('T')[0])
+            setShowResolveModal(true)
+          }} />
           <SidebarEspecialidades especialidades={activeEspecialidades} />
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && deleteTarget && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.5)', zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20
+        }} onClick={() => { setShowDeleteModal(false); setDeleteTarget(null) }}>
+          <div style={{
+            background: 'var(--white)', borderRadius: 16, width: '100%', maxWidth: 420, padding: 28
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 10, background: 'var(--error-bg)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}>
+                <Trash2 size={20} color="var(--error)" />
+              </div>
+              <h3 style={{ fontSize: 17, fontWeight: 600, color: 'var(--brown)', margin: 0 }}>Apagar entrada</h3>
+            </div>
+            <p style={{ fontSize: 14, color: 'var(--brown)', lineHeight: 1.6, margin: '0 0 8px 0' }}>
+              Apagar entrada de <strong>{deleteTarget.data ? formatDatePT(deleteTarget.data) : '—'}</strong>?
+            </p>
+            <p style={{ fontSize: 13, color: 'var(--brown-light)', lineHeight: 1.5, margin: '0 0 24px 0' }}>
+              Serão apagadas as fotografias associadas e os pendentes gerados por esta entrada. Esta ação é irreversível.
+            </p>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button onClick={() => { setShowDeleteModal(false); setDeleteTarget(null) }} className="btn btn-ghost" style={{ fontSize: 13 }}>
+                Cancelar
+              </button>
+              <button onClick={handleConfirmDelete} className="btn" style={{
+                fontSize: 13, gap: 6, background: 'var(--error)', color: 'white', border: 'none',
+                padding: '8px 18px', borderRadius: 8, cursor: 'pointer', fontWeight: 600
+              }}>
+                <Trash2 size={14} /> Apagar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Resolve Pendente Modal */}
+      {showResolveModal && resolveTarget && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.5)', zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20
+        }} onClick={() => { setShowResolveModal(false); setResolveTarget(null) }}>
+          <div style={{
+            background: 'var(--white)', borderRadius: 16, width: '100%', maxWidth: 440, padding: 28
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 10, background: 'var(--success-bg)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}>
+                <Check size={20} color="var(--success)" />
+              </div>
+              <h3 style={{ fontSize: 17, fontWeight: 600, color: 'var(--brown)', margin: 0 }}>Resolver pendente</h3>
+            </div>
+            <p style={{ fontSize: 13, color: 'var(--brown)', lineHeight: 1.5, margin: '0 0 16px 0', padding: '10px 12px', background: 'var(--cream)', borderRadius: 8 }}>
+              {resolveTarget.descricao}
+            </p>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--brown-light)', marginBottom: 6, display: 'block' }}>
+                Descrição da resolução
+              </label>
+              <textarea
+                value={resolveText}
+                onChange={e => setResolveText(e.target.value)}
+                className="textarea"
+                rows={3}
+                placeholder="Descreva como o pendente foi resolvido..."
+              />
+            </div>
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--brown-light)', marginBottom: 6, display: 'block' }}>
+                Data de resolução
+              </label>
+              <input type="date" value={resolveDate} onChange={e => setResolveDate(e.target.value)} className="input" />
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button onClick={() => { setShowResolveModal(false); setResolveTarget(null) }} className="btn btn-ghost" style={{ fontSize: 13 }}>
+                Cancelar
+              </button>
+              <button onClick={handleResolvePendente} className="btn btn-primary" style={{ fontSize: 13, gap: 6, background: 'var(--success)' }}>
+                <Check size={14} /> Resolver
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Entry Form Modal */}
       {showEntryForm && (
@@ -527,6 +825,7 @@ export default function DiarioObra() {
           entry={editingEntry}
           especialidades={especialidades}
           zonas={zonas}
+          obraId={selectedObra}
           onClose={() => { setShowEntryForm(false); setEditingEntry(null) }}
           onSaved={handleEntrySaved}
         />
@@ -603,18 +902,18 @@ function DayEntry({ entry, onEdit, onDelete, onUpdateActivity, onDeleteActivity,
     <div className="card" style={{ padding: 0, marginBottom: 20, overflow: 'hidden' }}>
       {/* Date Header */}
       <div style={{
-        padding: '14px 24px',
+        padding: '16px 24px',
         background: 'var(--cream)',
         borderBottom: '1px solid var(--stone)',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--brown)' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
+          <span style={{ fontSize: FONT_SIZES['2xl'], fontFamily: FONTS.heading, fontWeight: 600, color: 'var(--brown)' }}>
             {formatDatePT(entry.data)}
           </span>
-          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--brown-light)', letterSpacing: 0.5 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--brown-light)', letterSpacing: 0.8, textTransform: 'uppercase' }}>
             {getDayOfWeek(entry.data)}
           </span>
         </div>
@@ -628,43 +927,50 @@ function DayEntry({ entry, onEdit, onDelete, onUpdateActivity, onDeleteActivity,
         </div>
       </div>
 
-      {/* Weather + Stats Bar */}
+      {/* Metadata Bar */}
       <div style={{
-        padding: '12px 24px',
+        padding: '10px 24px',
         borderBottom: '1px solid var(--stone)',
         display: 'flex',
         alignItems: 'center',
-        gap: 20,
-        fontSize: 13,
-        color: 'var(--brown-light)'
+        gap: 6,
+        fontSize: 12,
+        color: '#9A9A8A'
       }}>
         {weather && (
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <WeatherIcon size={16} color={weather.color} />
-            <span style={{ color: 'var(--brown)' }}>
-              {entry.temperatura ? `${entry.temperatura}°C` : ''} {entry.temperatura ? '·' : ''} {weather.labelDisplay}
+          <>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <WeatherIcon size={14} color="#B8B8A8" />
+              <span>{entry.temperatura ? `${entry.temperatura}°C · ` : ''}{weather.labelDisplay}</span>
             </span>
-          </span>
+            <span style={{ color: '#D0D0C4' }}>|</span>
+          </>
         )}
         {workerCount > 0 && (
-          <span
-            style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: trabPresentes?.length > 0 ? 'pointer' : 'default' }}
-            onClick={() => trabPresentes?.length > 0 && setShowWorkerNames(!showWorkerNames)}
-          >
-            <Users size={14} /> {workerCount} em obra
-            {trabPresentes?.length > 0 && (
-              <ChevronRight size={12} style={{ transform: showWorkerNames ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }} />
-            )}
-          </span>
+          <>
+            <span
+              style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: trabPresentes?.length > 0 ? 'pointer' : 'default' }}
+              onClick={() => trabPresentes?.length > 0 && setShowWorkerNames(!showWorkerNames)}
+            >
+              <Users size={13} color="#B8B8A8" /> {workerCount} em obra
+              {trabPresentes?.length > 0 && (
+                <ChevronRight size={11} style={{ transform: showWorkerNames ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }} />
+              )}
+            </span>
+            <span style={{ color: '#D0D0C4' }}>|</span>
+          </>
         )}
         {(horaInicio || horaFim) && (
-          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <Clock size={14} /> {horaInicio || '—'} – {horaFim || '—'}
-          </span>
+          <>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Clock size={13} color="#B8B8A8" /> {horaInicio || '—'}–{horaFim || '—'}
+            </span>
+            <span style={{ color: '#D0D0C4' }}>|</span>
+          </>
         )}
         {photoCount > 0 && (
           <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <Camera size={14} /> {photoCount} fotos
+            <Camera size={13} color="#B8B8A8" /> {photoCount} fotos
           </span>
         )}
       </div>
@@ -725,16 +1031,40 @@ function DayEntry({ entry, onEdit, onDelete, onUpdateActivity, onDeleteActivity,
         ))}
       </div>
 
+      {/* Notas do Dia */}
+      {entry.observacoes_dia && (
+        <div style={{ padding: '0 24px 16px' }}>
+          <div style={{
+            background: '#F9F8F5',
+            borderLeft: '3px solid #D4BC9E',
+            borderRadius: '0 8px 8px 0',
+            padding: '14px 18px'
+          }}>
+            <div style={{
+              fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1,
+              color: 'var(--brown-light)', marginBottom: 6
+            }}>
+              Notas do Dia
+            </div>
+            <p style={{
+              margin: 0, fontSize: 13, color: 'var(--brown)', lineHeight: 1.6, fontStyle: 'italic'
+            }}>
+              {entry.observacoes_dia}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Registered By Footer */}
       <div style={{
-        padding: '12px 24px',
+        padding: '10px 24px',
         borderTop: '1px solid var(--stone)',
         fontSize: 12,
-        color: 'var(--brown-light)'
+        color: '#9A9A8A'
       }}>
-        Registado por <strong style={{ color: 'var(--brown)' }}>{entry.registado_por_nome || entry.funcao || 'Utilizador'}</strong>
+        Registado por {entry.registado_por_nome || entry.funcao || 'Utilizador'}
         {entry.updated_at && (
-          <> · {new Date(entry.updated_at).toLocaleDateString('pt-PT')} {new Date(entry.updated_at).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}</>
+          <> &middot; {new Date(entry.updated_at).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' })} {new Date(entry.updated_at).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}</>
         )}
       </div>
     </div>
@@ -1086,11 +1416,12 @@ function SidebarCalendar({ month, onChangeMonth, dots, today, currentMonth }) {
   )
 }
 
-function SidebarPendentes({ pendentes }) {
+function SidebarPendentes({ pendentes, onResolve }) {
   if (pendentes.length === 0) return null
 
   const typeConfig = {
     bloqueio: { label: 'Bloqueio', bg: 'var(--error-bg)', color: 'var(--error)' },
+    nao_conforme: { label: 'NC', bg: 'var(--error-bg)', color: 'var(--error)' },
     nc: { label: 'NC', bg: 'var(--error-bg)', color: 'var(--error)' },
     decisao: { label: 'Decisão', bg: 'var(--warning-bg)', color: 'var(--warning)' },
   }
@@ -1104,7 +1435,7 @@ function SidebarPendentes({ pendentes }) {
         {pendentes.map((p, idx) => {
           const cfg = typeConfig[p.tipo] || typeConfig.decisao
           return (
-            <div key={idx} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+            <div key={p.id || idx} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
               <span style={{
                 padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700,
                 background: cfg.bg, color: cfg.color, flexShrink: 0, marginTop: 2
@@ -1113,11 +1444,25 @@ function SidebarPendentes({ pendentes }) {
               </span>
               <div style={{ flex: 1 }}>
                 <p style={{ margin: 0, fontSize: 13, color: 'var(--brown)', lineHeight: 1.4 }}>{p.descricao}</p>
-                {p.data_registo && (
-                  <span style={{ fontSize: 11, color: 'var(--brown-light)' }}>
-                    {p.tipo === 'bloqueio' ? 'Desde' : 'Registada'} {new Date(p.data_registo + 'T12:00:00').toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' })}
-                  </span>
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                  {p.data_registo && (
+                    <span style={{ fontSize: 11, color: 'var(--brown-light)' }}>
+                      {p.tipo === 'bloqueio' ? 'Desde' : 'Registada'} {new Date((p.data_registo || '') + (String(p.data_registo).includes('T') ? '' : 'T12:00:00')).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' })}
+                    </span>
+                  )}
+                  {p._fromDB && onResolve && (
+                    <button
+                      onClick={() => onResolve(p)}
+                      style={{
+                        background: 'none', border: '1px solid var(--success)', borderRadius: 4,
+                        padding: '2px 8px', fontSize: 10, fontWeight: 600, cursor: 'pointer',
+                        color: 'var(--success)', display: 'flex', alignItems: 'center', gap: 3
+                      }}
+                    >
+                      <Check size={10} /> Resolver
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           )
@@ -1315,7 +1660,7 @@ function DocumentosTab() {
 // ENTRY FORM MODAL (Restructured for new design)
 // =====================================================
 
-function EntryFormModal({ obra, entry, especialidades, zonas, onClose, onSaved }) {
+function EntryFormModal({ obra, entry, especialidades, zonas, obraId, onClose, onSaved }) {
   const [saving, setSaving] = useState(false)
   const [data, setData] = useState(entry?.data || new Date().toISOString().split('T')[0])
   const [funcao, setFuncao] = useState(entry?.funcao || 'Encarregado de Obra')
@@ -1326,8 +1671,8 @@ function EntryFormModal({ obra, entry, especialidades, zonas, onClose, onSaved }
   const [observacoesMeteo, setObservacoesMeteo] = useState(entry?.observacoes_meteo || '')
 
   // Work hours
-  const [horaInicio, setHoraInicio] = useState(entry?.hora_inicio?.substring(0, 5) || '')
-  const [horaFim, setHoraFim] = useState(entry?.hora_fim?.substring(0, 5) || '')
+  const [horaInicio, setHoraInicio] = useState(entry?.hora_inicio?.substring(0, 5) || '08:00')
+  const [horaFim, setHoraFim] = useState(entry?.hora_fim?.substring(0, 5) || '17:30')
 
   // Workers (named list)
   const [trabalhadores, setTrabalhadores] = useState(() => {
@@ -1355,6 +1700,9 @@ function EntryFormModal({ obra, entry, especialidades, zonas, onClose, onSaved }
   const [pendentes, setPendentes] = useState(entry?.pendentes || [])
   const [showAddPendente, setShowAddPendente] = useState(false)
   const [novoPendente, setNovoPendente] = useState({ tipo: 'decisao', descricao: '' })
+
+  // Notas do dia
+  const [observacoesDia, setObservacoesDia] = useState(entry?.observacoes_dia || '')
 
   // Photos (global, in addition to per-activity)
   const [fotos, setFotos] = useState(entry?.fotos || [])
@@ -1534,6 +1882,7 @@ function EntryFormModal({ obra, entry, especialidades, zonas, onClose, onSaved }
         hora_fim: horaFim || null,
         registado_por_nome: funcao,
         pendentes,
+        observacoes_dia: observacoesDia || null,
       }
 
       // Try with new columns, fallback without if migration not applied
@@ -1557,6 +1906,36 @@ function EntryFormModal({ obra, entry, especialidades, zonas, onClose, onSaved }
         }
       } else if (saveErr) {
         throw saveErr
+      }
+
+      // Auto-resolve: if any atividade marked as "Concluída" matches an open pendente
+      try {
+        const resolvedDescs = processedAtividades
+          .filter(a => a.estado === 'concluida' || a.estado === 'Concluída')
+          .map(a => a.descricao?.toLowerCase().trim())
+          .filter(Boolean)
+        if (resolvedDescs.length > 0 && obraId) {
+          const { data: openPendentes } = await supabase
+            .from('obra_pendentes')
+            .select('id, descricao')
+            .eq('obra_id', obraId)
+            .eq('estado', 'aberto')
+          if (openPendentes?.length) {
+            const toResolve = openPendentes.filter(p =>
+              resolvedDescs.some(d => p.descricao?.toLowerCase().trim().includes(d) || d.includes(p.descricao?.toLowerCase().trim()))
+            )
+            for (const p of toResolve) {
+              await supabase.from('obra_pendentes').update({
+                estado: 'resolvido',
+                data_resolucao: data,
+                resolucao_descricao: 'Resolvido automaticamente — tarefa concluída no diário',
+                updated_at: new Date().toISOString()
+              }).eq('id', p.id)
+            }
+          }
+        }
+      } catch (autoResolveErr) {
+        console.warn('Auto-resolve pendentes failed:', autoResolveErr)
       }
 
       onSaved()
@@ -1988,6 +2367,19 @@ function EntryFormModal({ obra, entry, especialidades, zonas, onClose, onSaved }
                 <Camera size={20} color="var(--brown-light)" />
               </label>
             </div>
+          </div>
+
+          {/* Notas do Dia */}
+          <div style={{ marginBottom: 24 }}>
+            <FieldLabel>Notas do Dia</FieldLabel>
+            <textarea
+              value={observacoesDia}
+              onChange={e => setObservacoesDia(e.target.value)}
+              className="textarea"
+              rows={3}
+              placeholder="Observações gerais, informações relevantes do dia..."
+              style={{ width: '100%' }}
+            />
           </div>
 
           {/* Hidden file input for activity photos */}
