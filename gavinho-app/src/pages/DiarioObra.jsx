@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { exportDiarioToPDF } from '../utils/exportDiarioToPDF'
+import { FONTS, FONT_SIZES } from '../styles/designTokens'
 import {
   Sun, Cloud, CloudRain, Wind, CloudFog,
   Plus, Trash2, Edit2, Check, X, Upload, ChevronRight, ChevronLeft,
@@ -23,25 +24,25 @@ const WEATHER_OPTIONS = [
 ]
 
 const ESPECIALIDADE_COLORS = {
-  'Carpintaria': '#2563eb',
-  'Eletricidade': '#d97706',
-  'Elétrico': '#d97706',
-  'Pedra Natural': '#78716c',
-  'Revestimentos': '#78716c',
-  'AVAC': '#059669',
-  'Canalização': '#0891b2',
-  'Hidráulica': '#0891b2',
-  'Serralharia': '#475569',
-  'Alvenaria': '#92400e',
-  'Alvenarias': '#92400e',
-  'Pintura': '#7c3aed',
-  'Estrutura': '#dc2626',
-  'Impermeabilização': '#0d9488',
-  'Caixilharia': '#4f46e5',
-  'Vidros': '#06b6d4',
-  'Gás': '#ea580c',
-  'Paisagismo': '#16a34a',
-  'Piscina': '#0284c7',
+  'Carpintaria': '#7A8B6E',      // olive
+  'Eletricidade': '#C9A86C',     // warm gold
+  'Elétrico': '#C9A86C',         // warm gold
+  'Pedra Natural': '#9A8B7A',    // sage stone
+  'Revestimentos': '#9A8B7A',    // sage stone
+  'AVAC': '#7A9E7A',             // green sage
+  'Canalização': '#7A8B9E',      // steel blue
+  'Hidráulica': '#7A8B9E',       // steel blue
+  'Serralharia': '#6B6B6B',      // charcoal
+  'Alvenaria': '#9A6B5B',        // terracotta
+  'Alvenarias': '#9A6B5B',       // terracotta
+  'Pintura': '#8A7B9E',          // muted purple
+  'Estrutura': '#9A6B5B',        // terracotta
+  'Impermeabilização': '#6B8B7A', // teal sage
+  'Caixilharia': '#7A7B9E',     // muted indigo
+  'Vidros': '#7A9E9E',          // teal
+  'Gás': '#C9886C',             // warm orange
+  'Paisagismo': '#7A8B6E',      // olive
+  'Piscina': '#7A8B9E',         // steel blue
 }
 
 const TABS = [
@@ -584,7 +585,7 @@ export default function DiarioObra() {
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-                <h1 style={{ fontSize: 24, fontWeight: 700, color: 'var(--brown)', margin: 0 }}>{obra.codigo}</h1>
+                <h1 style={{ fontSize: FONT_SIZES['2xl'], fontFamily: FONTS.heading, fontWeight: 600, color: 'var(--brown)', margin: 0 }}>{obra.codigo}</h1>
                 <span style={{
                   width: 10, height: 10, borderRadius: '50%',
                   background: obra.status === 'em_curso' ? 'var(--success)' : obra.status === 'concluida' ? 'var(--info)' : 'var(--warning)',
@@ -901,18 +902,18 @@ function DayEntry({ entry, onEdit, onDelete, onUpdateActivity, onDeleteActivity,
     <div className="card" style={{ padding: 0, marginBottom: 20, overflow: 'hidden' }}>
       {/* Date Header */}
       <div style={{
-        padding: '14px 24px',
+        padding: '16px 24px',
         background: 'var(--cream)',
         borderBottom: '1px solid var(--stone)',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--brown)' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
+          <span style={{ fontSize: FONT_SIZES['2xl'], fontFamily: FONTS.heading, fontWeight: 600, color: 'var(--brown)' }}>
             {formatDatePT(entry.data)}
           </span>
-          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--brown-light)', letterSpacing: 0.5 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--brown-light)', letterSpacing: 0.8, textTransform: 'uppercase' }}>
             {getDayOfWeek(entry.data)}
           </span>
         </div>
@@ -926,43 +927,50 @@ function DayEntry({ entry, onEdit, onDelete, onUpdateActivity, onDeleteActivity,
         </div>
       </div>
 
-      {/* Weather + Stats Bar */}
+      {/* Metadata Bar */}
       <div style={{
-        padding: '12px 24px',
+        padding: '10px 24px',
         borderBottom: '1px solid var(--stone)',
         display: 'flex',
         alignItems: 'center',
-        gap: 20,
-        fontSize: 13,
-        color: 'var(--brown-light)'
+        gap: 6,
+        fontSize: 12,
+        color: '#9A9A8A'
       }}>
         {weather && (
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <WeatherIcon size={16} color={weather.color} />
-            <span style={{ color: 'var(--brown)' }}>
-              {entry.temperatura ? `${entry.temperatura}°C` : ''} {entry.temperatura ? '·' : ''} {weather.labelDisplay}
+          <>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <WeatherIcon size={14} color="#B8B8A8" />
+              <span>{entry.temperatura ? `${entry.temperatura}°C · ` : ''}{weather.labelDisplay}</span>
             </span>
-          </span>
+            <span style={{ color: '#D0D0C4' }}>|</span>
+          </>
         )}
         {workerCount > 0 && (
-          <span
-            style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: trabPresentes?.length > 0 ? 'pointer' : 'default' }}
-            onClick={() => trabPresentes?.length > 0 && setShowWorkerNames(!showWorkerNames)}
-          >
-            <Users size={14} /> {workerCount} em obra
-            {trabPresentes?.length > 0 && (
-              <ChevronRight size={12} style={{ transform: showWorkerNames ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }} />
-            )}
-          </span>
+          <>
+            <span
+              style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: trabPresentes?.length > 0 ? 'pointer' : 'default' }}
+              onClick={() => trabPresentes?.length > 0 && setShowWorkerNames(!showWorkerNames)}
+            >
+              <Users size={13} color="#B8B8A8" /> {workerCount} em obra
+              {trabPresentes?.length > 0 && (
+                <ChevronRight size={11} style={{ transform: showWorkerNames ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }} />
+              )}
+            </span>
+            <span style={{ color: '#D0D0C4' }}>|</span>
+          </>
         )}
         {(horaInicio || horaFim) && (
-          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <Clock size={14} /> {horaInicio || '—'} – {horaFim || '—'}
-          </span>
+          <>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Clock size={13} color="#B8B8A8" /> {horaInicio || '—'}–{horaFim || '—'}
+            </span>
+            <span style={{ color: '#D0D0C4' }}>|</span>
+          </>
         )}
         {photoCount > 0 && (
           <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <Camera size={14} /> {photoCount} fotos
+            <Camera size={13} color="#B8B8A8" /> {photoCount} fotos
           </span>
         )}
       </div>
@@ -1049,14 +1057,14 @@ function DayEntry({ entry, onEdit, onDelete, onUpdateActivity, onDeleteActivity,
 
       {/* Registered By Footer */}
       <div style={{
-        padding: '12px 24px',
+        padding: '10px 24px',
         borderTop: '1px solid var(--stone)',
         fontSize: 12,
-        color: 'var(--brown-light)'
+        color: '#9A9A8A'
       }}>
-        Registado por <strong style={{ color: 'var(--brown)' }}>{entry.registado_por_nome || entry.funcao || 'Utilizador'}</strong>
+        Registado por {entry.registado_por_nome || entry.funcao || 'Utilizador'}
         {entry.updated_at && (
-          <> · {new Date(entry.updated_at).toLocaleDateString('pt-PT')} {new Date(entry.updated_at).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}</>
+          <> &middot; {new Date(entry.updated_at).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' })} {new Date(entry.updated_at).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}</>
         )}
       </div>
     </div>
