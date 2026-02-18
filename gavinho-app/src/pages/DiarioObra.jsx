@@ -1608,8 +1608,8 @@ function EntryFormModal({ obra, entry, especialidades, zonas, obraId, onClose, o
   const [observacoesMeteo, setObservacoesMeteo] = useState(entry?.observacoes_meteo || '')
 
   // Work hours
-  const [horaInicio, setHoraInicio] = useState(entry?.hora_inicio?.substring(0, 5) || '')
-  const [horaFim, setHoraFim] = useState(entry?.hora_fim?.substring(0, 5) || '')
+  const [horaInicio, setHoraInicio] = useState(entry?.hora_inicio?.substring(0, 5) || '08:00')
+  const [horaFim, setHoraFim] = useState(entry?.hora_fim?.substring(0, 5) || '17:30')
 
   // Workers (named list)
   const [trabalhadores, setTrabalhadores] = useState(() => {
