@@ -116,6 +116,15 @@ export default function DiarioObra() {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState(null)
 
+  // Pendentes from DB (obra_pendentes table)
+  const [pendentesDB, setPendentesDB] = useState([])
+
+  // Resolve pendente modal
+  const [showResolveModal, setShowResolveModal] = useState(false)
+  const [resolveTarget, setResolveTarget] = useState(null)
+  const [resolveText, setResolveText] = useState('')
+  const [resolveDate, setResolveDate] = useState(new Date().toISOString().split('T')[0])
+
   // =====================================================
   // DATA FETCHING
   // =====================================================
@@ -130,6 +139,7 @@ export default function DiarioObra() {
       fetchObraDetails()
       fetchEntries()
       fetchZonas()
+      fetchPendentesDB()
     }
   }, [selectedObra])
 
@@ -193,6 +203,16 @@ export default function DiarioObra() {
     if (data) setZonas(data)
   }
 
+  const fetchPendentesDB = async () => {
+    const { data } = await supabase
+      .from('obra_pendentes')
+      .select('*')
+      .eq('obra_id', selectedObra)
+      .eq('estado', 'aberto')
+      .order('data_criacao', { ascending: false })
+    if (data) setPendentesDB(data)
+  }
+
   // =====================================================
   // COMPUTED VALUES
   // =====================================================
@@ -229,13 +249,21 @@ export default function DiarioObra() {
   }, [entries])
 
   const pendentes = useMemo(() => {
+    // Prefer DB pendentes if available
+    if (pendentesDB.length > 0) {
+      return pendentesDB.map(p => ({
+        ...p,
+        _fromDB: true,
+        data_registo: p.data_criacao,
+        data_entrada: p.data_criacao
+      })).slice(0, 8)
+    }
+    // Fallback: collect from entry JSONB fields
     const items = []
     entries.forEach(e => {
-      // Collect from pendentes field
       if (e.pendentes?.length) {
         e.pendentes.forEach(p => items.push({ ...p, data_entrada: e.data }))
       }
-      // Collect from atividades with alerts
       if (e.atividades?.length) {
         e.atividades.forEach(a => {
           if (a.alerta) {
@@ -248,7 +276,6 @@ export default function DiarioObra() {
           }
         })
       }
-      // Collect NCs
       if (e.nao_conformidades?.length) {
         e.nao_conformidades.forEach(nc => {
           items.push({
@@ -261,8 +288,8 @@ export default function DiarioObra() {
         })
       }
     })
-    return items.slice(0, 6)
-  }, [entries])
+    return items.slice(0, 8)
+  }, [entries, pendentesDB])
 
   const activeEspecialidades = useMemo(() => {
     const names = new Set()
@@ -305,6 +332,7 @@ export default function DiarioObra() {
     setShowEntryForm(false)
     setEditingEntry(null)
     fetchEntries()
+    fetchPendentesDB()
   }
 
   const handleDeleteEntry = (entryId) => {
@@ -348,6 +376,27 @@ export default function DiarioObra() {
 
     setShowDeleteModal(false)
     setDeleteTarget(null)
+    fetchEntries()
+    fetchPendentesDB()
+  }
+
+  const handleResolvePendente = async () => {
+    if (!resolveTarget) return
+    if (resolveTarget._fromDB && resolveTarget.id) {
+      // Resolve in DB table
+      await supabase.from('obra_pendentes').update({
+        estado: 'resolvido',
+        data_resolucao: resolveDate,
+        resolucao_descricao: resolveText || null,
+        resolved_by_user: 'user',
+        updated_at: new Date().toISOString()
+      }).eq('id', resolveTarget.id)
+    }
+    setShowResolveModal(false)
+    setResolveTarget(null)
+    setResolveText('')
+    setResolveDate(new Date().toISOString().split('T')[0])
+    fetchPendentesDB()
     fetchEntries()
   }
 
@@ -557,7 +606,12 @@ export default function DiarioObra() {
             today={new Date().getDate()}
             currentMonth={new Date().getMonth() === calendarMonth.getMonth() && new Date().getFullYear() === calendarMonth.getFullYear()}
           />
-          <SidebarPendentes pendentes={pendentes} />
+          <SidebarPendentes pendentes={pendentes} onResolve={(p) => {
+            setResolveTarget(p)
+            setResolveText('')
+            setResolveDate(new Date().toISOString().split('T')[0])
+            setShowResolveModal(true)
+          }} />
           <SidebarEspecialidades especialidades={activeEspecialidades} />
         </div>
       </div>
@@ -602,6 +656,58 @@ export default function DiarioObra() {
         </div>
       )}
 
+      {/* Resolve Pendente Modal */}
+      {showResolveModal && resolveTarget && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.5)', zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20
+        }} onClick={() => { setShowResolveModal(false); setResolveTarget(null) }}>
+          <div style={{
+            background: 'var(--white)', borderRadius: 16, width: '100%', maxWidth: 440, padding: 28
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 10, background: 'var(--success-bg)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}>
+                <Check size={20} color="var(--success)" />
+              </div>
+              <h3 style={{ fontSize: 17, fontWeight: 600, color: 'var(--brown)', margin: 0 }}>Resolver pendente</h3>
+            </div>
+            <p style={{ fontSize: 13, color: 'var(--brown)', lineHeight: 1.5, margin: '0 0 16px 0', padding: '10px 12px', background: 'var(--cream)', borderRadius: 8 }}>
+              {resolveTarget.descricao}
+            </p>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--brown-light)', marginBottom: 6, display: 'block' }}>
+                Descrição da resolução
+              </label>
+              <textarea
+                value={resolveText}
+                onChange={e => setResolveText(e.target.value)}
+                className="textarea"
+                rows={3}
+                placeholder="Descreva como o pendente foi resolvido..."
+              />
+            </div>
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--brown-light)', marginBottom: 6, display: 'block' }}>
+                Data de resolução
+              </label>
+              <input type="date" value={resolveDate} onChange={e => setResolveDate(e.target.value)} className="input" />
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button onClick={() => { setShowResolveModal(false); setResolveTarget(null) }} className="btn btn-ghost" style={{ fontSize: 13 }}>
+                Cancelar
+              </button>
+              <button onClick={handleResolvePendente} className="btn btn-primary" style={{ fontSize: 13, gap: 6, background: 'var(--success)' }}>
+                <Check size={14} /> Resolver
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Entry Form Modal */}
       {showEntryForm && (
         <EntryFormModal
@@ -609,6 +715,7 @@ export default function DiarioObra() {
           entry={editingEntry}
           especialidades={especialidades}
           zonas={zonas}
+          obraId={selectedObra}
           onClose={() => { setShowEntryForm(false); setEditingEntry(null) }}
           onSaved={handleEntrySaved}
         />
@@ -1168,11 +1275,12 @@ function SidebarCalendar({ month, onChangeMonth, dots, today, currentMonth }) {
   )
 }
 
-function SidebarPendentes({ pendentes }) {
+function SidebarPendentes({ pendentes, onResolve }) {
   if (pendentes.length === 0) return null
 
   const typeConfig = {
     bloqueio: { label: 'Bloqueio', bg: 'var(--error-bg)', color: 'var(--error)' },
+    nao_conforme: { label: 'NC', bg: 'var(--error-bg)', color: 'var(--error)' },
     nc: { label: 'NC', bg: 'var(--error-bg)', color: 'var(--error)' },
     decisao: { label: 'Decisão', bg: 'var(--warning-bg)', color: 'var(--warning)' },
   }
@@ -1186,7 +1294,7 @@ function SidebarPendentes({ pendentes }) {
         {pendentes.map((p, idx) => {
           const cfg = typeConfig[p.tipo] || typeConfig.decisao
           return (
-            <div key={idx} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+            <div key={p.id || idx} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
               <span style={{
                 padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700,
                 background: cfg.bg, color: cfg.color, flexShrink: 0, marginTop: 2
@@ -1195,11 +1303,25 @@ function SidebarPendentes({ pendentes }) {
               </span>
               <div style={{ flex: 1 }}>
                 <p style={{ margin: 0, fontSize: 13, color: 'var(--brown)', lineHeight: 1.4 }}>{p.descricao}</p>
-                {p.data_registo && (
-                  <span style={{ fontSize: 11, color: 'var(--brown-light)' }}>
-                    {p.tipo === 'bloqueio' ? 'Desde' : 'Registada'} {new Date(p.data_registo + 'T12:00:00').toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' })}
-                  </span>
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                  {p.data_registo && (
+                    <span style={{ fontSize: 11, color: 'var(--brown-light)' }}>
+                      {p.tipo === 'bloqueio' ? 'Desde' : 'Registada'} {new Date((p.data_registo || '') + (String(p.data_registo).includes('T') ? '' : 'T12:00:00')).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' })}
+                    </span>
+                  )}
+                  {p._fromDB && onResolve && (
+                    <button
+                      onClick={() => onResolve(p)}
+                      style={{
+                        background: 'none', border: '1px solid var(--success)', borderRadius: 4,
+                        padding: '2px 8px', fontSize: 10, fontWeight: 600, cursor: 'pointer',
+                        color: 'var(--success)', display: 'flex', alignItems: 'center', gap: 3
+                      }}
+                    >
+                      <Check size={10} /> Resolver
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           )
@@ -1397,7 +1519,7 @@ function DocumentosTab() {
 // ENTRY FORM MODAL (Restructured for new design)
 // =====================================================
 
-function EntryFormModal({ obra, entry, especialidades, zonas, onClose, onSaved }) {
+function EntryFormModal({ obra, entry, especialidades, zonas, obraId, onClose, onSaved }) {
   const [saving, setSaving] = useState(false)
   const [data, setData] = useState(entry?.data || new Date().toISOString().split('T')[0])
   const [funcao, setFuncao] = useState(entry?.funcao || 'Encarregado de Obra')
@@ -1639,6 +1761,36 @@ function EntryFormModal({ obra, entry, especialidades, zonas, onClose, onSaved }
         }
       } else if (saveErr) {
         throw saveErr
+      }
+
+      // Auto-resolve: if any atividade marked as "Concluída" matches an open pendente
+      try {
+        const resolvedDescs = processedAtividades
+          .filter(a => a.estado === 'concluida' || a.estado === 'Concluída')
+          .map(a => a.descricao?.toLowerCase().trim())
+          .filter(Boolean)
+        if (resolvedDescs.length > 0 && obraId) {
+          const { data: openPendentes } = await supabase
+            .from('obra_pendentes')
+            .select('id, descricao')
+            .eq('obra_id', obraId)
+            .eq('estado', 'aberto')
+          if (openPendentes?.length) {
+            const toResolve = openPendentes.filter(p =>
+              resolvedDescs.some(d => p.descricao?.toLowerCase().trim().includes(d) || d.includes(p.descricao?.toLowerCase().trim()))
+            )
+            for (const p of toResolve) {
+              await supabase.from('obra_pendentes').update({
+                estado: 'resolvido',
+                data_resolucao: data,
+                resolucao_descricao: 'Resolvido automaticamente — tarefa concluída no diário',
+                updated_at: new Date().toISOString()
+              }).eq('id', p.id)
+            }
+          }
+        }
+      } catch (autoResolveErr) {
+        console.warn('Auto-resolve pendentes failed:', autoResolveErr)
       }
 
       onSaved()
