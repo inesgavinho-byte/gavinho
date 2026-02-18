@@ -6,7 +6,7 @@ import {
   Plus, Trash2, Edit2, Check, X, Upload, ChevronRight, ChevronLeft,
   Save, Send, Clock, Users, AlertTriangle, Camera, ArrowRight,
   Loader2, Download, Image as ImageIcon, MapPin, Calendar,
-  AlertCircle, Info, UserPlus, User
+  AlertCircle, Info, UserPlus, User, Copy
 } from 'lucide-react'
 
 // =====================================================
@@ -335,6 +335,47 @@ export default function DiarioObra() {
     fetchPendentesDB()
   }
 
+  // Get yesterday's entry for "Copiar ontem" feature
+  const yesterdayEntry = useMemo(() => {
+    const yesterday = new Date()
+    yesterday.setDate(yesterday.getDate() - 1)
+    const yStr = yesterday.toISOString().split('T')[0]
+    return entries.find(e => e.data === yStr) || null
+  }, [entries])
+
+  const handleCopyYesterday = () => {
+    if (!yesterdayEntry) return
+    // Copy structure without fotos, states, or detailed descriptions
+    const copiedAtividades = (yesterdayEntry.atividades || []).map(a => ({
+      especialidade_nome: a.especialidade_nome || '',
+      zona: a.zona || '',
+      descricao: '',
+      fotos: [],
+      alerta: null,
+      nota: '',
+      executante: a.executante || ''
+    }))
+    const copiedTrabalhadores = (yesterdayEntry.trabalhadores || []).map(t => ({
+      ...t,
+      id: Date.now() + Math.random(),
+      estado: 'PRESENTE'
+    }))
+    setEditingEntry({
+      data: new Date().toISOString().split('T')[0],
+      funcao: yesterdayEntry.funcao || 'Encarregado de Obra',
+      condicoes_meteo: yesterdayEntry.condicoes_meteo || 'sol',
+      hora_inicio: yesterdayEntry.hora_inicio || null,
+      hora_fim: yesterdayEntry.hora_fim || null,
+      trabalhadores: copiedTrabalhadores,
+      atividades: copiedAtividades,
+      pendentes: [],
+      nao_conformidades: [],
+      fotos: [],
+      _isCopy: true
+    })
+    setShowEntryForm(true)
+  }
+
   const handleDeleteEntry = (entryId) => {
     const entry = entries.find(e => e.id === entryId)
     setDeleteTarget(entry || { id: entryId })
@@ -530,6 +571,15 @@ export default function DiarioObra() {
           <div style={{ display: 'flex', gap: 10 }}>
             <button className="btn btn-outline" style={{ gap: 6, fontSize: 13 }}>
               <Download size={15} /> Exportar
+            </button>
+            <button
+              onClick={handleCopyYesterday}
+              disabled={!yesterdayEntry}
+              title={yesterdayEntry ? 'Copiar estrutura do dia anterior' : 'Sem entrada ontem'}
+              className="btn btn-outline"
+              style={{ gap: 6, fontSize: 13, opacity: yesterdayEntry ? 1 : 0.4 }}
+            >
+              <Copy size={15} /> Copiar ontem
             </button>
             <button onClick={handleNewEntry} className="btn btn-primary" style={{ gap: 6, fontSize: 13, background: 'var(--olive-gray)' }}>
               <Plus size={15} /> Nova Entrada
