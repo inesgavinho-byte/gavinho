@@ -992,6 +992,30 @@ function DayEntry({ entry, onEdit, onDelete, onUpdateActivity, onDeleteActivity,
         ))}
       </div>
 
+      {/* Notas do Dia */}
+      {entry.observacoes_dia && (
+        <div style={{ padding: '0 24px 16px' }}>
+          <div style={{
+            background: '#F9F8F5',
+            borderLeft: '3px solid #D4BC9E',
+            borderRadius: '0 8px 8px 0',
+            padding: '14px 18px'
+          }}>
+            <div style={{
+              fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1,
+              color: 'var(--brown-light)', marginBottom: 6
+            }}>
+              Notas do Dia
+            </div>
+            <p style={{
+              margin: 0, fontSize: 13, color: 'var(--brown)', lineHeight: 1.6, fontStyle: 'italic'
+            }}>
+              {entry.observacoes_dia}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Registered By Footer */}
       <div style={{
         padding: '12px 24px',
@@ -1638,6 +1662,9 @@ function EntryFormModal({ obra, entry, especialidades, zonas, obraId, onClose, o
   const [showAddPendente, setShowAddPendente] = useState(false)
   const [novoPendente, setNovoPendente] = useState({ tipo: 'decisao', descricao: '' })
 
+  // Notas do dia
+  const [observacoesDia, setObservacoesDia] = useState(entry?.observacoes_dia || '')
+
   // Photos (global, in addition to per-activity)
   const [fotos, setFotos] = useState(entry?.fotos || [])
   const [photoFiles, setPhotoFiles] = useState([])
@@ -1816,6 +1843,7 @@ function EntryFormModal({ obra, entry, especialidades, zonas, obraId, onClose, o
         hora_fim: horaFim || null,
         registado_por_nome: funcao,
         pendentes,
+        observacoes_dia: observacoesDia || null,
       }
 
       // Try with new columns, fallback without if migration not applied
@@ -2300,6 +2328,19 @@ function EntryFormModal({ obra, entry, especialidades, zonas, obraId, onClose, o
                 <Camera size={20} color="var(--brown-light)" />
               </label>
             </div>
+          </div>
+
+          {/* Notas do Dia */}
+          <div style={{ marginBottom: 24 }}>
+            <FieldLabel>Notas do Dia</FieldLabel>
+            <textarea
+              value={observacoesDia}
+              onChange={e => setObservacoesDia(e.target.value)}
+              className="textarea"
+              rows={3}
+              placeholder="Observações gerais, informações relevantes do dia..."
+              style={{ width: '100%' }}
+            />
           </div>
 
           {/* Hidden file input for activity photos */}
