@@ -75,22 +75,18 @@ const formatShortDate = (dateStr) => {
 
 // Generate HTML content for PDF
 const generateDiarioHTML = (diario, obra, equipa = [], tarefas = [], ocorrencias = [], naoConformidades = []) => {
-  const weatherCondition = diario.condicoes_meteo || 'Bom'
-  const weatherIcon = weatherIcons[weatherCondition] || weatherIcons['Bom']
+  const rawWeather = diario.condicoes_meteo || 'Bom'
+  const weatherCondition = rawWeather.charAt(0).toUpperCase() + rawWeather.slice(1).toLowerCase()
+  const weatherIcon = weatherIcons[weatherCondition] || weatherIcons['Sol']
 
   // Calculate worker stats
-  const trabalhadores = equipa || []
-  const presentes = trabalhadores.filter(t => t.estado === 'Presente' || t.presente).length
-  const ausentes = trabalhadores.filter(t => t.estado === 'Ausente' || !t.presente).length
-  const subempreiteiros = trabalhadores.filter(t => t.tipo === 'Subempreiteiro').length
-
-  const totalTrabalhadores = (diario.trabalhadores_gavinho || 0) + (diario.trabalhadores_subempreiteiros || 0)
+  const trabalhadores = equipa || diario.trabalhadores || []
+  const presentes = trabalhadores.filter(t => (t.estado || '').toUpperCase() === 'PRESENTE' || t.presente).length
+  const ausentes = trabalhadores.filter(t => (t.estado || '').toUpperCase() === 'AUSENTE' || (!t.presente && (t.estado || '').toUpperCase() !== 'PRESENTE')).length
+  const subempreiteiros = trabalhadores.filter(t => (t.tipo || '').toLowerCase() === 'subempreiteiro').length
+  const gavinhoCount = trabalhadores.filter(t => (t.tipo || '').toLowerCase() === 'gavinho' && (t.estado || '').toUpperCase() === 'PRESENTE').length
 
   return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
       <style>
         * {
           margin: 0;
@@ -111,7 +107,7 @@ const generateDiarioHTML = (diario, obra, equipa = [], tarefas = [], ocorrencias
           --success: #7A8B6E;
         }
 
-        body {
+        .pdf-container {
           font-family: 'Segoe UI', Arial, sans-serif;
           background-color: var(--soft-cream);
           color: var(--text-dark);
@@ -614,8 +610,7 @@ const generateDiarioHTML = (diario, obra, equipa = [], tarefas = [], ocorrencias
           font-size: 13px;
         }
       </style>
-    </head>
-    <body>
+      <div class="pdf-container">
       <!-- Breadcrumb -->
       <div class="breadcrumb">
         <span>Obras</span> › <span>${obra?.codigo || ''}</span> › Diário de Obra
@@ -692,16 +687,16 @@ const generateDiarioHTML = (diario, obra, equipa = [], tarefas = [], ocorrencias
 
         <div class="workers-summary">
           <div class="worker-count-box">
-            <div class="count">${diario.trabalhadores_gavinho || presentes || 0}</div>
-            <div class="label">PRESENTES</div>
-          </div>
-          <div class="worker-count-box">
-            <div class="count">${ausentes || 0}</div>
-            <div class="label">AUSENTES</div>
+            <div class="count">${diario.trabalhadores_gavinho || gavinhoCount || presentes || 0}</div>
+            <div class="label">GAVINHO</div>
           </div>
           <div class="worker-count-box">
             <div class="count">${diario.trabalhadores_subempreiteiros || subempreiteiros || 0}</div>
             <div class="label">SUBEMPREITEIROS</div>
+          </div>
+          <div class="worker-count-box">
+            <div class="count">${presentes || 0}</div>
+            <div class="label">TOTAL PRESENTES</div>
           </div>
         </div>
 
@@ -722,8 +717,8 @@ const generateDiarioHTML = (diario, obra, equipa = [], tarefas = [], ocorrencias
                   <td>${t.funcao || ''}</td>
                   <td>${t.tipo || 'Equipa'}</td>
                   <td>
-                    <span class="worker-status ${(t.estado || t.presente) === 'Presente' || t.presente ? 'presente' : 'ausente'}">
-                      ${(t.estado || t.presente) === 'Presente' || t.presente ? 'Presente' : 'Ausente'}
+                    <span class="worker-status ${(t.estado || '').toUpperCase() === 'PRESENTE' || t.presente ? 'presente' : 'ausente'}">
+                      ${(t.estado || '').toUpperCase() === 'PRESENTE' || t.presente ? 'Presente' : 'Ausente'}
                     </span>
                   </td>
                 </tr>
@@ -755,10 +750,10 @@ const generateDiarioHTML = (diario, obra, equipa = [], tarefas = [], ocorrencias
                 ${t.concluida || t.progresso >= 100 ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>` : ''}
               </div>
               <div class="task-content">
-                <div class="task-title">${t.titulo || t.nome || ''}</div>
+                <div class="task-title">${t.titulo || t.nome || (t.especialidade_nome ? `[${t.especialidade_nome}]${t.zona ? ' ' + t.zona : ''}` : '')}</div>
                 <div class="task-desc">${t.descricao || ''}</div>
               </div>
-              <div class="task-progress">${t.progresso || 0}%</div>
+              ${t.executante ? `<div style="font-size: 12px; color: var(--text-muted);">${t.executante}</div>` : ''}
             </div>
           `).join('')}
         ` : diario.trabalhos_realizados ? `
@@ -899,8 +894,7 @@ const generateDiarioHTML = (diario, obra, equipa = [], tarefas = [], ocorrencias
         <div class="logo">GAVINHO</div>
         <div>Gerado em ${new Date().toLocaleDateString('pt-PT')} às ${new Date().toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}</div>
       </div>
-    </body>
-    </html>
+      </div>
   `
 }
 
@@ -942,7 +936,7 @@ export const exportDiarioToPDF = async (diario, obra, options = {}) => {
     await new Promise(resolve => setTimeout(resolve, 100))
 
     // Capture with html2canvas
-    const canvas = await html2canvas(container.querySelector('body'), {
+    const canvas = await html2canvas(container, {
       scale: 2,
       useCORS: true,
       allowTaint: true,
