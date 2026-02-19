@@ -70,13 +70,76 @@ export default function AcompanhamentoTab({ obra, obraId, activeSubtab, currentU
     if (!obraId) return
     setFotosLoading(true)
     try {
-      const [fotosRes, zonasRes, especRes] = await Promise.all([
-        supabase.from('obra_fotografias').select('*, obra_zonas(nome), especialidades(nome, cor)').eq('obra_id', obraId).order('data_fotografia', { ascending: false }),
+      const [fotosRes, diarioRes, zonasRes, especRes] = await Promise.all([
+        supabase.from('obra_fotografias').select('*, obra_zonas(nome), especialidades(nome, cor)').eq('obra_id', obraId).order('data_fotografia', { ascending: false })
+          .then(r => r.error?.code === '42P01' ? { data: [], error: null } : r),
+        supabase.from('obra_diario').select('id, data, fotos, atividades, status').eq('obra_id', obraId).order('data', { ascending: false }),
         supabase.from('obra_zonas').select('id, nome, piso').eq('obra_id', obraId).order('nome'),
         supabase.from('especialidades').select('id, nome, cor, categoria').eq('ativo', true).order('ordem')
       ])
       if (fotosRes.error) throw fotosRes.error
-      setFotos(fotosRes.data || [])
+
+      // Extract photos from diary entries (global + per-activity)
+      const diarioFotos = []
+      for (const entry of (diarioRes.data || [])) {
+        // Global diary photos
+        if (Array.isArray(entry.fotos)) {
+          entry.fotos.forEach((url, i) => {
+            if (!url || typeof url !== 'string') return
+            diarioFotos.push({
+              id: `diario-${entry.id}-g${i}`,
+              url,
+              filename: url.split('/').pop() || 'foto_diario',
+              titulo: `Diário ${entry.data}`,
+              data_fotografia: entry.data,
+              obra_id: obraId,
+              source: 'diario',
+              diario_entry_id: entry.id
+            })
+          })
+        }
+        // Per-activity photos
+        if (Array.isArray(entry.atividades)) {
+          entry.atividades.forEach((ativ, ai) => {
+            if (!Array.isArray(ativ.fotos)) return
+            ativ.fotos.forEach((url, fi) => {
+              if (!url || typeof url !== 'string') return
+              diarioFotos.push({
+                id: `diario-${entry.id}-a${ai}f${fi}`,
+                url,
+                filename: url.split('/').pop() || 'foto_atividade',
+                titulo: ativ.descricao || ativ.especialidade_nome || `Atividade ${entry.data}`,
+                descricao: ativ.zona ? `Zona: ${ativ.zona}` : null,
+                data_fotografia: entry.data,
+                obra_id: obraId,
+                source: 'diario',
+                diario_entry_id: entry.id,
+                _especialidade_nome: ativ.especialidade_nome || null,
+                _zona_nome: ativ.zona || null
+              })
+            })
+          })
+        }
+      }
+
+      // Merge: obra_fotografias first (they have richer metadata), then diary photos
+      // Deduplicate by URL to avoid showing the same photo twice
+      const seenUrls = new Set()
+      const allFotos = []
+      for (const f of (fotosRes.data || [])) {
+        seenUrls.add(f.url)
+        allFotos.push(f)
+      }
+      for (const f of diarioFotos) {
+        if (!seenUrls.has(f.url)) {
+          seenUrls.add(f.url)
+          allFotos.push(f)
+        }
+      }
+      // Sort by date descending
+      allFotos.sort((a, b) => (b.data_fotografia || '').localeCompare(a.data_fotografia || ''))
+      setFotos(allFotos)
+
       setZonas(zonasRes.data || [])
       // Deduplicate especialidades by nome (DB may have duplicates)
       const seen = new Set()
@@ -129,6 +192,10 @@ export default function AcompanhamentoTab({ obra, obraId, activeSubtab, currentU
   }
 
   const handleDeleteFoto = async (foto) => {
+    if (foto.source === 'diario') {
+      alert('Esta foto pertence ao Diário de Obra. Elimine-a a partir do diário.')
+      return
+    }
     if (!confirm('Eliminar esta fotografia?')) return
     try {
       const path = foto.url.split('/obras/')[1]
@@ -249,10 +316,10 @@ export default function AcompanhamentoTab({ obra, obraId, activeSubtab, currentU
         .eq('obra_id', obraId)
         .eq('estado', 'aberto')
         .order('data_criacao', { ascending: false })
-      if (error) throw error
-      setPendentes(data || [])
+      // 42P01 = table does not exist, PGRST204 = no rows — both are OK
+      if (error && error.code !== '42P01' && !error.message?.includes('does not exist')) throw error
+      setPendentes(error ? [] : (data || []))
     } catch (err) {
-      // Table may not exist yet — fallback silently
       console.warn('obra_pendentes:', err.message)
       setPendentes([])
     } finally { setPendentesLoading(false) }
@@ -846,9 +913,14 @@ export default function AcompanhamentoTab({ obra, obraId, activeSubtab, currentU
                   >
                     <div style={{ position: 'relative', paddingBottom: '75%', background: '#f0ede8' }}>
                       <img src={foto.url} alt={foto.titulo || foto.filename} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
-                      {foto.especialidades && (
-                        <span style={{ position: 'absolute', top: 6, left: 6, padding: '2px 7px', borderRadius: 5, fontSize: 9, fontWeight: 600, background: foto.especialidades.cor || colors.primary, color: '#fff' }}>
-                          {foto.especialidades.nome}
+                      {(foto.especialidades || foto._especialidade_nome) && (
+                        <span style={{ position: 'absolute', top: 6, left: 6, padding: '2px 7px', borderRadius: 5, fontSize: 9, fontWeight: 600, background: foto.especialidades?.cor || colors.primary, color: '#fff' }}>
+                          {foto.especialidades?.nome || foto._especialidade_nome}
+                        </span>
+                      )}
+                      {foto.source === 'diario' && (
+                        <span style={{ position: 'absolute', top: 6, right: 6, padding: '2px 7px', borderRadius: 5, fontSize: 9, fontWeight: 600, background: 'rgba(0,0,0,0.5)', color: '#fff' }}>
+                          Diário
                         </span>
                       )}
                     </div>
@@ -856,8 +928,8 @@ export default function AcompanhamentoTab({ obra, obraId, activeSubtab, currentU
                       <div style={{ fontSize: 12, fontWeight: 600, color: colors.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {foto.titulo || foto.filename}
                       </div>
-                      {foto.obra_zonas && (
-                        <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>{foto.obra_zonas.nome}</div>
+                      {(foto.obra_zonas || foto._zona_nome) && (
+                        <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>{foto.obra_zonas?.nome || foto._zona_nome}</div>
                       )}
                     </div>
                   </div>
@@ -916,10 +988,11 @@ export default function AcompanhamentoTab({ obra, obraId, activeSubtab, currentU
                 {lightboxFoto.titulo || lightboxFoto.filename}
               </div>
               <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>
-                {new Date(lightboxFoto.data_fotografia).toLocaleDateString('pt-PT')}
-                {lightboxFoto.obra_zonas && <> &middot; {lightboxFoto.obra_zonas.nome}</>}
-                {lightboxFoto.especialidades && <> &middot; {lightboxFoto.especialidades.nome}</>}
+                {lightboxFoto.data_fotografia && new Date(lightboxFoto.data_fotografia).toLocaleDateString('pt-PT')}
+                {(lightboxFoto.obra_zonas || lightboxFoto._zona_nome) && <> &middot; {lightboxFoto.obra_zonas?.nome || lightboxFoto._zona_nome}</>}
+                {(lightboxFoto.especialidades || lightboxFoto._especialidade_nome) && <> &middot; {lightboxFoto.especialidades?.nome || lightboxFoto._especialidade_nome}</>}
                 {lightboxFoto.autor && <> &middot; {lightboxFoto.autor}</>}
+                {lightboxFoto.source === 'diario' && <> &middot; <span style={{ color: 'rgba(255,255,255,0.4)' }}>Diário de Obra</span></>}
               </div>
               {lightboxFoto.descricao && (
                 <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>{lightboxFoto.descricao}</div>
@@ -1908,7 +1981,8 @@ export default function AcompanhamentoTab({ obra, obraId, activeSubtab, currentU
   // ============================================
   const renderResumoTab = () => {
     const recentEntries = diarioEntradas.slice(0, 5)
-    const totalPhotos = diarioEntradas.reduce((s, d) => s + (d.fotos?.length || 0) + (d.atividades || []).reduce((a, at) => a + (at.fotos?.length || 0), 0), 0)
+    // fotos state already includes both obra_fotografias + diary photos (unified)
+    const totalPhotos = fotos.length
     const totalWorkerDays = diarioEntradas.reduce((s, d) => s + (d.trabalhadores_gavinho || 0) + (d.trabalhadores_subempreiteiros || 0), 0)
     const totalIncidents = diarioEntradas.reduce((s, d) => s + (d.ocorrencias?.length || 0), 0)
 
@@ -1918,7 +1992,7 @@ export default function AcompanhamentoTab({ obra, obraId, activeSubtab, currentU
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
           {[
             { label: 'Entradas Diário', value: diarioEntradas.length, icon: BookOpen, color: '#2C2C2B' },
-            { label: 'Fotografias Total', value: totalPhotos + fotos.length, icon: Camera, color: '#5E7A8B' },
+            { label: 'Fotografias Total', value: totalPhotos, icon: Camera, color: '#5E7A8B' },
             { label: 'Homens/Dia Total', value: totalWorkerDays, icon: Users, color: '#7A8B6E' },
             { label: 'Incidentes', value: totalIncidents, icon: AlertTriangle, color: totalIncidents > 0 ? '#9A6B5B' : '#B0ADA3' },
           ].map((kpi, i) => {

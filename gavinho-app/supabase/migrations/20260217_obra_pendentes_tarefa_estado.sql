@@ -3,6 +3,15 @@
 -- e não conformes criadas automaticamente a partir do diário
 -- =====================================================
 
+-- Função helper update_updated_at (criada se não existir)
+CREATE OR REPLACE FUNCTION update_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
 -- Tabela obra_pendentes
 -- Cada entrada representa um pendente (bloqueio ou NC) criado
 -- automaticamente quando uma tarefa do diário tem estado
@@ -49,7 +58,8 @@ CREATE INDEX IF NOT EXISTS idx_obra_pendentes_diario ON obra_pendentes(diario_en
 -- RLS
 ALTER TABLE obra_pendentes ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Allow all for authenticated users" ON obra_pendentes;
-CREATE POLICY "Allow all for authenticated users" ON obra_pendentes FOR ALL USING (true);
+CREATE POLICY "Allow all for authenticated users" ON obra_pendentes
+  FOR ALL USING (true) WITH CHECK (true);
 
 -- Trigger updated_at
 DROP TRIGGER IF EXISTS trigger_obra_pendentes_updated_at ON obra_pendentes;
