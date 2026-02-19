@@ -336,7 +336,11 @@ export default function DiarioObra() {
   // =====================================================
 
   const handleNewEntry = () => {
-    setEditingEntry(null)
+    setEditingEntry({
+      _isNew: true,
+      hora_inicio: '08:00',
+      hora_fim: '17:30',
+    })
     setShowEntryForm(true)
   }
 
@@ -823,6 +827,7 @@ export default function DiarioObra() {
       {/* Entry Form Modal */}
       {showEntryForm && (
         <EntryFormModal
+          key={editingEntry?.id || 'new'}
           obra={obra}
           entry={editingEntry}
           especialidades={especialidades}
@@ -2377,10 +2382,9 @@ function EntryFormModal({ obra, entry, especialidades, zonas, obraId, onClose, o
             <textarea
               value={observacoesDia}
               onChange={e => setObservacoesDia(e.target.value)}
-              className="input"
+              className="textarea"
               rows={3}
               placeholder="Observações gerais, reuniões, decisões..."
-              style={{ width: '100%', minHeight: 80, resize: 'vertical', fontFamily: 'inherit' }}
             />
           </div>
 
