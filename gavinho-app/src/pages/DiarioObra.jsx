@@ -613,17 +613,17 @@ export default function DiarioObra() {
             <button onClick={handleExportPDF} disabled={exporting || entries.length === 0} className="btn btn-outline" style={{ gap: 6, fontSize: 13 }}>
               {exporting ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> : <Download size={15} />} Exportar
             </button>
+            <button onClick={handleNewEntry} className="btn btn-primary" style={{ gap: 6, fontSize: 13, background: 'var(--olive-gray)' }}>
+              <Plus size={15} /> Nova Entrada
+            </button>
             <button
               onClick={handleCopyYesterday}
               disabled={!yesterdayEntry}
               title={yesterdayEntry ? 'Copiar estrutura do dia anterior' : 'Sem entrada ontem'}
               className="btn btn-outline"
-              style={{ gap: 6, fontSize: 13, opacity: yesterdayEntry ? 1 : 0.4 }}
+              style={{ gap: 6, fontSize: 13, opacity: yesterdayEntry ? 1 : 0.5 }}
             >
               <Copy size={15} /> Copiar ontem
-            </button>
-            <button onClick={handleNewEntry} className="btn btn-primary" style={{ gap: 6, fontSize: 13, background: 'var(--olive-gray)' }}>
-              <Plus size={15} /> Nova Entrada
             </button>
           </div>
         </div>
@@ -665,26 +665,24 @@ export default function DiarioObra() {
           {activeTab === 'diario' && (
             <>
               {/* Category Filter */}
-              {activeEspecialidades.length > 0 && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-                  <select
-                    value={filterCategoria}
-                    onChange={e => setFilterCategoria(e.target.value)}
-                    className="select"
-                    style={{ minWidth: 200, fontSize: 13 }}
-                  >
-                    <option value="">Todas as categorias</option>
-                    {activeEspecialidades.map(name => (
-                      <option key={name} value={name}>{name}</option>
-                    ))}
-                  </select>
-                  {filterCategoria && (
-                    <span style={{ fontSize: 12, color: 'var(--brown-light)' }}>
-                      {filteredEntries.length} entrada{filteredEntries.length !== 1 ? 's' : ''}
-                    </span>
-                  )}
-                </div>
-              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                <select
+                  value={filterCategoria}
+                  onChange={e => setFilterCategoria(e.target.value)}
+                  className="select"
+                  style={{ minWidth: 200, fontSize: 13 }}
+                >
+                  <option value="">Todas as categorias</option>
+                  {(activeEspecialidades.length > 0 ? activeEspecialidades : especialidades.map(e => e.nome)).map(name => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
+                {filterCategoria && (
+                  <span style={{ fontSize: 12, color: 'var(--brown-light)' }}>
+                    {filteredEntries.length} entrada{filteredEntries.length !== 1 ? 's' : ''}
+                  </span>
+                )}
+              </div>
               <DiarioTimeline
                 entries={filteredEntries}
                 onEdit={handleEditEntry}
@@ -2005,9 +2003,9 @@ function EntryFormModal({ obra, entry, especialidades, zonas, obraId, onClose, o
             <div>
               <FieldLabel>Horário</FieldLabel>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <input type="time" value={horaInicio} onChange={e => setHoraInicio(e.target.value)} className="input" style={{ flex: 1 }} />
+                <input type="time" value={horaInicio || '08:00'} onChange={e => setHoraInicio(e.target.value)} className="input" style={{ flex: 1 }} />
                 <span style={{ color: 'var(--brown-light)' }}>–</span>
-                <input type="time" value={horaFim} onChange={e => setHoraFim(e.target.value)} className="input" style={{ flex: 1 }} />
+                <input type="time" value={horaFim || '17:30'} onChange={e => setHoraFim(e.target.value)} className="input" style={{ flex: 1 }} />
               </div>
             </div>
           </div>
@@ -2375,14 +2373,14 @@ function EntryFormModal({ obra, entry, especialidades, zonas, obraId, onClose, o
 
           {/* Notas do Dia */}
           <div style={{ marginBottom: 24 }}>
-            <FieldLabel>Notas do Dia</FieldLabel>
+            <FieldLabel>NOTAS DO DIA</FieldLabel>
             <textarea
               value={observacoesDia}
               onChange={e => setObservacoesDia(e.target.value)}
-              className="textarea"
+              className="input"
               rows={3}
-              placeholder="Observações gerais, informações relevantes do dia..."
-              style={{ width: '100%' }}
+              placeholder="Observações gerais, reuniões, decisões..."
+              style={{ width: '100%', minHeight: 80, resize: 'vertical', fontFamily: 'inherit' }}
             />
           </div>
 
