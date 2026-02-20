@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useObraId } from '../hooks/useObraId'
 import { 
   ArrowLeft, Calendar, Download, FileText, Users, Clock, Sun, Cloud, 
   CloudRain, Wind, AlertTriangle, Camera, ChevronLeft, ChevronRight,
@@ -49,34 +50,25 @@ export default function RelatorioSemanal() {
   const navigate = useNavigate()
   const reportRef = useRef(null)
   const toast = useToast()
-  
+  const { obraUuid, obra: resolvedObra, loading: resolving } = useObraId(id)
+
   const [obra, setObra] = useState(null)
   const [diarios, setDiarios] = useState([])
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [selectedWeek, setSelectedWeek] = useState(getWeekDates(new Date()))
   const [reportType, setReportType] = useState('cliente') // 'cliente' or 'interno'
-  
+
   useEffect(() => {
-    fetchObra()
-  }, [id])
-  
+    if (resolvedObra) {
+      setObra(resolvedObra)
+      setLoading(false)
+    }
+  }, [resolvedObra])
+
   useEffect(() => {
     if (obra) fetchDiarios()
   }, [obra, selectedWeek])
-  
-  const fetchObra = async () => {
-    try {
-      const { data } = await supabase
-        .from('obras')
-        .select('*')
-        .eq('codigo', id)
-        .single()
-      setObra(data)
-    } catch (err) {
-      console.error('Erro:', err)
-    }
-  }
   
   const fetchDiarios = async () => {
     if (!obra) return

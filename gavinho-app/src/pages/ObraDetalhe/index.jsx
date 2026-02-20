@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { useObraId } from '../../hooks/useObraId'
 import { ArrowLeft, MapPin, Users, AlertTriangle, FileText, MessageSquare, Loader2 } from 'lucide-react'
 import ObraChat from '../../components/ObraChat'
 import ObraChecklist from '../../components/ObraChecklist'
@@ -18,6 +19,7 @@ export default function ObraDetalhe() {
   const navigate = useNavigate()
   const toast = useToast()
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null })
+  const { obraUuid, obra: resolvedObra, loading: resolving } = useObraId(id)
 
   // Estados principais
   const [obra, setObra] = useState(null)
@@ -35,9 +37,17 @@ export default function ObraDetalhe() {
   // ============================================
 
   useEffect(() => {
-    if (id) fetchObra()
     fetchCurrentUser()
-  }, [id])
+  }, [])
+
+  useEffect(() => {
+    if (resolvedObra) {
+      setObra(resolvedObra)
+      setLoading(false)
+    } else if (!resolving && !resolvedObra) {
+      setLoading(false)
+    }
+  }, [resolvedObra, resolving])
 
   useEffect(() => {
     if (obra?.id) fetchChecklistCount()
@@ -66,21 +76,6 @@ export default function ObraDetalhe() {
       const { data: profile } = await supabase
         .from('profiles').select('*').eq('id', user.id).single()
       setCurrentUser(profile || { id: user.id, email: user.email, nome: user.email?.split('@')[0] })
-    }
-  }
-
-  const fetchObra = async () => {
-    try {
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
-      const column = isUuid ? 'id' : 'codigo'
-      const { data, error } = await supabase
-        .from('obras').select('*, projetos(id, codigo, nome, cliente_nome)').eq(column, id).single()
-      if (error) throw error
-      setObra(data)
-    } catch (err) {
-      console.error('Erro ao carregar obra:', err)
-    } finally {
-      setLoading(false)
     }
   }
 
