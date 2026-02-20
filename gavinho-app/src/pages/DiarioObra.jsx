@@ -142,10 +142,16 @@ export default function DiarioObra() {
 
   useEffect(() => {
     if (selectedObra) {
-      fetchObraDetails()
-      fetchEntries()
-      fetchZonas()
-      fetchPendentesDB()
+      // If selectedObra is not a UUID (e.g. obra code like "GB00462"), resolve to UUID first
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(selectedObra)
+      if (!isUuid) {
+        resolveObraUuid(selectedObra)
+      } else {
+        fetchObraDetails()
+        fetchEntries()
+        fetchZonas()
+        fetchPendentesDB()
+      }
     }
   }, [selectedObra])
 
@@ -159,6 +165,20 @@ export default function DiarioObra() {
       if (id && !selectedObra) setSelectedObra(id)
     }
     if (!id) setLoading(false)
+  }
+
+  const resolveObraUuid = async (codigo) => {
+    setLoading(true)
+    const { data } = await supabase
+      .from('obras')
+      .select('id')
+      .eq('codigo', codigo)
+      .single()
+    if (data?.id) {
+      setSelectedObra(data.id)
+    } else {
+      setLoading(false)
+    }
   }
 
   const fetchObraDetails = async () => {
