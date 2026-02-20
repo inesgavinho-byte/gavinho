@@ -74,7 +74,7 @@ export default function ObraDetalhe() {
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       const { data: profile } = await supabase
-        .from('profiles').select('*').eq('id', user.id).single()
+        .from('utilizadores').select('*').eq('id', user.id).single()
       setCurrentUser(profile || { id: user.id, email: user.email, nome: user.email?.split('@')[0] })
     }
   }
