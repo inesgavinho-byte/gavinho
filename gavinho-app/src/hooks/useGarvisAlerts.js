@@ -5,7 +5,14 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import Sentry from '../lib/sentry'
 
+/**
+ * Hook para alertas G.A.R.V.I.S. — fetch, mark read, archive, auto-generate.
+ *
+ * @param {{ autoGenerate?: boolean, pollInterval?: number }} [options]
+ * @returns {{ alertas: object[], loading: boolean, error: string|null, fetchAlertas: () => Promise<void>, markRead: (id: string) => Promise<void>, archive: (id: string) => Promise<void>, unreadCount: number }}
+ */
 export function useGarvisAlerts(options = {}) {
   const { autoGenerate = true, pollInterval = 60000 } = options
 
@@ -42,6 +49,7 @@ export function useGarvisAlerts(options = {}) {
         setError(null)
       }
     } catch (err) {
+      Sentry.captureException(err, { tags: { hook: 'useGarvisAlerts' } })
       if (mountedRef.current) {
         setError(err.message)
         // Fallback to empty on any error

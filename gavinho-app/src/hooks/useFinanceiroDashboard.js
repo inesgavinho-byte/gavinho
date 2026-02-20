@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
+import Sentry from '../lib/sentry'
 
 // ── Projection engine ────────────────────────────────
 function calcularProjecao(cap) {
@@ -145,7 +146,13 @@ function gerarAlertas(capitulos, extras, facturas, pos, obrasData) {
   return alertas
 }
 
-// ── Main hook ────────────────────────────────────────
+/**
+ * Hook principal do dashboard financeiro.
+ * Carrega capitulos, extras, facturas, POs e obras; calcula projecções ETC/EAC e gera alertas.
+ *
+ * @param {string} projetoId - UUID do projeto
+ * @returns {{ loading: boolean, error: string|null, projeto: object|null, capitulos: object[], extras: object[], alertas: object[], totais: object, obrasData: object[], facturas: object[], purchaseOrders: object[], fetchData: () => Promise<void> }}
+ */
 export function useFinanceiroDashboard(projetoId) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -242,6 +249,7 @@ export function useFinanceiroDashboard(projetoId) {
         setCapitulos(caps)
       }
     } catch (err) {
+      Sentry.captureException(err, { tags: { hook: 'useFinanceiroDashboard' } })
       console.error('Financeiro fetch error:', err)
       setError(err.message)
     } finally {

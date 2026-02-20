@@ -1,6 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 
+/**
+ * Hook de navegação de projetos — tabs, subtabs, URL sync.
+ *
+ * @returns {{ id: string, activeTab: string, activeFaseSection: string, activeArchvizSection: string, activeGestaoSection: string, activeAcompSection: string, activeBriefingSection: string, handleTabChange: (tabId: string, subtab?: string|null) => void, handleSubtabChange: (subtabId: string, tabType?: string) => void, navigate: Function }}
+ */
 export default function useProjetoNavigation() {
   const { id, tab: urlTab, subtab: urlSubtab } = useParams()
   const navigate = useNavigate()

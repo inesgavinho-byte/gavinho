@@ -1,8 +1,16 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import Sentry from '../lib/sentry'
 
 const EMPTY = { requisicoes: [], cotacoes: [], purchaseOrders: [], facturas: [] }
 
+/**
+ * Hook de procurement — requisições, cotações, POs, faturas.
+ *
+ * @param {string|null} [projectId] - Filtrar por projeto
+ * @param {string|null} [obraId] - Filtrar por obra
+ * @returns {{ data: { requisicoes: object[], cotacoes: object[], purchaseOrders: object[], facturas: object[] }, loading: boolean, error: string|null, stats: object, fetchAll: () => Promise<void> }}
+ */
 export function useProcurement(projectId = null, obraId = null) {
   const [data, setData] = useState(EMPTY)
   const [loading, setLoading] = useState(true)
@@ -81,6 +89,7 @@ export function useProcurement(projectId = null, obraId = null) {
         valor_facturas_pendentes: fatsPendentes.reduce((sum, f) => sum + (f.valor_com_iva || 0), 0),
       })
     } catch (err) {
+      Sentry.captureException(err, { tags: { hook: 'useProcurement' } })
       console.error('useProcurement error:', err)
       setError(err.message)
       setData(EMPTY)

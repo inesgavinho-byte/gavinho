@@ -5,7 +5,13 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import Sentry from '../lib/sentry'
 
+/**
+ * Hook para KPIs reais de procurement — métricas em tempo real.
+ *
+ * @returns {{ kpis: { totalFornecedores: number, fornecedoresAtivos: number, volumeYTD: number, volumeYTDFormatted: string, dealRoomsAtivos: number, orcamentosPendentes: number, alertasCriticos: number }, loading: boolean, refreshKPIs: () => Promise<void> }}
+ */
 export function useGarvisKPIs() {
   const [kpis, setKpis] = useState({
     totalFornecedores: 0,
@@ -98,6 +104,7 @@ export function useGarvisKPIs() {
         })
       }
     } catch (err) {
+      Sentry.captureException(err, { tags: { hook: 'useGarvisKPIs' } })
       // Non-critical - if tables don't exist, use fallback from fornecedores
       try {
         const { data } = await supabase.from('fornecedores').select('id, status')
