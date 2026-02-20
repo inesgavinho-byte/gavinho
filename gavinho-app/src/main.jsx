@@ -1,5 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import Sentry from './lib/sentry'
 import './index.css'
 import App from './App.jsx'
 
@@ -43,6 +44,8 @@ if ('serviceWorker' in navigator) {
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <App />
+    <Sentry.ErrorBoundary fallback={<p>Ocorreu um erro. Recarregue a página.</p>}>
+      <App />
+    </Sentry.ErrorBoundary>
   </StrictMode>,
 )

@@ -6,9 +6,15 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
+import Sentry from '../lib/sentry'
 
 const FASES = ['contacto_inicial', 'qualificacao', 'proposta', 'negociacao', 'ganho', 'perdido']
 
+/**
+ * Hook para o pipeline de leads — kanban board, CRUD, KPIs, interações.
+ *
+ * @returns {{ leads: object[], loading: boolean, error: string|null, equipa: object[], kpis: object, leadsByFase: Record<string, object[]>, fetchLeads: () => Promise<void>, createLead: (data: object) => Promise<object|null>, updateLead: (id: string, data: object) => Promise<boolean>, deleteLead: (id: string) => Promise<boolean>, moveLead: (id: string, fase: string) => Promise<boolean> }}
+ */
 export function useLeadsPipeline() {
   const [leads, setLeads] = useState([])
   const [interacoes, setInteracoes] = useState({}) // keyed by lead_id
@@ -36,6 +42,7 @@ export function useLeadsPipeline() {
       }
       setLeads(data || [])
     } catch (err) {
+      Sentry.captureException(err, { tags: { hook: 'useLeadsPipeline' } })
       console.error('Erro ao carregar leads:', err)
       setError(err.message)
       setLeads([])

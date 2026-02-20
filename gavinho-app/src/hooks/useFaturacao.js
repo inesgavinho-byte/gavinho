@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
+import Sentry from '../lib/sentry'
 
 const INITIAL_FORM = {
   projeto_id: '',
@@ -13,6 +14,11 @@ const INITIAL_FORM = {
   notas: ''
 }
 
+/**
+ * Hook para gestão de faturação — CRUD faturas, projetos, capitulos, KPIs.
+ *
+ * @returns {{ faturas: object[], projetos: object[], loading: boolean, saving: boolean, error: string|null, fetchFaturas: () => Promise<void>, createFatura: (form: object) => Promise<void>, updateFatura: (id: string, data: object) => Promise<void>, deleteFatura: (id: string) => Promise<void>, kpis: object }}
+ */
 export function useFaturacao() {
   const [faturas, setFaturas] = useState([])
   const [projetos, setProjetos] = useState([])
@@ -43,6 +49,7 @@ export function useFaturacao() {
       }
       setFaturas(data || [])
     } catch (err) {
+      Sentry.captureException(err, { tags: { hook: 'useFaturacao' } })
       console.error('Erro ao carregar faturas:', err)
       setError(err.message)
       setFaturas([])

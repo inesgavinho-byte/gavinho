@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import Sentry from '../lib/sentry'
 
 // Generate deal room code (GA + 5 digits)
 function generateCodigo() {
@@ -12,6 +13,12 @@ function generateCodigo() {
   return `GA${num}`
 }
 
+/**
+ * Hook para gestão de Deal Rooms — CRUD, convidar fornecedores, acompanhar status.
+ *
+ * @param {{ projetoId?: string|null, status?: string|null }} [options]
+ * @returns {{ dealRooms: object[], loading: boolean, error: string|null, fetchDealRooms: () => Promise<void>, createDealRoom: (data: object) => Promise<object|null>, updateDealRoom: (id: string, data: object) => Promise<boolean> }}
+ */
 export function useDealRooms(options = {}) {
   const { projetoId = null, status = null } = options
 
@@ -71,6 +78,7 @@ export function useDealRooms(options = {}) {
         setError(null)
       }
     } catch (err) {
+      Sentry.captureException(err, { tags: { hook: 'useDealRooms' } })
       if (mountedRef.current) {
         setError(err.message)
         setDealRooms([])
