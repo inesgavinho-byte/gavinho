@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useObraId } from '../hooks/useObraId'
 import { exportDiarioToPDF } from '../utils/exportDiarioToPDF'
 import { FONTS, FONT_SIZES } from '../styles/designTokens'
 import {
@@ -95,11 +96,14 @@ export default function DiarioObra() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
 
+  // Resolve URL param (code or UUID) to UUID
+  const { obraUuid: resolvedId, obra: resolvedObra, loading: resolving } = useObraId(id)
+
   // Core state
   const [obra, setObra] = useState(null)
   const [obras, setObras] = useState([])
   const [loading, setLoading] = useState(true)
-  const [selectedObra, setSelectedObra] = useState(id || '')
+  const [selectedObra, setSelectedObra] = useState('')
   const [activeTab, setActiveTab] = useState('diario')
 
   // Timeline data
@@ -140,18 +144,21 @@ export default function DiarioObra() {
     fetchEspecialidades()
   }, [])
 
+  // When hook resolves URL param, set selectedObra to UUID
+  useEffect(() => {
+    if (resolvedId && !selectedObra) {
+      setSelectedObra(resolvedId)
+      setObra(resolvedObra)
+    }
+  }, [resolvedId])
+
+  // When selectedObra changes (from hook or dropdown), fetch data
   useEffect(() => {
     if (selectedObra) {
-      // If selectedObra is not a UUID (e.g. obra code like "GB00462"), resolve to UUID first
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(selectedObra)
-      if (!isUuid) {
-        resolveObraUuid(selectedObra)
-      } else {
-        fetchObraDetails()
-        fetchEntries()
-        fetchZonas()
-        fetchPendentesDB()
-      }
+      fetchObraDetails()
+      fetchEntries()
+      fetchZonas()
+      fetchPendentesDB()
     }
   }, [selectedObra])
 
@@ -160,25 +167,8 @@ export default function DiarioObra() {
       .from('obras')
       .select('id, codigo, nome, localizacao, encarregado, status')
       .order('codigo')
-    if (data) {
-      setObras(data)
-      if (id && !selectedObra) setSelectedObra(id)
-    }
+    if (data) setObras(data)
     if (!id) setLoading(false)
-  }
-
-  const resolveObraUuid = async (codigo) => {
-    setLoading(true)
-    const { data } = await supabase
-      .from('obras')
-      .select('id')
-      .eq('codigo', codigo)
-      .single()
-    if (data?.id) {
-      setSelectedObra(data.id)
-    } else {
-      setLoading(false)
-    }
   }
 
   const fetchObraDetails = async () => {

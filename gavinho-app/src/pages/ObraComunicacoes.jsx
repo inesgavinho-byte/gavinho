@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../components/ui/Toast'
+import { useObraId } from '../hooks/useObraId'
 import {
   ArrowLeft, MessageSquare, Mail, Filter, Search, Plus, Clock,
   AlertTriangle, CheckCircle2, Calendar, FileText, Paperclip, Users,
@@ -48,6 +49,7 @@ export default function ObraComunicacoes() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
+  const { obraUuid, obra: obraResolved, loading: obraLoading } = useObraId(id)
 
   const [obra, setObra] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -89,14 +91,19 @@ export default function ObraComunicacoes() {
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
+  // When the hook resolves the obra, set it and load data using the UUID
   useEffect(() => {
-    if (id) {
-      loadObra()
+    if (obraResolved && obraUuid) {
+      setObra(obraResolved)
+      setLoading(false)
       loadCanais()
       loadTimeline()
       loadAcoes()
+    } else if (!obraLoading && !obraResolved) {
+      setError('Erro ao carregar obra')
+      setLoading(false)
     }
-  }, [id])
+  }, [obraUuid, obraResolved, obraLoading])
 
   useEffect(() => {
     // Atualizar URL com filtros
@@ -116,30 +123,13 @@ export default function ObraComunicacoes() {
     loadAcoes()
   }, [filtroEstado])
 
-  const loadObra = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('obras')
-        .select('*, projetos(nome)')
-        .eq('id', id)
-        .single()
-
-      if (error) throw error
-      setObra(data)
-    } catch (err) {
-      console.error('Erro ao carregar obra:', err)
-      setError('Erro ao carregar obra')
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const loadCanais = async () => {
+    if (!obraUuid) return
     try {
       const { data, error } = await supabase
         .from('obra_canais')
         .select('*')
-        .eq('obra_id', id)
+        .eq('obra_id', obraUuid)
         .eq('ativo', true)
         .order('ordem', { ascending: true })
 
@@ -157,7 +147,7 @@ export default function ObraComunicacoes() {
 
   const criarCanaisPadrao = async () => {
     try {
-      const { error } = await supabase.rpc('criar_canais_padrao_obra', { p_obra_id: id })
+      const { error } = await supabase.rpc('criar_canais_padrao_obra', { p_obra_id: obraUuid })
       if (!error) {
         loadCanais()
       }
@@ -167,12 +157,13 @@ export default function ObraComunicacoes() {
   }
 
   const loadTimeline = async () => {
+    if (!obraUuid) return
     setTimelineLoading(true)
     try {
       let query = supabase
         .from('obra_timeline')
         .select('*')
-        .eq('obra_id', id)
+        .eq('obra_id', obraUuid)
         .order('data_evento', { ascending: false })
         .limit(100)
 
@@ -198,11 +189,12 @@ export default function ObraComunicacoes() {
   }
 
   const loadAcoes = async () => {
+    if (!obraUuid) return
     try {
       let query = supabase
         .from('obra_acoes')
         .select('*')
-        .eq('obra_id', id)
+        .eq('obra_id', obraUuid)
         .order('created_at', { ascending: false })
         .limit(50)
 
@@ -900,7 +892,7 @@ export default function ObraComunicacoes() {
       {/* Modal Nova Acao */}
       {showNovaAcao && (
         <ModalNovaAcao
-          obraId={id}
+          obraId={obraUuid}
           canais={canais}
           onClose={() => setShowNovaAcao(false)}
           onSave={() => {
