@@ -29,7 +29,6 @@ export default function ObraDetalhe() {
   const [activeAcompanhamentoSubtab, setActiveAcompanhamentoSubtab] = useState('resumo')
   const [activeFiscalizacaoSubtab, setActiveFiscalizacaoSubtab] = useState('hso')
   const [activeEquipasSubtab, setActiveEquipasSubtab] = useState('equipa')
-  const [checklistCount, setChecklistCount] = useState(0)
   const [currentUser, setCurrentUser] = useState(null)
 
   // ============================================
@@ -48,10 +47,6 @@ export default function ObraDetalhe() {
       setLoading(false)
     }
   }, [resolvedObra, resolving])
-
-  useEffect(() => {
-    if (obra?.id) fetchChecklistCount()
-  }, [obra?.id])
 
   useEffect(() => {
     if (urlTab) {
@@ -74,19 +69,9 @@ export default function ObraDetalhe() {
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       const { data: profile } = await supabase
-        .from('utilizadores').select('*').eq('id', user.id).single()
+        .from('utilizadores').select('id, nome, email, cargo, avatar_url').eq('id', user.id).maybeSingle()
       setCurrentUser(profile || { id: user.id, email: user.email, nome: user.email?.split('@')[0] })
     }
-  }
-
-  const fetchChecklistCount = async () => {
-    try {
-      const { count, error } = await supabase
-        .from('checklist_items').select('*', { count: 'exact', head: true })
-        .eq('obra_id', obra.id).eq('estado', 'aberto')
-      if (error) { setChecklistCount(0); return }
-      setChecklistCount(count || 0)
-    } catch { setChecklistCount(0) }
   }
 
   // ============================================
@@ -246,15 +231,6 @@ export default function ObraDetalhe() {
           >
             <tab.icon size={16} />
             {tab.label}
-            {tab.id === 'chat' && checklistCount > 0 && (
-              <span style={{
-                position: 'absolute', top: '6px', right: '8px', minWidth: '18px', height: '18px',
-                padding: '0 5px', borderRadius: '9px', background: colors.warning, color: colors.white,
-                fontSize: '11px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center'
-              }}>
-                {checklistCount}
-              </span>
-            )}
           </button>
         ))}
       </div>
