@@ -20,18 +20,6 @@ const WEATHER_MAP = {
 }
 const DEFAULT_WEATHER = { icon: Sun, label: 'Sol', color: '#f59e0b' }
 
-const TIPO_LABELS = {
-  geral: 'Geral', mao_obra: 'Mão Obra', materiais: 'Materiais',
-  equipamentos: 'Equipamentos', ocorrencias: 'Ocorrência',
-}
-const TIPO_COLORS = {
-  geral: { color: '#2C2C2B', bg: 'rgba(44,44,43,0.08)' },
-  mao_obra: { color: '#7A8B6E', bg: 'rgba(122,139,110,0.12)' },
-  materiais: { color: '#5E7A8B', bg: 'rgba(94,122,139,0.12)' },
-  equipamentos: { color: '#C9A86C', bg: 'rgba(201,168,108,0.12)' },
-  ocorrencias: { color: '#9A6B5B', bg: 'rgba(154,107,91,0.12)' },
-}
-
 function getWeatherInfo(meteo) {
   if (!meteo) return DEFAULT_WEATHER
   const key = typeof meteo === 'string' ? meteo : meteo.condicao || meteo.condição
@@ -73,7 +61,7 @@ export default function ResumoSubtab({ obraUuid, obra }) {
       const [diarioRes, fotosRes, pendentesRes, ncsRes] = await Promise.all([
         supabase
           .from('obra_diario')
-          .select('id, data, tipo, descricao, condicoes_meteorologicas, temperatura_min, temperatura_max, mao_obra_propria, mao_obra_subempreiteiro, notas, created_at')
+          .select('id, data, fotos, atividades, status, trabalhadores_gavinho, trabalhadores_subempreiteiros, ocorrencias, condicoes_meteo, temperatura')
           .eq('obra_id', obraUuid)
           .order('data', { ascending: false }),
         supabase
@@ -108,8 +96,8 @@ export default function ResumoSubtab({ obraUuid, obra }) {
   useEffect(() => { loadData() }, [loadData])
 
   // ── Cálculos ────────────────────────────────────
-  const totalWorkerDays = diarioEntradas.reduce((s, d) => s + (d.mao_obra_propria || 0) + (d.mao_obra_subempreiteiro || 0), 0)
-  const totalIncidents = diarioEntradas.filter(d => d.tipo === 'ocorrencias').length
+  const totalWorkerDays = diarioEntradas.reduce((s, d) => s + (d.trabalhadores_gavinho || 0) + (d.trabalhadores_subempreiteiros || 0), 0)
+  const totalIncidents = diarioEntradas.reduce((s, d) => s + (d.ocorrencias?.length || 0), 0)
 
   if (loading) {
     return (
@@ -175,13 +163,13 @@ export default function ResumoSubtab({ obraUuid, obra }) {
           ) : (
             <div style={{ ...S.card, padding: 0, overflow: 'hidden' }}>
               {diarioEntradas.slice(0, 5).map((d, i) => {
-                const weather = getWeatherInfo(d.condicoes_meteorologicas)
+                const weather = getWeatherInfo(d.condicoes_meteo)
                 const WeatherIcon = weather.icon
-                const wc = (d.mao_obra_propria || 0) + (d.mao_obra_subempreiteiro || 0)
-                const tipoStyle = TIPO_COLORS[d.tipo] || TIPO_COLORS.geral
+                const wc = (d.trabalhadores_gavinho || 0) + (d.trabalhadores_subempreiteiros || 0)
+                const ativCount = d.atividades?.length || 0
                 return (
                   <div key={d.id} style={{ padding: '14px 20px', borderBottom: i < Math.min(diarioEntradas.length, 5) - 1 ? `1px solid ${colors.border}` : 'none', display: 'flex', alignItems: 'center', gap: 14 }}>
-                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: tipoStyle.color, flexShrink: 0 }} />
+                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: d.status === 'submetido' ? '#7A8B6E' : '#C9A86C', flexShrink: 0 }} />
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <span style={{ fontSize: FONT_SIZES.md, fontWeight: 600, color: '#2C2C2B', fontFamily: FONTS.body }}>{formatDatePT(d.data)}</span>
@@ -189,17 +177,18 @@ export default function ResumoSubtab({ obraUuid, obra }) {
                       </div>
                       <div style={{ display: 'flex', gap: 12, marginTop: 3, fontSize: FONT_SIZES.sm, color: '#8B8670', fontFamily: FONTS.body }}>
                         <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                          <WeatherIcon size={12} style={{ color: weather.color }} /> {d.temperatura_max ? `${d.temperatura_max}°C` : weather.label}
+                          <WeatherIcon size={12} style={{ color: weather.color }} /> {d.temperatura ? `${d.temperatura}°C` : weather.label}
                         </span>
                         {wc > 0 && <span>{wc} trabalhadores</span>}
+                        {ativCount > 0 && <span>{ativCount} atividade{ativCount !== 1 ? 's' : ''}</span>}
                       </div>
                     </div>
                     <span style={{
                       padding: '3px 10px', borderRadius: 6, fontSize: FONT_SIZES.xs, fontWeight: 600, fontFamily: FONTS.body,
-                      color: tipoStyle.color,
-                      background: tipoStyle.bg,
+                      color: d.status === 'submetido' ? '#7A8B6E' : '#9A7B5B',
+                      background: d.status === 'submetido' ? 'rgba(122,139,110,0.12)' : 'rgba(201,168,108,0.12)',
                     }}>
-                      {TIPO_LABELS[d.tipo] || 'Geral'}
+                      {d.status === 'submetido' ? 'Submetido' : 'Rascunho'}
                     </span>
                   </div>
                 )
@@ -249,9 +238,10 @@ function WeekSummary({ diarioEntradas }) {
 
   const weekEntries = diarioEntradas.filter(d => d.data >= startStr && d.data <= endStr)
   const weekDays = weekEntries.length
-  const weekWorkers = weekEntries.reduce((s, d) => s + (d.mao_obra_propria || 0) + (d.mao_obra_subempreiteiro || 0), 0)
+  const weekWorkers = weekEntries.reduce((s, d) => s + (d.trabalhadores_gavinho || 0) + (d.trabalhadores_subempreiteiros || 0), 0)
   const avgWorkers = weekEntries.length > 0 ? (weekWorkers / weekEntries.length).toFixed(1) : '0'
-  const weekIncidents = weekEntries.filter(d => d.tipo === 'ocorrencias').length
+  const weekPhotos = weekEntries.reduce((s, d) => s + (d.fotos?.length || 0) + (d.atividades || []).reduce((a, at) => a + (at.fotos?.length || 0), 0), 0)
+  const weekIncidents = weekEntries.reduce((s, d) => s + (d.ocorrencias?.length || 0), 0)
 
   return (
     <div style={S.card}>
@@ -260,8 +250,8 @@ function WeekSummary({ diarioEntradas }) {
         {[
           { label: 'Dias Registados', value: weekDays, suffix: '/5' },
           { label: 'Média em Obra', value: avgWorkers },
-          { label: 'H/Dia Total', value: weekWorkers },
-          { label: 'Ocorrências', value: weekIncidents, alert: weekIncidents > 0 },
+          { label: 'Fotografias', value: weekPhotos },
+          { label: 'Incidentes', value: weekIncidents, alert: weekIncidents > 0 },
         ].map((item, i) => (
           <div key={i} style={{ padding: '14px 12px' }}>
             <div style={{ fontSize: FONT_SIZES.xs, fontWeight: 700, color: item.alert ? '#9A6B5B' : '#B0ADA3', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4, fontFamily: FONTS.body }}>{item.label}</div>
@@ -330,7 +320,7 @@ function CalendarCard({ diarioEntradas }) {
 // ── Sidebar: Pendentes ──────────────────────────────
 function PendentesCard({ pendentes, ncs, diarioEntradas }) {
   const openNcs = ncs.filter(n => ['aberta', 'em_resolucao'].includes(n.estado))
-  const criticalOcorrencias = diarioEntradas.filter(d => d.tipo === 'ocorrencias')
+  const criticalOcorrencias = diarioEntradas.flatMap(d => (d.ocorrencias || []).filter(o => o.severidade === 'Alta'))
 
   const hasPendentes = pendentes.length > 0 || openNcs.length > 0 || criticalOcorrencias.length > 0
 
