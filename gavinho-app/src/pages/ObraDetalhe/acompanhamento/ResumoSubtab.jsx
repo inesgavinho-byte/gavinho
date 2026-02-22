@@ -61,7 +61,7 @@ export default function ResumoSubtab({ obraUuid, obra }) {
       const [diarioRes, fotosRes, pendentesRes, ncsRes] = await Promise.all([
         supabase
           .from('obra_diario')
-          .select('id, data, fotos, atividades, status, trabalhadores_gavinho, trabalhadores_sub, ocorrencias, condicoes_meteo, temperatura')
+          .select('id, data, fotos, atividades, status, trabalhadores_gavinho, trabalhadores_subempreiteiros, ocorrencias, condicoes_meteo, temperatura')
           .eq('obra_id', obraUuid)
           .order('data', { ascending: false }),
         supabase
@@ -96,7 +96,7 @@ export default function ResumoSubtab({ obraUuid, obra }) {
   useEffect(() => { loadData() }, [loadData])
 
   // ── Cálculos ────────────────────────────────────
-  const totalWorkerDays = diarioEntradas.reduce((s, d) => s + (d.trabalhadores_gavinho || 0) + (d.trabalhadores_sub || 0), 0)
+  const totalWorkerDays = diarioEntradas.reduce((s, d) => s + (d.trabalhadores_gavinho || 0) + (d.trabalhadores_subempreiteiros || 0), 0)
   const totalIncidents = diarioEntradas.reduce((s, d) => s + (d.ocorrencias?.length || 0), 0)
 
   if (loading) {
@@ -165,7 +165,7 @@ export default function ResumoSubtab({ obraUuid, obra }) {
               {diarioEntradas.slice(0, 5).map((d, i) => {
                 const weather = getWeatherInfo(d.condicoes_meteo)
                 const WeatherIcon = weather.icon
-                const wc = (d.trabalhadores_gavinho || 0) + (d.trabalhadores_sub || 0)
+                const wc = (d.trabalhadores_gavinho || 0) + (d.trabalhadores_subempreiteiros || 0)
                 const ativCount = d.atividades?.length || 0
                 return (
                   <div key={d.id} style={{ padding: '14px 20px', borderBottom: i < Math.min(diarioEntradas.length, 5) - 1 ? `1px solid ${colors.border}` : 'none', display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -238,7 +238,7 @@ function WeekSummary({ diarioEntradas }) {
 
   const weekEntries = diarioEntradas.filter(d => d.data >= startStr && d.data <= endStr)
   const weekDays = weekEntries.length
-  const weekWorkers = weekEntries.reduce((s, d) => s + (d.trabalhadores_gavinho || 0) + (d.trabalhadores_sub || 0), 0)
+  const weekWorkers = weekEntries.reduce((s, d) => s + (d.trabalhadores_gavinho || 0) + (d.trabalhadores_subempreiteiros || 0), 0)
   const avgWorkers = weekEntries.length > 0 ? (weekWorkers / weekEntries.length).toFixed(1) : '0'
   const weekPhotos = weekEntries.reduce((s, d) => s + (d.fotos?.length || 0) + (d.atividades || []).reduce((a, at) => a + (at.fotos?.length || 0), 0), 0)
   const weekIncidents = weekEntries.reduce((s, d) => s + (d.ocorrencias?.length || 0), 0)
