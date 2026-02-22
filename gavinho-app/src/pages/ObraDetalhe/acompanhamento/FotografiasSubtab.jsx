@@ -223,8 +223,11 @@ export default function FotografiasSubtab({ obraUuid, obra, currentUser }) {
                 {group.fotos.map(foto => (
                   <div key={foto.id} onClick={() => { const idx = filtered.findIndex(f => f.id === foto.id); if (idx !== -1) setLightboxIndex(idx) }}
                     style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', cursor: 'pointer', aspectRatio: '1', background: '#F2F0E7' }}>
-                    <img src={foto.url} alt={foto.titulo || ''} loading="lazy"
-                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    {isVideo(foto.url || foto.filename) ? (
+                      <video src={foto.url} muted preload="metadata" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    ) : (
+                      <img src={foto.url} alt={foto.titulo || ''} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    )}
                     {foto.source === 'diario' && (
                       <div style={{ position: 'absolute', top: 6, right: 6, padding: '2px 8px', borderRadius: 4, background: 'rgba(44,44,43,0.7)', color: '#fff', fontSize: 10, fontWeight: 600, fontFamily: FONTS.body }}>Diário</div>
                     )}
@@ -257,8 +260,11 @@ export default function FotografiasSubtab({ obraUuid, obra, currentUser }) {
                 <ChevronLeft size={24} color="#fff" />
               </button>
             )}
-            <img src={lightboxFoto.url} alt={lightboxFoto.titulo || ''}
-              style={{ maxWidth: '100%', maxHeight: 'calc(100vh - 180px)', objectFit: 'contain', borderRadius: 4 }} />
+            {isVideo(lightboxFoto.url || lightboxFoto.filename) ? (
+              <video src={lightboxFoto.url} controls autoPlay style={{ maxWidth: '100%', maxHeight: 'calc(100vh - 180px)', objectFit: 'contain', borderRadius: 4 }} />
+            ) : (
+              <img src={lightboxFoto.url} alt={lightboxFoto.titulo || ''} style={{ maxWidth: '100%', maxHeight: 'calc(100vh - 180px)', objectFit: 'contain', borderRadius: 4 }} />
+            )}
             {lightboxIndex < filtered.length - 1 && (
               <button onClick={() => setLightboxIndex(i => i + 1)} style={{ position: 'absolute', right: 16, background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%', width: 44, height: 44, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <ChevronRight size={24} color="#fff" />
@@ -301,7 +307,7 @@ export default function FotografiasSubtab({ obraUuid, obra, currentUser }) {
             </div>
 
             {/* File picker */}
-            <input ref={fileInputRef} type="file" accept="image/*" multiple style={{ display: 'none' }}
+            <input ref={fileInputRef} type="file" accept="image/*,video/mp4,video/quicktime,video/webm" multiple style={{ display: 'none' }}
               onChange={e => setUploadForm(f => ({ ...f, files: Array.from(e.target.files) }))} />
             <button onClick={() => fileInputRef.current?.click()}
               style={{ width: '100%', padding: 24, border: '2px dashed #ADAA96', borderRadius: 8, background: '#F2F0E7', cursor: 'pointer', textAlign: 'center', marginBottom: 16 }}>
@@ -309,7 +315,7 @@ export default function FotografiasSubtab({ obraUuid, obra, currentUser }) {
               <div style={{ fontSize: 13, color: '#8B8670', fontFamily: FONTS.body }}>
                 {uploadForm.files.length > 0
                   ? `${uploadForm.files.length} ficheiro${uploadForm.files.length > 1 ? 's' : ''} seleccionado${uploadForm.files.length > 1 ? 's' : ''}`
-                  : 'Clique para seleccionar imagens'}
+                  : 'Clique para seleccionar imagens ou vídeos'}
               </div>
             </button>
 
@@ -413,6 +419,11 @@ function mergeAndDedupe(dbFotos, diaryFotos) {
   for (const f of diaryFotos) { if (!seenUrls.has(f.url)) { seenUrls.add(f.url); all.push(f) } }
   all.sort((a, b) => (b.data_fotografia || '').localeCompare(a.data_fotografia || ''))
   return all
+}
+
+const VIDEO_EXTS = /\.(mp4|mov|webm|avi|mkv)$/i
+function isVideo(urlOrFilename) {
+  return urlOrFilename && VIDEO_EXTS.test(urlOrFilename)
 }
 
 function groupByDate(fotos) {
