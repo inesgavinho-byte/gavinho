@@ -46,7 +46,8 @@ export default function FotografiasSubtab({ obraUuid, obra, currentUser }) {
         supabase.from('obra_diario')
           .select('id, data, fotos, atividades, status')
           .eq('obra_id', obraUuid)
-          .order('data', { ascending: false }),
+          .order('data', { ascending: false })
+          .then(r => r.error ? { data: [], error: null } : r),
         supabase.from('obra_zonas')
           .select('id, nome, piso')
           .eq('obra_id', obraUuid)

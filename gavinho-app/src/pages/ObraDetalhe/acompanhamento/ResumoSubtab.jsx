@@ -63,7 +63,8 @@ export default function ResumoSubtab({ obraUuid, obra }) {
           .from('obra_diario')
           .select('id, data, fotos, atividades, status, trabalhadores_gavinho, trabalhadores_subempreiteiros, ocorrencias, condicoes_meteo, temperatura')
           .eq('obra_id', obraUuid)
-          .order('data', { ascending: false }),
+          .order('data', { ascending: false })
+          .then(r => r.error ? { data: [], error: null } : r),
         supabase
           .from('obra_fotografias')
           .select('*', { count: 'exact', head: true })
