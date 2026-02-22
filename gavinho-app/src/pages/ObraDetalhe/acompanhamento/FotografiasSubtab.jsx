@@ -410,7 +410,7 @@ function mergeAndDedupe(dbFotos, diaryFotos) {
   const all = []
   for (const f of dbFotos) { seenUrls.add(f.url); all.push(f) }
   for (const f of diaryFotos) { if (!seenUrls.has(f.url)) { seenUrls.add(f.url); all.push(f) } }
-  all.sort((a, b) => (a.data_fotografia || '').localeCompare(b.data_fotografia || ''))
+  all.sort((a, b) => (b.data_fotografia || '').localeCompare(a.data_fotografia || ''))
   return all
 }
 
@@ -422,6 +422,6 @@ function groupByDate(fotos) {
     groups[key].push(f)
   })
   return Object.entries(groups)
-    .sort(([a], [b]) => a.localeCompare(b))
+    .sort(([a], [b]) => b.localeCompare(a))
     .map(([date, fotos]) => ({ date, fotos }))
 }
